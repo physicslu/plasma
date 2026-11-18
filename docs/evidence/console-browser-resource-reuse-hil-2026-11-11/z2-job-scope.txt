@@ -1,0 +1,36 @@
+ 
+
+== time 2026-11-11T00:32:40Z uptime-since 2026-10-24 10:21:37 tz CST
+== job dir
+total 16
+drwxr-xr-x  2 plasma plasma 4096 2026-11-11 08:24:03.506901640 +0800 .
+drwxr-xr-x 25 plasma plasma 4096 2026-11-11 08:23:56.226850863 +0800 ..
+-rw-r--r--  1 plasma plasma  972 2026-11-11 08:24:03.496901571 +0800 job_state.json
+-rw-r--r--  1 plasma plasma 2626 2026-11-11 08:24:03.506901640 +0800 result.json
+== seal/recovery/outcome/quarantine names
+-rw-r--r-- 1 root root 8484 2026-11-10 21:23:34.891285252 +0800 /var/lib/plasma-bootstrap/control-plane-snapshots/f3696b53-d1c4-44c1-8810-5d9c1deb44fa/files/ppu_site_recovery.py
+-rw------- 1 root root  429 2026-11-02 23:42:21.851988557 +0800 /var/lib/plasma-bootstrap/deployment-api.json.recovery-20261102T234441
+-rw------- 1 root root 2284 2026-11-03 20:53:05.153339677 +0800 /var/lib/plasma-bootstrap/deployment-api.json.recovery-20261103T205510
+-rw------- 1 root root 2288 2026-11-04 09:08:47.930002506 +0800 /var/lib/plasma-bootstrap/deployment-api.json.recovery-20261104T091005
+-rw------- 1 root root  924 2026-11-03 20:53:04.593335443 +0800 /var/lib/plasma-bootstrap/deployment.json.recovery-20261103T205510
+-rw------- 1 root root  929 2026-11-04 09:08:47.059995908 +0800 /var/lib/plasma-bootstrap/deployment.json.recovery-20261104T091005
+-rw------- 1 root root 8484 2026-11-08 00:29:33.983163792 +0800 /var/lib/plasma-bootstrap/operator-recovery/factory-refresh-dc3f9426-2a5c09f6/factory-before/ppu_site_recovery.py
+-rw------- 1 root root 8484 2026-11-08 14:58:12.570768482 +0800 /var/lib/plasma-bootstrap/operator-recovery/factory-refresh-s2-37a7823d/factory-before/ppu_site_recovery.py
+-rwxr-xr-x 1 root root 8401 2026-11-04 09:05:43.428602767 +0800 /var/lib/plasma-bootstrap/pre-pr1305-factory-20261105T025454Z/ppu_site_recovery.py
+-rwxr-xr-x 1 root root 8484 2026-11-05 10:54:55.294518266 +0800 /var/lib/plasma-bootstrap/pre-pr1305-factory-20261105T030505Z/ppu_site_recovery.py
+-rwxr-xr-x 1 root root 8484 2026-11-05 11:05:05.939278592 +0800 /var/lib/plasma-bootstrap/pre-pr1305-factory-20261105T034555Z/ppu_site_recovery.py
+
+/var/lib/plasma-bootstrap/operator-recovery:
+total 24
+drwx------  4 root root 4096 2026-11-08 14:57:26.690441499 +0800 .
+drwx------ 11 root root 4096 2026-11-10 21:27:27.562929329 +0800 ..
+-rw-------  1 root root 2303 2026-11-07 23:28:23.815501468 +0800 deployment-api-192d50fd295e4e9788b34b3ad4d7e83f.json
+-rw-------  1 root root 2302 2026-11-08 00:20:02.758128930 +0800 deployment-api-dc3f9426b54049618be2a676738ba0c7.json
+drwx------  4 root root 4096 2026-11-08 00:29:33.313158249 +0800 factory-refresh-dc3f9426-2a5c09f6
+drwx------  4 root root 4096 2026-11-08 14:58:12.300766558 +0800 factory-refresh-s2-37a7823d
+(end)
+== openocd-named files newer than 2026-11-11T00:00Z
+(end)
+== modified since 2026-11-10T14:14:30Z under bootstrap/assets/run/etc
+2026-11-11 08:24:03.20689 /run/plasma-z2-swd05
+(end)

@@ -67,7 +67,8 @@ test("EMode Programming owns single-PPU engineering operations after legacy cons
   assert.match(page, /getPPUStatus/);
   assert.match(page, /startJob/);
   assert.match(page, /cancelJob/);
-  assert.match(page, /operationOrder: Operation\[] = \["erase", "program", "verify", "read"\]/);
+  assert.match(page, /operationOrder: Operation\[] = \["erase", "program", "verify"\]/);
+  assert.match(page, /aria-label=\{`SITE \$\{site\.id\} Read Memory`\}/);
   assert.match(page, /runSingleSite\(site\.id, operation\)/);
   assert.match(page, /readDownloadUrl\(targetApiBase, site\.jobId, site\.outputFile\)/);
   assert.match(page, /startEngineeringServerBatch/);

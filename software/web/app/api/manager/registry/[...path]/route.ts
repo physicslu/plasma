@@ -31,7 +31,7 @@ function registryPath(request: Request): RegistryBrowserPath | null {
   if (!alias || alias.includes("/") || alias.includes("\\")) return null;
   if (parts.length === 1) return { alias, resource: "entry" };
   if (parts[1] === "bootstrap") {
-    if (parts.length > 5 || parts.some(part => !part)) return null;
+    if (parts.length > 6 || parts.some(part => !part)) return null;
     return {
       alias,
       resource: "bootstrap",

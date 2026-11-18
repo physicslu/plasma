@@ -21,33 +21,26 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
-      - "scripts/plasma_path3_cross_job_resume.py"
-      - "scripts/tests/test_plasma_path3_cross_job_resume.py"
+      - "scripts/plasma_programming_load.py"
+      - "scripts/tests/test_plasma_programming_load.py"
+      - "specs/programming-loading-benchmark-v1.schema.json"
+      - "scripts/plasma_host_observe.py"
       - "scripts/plasma_engineering_monitor.py"
+      - "scripts/plasma_engineering_activity.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
+      - "scripts/tests/test_plasma_p2hw_claim.py"
       - "scripts/tests/test_plasma_development_blocking.py"
       - "scripts/plasma_vivado_host_build.py"
-      - "scripts/plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_licensed_f1b.py"
-      - "scripts/plasma_path2_build_qualification.py"
-      - "scripts/plasma_path2_runtime_integration.py"
-      - "scripts/tests/test_plasma_path2_runtime_integration.py"
-      - "scripts/plasma_path2_stage_orchestrator.py"
-      - "scripts/plasma_path2_f1b_adapters.py"
+      - "scripts/tests/test_plasma_vivado_host_build_contracts.py"
       - "scripts/plasma_path2_persistent_lease.py"
-      - "scripts/plasma_path2_bin_provenance.py"
-      - "scripts/plasma_path2_held_provider.py"
-      - "scripts/tests/test_plasma_path2_held_provider.py"
-      - "pl/hil/path2_z2_target_guard.py"
-      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
-      - "pl/hil/path2_f1b_dev_risk.py"
-      - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
-      - "pl/hil/path2_f1b_minimal_stage.py"
-      - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
+      - "scripts/z2/plasma-path2-root-entry"
+      - "pl/hil/fpga_image_root.py"
+      - "pl/hil/fpga_image_guard.py"
+      - "pl/hil/fpga_image_admission.py"
+      - "scripts/tests/test_fpga_image_root.py"
       - "scripts/plasma_development_stage_transport.py"
-      - "scripts/z2/plasma-path2-f1b-root-entry"
+      - "scripts/tests/test_plasma_path2_root_direct.py"
       - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "scripts/tests/test_plasma_development_stage_transport.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
@@ -63,33 +56,25 @@ on:
       - ".github/workflows/plasma-engineering-runtime-dispatch.yml"
       - "scripts/plasma_engineering_runtime_v1.py"
       - "scripts/plasma_development_dispatch.py"
-      - "scripts/plasma_path3_cross_job_resume.py"
-      - "scripts/tests/test_plasma_path3_cross_job_resume.py"
+      - "scripts/plasma_programming_load.py"
+      - "scripts/tests/test_plasma_programming_load.py"
+      - "specs/programming-loading-benchmark-v1.schema.json"
       - "scripts/plasma_engineering_monitor.py"
+      - "scripts/plasma_engineering_activity.py"
       - "scripts/tests/test_plasma_engineering_monitor.py"
       - "scripts/tests/test_plasma_development_dispatch.py"
+      - "scripts/tests/test_plasma_p2hw_claim.py"
       - "scripts/tests/test_plasma_development_blocking.py"
       - "scripts/plasma_vivado_host_build.py"
-      - "scripts/plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_fpga_build_diagnostics.py"
-      - "scripts/tests/test_plasma_licensed_f1b.py"
-      - "scripts/plasma_path2_build_qualification.py"
-      - "scripts/plasma_path2_runtime_integration.py"
-      - "scripts/tests/test_plasma_path2_runtime_integration.py"
-      - "scripts/plasma_path2_stage_orchestrator.py"
-      - "scripts/plasma_path2_f1b_adapters.py"
+      - "scripts/tests/test_plasma_vivado_host_build_contracts.py"
       - "scripts/plasma_path2_persistent_lease.py"
-      - "scripts/plasma_path2_bin_provenance.py"
-      - "scripts/plasma_path2_held_provider.py"
-      - "scripts/tests/test_plasma_path2_held_provider.py"
-      - "pl/hil/path2_z2_target_guard.py"
-      - "scripts/tests/test_plasma_path2_z2_target_guard.py"
-      - "pl/hil/path2_f1b_dev_risk.py"
-      - "scripts/tests/test_plasma_path2_f1b_dev_risk.py"
-      - "pl/hil/path2_f1b_minimal_stage.py"
-      - "scripts/tests/test_plasma_path2_f1b_minimal_stage.py"
+      - "scripts/z2/plasma-path2-root-entry"
+      - "pl/hil/fpga_image_root.py"
+      - "pl/hil/fpga_image_guard.py"
+      - "pl/hil/fpga_image_admission.py"
+      - "scripts/tests/test_fpga_image_root.py"
       - "scripts/plasma_development_stage_transport.py"
-      - "scripts/z2/plasma-path2-f1b-root-entry"
+      - "scripts/tests/test_plasma_path2_root_direct.py"
       - "scripts/tests/test_plasma_path2_swpc_bridge.py"
       - "scripts/tests/test_plasma_development_stage_transport.py"
       - "specs/engineering-dispatch/development-tasks-v1.json"
@@ -120,32 +105,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py
+          python3 -m py_compile scripts/plasma_engineering_runtime_v1.py scripts/tests/test_plasma_engineering_runtime_v1.py scripts/plasma_development_dispatch.py scripts/tests/test_plasma_development_dispatch.py scripts/tests/test_plasma_path2_operator_cli.py
           python3 scripts/tests/test_plasma_engineering_runtime_v1.py
           python3 -m py_compile scripts/plasma_development_codex_sandbox.py scripts/tests/test_plasma_development_codex_sandbox.py
           python3 scripts/tests/test_plasma_development_codex_sandbox.py
           python3 -m py_compile scripts/plasma-codex-hardware-parity.py scripts/tests/test-plasma-codex-hardware-parity.py
           python3 scripts/tests/test-plasma-codex-hardware-parity.py
           python3 scripts/tests/test_plasma_development_dispatch.py
-          python3 scripts/tests/test_plasma_path3_cross_job_resume.py
+          python3 scripts/tests/test_plasma_path2_operator_cli.py
+          python3 scripts/tests/test_plasma_p2hw_claim.py
+          python3 scripts/tests/test_plasma_programming_load.py
           python3 scripts/tests/test_plasma_development_blocking.py
           python3 scripts/tests/test_plasma_engineering_monitor.py
-          python3 -m py_compile scripts/plasma_fpga_build_diagnostics.py scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_fpga_build_diagnostics.py scripts/tests/test_plasma_licensed_f1b.py
-          python3 scripts/tests/test_plasma_fpga_build_diagnostics.py
-          python3 scripts/tests/test_plasma_licensed_f1b.py
-          python3 -m py_compile scripts/plasma_path2_build_qualification.py scripts/plasma_path2_runtime_integration.py scripts/tests/test_plasma_path2_runtime_integration.py
-          python3 scripts/tests/test_plasma_path2_runtime_integration.py
-          python3 -m py_compile scripts/plasma_path2_bin_provenance.py scripts/plasma_path2_held_provider.py scripts/tests/test_plasma_path2_held_provider.py
-          python3 scripts/tests/test_plasma_path2_held_provider.py
-          python3 -m py_compile pl/hil/path2_z2_target_guard.py scripts/tests/test_plasma_path2_z2_target_guard.py
-          python3 scripts/tests/test_plasma_path2_z2_target_guard.py
-          python3 -m py_compile pl/hil/path2_f1b_dev_risk.py scripts/tests/test_plasma_path2_f1b_dev_risk.py
-          python3 scripts/tests/test_plasma_path2_f1b_dev_risk.py
-          python3 -m py_compile pl/hil/path2_f1b_minimal_stage.py scripts/tests/test_plasma_path2_f1b_minimal_stage.py
-          python3 scripts/tests/test_plasma_path2_f1b_minimal_stage.py
+          python3 -m py_compile scripts/plasma_vivado_host_build.py scripts/tests/test_plasma_vivado_host_build_contracts.py scripts/tests/test_plasma_generic_vivado_host_build.py pl/projects/z2-identity/verify_hwh.py pl/projects/z2-control-waveform/verify_hwh.py
+          python3 scripts/tests/test_plasma_generic_vivado_host_build.py
+          python3 scripts/tests/test_plasma_vivado_host_build_contracts.py
+          python3 -m py_compile pl/hil/fpga_image_root.py pl/hil/fpga_image_guard.py pl/hil/fpga_image_admission.py scripts/tests/test_fpga_image_root.py
+          python3 scripts/tests/test_fpga_image_root.py
           python3 -m py_compile scripts/plasma_development_stage_transport.py scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_path2_swpc_bridge.py
           python3 scripts/tests/test_plasma_development_stage_transport.py
+          python3 scripts/tests/test_plasma_trusted_z2_ci_artifact.py
+          python3 scripts/tests/test_plasma_path2_root_direct.py
           python3 scripts/tests/test_plasma_hil_a2_cpu_only.py
           git diff --exit-code
 
@@ -216,10 +197,15 @@ jobs:
       execution_path: ${{ steps.approve.outputs.execution_path }}
       execution_capability: ${{ steps.approve.outputs.execution_capability }}
       task_id: ${{ steps.approve.outputs.task_id }}
+      monitor_summary: ${{ steps.approve.outputs.monitor_summary }}
+      monitor_phase: ${{ steps.approve.outputs.monitor_phase }}
+      artifact_run_id: ${{ steps.approve.outputs.artifact_run_id }}
+      artifact_source_sha: ${{ steps.approve.outputs.artifact_source_sha }}
+      monitor_stage: ${{ steps.approve.outputs.monitor_stage }}
       comment_id: ${{ steps.approve.outputs.comment_id }}
       claim_ref: ${{ steps.approve.outputs.claim_ref }}
       work_order_sha256: ${{ steps.approve.outputs.work_order_sha256 }}
-      session_resume: ${{ steps.approve.outputs.session_resume }}
+      hardware_claim_ref: ${{ steps.approve.outputs.hardware_claim_ref }}
     steps:
       - name: Checkout trusted main dispatcher
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -234,13 +220,23 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/main
           test "$(git -C trusted rev-parse HEAD)" = "$GITHUB_SHA"
+          # The request command exits nonzero on denied admission. Preserve its
+          # sanitized JSON for the fail-closed diagnostic parser below.
           python3 trusted/scripts/plasma_development_dispatch.py request \
-            --event "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/plasma-dev-request.json"
+            --event "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/plasma-dev-request.json" || true
           python3 - "$RUNNER_TEMP/plasma-dev-request.json" "$GITHUB_OUTPUT" <<'PY'
           import json,sys
           with open(sys.argv[1], encoding="utf-8") as f:
               data=json.load(f)
-          assert data["status"] == "VALID_OWNER_REQUEST"
+          if data.get("status") != "VALID_OWNER_REQUEST":
+              # The dispatcher already maps errors to safe reason codes.
+              # Never expose raw event data, token, or arbitrary error strings.
+              import re
+              reason = data.get("reason")
+              if not isinstance(reason, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{2,79}", reason):
+                  reason = "DISPATCH_REQUEST_DENIED"
+              print(f"::error title=PLASMA Dispatcher admission denied::{reason}")
+              sys.exit(2)
           with open(sys.argv[2],"a",encoding="utf-8") as f:
               f.write(f"pr_number={data['pr_number']}\n")
               f.write(f"source_sha={data['source_sha']}\n")
@@ -288,7 +284,9 @@ jobs:
               for k in ("pinned_sha","trusted_sha","pr_number",
                         "registry_sha256","execution_path","execution_capability","task_id"):
                   f.write(f"{k}={data[k]}\n")
-              for k in ("comment_id","claim_ref","work_order_sha256","session_resume"):
+              for k in ("comment_id","claim_ref","work_order_sha256","hardware_claim_ref",
+                        "monitor_summary","monitor_stage","monitor_phase",
+                        "artifact_run_id","artifact_source_sha"):
                   f.write(f"{k}={data.get(k,'')}\n")
               # Pass only the minimal, already-verified PR identity snapshot.
               # No second PR API client or runner is required on SWPC.
@@ -393,18 +391,75 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  development-hardware-claim:
+    # Path 2 one-shot hardware only (not A2): hosted atomic protected-ref
+    # creation keyed by the FULL Work Order digest is the cross-Run
+    # exactly-once gate. Duplicate/ambiguous creation fails closed, no retry.
+    needs: development-authorize
+    if: >-
+      github.event_name == 'issue_comment' &&
+      needs.development-authorize.result == 'success' &&
+      needs.development-authorize.outputs.execution_path == 'path2-cli' &&
+      needs.development-authorize.outputs.execution_capability == 'operator-cli' &&
+      needs.development-authorize.outputs.hardware_claim_ref != '' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      hardware_claim_ref: ${{ steps.claim.outputs.hardware_claim_ref }}
+    steps:
+      - name: Checkout trusted main dispatcher
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Atomically claim the exact one-shot hardware Work Order digest
+        id: claim
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HARDWARE_CLAIM_REF: ${{ needs.development-authorize.outputs.hardware_claim_ref }}
+          PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+          WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(git -C trusted rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 trusted/scripts/plasma_development_dispatch.py p2hw-claim \
+            --event "$GITHUB_EVENT_PATH" --claim-ref "$HARDWARE_CLAIM_REF" \
+            --pinned-sha "$PINNED_SHA" --work-order-sha256 "$WORK_ORDER_SHA256" \
+            --evidence-dir "$RUNNER_TEMP"
+          echo "hardware_claim_ref=$HARDWARE_CLAIM_REF" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: plasma-p2hw-claim-${{ github.run_id }}
+          path: ${{ runner.temp }}/plasma-p2hw-claim.json
+          if-no-files-found: warn
+          retention-days: 14
+
   development-execute:
-    # Path 2 retains its trusted provider; no automatic post-Codex stages.
+    # Path 2 invokes its trusted Root operation provider; no automatic chaining.
     # Hardware-capable A2 retains its existing one-shot claim gate.
-    needs: [development-authorize, development-claim]
+    needs: [development-authorize, development-claim, development-hardware-claim]
     if: >-
       always() &&
       needs.development-authorize.result == 'success' &&
       (
         (needs.development-authorize.outputs.execution_path == 'path2-cli' &&
          (
-          contains(fromJSON('["cpu-only","vivado-host-build","path2-stage-contract"]'),
+          contains(fromJSON('["cpu-only","vivado-host-build"]'),
                    needs.development-authorize.outputs.execution_capability) ||
+          (needs.development-authorize.outputs.execution_capability == 'operator-cli' &&
+           needs.development-authorize.outputs.hardware_claim_ref == '') ||
+          (needs.development-authorize.outputs.execution_capability == 'operator-cli' &&
+           needs.development-authorize.outputs.hardware_claim_ref != '' &&
+           needs.development-hardware-claim.result == 'success' &&
+           needs.development-hardware-claim.outputs.hardware_claim_ref == needs.development-authorize.outputs.hardware_claim_ref &&
+           github.run_attempt == 1) ||
           (needs.development-authorize.outputs.execution_capability == 'z2-cpu-only' &&
            needs.development-authorize.outputs.task_id == 'hil-a2-cpu-only' &&
            needs.development-claim.result == 'success' &&
@@ -415,7 +470,7 @@ jobs:
       )
     # PR #1046: reuse existing SWPC Runner, not a new isolated Runner.
     runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.task_id == 'z2-path2-full-hil' && 10 || 5 }}
+    timeout-minutes: ${{ needs.development-authorize.outputs.execution_capability == 'vivado-host-build' && 50 || needs.development-authorize.outputs.execution_capability == 'operator-cli' && 35 || 5 }}
     permissions:
       contents: read
       actions: read
@@ -453,9 +508,63 @@ jobs:
           name: plasma-armv7-hil-a1-pr-39192248348
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/plasma-hil-a2-source
+      # Exact owner-pinned successful main CI artifact. This is the same
+      # trusted verifier as Path 3; no GitHub token enters the Path 2 CLI.
+      - name: Admit owner-pinned Z2 Runtime CI Kit (trusted Path 2)
+        id: path2-z2ci
+        if: ${{ needs.development-authorize.outputs.execution_capability == 'operator-cli' && needs.development-authorize.outputs.artifact_run_id != '' && needs.development-authorize.outputs.pr_number == '0' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_RUN_ID: ${{ needs.development-authorize.outputs.artifact_run_id }}
+          ARTIFACT_SOURCE_SHA: ${{ needs.development-authorize.outputs.artifact_source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_RUN_ID" =~ ^[1-9][0-9]{0,14}$ ]]
+          [[ "$ARTIFACT_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api "repos/physicslu/plasma/actions/runs/$ARTIFACT_RUN_ID" \
+            > "$RUNNER_TEMP/plasma-path2-z2-ci-run.json"
+          gh api "repos/physicslu/plasma/actions/runs/$ARTIFACT_RUN_ID/artifacts?per_page=100" \
+            > "$RUNNER_TEMP/plasma-path2-z2-ci-artifacts.json"
+          python3 trusted/scripts/plasma_trusted_z2_ci_artifact.py admit \
+            --run-json "$RUNNER_TEMP/plasma-path2-z2-ci-run.json" \
+            --artifacts-json "$RUNNER_TEMP/plasma-path2-z2-ci-artifacts.json" \
+            --source-sha "$ARTIFACT_SOURCE_SHA" --run-id "$ARTIFACT_RUN_ID" \
+            --receipt "$RUNNER_TEMP/plasma-path2-z2-ci-admission.json" \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Verify owner-pinned Z2 Runtime CI Kit (trusted Path 2)
+        if: ${{ steps.path2-z2ci.outcome == 'success' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.path2-z2ci.outputs.artifact_id }}
+          ARTIFACT_SOURCE_SHA: ${{ needs.development-authorize.outputs.artifact_source_sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]{0,14}$ ]]
+          curl --fail --location --silent --show-error --retry 2 \
+            --connect-timeout 15 --max-time 1200 --max-filesize 536870912 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/physicslu/plasma/actions/artifacts/$ARTIFACT_ID/zip" \
+            -o "$RUNNER_TEMP/plasma-path2-z2-ci.zip"
+          python3 trusted/scripts/plasma_trusted_z2_ci_artifact.py verify \
+            --admission "$RUNNER_TEMP/plasma-path2-z2-ci-admission.json" \
+            --zip "$RUNNER_TEMP/plasma-path2-z2-ci.zip" \
+            --destination "$RUNNER_TEMP/plasma-path2-z2-verified" \
+            --helper trusted/scripts/ppu-bootstrap-kit.py \
+            --receipt "$RUNNER_TEMP/plasma-path2-z2-ci-verified-receipt.json" \
+            --github-env "$GITHUB_ENV"
+          echo "PLASMA_Z2_KIT_SOURCE_SHA=$ARTIFACT_SOURCE_SHA" >> "$GITHUB_ENV"
       - name: Execute candidate CLI using trusted dispatcher
         shell: bash
         env:
+          PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
+          PLASMA_MONITOR_COMMENT_ID: ${{ needs.development-authorize.outputs.comment_id }}
+          PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}
+          PLASMA_MONITOR_STAGE: ${{ needs.development-authorize.outputs.monitor_stage }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
@@ -464,8 +573,10 @@ jobs:
           WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
           EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
           PLASMA_HIL_A2_CLAIM_REF: ${{ needs.development-claim.outputs.claim_ref }}
+          PLASMA_P2HW_CLAIM_REF: ${{ needs.development-hardware-claim.outputs.hardware_claim_ref }}
           PLASMA_HIL_A2_WORK_ORDER_SHA256: ${{ needs.development-claim.outputs.work_order_sha256 }}
           PLASMA_HIL_A2_ARTIFACT_DIR: ${{ runner.temp }}/plasma-hil-a2-source
+          PLASMA_Z2_KIT_ARTIFACT_DIR: ${{ runner.temp }}/plasma-z2-kit-source
         run: |
           set -euo pipefail
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
@@ -513,9 +624,11 @@ jobs:
             ${{ runner.temp }}/plasma-path2-receipt.json.sha256
             ${{ runner.temp }}/plasma-path2-stdout.txt
             ${{ runner.temp }}/plasma-path2-stderr.txt
-            ${{ runner.temp }}/plasma-fpga-build-diagnostics.json
-            ${{ runner.temp }}/plasma-fpga-build-diagnostics.json.sha256
+            ${{ runner.temp }}/plasma-path2-process.json
+            ${{ runner.temp }}/plasma-path2-loading-benchmark.tar.gz
+            ${{ runner.temp }}/plasma-path2-loading-benchmark.tar.gz.sha256
             ${{ runner.temp }}/plasma-path2-vivado-host-receipt.json
+            ${{ runner.temp }}/plasma-path2-z2-ci-verified-receipt.json
             candidate/pl/build/**/*.log
             candidate/pl/build/**/*.rpt
             candidate/pl/build/**/*.bit
@@ -533,8 +646,9 @@ jobs:
     # Long RTL/Vivado implementation is expected in Development Mode.
     timeout-minutes: 360
     permissions:
-      contents: read
-      pull-requests: read  # trusted worker verifies the live exact PR HEAD
+      contents: write  # trusted publisher can update only the verified PR ref
+      actions: read  # fetch only owner-pinned CI artifacts in trusted steps
+      pull-requests: read  # resolve and verify live owner PR and pinned HEAD
     steps:
       - name: Check SWPC identity and trusted dispatcher SHA
         shell: bash
@@ -560,10 +674,62 @@ jobs:
           path: candidate
           persist-credentials: false
           clean: true
-      - name: Codex develops, builds and tests candidate; preserve real evidence
+      # The trusted Actions step, never the Codex child, uses GITHUB_TOKEN.
+      # Owner work order pins the exact successful main push run and source.
+      - name: Admit source-pinned Z2 CI artifact (trusted)
+        id: z2-ci
+        if: ${{ needs.development-authorize.outputs.artifact_run_id != '' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          ARTIFACT_RUN_ID: ${{ needs.development-authorize.outputs.artifact_run_id }}
+          ARTIFACT_SOURCE_SHA: ${{ needs.development-authorize.outputs.artifact_source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_RUN_ID" =~ ^[1-9][0-9]{0,14}$ ]]
+          [[ "$ARTIFACT_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api "repos/physicslu/plasma/actions/runs/$ARTIFACT_RUN_ID" \
+            > "$RUNNER_TEMP/plasma-z2-ci-run.json"
+          gh api "repos/physicslu/plasma/actions/runs/$ARTIFACT_RUN_ID/artifacts?per_page=100" \
+            > "$RUNNER_TEMP/plasma-z2-ci-artifacts.json"
+          python3 trusted/scripts/plasma_trusted_z2_ci_artifact.py admit \
+            --run-json "$RUNNER_TEMP/plasma-z2-ci-run.json" \
+            --artifacts-json "$RUNNER_TEMP/plasma-z2-ci-artifacts.json" \
+            --source-sha "$ARTIFACT_SOURCE_SHA" --run-id "$ARTIFACT_RUN_ID" \
+            --receipt "$RUNNER_TEMP/plasma-z2-ci-admission.json" \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Download and verify Z2 CI artifact bytes (trusted)
+        if: ${{ steps.z2-ci.outcome == 'success' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.z2-ci.outputs.artifact_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]{0,14}$ ]]
+          curl --fail --location --silent --show-error --retry 2 \
+            --connect-timeout 15 --max-time 1200 --max-filesize 536870912 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/physicslu/plasma/actions/artifacts/$ARTIFACT_ID/zip" \
+            -o "$RUNNER_TEMP/plasma-z2-ci-artifact.zip"
+          python3 trusted/scripts/plasma_trusted_z2_ci_artifact.py verify \
+            --admission "$RUNNER_TEMP/plasma-z2-ci-admission.json" \
+            --zip "$RUNNER_TEMP/plasma-z2-ci-artifact.zip" \
+            --destination "$RUNNER_TEMP/plasma-z2-ci-verified" \
+            --helper trusted/scripts/ppu-bootstrap-kit.py \
+            --receipt "$RUNNER_TEMP/plasma-z2-ci-verified-receipt.json" \
+            --github-env "$GITHUB_ENV"
+          echo PLASMA_Z2_CI_ARTIFACTS_VERIFIED
+      - name: Codex develops, builds and tests candidate; preserve real evidence
+        shell: bash
+        env:
+          PLASMA_MONITOR_TASK: ${{ needs.development-authorize.outputs.task_id }}
+          PLASMA_MONITOR_COMMENT_ID: ${{ needs.development-authorize.outputs.comment_id }}
+          PLASMA_MONITOR_SUMMARY: ${{ needs.development-authorize.outputs.monitor_summary }}
+          PLASMA_MONITOR_PHASE: ${{ needs.development-authorize.outputs.monitor_phase }}
           TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
           PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
@@ -572,18 +738,11 @@ jobs:
           EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
           PLASMA_FPGA_PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
           PLASMA_FPGA_PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
-          SESSION_RESUME: ${{ needs.development-authorize.outputs.session_resume }}
         run: |
           set -euo pipefail
           test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
           test "$(git -C candidate rev-parse HEAD)" = "$PINNED_SHA"
           test -z "$(git -C candidate status --porcelain --untracked-files=all)"
-          phase_args=()
-          if [ "$SESSION_RESUME" = page-boundary-off-by-one ]; then
-            phase_args+=(--resume-phase new)
-          else
-            test -z "$SESSION_RESUME"
-          fi
           python3 trusted/scripts/plasma_engineering_monitor.py run path3 -- \
             python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
             --event "$GITHUB_EVENT_PATH" \
@@ -593,7 +752,6 @@ jobs:
             --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
             --work-order-sha256 "$WORK_ORDER_SHA256" \
             --execution-capability "$EXECUTION_CAPABILITY" \
-            "${phase_args[@]}" \
             > "$RUNNER_TEMP/plasma-path3-receipt.json"
           # Runner exits nonzero when Codex failed/incomplete. Do not put
           # evidence extraction here: 'set -e' would skip it on failure.
@@ -602,17 +760,8 @@ jobs:
       - name: Collect Path 3 evidence even when Codex or preflight fails
         if: always()
         shell: bash
-        env:
-          SESSION_RESUME: ${{ needs.development-authorize.outputs.session_resume }}
         run: |
           set -euo pipefail
-          # The generic untracked-files archive MUST NOT upload the private
-          # continuity challenge if a failed model wrote it into scratch.
-          # Resume jobs publish only the sanitized numeric/hash receipt.
-          if [ "$SESSION_RESUME" = page-boundary-off-by-one ]; then
-            exit 0
-          fi
-          test -z "$SESSION_RESUME"
           # Admission failure may leave no candidate checkout. Never fetch
           # additional source, rerun the agent, or access physical devices.
           if [ -d candidate/.git ]; then
@@ -652,13 +801,76 @@ jobs:
             sha256sum "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz" \
               > "$RUNNER_TEMP/plasma-path3-engineering-evidence.tar.gz.sha256"
           fi
+      - name: Publish successful Path 3 edits to the exact authorized PR
+        if: ${{ success() && needs.development-authorize.outputs.pr_number != '0' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
+          PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          # Keep GitHub write credentials outside the model namespace.
+          python3 - "$RUNNER_TEMP/plasma-path3-receipt.json" "$PINNED_SHA" <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as handle:
+              receipt = json.load(handle)
+          assert receipt['codex_exit_code'] == 0
+          assert receipt['status'] == 'EVIDENCE_READY_REVIEW_REQUIRED'
+          assert receipt['pinned_sha'] == sys.argv[2]
+          PY
+          test "$(git -C candidate rev-parse HEAD)" = "$PINNED_SHA"
+          git -C candidate diff --check
+          pr_json="$(gh api "repos/physicslu/plasma/pulls/$PR_NUMBER")"
+          PR_HEAD_REF="$(printf '%s' "$pr_json" | python3 -c '
+          import json,sys,re
+          p=json.load(sys.stdin)
+          ref=p["head"]["ref"]
+          assert p["state"]=="open" and p["merged_at"] is None
+          assert p["user"]["login"]=="physicslu"
+          assert p["head"]["repo"]["full_name"]=="physicslu/plasma"
+          assert p["base"]["repo"]["full_name"]=="physicslu/plasma"
+          assert p["base"]["ref"]=="main"
+          assert p["head"]["sha"]==sys.argv[1]
+          assert ref!="main" and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9/_-]{1,120}",ref)
+          print(ref)
+          ' "$PINNED_SHA")"
+          # Do not publish private Codex logs or generated Vivado outputs.
+          git -C candidate add -A -- . ':(exclude).plasma-path3-evidence' ':(exclude)pl/build'
+          git -C candidate diff --cached --check
+          if git -C candidate diff --cached --quiet; then
+            echo PATH3_NO_SOURCE_CHANGES
+            exit 0
+          fi
+          git -C candidate config user.name 'github-actions[bot]'
+          git -C candidate config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C candidate commit -m "Path 3: autonomous fixes for PR #$PR_NUMBER"
+          # Normal non-force push fails if the authorized branch moved.
+          actual_sha="$(gh api "repos/physicslu/plasma/pulls/$PR_NUMBER" --jq '.head.sha')"
+          test "$actual_sha" = "$PINNED_SHA"
+          askpass="$RUNNER_TEMP/plasma-path3-askpass"
+          cat > "$askpass" <<'SH'
+          #!/bin/sh
+          case "$1" in
+            *Username*) printf '%s\n' x-access-token ;;
+            *Password*) printf '%s\n' "$GH_TOKEN" ;;
+            *) exit 1 ;;
+          esac
+          SH
+          chmod 700 "$askpass"
+          trap 'rm -f "$askpass"' EXIT
+          GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
+            git -C candidate push origin "HEAD:refs/heads/$PR_HEAD_REF"
+          echo PATH3_AUTHORIZED_PR_PUBLISHED
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: ${{ always() && needs.development-authorize.outputs.session_resume != 'page-boundary-off-by-one' }}
+        if: always()
         with:
           name: plasma-development-codex-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/plasma-path3-receipt.json
             ${{ runner.temp }}/plasma-path3-receipt.json.sha256
+            ${{ runner.temp }}/plasma-z2-ci-admission.json
+            ${{ runner.temp }}/plasma-z2-ci-verified-receipt.json
             ${{ runner.temp }}/plasma-path3-source.patch
             ${{ runner.temp }}/plasma-path3-source.patch.sha256
             ${{ runner.temp }}/plasma-path3-status.txt
@@ -676,104 +888,6 @@ jobs:
             candidate/scripts/experiments/plasma_*_generated.txt
             candidate/scripts/experiments/plasma_*_generated.test.log
             candidate/scripts/experiments/plasma_*_generated.codex.log
-          if-no-files-found: warn
-          retention-days: 14
-
-      # Resume receipts are allowlisted separately: never glob candidate/
-      # because even a failed untrusted model could have written raw context.
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: ${{ always() && needs.development-authorize.outputs.session_resume == 'page-boundary-off-by-one' }}
-        with:
-          name: plasma-development-codex-new-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/plasma-path3-receipt.json
-            ${{ runner.temp }}/plasma-path3-receipt.json.sha256
-          if-no-files-found: warn
-          retention-days: 14
-
-  development-codex-resume:
-    # Second GitHub Actions Job in the SAME existing Workflow/Runner.
-    needs: [development-authorize, development-codex]
-    if: >-
-      github.event_name == 'issue_comment' &&
-      needs.development-authorize.result == 'success' &&
-      needs.development-codex.result == 'success' &&
-      needs.development-authorize.outputs.execution_path == 'path3-codex' &&
-      needs.development-authorize.outputs.session_resume == 'page-boundary-off-by-one' &&
-      github.run_attempt == 1
-    runs-on: [self-hosted, linux, x64, plasma-codex]
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Check exact existing runner and device sandbox
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(id -u)" != 0
-          test "$RUNNER_NAME" = SWPC-plasma-codex
-          test "$RUNNER_ENVIRONMENT" = self-hosted
-          command -v codex
-          command -v bwrap
-      - name: Checkout trusted main dispatcher
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ needs.development-authorize.outputs.trusted_sha }}
-          path: trusted
-          persist-credentials: false
-          clean: true
-      - name: Checkout exact same candidate SHA
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ needs.development-authorize.outputs.pinned_sha }}
-          path: candidate
-          persist-credentials: false
-          clean: true
-      - name: Worker readmission and real isolated Codex RESUME
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TRUSTED_SHA: ${{ needs.development-authorize.outputs.trusted_sha }}
-          PINNED_SHA: ${{ needs.development-authorize.outputs.pinned_sha }}
-          PR_NUMBER: ${{ needs.development-authorize.outputs.pr_number }}
-          REGISTRY_SHA256: ${{ needs.development-authorize.outputs.registry_sha256 }}
-          WORK_ORDER_SHA256: ${{ needs.development-authorize.outputs.work_order_sha256 }}
-          EXECUTION_CAPABILITY: ${{ needs.development-authorize.outputs.execution_capability }}
-        run: |
-          set -euo pipefail
-          test "$(git -C trusted rev-parse HEAD)" = "$TRUSTED_SHA"
-          test "$(git -C candidate rev-parse HEAD)" = "$PINNED_SHA"
-          test -z "$(git -C candidate status --porcelain --untracked-files=all)"
-          python3 trusted/scripts/plasma_engineering_monitor.py run path3 -- \
-            python3 trusted/scripts/plasma_development_dispatch.py execute-codex \
-            --event "$GITHUB_EVENT_PATH" \
-            --registry candidate/specs/engineering-dispatch/development-tasks-v1.json \
-            --workspace candidate \
-            --trusted-sha "$TRUSTED_SHA" --pinned-sha "$PINNED_SHA" \
-            --pr-number "$PR_NUMBER" --registry-sha256 "$REGISTRY_SHA256" \
-            --work-order-sha256 "$WORK_ORDER_SHA256" \
-            --execution-capability "$EXECUTION_CAPABILITY" \
-            --resume-phase resume \
-            > "$RUNNER_TEMP/plasma-path3-resume-receipt.json"
-          cat "$RUNNER_TEMP/plasma-path3-resume-receipt.json"
-          git -C trusted diff --exit-code
-      - name: Hash sanitized receipt only
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -f "$RUNNER_TEMP/plasma-path3-resume-receipt.json" ]; then
-            sha256sum "$RUNNER_TEMP/plasma-path3-resume-receipt.json" \
-              > "$RUNNER_TEMP/plasma-path3-resume-receipt.json.sha256"
-          fi
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
-        with:
-          name: plasma-development-codex-resume-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/plasma-path3-resume-receipt.json
-            ${{ runner.temp }}/plasma-path3-resume-receipt.json.sha256
           if-no-files-found: warn
           retention-days: 14
 

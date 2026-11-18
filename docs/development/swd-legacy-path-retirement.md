@@ -1,0 +1,43 @@
+# SWD Legacy Path Retirement — Current Blue Pill Selection & Dependencies
+
+**2026-11-04 update.** The product Blue Pill path is now **Z2 PS-local OpenOCD `plasma_swd` adapter → PL ABI-v5 SWD engine** (PR #1285 HIL, [runbook](swd-abi5-openocd-dpidr-hil-runbook.md) §9–§10), run by the Runtime through the C-3 Site Worker. The WordPort / RemoteBitbang path below is kept **only as an experiment/comparison path**: `scripts/plasma_wordport_program.py` (explicit `--openocd-root` remote_bitbang engine and `--z2-python`; no versioned path), `bluepill-wordport-session.py`, the native WordPort bridge and `pl/projects/z2-bluepill-rbb/image-manifest.json`. `scripts/plasma_native_wordport_v02.py` is **retired** (superseded by the generic tool). Note `software/native/swd/plasma_swd_lease_word_port.c` belongs to the current `plasma_swd` driver, not to this legacy path.
+
+**2026-10-26 decision (historical).** For real external STM32 Blue Pill SWD select **Z2 PS-local OpenOCD -> PS-local UNIX WordPort/RemoteBitbang -> verified PL SWD Image -> PMOD SWCLK/SWDIO -> Blue Pill**. This is a source-selection invariant, not a fresh HIL PASS or hardware authorization. Retirement base: `0c11e3420272bed09e778182e9d6422c115f75d0`.
+
+| Item | Status | Required distinction / dependency |
+| --- | --- | --- |
+| `pl/projects/z2-swd-gpio/` | **RETIRED physical FPGA project** | PS EMIO GPIO software bit-bang, not current PL SWD. Build, monitor, Tcl, standalone artifact CLI fail closed. |
+| `pl/projects/z2-swd03-axi/` | **RETIRED physical FPGA project** | FPGA-internal synthetic responder (DPIDR `0x2BA01477`); no external SWD pins. Build, Tcl and standalone artifact CLI fail closed. |
+| `pl/projects/z2-swd-gpio/artifact.py` | Shared **host-only** imports | Used by `z2-identity/artifact.py` and `z2-control-waveform/artifact.py` for identity headers, git/hash generation. Standalone CLI blocked; do not delete dependency blindly. |
+| `pl/projects/z2-swd-gpio/prepare-board-repository.sh` | Shared generic Board Files helper | Needed by trusted `scripts/plasma_vivado_host_build.py` and Vivado environment preflight. It does not build or load retired FPGA images. |
+| `pl/projects/z2-swd-gpio/check-swpc-vivado-runner.sh` / `probe-vivado.tcl` | Generic **read-only Vivado** probe | Called by `swpc-vivado-runner-environment.yml`. Not a programmer/hardware-load contract. |
+| `pl/rtl/site/swd_emio_bridge.sv` and old GPIO XDC | Historical RTL / offline source tests | Not production external SWD. |
+| `pl/rtl/site/swd03_dpidr_responder.sv`, `pl/sim/swd03_axi_fixture_tb.sv` | **SYNTHETIC-only** RTL/fixture | Used by SWD-03/04/06, LT02 and Fixed ABI host regressions. Never treat synthetic ACK/data as Blue Pill. |
+| `pl/hil/swd04/`, SWD-05 source and `docs/development/swd04-*` | Historical **internal HIL** contracts | Some Root/target guard code still imports `pl/hil/swd04/one_shot.py` safety/owner-lock helpers. Do not delete locks, Root Guard, FPGA Manager safety or Golden recovery. |
+| `pl/projects/z2-fixed-unified-site1/` | Former fixed-ABI host candidate/internal fixture (F1-B) | **Deleted 2026-11-02**; never represented the current external Blue Pill image. |
+| `pl/projects/z2-bluepill-rbb/image-manifest.json`, `scripts/bluepill-wordport-session.py` | **Experiment / comparison path only** (since 2026-11-04) | Paired PL Image identity + PS-local WordPort bridge; still verify live boot/manager/ownership and real SWD before PASS. |
+| `.github/workflows/swpc-vivado-bitstream-build.yml` | **REMOVED** | Manual persistent-runner action targeting old GPIO Image should not be offered. |
+| `.github/workflows/pl-z2-swd-gpio.yml`, `pl-swd03-axi.yml` | Offline regression only | Keep hosted PR/main tests for shared/fixture source; remove manual dispatch. No physical target qualification. |
+
+## Remaining legacy HIL entrypoints and live safety dependencies
+
+| Source / entrypoint | Scope and actual capability | Current decision |
+| --- | --- | --- |
+| `python -m pl.hil.swd04.one_shot` | Historical SWD-05 internal FPGA synthetic fixture load/MMIO/recovery | **DIRECT CLI RETIRED** (`RETIRED_SWD05_INTERNAL_IMAGE_CLI`). Retain importable `run_sequence`, `run_live`, `manager_write`, `OWNER_LOCK` and Root safety helpers for existing protected recovery. |
+| `python -m pl.hil.swd04.native_qualify` | Historical SWD-04 `/dev/mem` native AXI synthetic DPIDR HIL | **DIRECT CLI RETIRED** (`RETIRED_SWD04_SYNTHETIC_MMIO_CLI`). Retain injected `run_stage` and `check_runtime` for host-only tests. |
+| `pl.hil.swd04.development` | Historical ownership/current loaded-image receipt helpers | **RETAIN guarded helpers**; not an alternate external Blue Pill SWD controller. |
+| `pl.hil.pspl02.runner` and `pl.hil.lt02.native` | Separate PS→PL internal loopback/AXI MMIO HIL; NO external SWD pins | **RETAIN for independent internal validation only** with existing safety gates; not a Blue Pill programmer. |
+| `SWDTransactionDriver`, `swd_transaction_master.sv` (the F1-B `z2-fixed-unified-site1` project that also used them was deleted 2026-11-02) | Fixed ABI/internal synthetic fixture and future RTL/controller candidates | **RETAIN offline tests/build dependencies**; no automatic live PMOD/DUT qualification. Do not substitute for current WordPort image. |
+| `scripts/plasma-z2-smoke.sh`, `scripts/z2/plasma-z2-ssh-smoke-target.sh` | Historical F1-B Site 1 Z2 SSH smoke/diagnostic utility | **F1-B runtime RETIRED** (owner Gate 1, 2026-11-02): deleted together with `pl/hil/f1b.py`, `f1b_owner_once.py`, `path2_f1b_minimal_stage.py`, `path2_f1b_dev_risk.py`, `path2_z2_target_guard.py`, `approved-fpga-image.json` and their tests. The ABI v5 Root chain (`plasma-path2-root-entry` → `fpga_image_root` / `fpga_image_guard` / `fpga_image_admission`) never depended on them. Historical evidence is unchanged. |
+
+The SWD-05 historical no-callback `one_shot.run_live()` execution mode additionally fails **before image preflight/FPGA load**, so retiring its CLI cannot leave an already-loaded synthetic Image when the child CLI is unavailable. Host-only regression verifies the negative gate. (The former F1-B Identity-callback caller is retired.)
+
+The direct legacy Python CLI guards prevent ordinary `python -m ...` execution, but **are not an OS privilege boundary**; imported shared functions remain callable and protected by independent Root/ownership/lock controls. Their continued presence does not authorize them as an external target interface. Synthetic DPIDR `0x2BA01477` must never be confused with ST-LINK-observed STM32F103 `0x1BA01477`.
+
+## Operator / Codex selection rule
+
+1. Confirm the actual current Git worktree, SHA and owner-approved Gate 1 hardware scope. Old Worktrees and historical README search hits do not define current architecture.
+2. Only select Z2 PS-local ARMv7 OpenOCD with the `plasma_swd` adapter, exact paired PL ABI-v5 Image/Manifest and physical PMOD wiring for external MCU; never select either retired project by name or alphabetical order.
+3. Require live Z2 Boot ID, Root source SHA and manifest, FPGA Manager load/current image/owner-lock/MMIO lease, validated Golden recovery and legal 3.3V/common-ground. An ST-LINK control group may stay wired to the same DUT (owner decision 2026-11-15); the operator must not drive it and Z2 at the same time. LA2016 passively observes signal only.
+4. 2026-10-23 ST-LINK true successful Golden DPIDR `0x1BA01477` is independent reference. SWD-03 synthetic `0x2BA01477` is **not** the real DUT. Record fresh `.sr` capture and local OpenOCD/WordPort command exits; absent physical evidence is NOT_RUN, even if GitHub job exits zero.
+5. Retained shared code exists only for proven imports and host regressions; migrate those consumers before future physical deletion. Do not conflate retirement of old **Image selection** with deletion of shared FPGA safety locks or `one_shot` code.

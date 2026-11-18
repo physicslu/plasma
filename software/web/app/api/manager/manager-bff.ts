@@ -309,6 +309,23 @@ export async function relayManagerPpuAliasRequest(
   );
 }
 
+/**
+ * OPF S5 / PR-C2: the Device Selector is owned by Plasma Manager and answered
+ * from Catalog data the Manager owns. It is never relayed to a PPU Gateway.
+ * Manager errors (400 / 503 DEVICE_SELECTOR_UNAVAILABLE) pass through
+ * unchanged; the BFF never substitutes an empty result.
+ */
+export async function relayManagerDeviceSearchRequest(request: Request): Promise<Response> {
+  if (request.method !== "GET") {
+    return json(405, {
+      ok: false,
+      error: { code: "method_not_allowed", message: "Device Selector is read-only" },
+    });
+  }
+  const incoming = new URL(request.url);
+  return await relayManagerRequest(request, `/api/devices/search${incoming.search}`, false);
+}
+
 export async function relayManagerRegistryRequest(request: Request, alias?: string): Promise<Response> {
   if (!["GET", "POST", "PATCH", "DELETE"].includes(request.method)) {
     return json(405, {

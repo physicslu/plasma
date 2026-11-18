@@ -9,11 +9,12 @@ export type BootstrapRuntimeStatus = {
 
 export type BootstrapDeploymentRecord = {
   transaction_id: string;
-  state: "queued" | "running" | "succeeded" | "failed" | "recovery_required" | string;
+  state: "queued" | "running" | "succeeded" | "failed" | "recovery_required" | "reconciled" | string;
   upload_id: string;
   started_at_epoch_s: number;
   updated_at_epoch_s: number;
   error: string | null;
+  error_code?: string | null;
   result: Record<string, unknown> | null;
 };
 
@@ -27,6 +28,9 @@ export type ManagerBootstrapStatus = {
     device_match: boolean;
     credential_persistence: string;
     updated_at: string | null;
+    controller_generation?: number | null;
+    controller_id?: string | null;
+    controller_replaced?: boolean;
   };
   bootstrap: {
     schema_version: number;
@@ -160,10 +164,27 @@ export function getManagerPpuBootstrap(alias: string): Promise<ManagerBootstrapS
   return jsonRequest<ManagerBootstrapStatus>(root(alias));
 }
 
-export function pairManagerPpuBootstrap(alias: string, token: string): Promise<ManagerBootstrapStatus> {
-  return jsonRequest<ManagerBootstrapStatus>(`${root(alias)}/pair`, {
+export type ManagerPpuEnrollmentResult = {
+  ok: boolean;
+  ppu_alias: string;
+  state: string | null;
+  controller_generation?: number;
+  controller_mode?: "NORMAL" | "RECOVERY_ONLY";
+  recovery_blockers?: string[];
+  enrollment_source?: string;
+  expires_in_s?: number;
+  instruction?: string;
+  detail?: unknown;
+};
+
+/** LOM-P2A-2 local enrollment: no token is ever typed for normal use. */
+export function enrollManagerPpuBootstrap(
+  alias: string,
+  request: { entry: "button"; step: "start" | "claim" } | { entry: "ticket"; ticket: string },
+): Promise<ManagerPpuEnrollmentResult> {
+  return jsonRequest<ManagerPpuEnrollmentResult>(`${root(alias)}/enrollment`, {
     method: "POST",
-    body: JSON.stringify({ token }),
+    body: JSON.stringify(request),
   });
 }
 
@@ -213,6 +234,88 @@ export function commitManagerPpuBootstrapUpload(alias: string, uploadId: string)
   return jsonRequest<UploadPayload>(`${root(alias)}/uploads/${encodeURIComponent(uploadId)}/commit`, {
     method: "POST",
     body: JSON.stringify({ action: "commit" }),
+  });
+}
+
+export function admitManagerPpuBundle(
+  alias: string,
+  uploadId: string,
+  archiveSha256: string,
+): Promise<DeploymentPayload> {
+  if (!/^[0-9a-f]{32}$/.test(uploadId)) {
+    return Promise.reject(new Error("Invalid Bundle upload ID"));
+  }
+  if (!/^[0-9a-f]{64}$/.test(archiveSha256)) {
+    return Promise.reject(new Error("Invalid Bundle SHA-256"));
+  }
+  // Browser -> existing BFF -> Manager -> the same PPU Bootstrap API. The
+  // explicit owner choice is the exact SHA-256 of the selected file; the
+  // paired Manager turns it into a device-bound Owner Operation Authorization.
+  // No device credential, per-Bundle allowlist or install/activate flag.
+  return jsonRequest<DeploymentPayload>(`${root(alias)}/deployments`, {
+    method: "POST",
+    body: JSON.stringify({ kind: "bundle", upload_id: uploadId, archive_sha256: archiveSha256 }),
+  }).then(receipt => {
+    const deployment = receipt.deployment;
+    const result = deployment?.result;
+    const plan = result && typeof result === "object"
+      ? (result.plan as Record<string, unknown> | undefined) : undefined;
+    const owner = plan?.owner_authorization && typeof plan.owner_authorization === "object"
+      ? (plan.owner_authorization as Record<string, unknown>) : undefined;
+    if (deployment?.state !== "admitted" ||
+        result?.stage !== "package_admission_only" ||
+        result?.install_qualified !== false ||
+        result?.owner_authorized !== true ||
+        plan?.kind !== "bundle" ||
+        plan?.execution_permitted !== false ||
+        plan?.archive_sha256 !== archiveSha256 ||
+        owner?.status !== "OWNER_AUTHORIZED" ||
+        owner?.action !== "bundle.admit" ||
+        owner?.subject_sha256 !== archiveSha256) {
+      throw new Error("Bundle B2 receipt lacks owner authorization for this exact file or non-execution guarantee");
+    }
+    return receipt;
+  });
+}
+
+export interface AdmittedBundle {
+  uploadId: string;
+  archiveSha256: string;
+  admissionTransactionId: string;
+}
+
+export function installManagerPpuBundle(
+  alias: string,
+  admitted: AdmittedBundle,
+  fpgaLoad: boolean,
+): Promise<DeploymentPayload> {
+  if (!/^[0-9a-f]{32}$/.test(admitted.uploadId) ||
+      !/^[0-9a-f]{32}$/.test(admitted.admissionTransactionId)) {
+    return Promise.reject(new Error("Invalid Bundle upload or admission ID"));
+  }
+  if (!/^[0-9a-f]{64}$/.test(admitted.archiveSha256)) {
+    return Promise.reject(new Error("Invalid Bundle SHA-256"));
+  }
+  // B3 of the PPU's CURRENT B2-admitted Bundle. The owner choices are the
+  // exact admitted SHA-256/transaction and whether to also load its FPGA
+  // Image; never a path, idle claim or token. Both Console choices activate
+  // the Bundle as the Active Set (the Manager requires an explicit mode);
+  // the Console never requests a stage-only install.
+  return jsonRequest<DeploymentPayload>(`${root(alias)}/deployments`, {
+    method: "POST",
+    body: JSON.stringify({
+      kind: "bundle", upload_id: admitted.uploadId,
+      archive_sha256: admitted.archiveSha256,
+      admission_transaction_id: admitted.admissionTransactionId,
+      mode: "activate",
+      fpga_load: fpgaLoad,
+    }),
+  }).then(receipt => {
+    const state = receipt.deployment?.state;
+    if (receipt.deployment?.upload_id !== admitted.uploadId || (state !== "queued" && state !== "running")) {
+      throw new Error("Bundle B3 submission was not queued");
+    }
+    return receipt;
   });
 }
 

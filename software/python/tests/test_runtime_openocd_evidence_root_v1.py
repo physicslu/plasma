@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from plasma_web.device_catalog import DeviceCatalogIntegrityError
-from plasma_web.gateway import _device_search_payload
+from plasma_web.legacy_device_selector import _device_search_payload
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.backend_candidate_registry import (
     ROOT as CANDIDATE_ROOT,

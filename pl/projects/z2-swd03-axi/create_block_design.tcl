@@ -1,3 +1,5 @@
+# RETIRED: historical Tcl retained for offline code/tests only.
+error "RETIRED_Z2_SWD03_AXI: retired FPGA image build entrypoint"
 # Four independent 4 KiB apertures. No external SWD pins or PL IO.
 # Original Identity / Control / SWD-00 behavior is preserved.
 create_bd_design system

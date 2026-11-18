@@ -12,8 +12,6 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 import plasma_path2_persistent_lease as lease
-import plasma_path2_f1b_adapters as adapter
-import plasma_path2_stage_orchestrator as stage
 
 NOW = 100_000
 SRC = "a" * 40
@@ -270,37 +268,6 @@ def test_invalid_intent_never_creates_state_file(tmp_path,field,value):
     with pytest.raises(lease.LeaseDenied):
         store.initialize(intent(**{field:value}),NOW)
     assert not store.path.exists()
-
-
-def test_guarded_existing_adapter_can_consult_persisted_lease(tmp_path):
-    """Integration point uses actual merged adapter API, but only fake data."""
-    store=loaded(tmp_path)
-    events=[]
-    rawload = {"stage":"download","status":"PASS","source_sha":SRC,
-               "profile_id":"f1b-site1-v1", "target_id":"z2-test",
-               "artifact_sha256":BIT,"lease_id":"lease-123",
-               "load_evidence_sha256":LOAD, "evidence_sha256":"5"*64}
-    def guarded_identity(ctx):
-        now=NOW+3
-        lease.require_testing(store.snapshot(),held_request(),obs(BIT,now),now)
-        events.append("identity-callback")
-        return {"result":"IDENTITY_PASS", "source_sha":SRC,
-                "profile_id":"f1b-site1-v1", "target_id":"z2-test",
-                "artifact_sha256":BIT, "lease_id":"lease-123",
-                "load_evidence_sha256":LOAD,"test_evidence_sha256":TEST,
-                "observed":dict(adapter.f1b.IDENTITY),
-                "read32_count":3,"write32_count":0,
-                "native_readonly":True,"image_state":"LOADED_AND_HELD"}
-    handlers=adapter.bind_f1b_adapters(identity_test=guarded_identity)
-    out=stage.run({"stage":"test","source_sha":SRC,
-                   "profile_id":"f1b-site1-v1","target_id":"z2-test",
-                   "artifact_sha256":BIT,"load_receipt":rawload},
-                  adapters=handlers)
-    assert events==["identity-callback"]
-    assert out["completed"]==["test"]
-    assert out["status"]=="RECEIPTS_VALIDATED"
-    assert store.snapshot()["status"]=="LOADED_AND_HELD"
-    # This proves eligibility-check integration only. The test is a HOST MOCK.
 
 
 def test_module_is_inert_without_hardware_entrypoint():

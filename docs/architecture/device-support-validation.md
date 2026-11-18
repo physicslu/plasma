@@ -148,10 +148,35 @@ target voltage and relevant electrical limits
 programming backend/profile and versions
 PPU model and hardware revision
 Site interface revision or capability profile
-Socket model/adapter revision
+Socket model/adapter revision, or explicit DIRECT_WIRE with Socket NOT_APPLICABLE
 Plasma software version
 algorithm/settings revision
 ```
+
+For Catalog L3 there are two independently verified configuration tracks:
+`PPU_SITE` (`PPU Ready`) and `SOCKET_ADAPTER` (`Socket Ready`). A direct-wired
+PPU/Site HIL result may qualify the first without any Socket, but it must
+explicitly record that the Socket was absent. A Socket result requires a
+physical fixture identity and versioned receipt. Each HIL PASS is scoped to
+the actual device, site, image, operations and versions used. Missing analog
+voltage/current or wiring revision observations remain `NOT_TESTED` /
+`NOT_RECORDED` when available, but **independent analog voltage/current
+measurements and a physical wiring-harness revision are not L3 promotion
+prerequisites**. Either observation may be omitted without blocking the
+configuration-scoped HIL result. Neither an L3 badge nor a historical HIL PASS
+authorizes a new live Job. The separate L3 tracks do not create a `Both Ready` tier.
+
+An additional reviewed **PPU Family Ready** source can promote an explicitly
+admitted Exact ICPN to L3 without falsely attaching another part's HIL receipt
+to that ICPN. It requires the selected Exact ICPN's prior L2 `SUPPORTED`
+qualification, manufacturer Programming Guide source lock, same versioned
+Provider/target CFG/driver, the correct per-ICPN Flash geometry, an exact
+allowlist entry, and a real PPU/Site HIL PASS anchor. Its
+`ppu_readiness_source=FAMILY_DERIVED` and `verified_configurations=[]` explicitly
+distinguish **family-inferred PPU compatibility** from `DIRECT_HIL` (same exact
+ICPN physically tested). **Socket Ready never inherits** from a PPU Family
+Ready group. See ADR-0002 for normative promotion policy; the versioned family
+allowlist is `release/physical-compatibility/l3-family-ready-v1.json`.
 
 The `configuration_fingerprint` covers reusable compatibility fields: device variant, package, programming backend/profile, interface, voltage/settings, PPU model/revision, Site interface profile/revision, Socket model/revision, and algorithm/settings revision.
 

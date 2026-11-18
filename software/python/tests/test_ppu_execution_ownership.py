@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ from plasma_client.client import PlasmaClient
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
+from plasma_interfaces.mock import MockInterface
 from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
 
@@ -188,3 +190,75 @@ class PPUExecutionOwnershipTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(PlasmaError) as caught:
             await client.start(invalid)
         self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
+
+
+class _HeldEraseMock(MockInterface):
+    """Erase blocks on a shared event, recording the Site that reached hardware."""
+
+    def __init__(self, site_id: int, arrived: dict[int, asyncio.Event],
+                 release: asyncio.Event) -> None:
+        super().__init__()
+        self._site_id = site_id
+        self._arrived = arrived
+        self._release = release
+
+    async def erase(self, progress=None) -> None:
+        self._arrived[self._site_id].set()
+        await self._release.wait()
+
+
+class PPUSiteConcurrencyOracleTests(unittest.IsolatedAsyncioTestCase):
+    """PPU-side oracle: ``server.max_concurrent_jobs`` alone decides overlap.
+
+    One Batch owner holds the PPU lease for both Sites. Each Site's interface
+    is held on an event, so a serial PPU cannot let the second Site reach the
+    interface while the first is still held, and a two-slot PPU must.
+    """
+
+    async def _manager(self, max_jobs: int):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        config = make_config(Path(temporary.name), enabled_sites=2, max_concurrent_jobs=max_jobs,
+                             site_options={1: {"operation_timeout_s": 10.0},
+                                           2: {"operation_timeout_s": 10.0}})
+        arrived = {1: asyncio.Event(), 2: asyncio.Event()}
+        release = asyncio.Event()
+        manager = SiteManager(config, interface_factory=lambda site: _HeldEraseMock(
+            site.id, arrived, release))
+        await manager.start()
+        self.addAsyncCleanup(manager.shutdown)
+        futures = [manager.enqueue(JobRequest(
+            site_id=site, operation=Operation.ERASE, job_id=f"batch-a-site-{site}",
+            client_id="plasma-batch-runtime", metadata={"batch_id": "batch-a"}))
+            for site in (1, 2)]
+        return manager, arrived, release, futures
+
+    async def test_two_slots_overlap_both_sites_under_one_batch_lease(self) -> None:
+        manager, arrived, release, futures = await self._manager(2)
+        await asyncio.wait_for(asyncio.gather(arrived[1].wait(), arrived[2].wait()), 5)
+        lease = manager.execution_lease_snapshot()
+        self.assertEqual((lease["owner_kind"], lease["owner_id"], lease["active_job_count"]),
+                         ("batch", "batch-a", 2))
+        states = {site: manager.registry.get(f"batch-a-site-{site}").state.value for site in (1, 2)}
+        self.assertEqual(states, {1: "running", 2: "running"})
+        release.set()
+        results = await asyncio.wait_for(asyncio.gather(*futures), 5)
+        self.assertEqual([r.state.value for r in results], ["success", "success"])
+
+    async def test_one_slot_serializes_sites_even_under_one_batch_lease(self) -> None:
+        manager, arrived, release, futures = await self._manager(1)
+        first = await asyncio.wait_for(asyncio.wait(
+            [asyncio.ensure_future(arrived[s].wait()) for s in (1, 2)],
+            return_when=asyncio.FIRST_COMPLETED), 5)
+        self.assertTrue(first[0])
+        held = 1 if arrived[1].is_set() else 2
+        other = 3 - held
+        for _ in range(50):  # the peer is admitted and queued, never on hardware
+            await asyncio.sleep(0.01)
+            self.assertFalse(arrived[other].is_set(), "max_concurrent_jobs=1 let a peer overlap")
+        self.assertEqual(manager.registry.get(f"batch-a-site-{other}").state.value, "queued")
+        self.assertEqual(manager.execution_lease_snapshot()["active_job_count"], 2)
+        release.set()
+        await asyncio.wait_for(arrived[other].wait(), 5)
+        results = await asyncio.wait_for(asyncio.gather(*futures), 5)
+        self.assertEqual([r.state.value for r in results], ["success", "success"])

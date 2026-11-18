@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import unittest
 from pl.hil.swd04.one_shot import run_protected
+from pl.hil.swd04 import one_shot
+from unittest.mock import patch
+from pathlib import Path
 
 
 class OneShotSupervisorTests(unittest.TestCase):
@@ -65,6 +68,16 @@ class OneShotSupervisorTests(unittest.TestCase):
         self.assertEqual(events, ["preflight", "load", "hil01", "hil02", "restore", "verify"])
         self.assertEqual(state["restoration_verified"], "FAIL_OR_UNKNOWN")
         self.assertEqual(state["overall"], "NO_GO")
+
+
+class LegacyPathRetirementTests(unittest.TestCase):
+    def test_retired_default_swd05_sequence_denied_before_physical_preflight(self):
+        """The retired default sequence must never reach artifacts or hardware."""
+        with patch.object(one_shot, "verify_inputs",
+                          side_effect=AssertionError("must not touch preflight")):
+            with self.assertRaisesRegex(one_shot.c.SafetyError,
+                                        "RETIRED_SWD05_INTERNAL_SEQUENCE_NO_CALLBACK"):
+                one_shot.run_live(object())
 
 
 if __name__ == "__main__":

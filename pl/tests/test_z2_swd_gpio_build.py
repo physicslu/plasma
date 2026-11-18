@@ -244,54 +244,16 @@ class Z2SourceContractTest(unittest.TestCase):
             # incorrectly display NOT_STARTED after a successful hash check.
             self.assertIn("STAGE SHA-256 verification: 00:00:01", summary)
 
-    def test_foreground_blocking_client_with_mock_supervisor(self):
-        """Real Bash detach+block+reattach behavior, no Vivado/FPGA execution."""
-        import shutil
-
-        source = ROOT / "projects/z2-swd-gpio/build-blocking-on-swpc.sh"
-        for tool in ("bash", "flock", "nohup", "tail", "git"):
-            if shutil.which(tool) is None:
-                self.skipTest(f"{tool} not available")
-        with tempfile.TemporaryDirectory() as tmp:
-            folder = Path(tmp) / "pl/projects/z2-swd-gpio"
-            folder.mkdir(parents=True)
-            monitor = folder / "run-monitored-on-swpc.sh"
-            shutil.copyfile(source, folder / source.name)
-            shutil.copyfile(ROOT / "projects/z2-swd-gpio/build-progress.py", folder / "build-progress.py")
-            monitor.write_text(
-                '#!/usr/bin/env bash\n'
-                'set -Eeuo pipefail\n'
-                'd="$(cd -- "$(dirname "$0")/../../build/z2-swd-gpio/logs" && pwd)"\n'
-                'printf "STATUS=RUNNING\\nSUPERVISOR_PID=%s\\n" "$$" > "$d/monitored-build.status"\n'
-                'echo MOCK_BUILD_STARTED\n'
-                'sleep 0.3\n'
-                'printf "STATUS=PASS\\nSUPERVISOR_PID=%s\\n" "$$" > "$d/monitored-build.status"\n'
-                'echo MOCK_BUILD_FINISHED\n'
-            )
-            subprocess.run(["git", "-C", tmp, "init", "-q"], check=True)
-            run = subprocess.run(
-                ["bash", str(folder / source.name), "start"],
-                text=True, capture_output=True, timeout=15,
-                env={**os.environ, "PLASMA_PROGRESS_INTERVAL_SECONDS": "1"},
-            )
-            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-            self.assertIn("BUILD_STARTED_SUPERVISOR_PID=", run.stdout)
-            self.assertIn("MOCK_BUILD_FINISHED", run.stdout)
-            self.assertIn("RESULT=PASS", run.stdout)
-            pid = (Path(tmp) / "pl/build/z2-swd-gpio/logs/monitored-build.pid").read_text().strip()
-            reattach = subprocess.run(
-                ["bash", str(folder / source.name), "attach", pid],
-                text=True, capture_output=True, timeout=15,
-            )
-            self.assertEqual(reattach.returncode, 0, reattach.stdout + reattach.stderr)
-            self.assertIn("RESULT=PASS", reattach.stdout)
-            wrong = subprocess.run(
-                ["bash", str(folder / source.name), "attach", "99999999"],
-                text=True, capture_output=True, timeout=15,
-            )
-            self.assertNotEqual(wrong.returncode, 0)
-            self.assertIn("stale/unrelated status", wrong.stderr)
-
+    def test_retired_monitor_entrypoints_fail_closed(self):
+        """Retired GPIO build/monitor scripts cannot launch Vivado or workers."""
+        folder = ROOT / "projects/z2-swd-gpio"
+        for script in ("build-on-swpc.sh", "run-monitored-on-swpc.sh",
+                       "build-blocking-on-swpc.sh"):
+            with self.subTest(script=script):
+                result = subprocess.run(["bash", str(folder / script)],
+                                        text=True, capture_output=True, timeout=5)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("RETIRED_Z2_SWD_GPIO", result.stderr)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 # PPU Bootstrap Factory Provisioning and Z2 HIL
 
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) defines the two PPU deployment routes; this document covers Route A (product deployment) and its Factory Bootstrap prerequisite.
+
 Status: physical PYNQ-Z2 PS first install, Runtime verification, reboot persistence, normal upgrade, controlled activation-failure rollback and reboot-after-rollback are evidenced. FPGA/PL, Site electrical behavior, target power, real IC programming and physical multi-Site concurrency remain separate qualification domains.
 
 ## Responsibility boundary
@@ -23,7 +25,7 @@ On the real `z2-ps` profile:
 <Z2-LAN-IP>:18081  independent Bootstrap / recovery service
 ```
 
-This is profile-specific. SWPC Z2-like `:18081` remains its restricted diagnostics/status ingress and is not the Bootstrap service.
+This is profile-specific. The former SWPC host `127.0.0.1:18081` diagnostics/status ingress is retired (Issue #549) and must stay unused; see the [port profile matrix](port-profile-matrix.md).
 
 Bootstrap HTTP is currently qualified only for a controlled private commissioning link. Transport confidentiality and publisher authenticity are **not qualified**. SHA-256 proves integrity only.
 
@@ -50,15 +52,27 @@ Expected ownership:
 /etc/systemd/system/plasma-bootstrap.service
 ```
 
+The factory bundle must contain `scripts/ppu_unified_deployment.py` together
+with `ppu-bootstrap-service.py`. The existing factory installer copies both
+to `/opt/plasma/bootstrap/`, allowing the Package Admission code merged in
+PR #1219 to load its verifier directly from the installed Bootstrap directory.
+The Factory Installer does **not** automatically create a board identity file,
+install a generic Package, activate anything or modify Runtime/FPGA.
+
+Before generic Package Admission, the operator must independently verify the
+specific device's board/FPGA identity, then explicitly provision
+`/etc/plasma/ppu-package-target.json` as a root-owned regular file with mode
+`0600`, containing exactly `platform`, `board` and `fpga_part`. An absent,
+untrusted or mismatched target profile fails closed. This is a local device
+enrollment responsibility, not a property claimed by a remote Manifest.
+See the [physical admission transcript](../evidence/ppu-package-admission-2026-10-30/README.md)
+for the bounded real-Z2 evidence and limitations. The current commissioning
+HTTP service does not qualify TLS confidentiality or publisher authenticity;
+the SWPC production HTTPS Client must not silently downgrade to HTTP.
+
 A clean factory install must not create `/opt/plasma/current`.
 
-Provision the device-local pairing token separately:
-
-```bash
-sudo /usr/bin/python3 /opt/plasma/bootstrap/ppu-bootstrap-service.py provision-token
-```
-
-Treat the printed token as a one-time factory credential. Do not put it in repository files, screenshots, CI artifacts or general logs.
+The factory install provisions **no** credential. A Control Station becomes the PPU's controller only through Local Owner Mode enrollment (LOM-P2A-2, [ADR-0008](../adr/0008-local-owner-mode.md), [enrollment spec](../development/opf-local-owner-mode-p2a0-enrollment-spec.md)): the PS-GPIO enrollment button (production entry once the board profile is hardware-verified), the Engineering CLI `ppu-enroll.py arm` under a root-owned Engineering Mode policy (development), or an SD boot-partition ticket (rescue). The retired `provision-token` command no longer exists; an existing P2A-1 `control-token` is migrated once to controller generation 1. Clients never send the credential: every authenticated request uses [mutual request authentication](ppu-bootstrap-request-authentication.md).
 
 Validate Bootstrap while Product Runtime is absent:
 
@@ -98,13 +112,13 @@ tar -xzf plasma-ppu-bootstrap-*.tar.gz
 cd plasma-ppu-bootstrap-*/
 sudo /usr/bin/python3 scripts/ppu-bootstrap-installer.py \
   --source-root "$PWD/scripts" \
-  --host 192.168.2.99 \
+  --host <Z2_HOST> \
   --enable-now
 # --enable-now does NOT restart an already-running Bootstrap unit.
 sudo systemctl restart plasma-bootstrap.service
 systemctl is-active plasma-bootstrap.service
-curl --noproxy '*' -fsS http://192.168.2.99:18081/v1/health
-curl --noproxy '*' -fsS http://192.168.2.99:18081/v1/status
+curl --noproxy '*' -fsS http://<Z2_HOST>:18081/v1/health
+curl --noproxy '*' -fsS http://<Z2_HOST>:18081/v1/status
 ```
 
 This reinstall updates the factory scripts and service unit without clearing
@@ -160,7 +174,7 @@ In **EMode -> PPU Sites -> Runtime Deployment**:
 
 1. Select the known PPU connection. Programming Registration may still be pending, commissioned or disabled.
 2. Confirm Bootstrap status and immutable `device_id`.
-3. Enter the one-time Platform maintenance pairing token.
+3. Enroll this Control Station (Local PPU Enrollment: PPU button, or the engineering ticket in development). No token is typed for normal use.
 4. Select the CI-produced `plasma-z2-ps-kit-*.tar.gz` and matching `.sha256` sidecar.
 5. Confirm PPU ID, Facility ID and Display Name.
 6. Start Runtime deployment.
@@ -305,7 +319,7 @@ readlink -f /opt/plasma/current
 systemctl is-active plasma-server.service
 systemctl is-active plasma-web.service
 systemctl is-active plasma-runtime-activation.service
-curl -fsS http://192.168.2.99:18080/api/health/ready
+curl -fsS http://<Z2_HOST>:18080/api/health/ready
 ```
 
 Observed:
@@ -345,7 +359,7 @@ systemctl is-active plasma-bootstrap.service
 systemctl is-active plasma-server.service
 systemctl is-active plasma-web.service
 systemctl is-active plasma-runtime-activation.service
-curl -fsS http://192.168.2.99:18080/api/health/ready
+curl -fsS http://<Z2_HOST>:18080/api/health/ready
 sudo bash scripts/plasmactl verify z2-ps
 ```
 

@@ -1,3 +1,5 @@
+# RETIRED: historical Tcl retained for offline code/tests only.
+error "RETIRED_Z2_SWD03_AXI: retired FPGA image build entrypoint"
 # New SWD-03 host-only implementation; never programs the Z2.
 set script_dir [file dirname [file normalize [info script]]]
 source [file join $script_dir create_project.tcl]

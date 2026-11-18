@@ -12,14 +12,44 @@ from .bootstrap import (
     BootstrapCredentialError,
     BootstrapCredentialStore,
     BootstrapManagerError,
+    ControllerReplacedError,
     ManagerBootstrapCoordinator,
 )
 from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
+from .programming import (
+    SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
+    BundleProgrammingWorkflow, ProgrammingError,
+)
+from .programming_batch import ProgrammingBatchCoordinator
 from .registry import RegistryEntryNotFound
+from .shared_control import SharedControlError, shared_boundary
 from .verified_bootstrap import VerifiedManagerBootstrapCoordinator
 
 BOOTSTRAP_ROUTE_RE = re.compile(r"^/api/registry/([^/]+)/bootstrap(?:/(.*))?$")
 UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+PROGRAMMING_RUN_RE = re.compile(r"^programming/runs/([0-9a-f]{32})$")
+PROGRAMMING_OUTPUT_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/output$")
+# The Batch is owned by the Manager, not by a PPU, so its canonical resource
+# does not sit under one. The alias-scoped compatibility entry, and the
+# alias-scoped start resource that served it, retired in PR-C (ADR 5.8)
+# after every consumer was migrated.
+CANONICAL_BATCHES = "/api/programming/batches"
+CANONICAL_BATCH_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})$")
+CANONICAL_BATCH_STOP_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})/stop$")
+CANONICAL_STARTS = "/api/programming/starts"
+CANONICAL_START_RE = re.compile(r"^/api/programming/starts/([0-9a-f]{32})$")
+CANONICAL_START_VOID_RE = re.compile(r"^/api/programming/starts/([0-9a-f]{32})/void$")
+PROGRAMMING_ACK_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/acknowledge$")
+#: Retired in PR-C. A Console tab loaded before the Control Station was
+#: upgraded still holds the old JavaScript and will ask for these.
+RETIRED_PROGRAMMING_ACTIONS = (
+    re.compile(r"^programming/batches$"),
+    re.compile(r"^programming/batches/[0-9a-f]{32}$"),
+    re.compile(r"^programming/batches/[0-9a-f]{32}/stop$"),
+    re.compile(r"^programming/starts$"),
+    re.compile(r"^programming/starts/[0-9a-f]{32}$"),
+    re.compile(r"^programming/starts/[0-9a-f]{32}/void$"),
+)
 
 
 class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
@@ -31,6 +61,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
     """
 
     bootstrap_coordinator: ManagerBootstrapCoordinator | None = None
+    programming_workflow: BundleProgrammingWorkflow | None = None
+    programming_batches: ProgrammingBatchCoordinator | None = None
     runtime_client_factory = PPUHttpClient
     _bootstrap_init_lock = RLock()
 
@@ -63,15 +95,82 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 credentials,
                 config.request_timeout_s,
             )
+            if self.network_commissioning is not None:
+                self.network_commissioning.write_signer_for = cls.bootstrap_coordinator.gateway_signer
             return cls.bootstrap_coordinator
+
+    def _programming(self) -> BundleProgrammingWorkflow:
+        cls = type(self)
+        if cls.programming_workflow is not None:
+            return cls.programming_workflow
+        with cls._bootstrap_init_lock:
+            if cls.programming_workflow is None:
+                config = self._config()
+                journal = (config.registry_state_path.with_name("bundle-programming-runs.json")
+                           if config.registry_state_path is not None else None)
+                cls.programming_workflow = BundleProgrammingWorkflow(
+                    coordinator=self._bootstrap(),
+                    registry=self.registry_store,
+                    gateway_client_factory=cls.runtime_client_factory,
+                    gate=self._operation_gate(),
+                    request_timeout_s=config.request_timeout_s,
+                    journal_path=journal,
+                )
+            return cls.programming_workflow
+
+    def _batches(self) -> ProgrammingBatchCoordinator:
+        cls = type(self)
+        if cls.programming_batches is not None:
+            return cls.programming_batches
+        workflow = self._programming()
+        with cls._bootstrap_init_lock:
+            if cls.programming_batches is None:
+                config = self._config()
+                journal = (config.registry_state_path.with_name("programming-batches.json")
+                           if config.registry_state_path is not None else None)
+                cls.programming_batches = ProgrammingBatchCoordinator(
+                    workflow, journal_path=journal,
+                    platform_gate=cls.platform_gate_reason,
+                    shared_control_gate=cls.shared_control_gate)
+            return cls.programming_batches
+
+    def _programming_call(self, call) -> None:
+        try:
+            status, payload = call()
+        except ProgrammingError as exc:
+            self._json(exc.status, exc.payload())
+            return
+        except Exception as exc:
+            self._bootstrap_error(exc)
+            return
+        self._json(status, payload)
+
+    def _ppu_client(self, alias: str, endpoint: str) -> PPUHttpClient:
+        client = type(self).runtime_client_factory(endpoint, self._config().request_timeout_s)
+        try:
+            signer = getattr(self._bootstrap(), "gateway_signer", None)
+        except BootstrapManagerError:
+            signer = None          # unsigned writes are refused by a G13 PPU (fail closed)
+        if signer is not None:
+            client.write_signer = signer(alias)
+        return client
+
+    def _ppu_write_error(self, exc: Exception) -> bool:
+        if isinstance(exc, (BootstrapManagerError, RegistryEntryNotFound)):
+            self._bootstrap_error(exc)
+            return True
+        return False
 
     def _bootstrap_error(self, exc: Exception) -> None:
         if isinstance(exc, RegistryEntryNotFound):
             status = HTTPStatus.NOT_FOUND
             code = "ppu_not_found"
+        elif isinstance(exc, ControllerReplacedError):
+            status = HTTPStatus.CONFLICT
+            code = "controller_replaced"
         elif isinstance(exc, BootstrapCredentialError):
             status = HTTPStatus.CONFLICT
-            code = "bootstrap_pairing_required"
+            code = "controller_enrollment_required"
         elif isinstance(exc, BootstrapManagerError):
             status = HTTPStatus.CONFLICT
             code = "bootstrap_operation_rejected"
@@ -127,27 +226,84 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         return None
 
     def _bootstrap_mutation_allowed(self, alias: str) -> bool:
+        """The Platform gate as an HTTP answer: writes the refusal it decides."""
+        try:
+            block = self._platform_mutation_block(alias)
+        except Exception as exc:
+            self._bootstrap_error(exc)
+            return False
+        if block is None:
+            return True
+        code, message = block
+        self._json(HTTPStatus.CONFLICT,
+                   {"ok": False, "error": {"code": code, "message": message}})
+        return False
+
+    def _programming_fleet_item_for_alias(self, alias):
+        with shared_boundary("FLEET_CACHE_READ"):
+            snapshot = self._poller().snapshot()
+            ppus = snapshot["ppus"]
+            if not isinstance(ppus, list):
+                raise ValueError("invalid fleet cache")
+            matches = [item for item in ppus if isinstance(item, dict) and item.get("alias") == alias]
+            return matches[0] if len(matches) == 1 else None
+
+    @classmethod
+    def shared_control_gate(cls):
+        try:
+            with shared_boundary("MANAGER_SHARED_AUTHORITY"):
+                if cls.registry_store is None or cls.poller is None or cls.bootstrap_coordinator is None:
+                    return SHARED_CONTROL_FAILURE, "MANAGER_CONTROL_PLANE_UNAVAILABLE"
+                cls.registry_store.records()
+                cls.poller.shared_control_check()
+                if cls.bootstrap_coordinator.registry is not cls.registry_store:
+                    return SHARED_CONTROL_FAILURE, "MANAGER_REGISTRY_AUTHORITY_MISMATCH"
+                cls.bootstrap_coordinator.shared_control_check()
+        except SharedControlError as exc:
+            return SHARED_CONTROL_FAILURE, str(exc)
+        return None
+
+    @classmethod
+    def platform_gate_reason(cls, alias: str) -> tuple[str, str] | None:
+        """The same gate, classified by failure domain, for a non-request caller.
+
+        The Batch coordinator re-evaluates this immediately before it operates
+        each PPU, long after the request that admitted the Batch is gone, so it
+        cannot borrow a live handler. The probe below carries no instance state
+        at all: every helper it reaches reads class-level Manager state - the
+        fleet poller, the Bootstrap coordinator, the registry - which is what
+        this judgement is made of.
+
+        Those three ARE the shared control. If any of them is missing, this
+        gate cannot be executed at all, and that is not one PPU's problem: it
+        is reported as a shared failure rather than quietly degrading into
+        "no fleet entry, therefore idle", which would let an unjudged PPU
+        through. A failure while reading ONE PPU's Platform state is local to
+        that PPU, and nothing has been submitted for it at this point.
+        """
+        shared = cls.shared_control_gate()
+        if shared is not None:
+            return shared
+        probe = object.__new__(cls)
+        # Only programming admission uses strict cache provenance. Keep the
+        # other existing Bootstrap HTTP surfaces on their own policy path.
+        probe._fleet_item_for_alias = probe._programming_fleet_item_for_alias
+        try:
+            block = cls._platform_mutation_block(probe, alias)
+        except (BootstrapManagerError, PPUHTTPError) as exc:
+            return TARGET_STATE_UNAVAILABLE, f"PPU_PLATFORM_STATE_UNREADABLE_{type(exc).__name__}"
+        except Exception as exc:
+            return SHARED_CONTROL_FAILURE, f"PLATFORM_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}"
+        return None if block is None else (TARGET_NOT_READY, block[0].upper())
+
+    def _platform_mutation_block(self, alias: str) -> tuple[str, str] | None:
         # Platform maintenance authorization is independent from programming
         # Registration. Registration controls managed Site/programming admission;
         # this gate instead proves the PPU is safe to mutate at the Platform layer.
         if self._alias_has_active_execution(alias):
-            self._json(
-                HTTPStatus.CONFLICT,
-                {
-                    "ok": False,
-                    "error": {
-                        "code": "ppu_busy",
-                        "message": "active PPU Jobs must finish or be cancelled before Platform maintenance",
-                    },
-                },
-            )
-            return False
-
-        try:
-            platform = self._bootstrap().status(alias)
-        except Exception as exc:
-            self._bootstrap_error(exc)
-            return False
+            return ("ppu_busy",
+                    "active PPU Jobs must finish or be cancelled before Platform maintenance")
+        platform = self._bootstrap().status(alias)
         bootstrap = platform.get("bootstrap")
         runtime = bootstrap.get("runtime") if isinstance(bootstrap, dict) else None
         deployment = bootstrap.get("deployment") if isinstance(bootstrap, dict) else None
@@ -155,55 +311,119 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         deployment_state = deployment.get("state") if isinstance(deployment, dict) else None
 
         if runtime_state == "recovery_required" or deployment_state == "recovery_required":
-            self._json(
-                HTTPStatus.CONFLICT,
-                {
-                    "ok": False,
-                    "error": {
-                        "code": "ppu_recovery_required",
-                        "message": "explicit Platform recovery is required before normal Runtime maintenance",
-                    },
-                },
-            )
-            return False
+            return ("ppu_recovery_required",
+                    "explicit Platform recovery is required before normal Runtime maintenance")
 
         # A factory/first-install target has no Runtime whose idle state can be
         # observed yet. Pairing/authentication remains enforced by the Bootstrap
         # coordinator before any mutation reaches the device.
         if runtime_state == "runtime_absent":
-            return True
+            return None
 
         if runtime_state == "runtime_active":
             if not self._trusted_idle_observation(alias):
-                self._json(
-                    HTTPStatus.CONFLICT,
-                    {
-                        "ok": False,
-                        "error": {
-                            "code": "ppu_idle_state_unproven",
-                            "message": (
-                                "a current trusted idle PPU observation is required for normal Runtime maintenance; "
-                                "programming Registration state does not lower this Platform safety gate"
-                            ),
-                        },
-                    },
-                )
-                return False
-            return True
+                return ("ppu_idle_state_unproven",
+                        "a current trusted idle PPU observation is required for normal Runtime "
+                        "maintenance; programming Registration state does not lower this "
+                        "Platform safety gate")
+            return None
 
-        self._json(
-            HTTPStatus.CONFLICT,
-            {
-                "ok": False,
-                "error": {
-                    "code": "ppu_platform_state_invalid",
-                    "message": f"Runtime state {runtime_state!r} is not eligible for normal Platform maintenance",
-                },
-            },
-        )
-        return False
+        return ("ppu_platform_state_invalid",
+                f"Runtime state {runtime_state!r} is not eligible for normal Platform maintenance")
+
+    def _retired_programming_route(self, action: str) -> bool:
+        """The alias-scoped Batch and start routes retired in PR-C (ADR 5.8).
+
+        410 rather than 404: the route existed and is gone, so a Console
+        still running the pre-upgrade JavaScript can say so instead of
+        reporting a PPU that cannot be found. It is a definite refusal -
+        nothing was planned, queued or submitted - and 5.3 reads a 4xx as a
+        refusal, never as an unknown outcome.
+        """
+        if not any(pattern.fullmatch(action) for pattern in RETIRED_PROGRAMMING_ACTIONS):
+            return False
+        self._json(HTTPStatus.GONE, {"ok": False, "error": {
+            "code": "programming_route_retired",
+            "message": ("this alias-scoped programming route retired: a Batch and its "
+                        "start are owned by the Manager, not by a PPU, and live at "
+                        "/api/programming/batches and /api/programming/starts. Nothing "
+                        "was started. Reload the Console to load the current version."),
+        }})
+        return True
+
+    def _canonical_programming_post(self, path: str) -> bool:
+        """The canonical Manager-owned Batch and start resources. Not under a PPU.
+
+        The Platform gate is NOT applied once here for one alias: a Batch
+        spans PPUs, so the gate is evaluated per Target by the coordinator at
+        admission and again immediately before each PPU is operated.
+        """
+        stop_match = CANONICAL_BATCH_STOP_RE.fullmatch(path)
+        void_match = CANONICAL_START_VOID_RE.fullmatch(path)
+        if (stop_match is None and void_match is None
+                and path not in (CANONICAL_BATCHES, CANONICAL_STARTS)):
+            return False
+        try:
+            body = self._read_json_object()
+        except Exception as exc:  # noqa: BLE001 - an unreadable body changes nothing
+            self._bootstrap_error(exc)
+            return True
+        if stop_match is not None:
+            batch_id = stop_match.group(1)
+            # Stop queuing only: allowed in any Platform state.
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().request_stop_batch(batch_id, body)))
+            return True
+        if void_match is not None:
+            # Drops an unconsumed start ID; refuses an admitted start. It
+            # cannot touch a run, a Batch, a Job or a PPU.
+            start_id = void_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._programming().void_start(start_id, body)))
+            return True
+        if path == CANONICAL_STARTS:
+            # Issues a start ID only: nothing is planned, queued or submitted,
+            # and no PPU is read or named.
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._programming().issue_batch_start(body)))
+            return True
+        self._programming_call(
+            lambda: (HTTPStatus.ACCEPTED, self._batches().start_batch(body)))
+        return True
 
     def _bootstrap_get(self, alias: str, action: str) -> None:
+        if action == "programming/routes":
+            self._programming_call(lambda: (HTTPStatus.OK, self._programming().list_routes()))
+            return
+        run_match = PROGRAMMING_RUN_RE.fullmatch(action)
+        if run_match is not None:
+            run_id = run_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._programming().run_status(alias, run_id)))
+            return
+        if self._retired_programming_route(action):
+            return
+        output_match = PROGRAMMING_OUTPUT_RE.fullmatch(action)
+        if output_match is not None:
+            # Read Memory binary: Console -> BFF -> Manager only; the Manager
+            # re-hashes the retained bytes against the run receipt first.
+            try:
+                data, output = self._programming().read_output(alias, output_match.group(1))
+            except ProgrammingError as exc:
+                self._json(exc.status, exc.payload())
+                return
+            except Exception as exc:
+                self._bootstrap_error(exc)
+                return
+            # _raw_response is the only Content-Length producer; a second one
+            # here made Node.js fetch reject the response (duplicate header).
+            self._raw_response(HTTPStatus.OK, {
+                "Content-Type": "application/octet-stream",
+                "Content-Disposition": f'attachment; filename="{output["filename"]}"',
+                "X-Plasma-Read-Sha256": str(output["sha256"]),
+                "X-Content-Type-Options": "nosniff",
+            }, data)
+            return
         if action:
             self._json(
                 HTTPStatus.NOT_FOUND,
@@ -256,7 +476,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             )
             return
         relay_timeout_s = min(max(timeout_ms / 1000.0 + 1.0, self._config().request_timeout_s), 121.0)
-        client = type(self).runtime_client_factory(entry.endpoint, self._config().request_timeout_s)
+        client = self._ppu_client(alias, entry.endpoint)
         started = time.monotonic()
         try:
             status, payload = client.ps_loopback(body, timeout_s=relay_timeout_s)
@@ -342,7 +562,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             )
             return
         relay_timeout_s = min(max(timeout_ms / 1000.0 + 2.0, self._config().request_timeout_s), 35.0)
-        client = type(self).runtime_client_factory(entry.endpoint, self._config().request_timeout_s)
+        client = self._ppu_client(alias, entry.endpoint)
         started = time.monotonic()
         try:
             status, payload = client.openocd_control_plane(body, timeout_s=relay_timeout_s)
@@ -373,10 +593,63 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         coordinator = self._bootstrap()
         try:
             body = self._read_json_object()
-            if action == "pair":
-                if set(body) != {"token"} or not isinstance(body.get("token"), str):
-                    raise ValueError("Bootstrap pairing request requires only token")
-                self._json(HTTPStatus.OK, coordinator.pair(alias, body["token"]))
+            if action == "enrollment":
+                # LOM-P2A-2: button (start/claim) or engineering/SD ticket claim.
+                result = coordinator.enrollment(alias, body)
+                if not result.get("ok"):
+                    result = {**result, "error": {
+                        "code": result.get("state") or "enrollment_failed",
+                        "message": "PPU enrollment did not complete; nothing was changed by this Manager",
+                    }}
+                self._json(HTTPStatus.OK if result.get("ok") else HTTPStatus.CONFLICT, result)
+                return
+            if action == "recovery":
+                status, payload = coordinator.recovery_action(alias, body)
+                self._json(status, payload)
+                return
+            if action == "deployment/reconcile":
+                # P0: explicit close of one already-activated Runtime transaction.
+                # Exclusive with every other Manager-launched PPU write.
+                entry = self._resolve_ppu_alias(alias)
+                if entry is None:
+                    self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {
+                        "code": "ppu_not_found", "message": "configured PPU alias was not found"}})
+                    return
+                gate = self._operation_gate()
+                if not gate.try_begin_platform_launch(alias):
+                    self._json(HTTPStatus.CONFLICT, {"ok": False, "error": {
+                        "code": "ppu_control_plane_busy",
+                        "message": "another managed PPU write or Platform launch is in progress"}})
+                    return
+                try:
+                    if self._alias_has_active_execution(alias):
+                        self._json(HTTPStatus.CONFLICT, {"ok": False, "error": {
+                            "code": "ppu_busy", "message": "active PPU Jobs must finish first"}})
+                        return
+                    status, payload = coordinator.reconcile_runtime_deployment(
+                        alias, body, self._ppu_client(alias, entry.endpoint))
+                    self._json(status, payload)
+                    return
+                finally:
+                    gate.end_platform_launch(alias)
+            if action == "programming/plans":
+                self._programming_call(
+                    lambda: (HTTPStatus.OK, self._programming().plan(alias, body)))
+                return
+            if action == "programming/runs":
+                # Same Platform safety gate as manual B2/B3 (idle, no recovery).
+                if not self._bootstrap_mutation_allowed(alias):
+                    return
+                self._programming_call(
+                    lambda: (HTTPStatus.ACCEPTED, self._programming().start(alias, body)))
+                return
+            if self._retired_programming_route(action):
+                return
+            ack_match = PROGRAMMING_ACK_RE.fullmatch(action)
+            if ack_match is not None:
+                run_id = ack_match.group(1)
+                self._programming_call(
+                    lambda: (HTTPStatus.OK, self._programming().acknowledge(alias, run_id, body)))
                 return
             if action == "ps-loopback":
                 self._platform_ps_loopback(alias, body)
@@ -444,6 +717,19 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        batch_match = CANONICAL_BATCH_RE.fullmatch(parsed.path)
+        if batch_match is not None:
+            batch_id = batch_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().status_batch(batch_id)))
+            return
+        start_match = CANONICAL_START_RE.fullmatch(parsed.path)
+        if start_match is not None:
+            # Start Outcome Reconciliation: read-only, journal and memory only.
+            start_id = start_match.group(1)
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().reconcile_start(start_id)))
+            return
         bootstrap = self._parse_bootstrap_route(parsed.path)
         if bootstrap is not None:
             alias, action = bootstrap
@@ -453,6 +739,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+        if self._canonical_programming_post(parsed.path):
+            return
         bootstrap = self._parse_bootstrap_route(parsed.path)
         if bootstrap is not None:
             alias, action = bootstrap

@@ -1,0 +1,12 @@
+{
+  "capture_bytes": 99955,
+  "capture_exit": 0,
+  "capture_finished_unix": 1793016478.3975081,
+  "capture_log_tail": "sr: kingst-la2016: USB PID 01a2, MCU firmware 'kingst-la-01a2.fw'.\nsr: kingst-la2016: Manufacture date: 2026-03.\nsr: kingst-la2016: Model 'LA2016', 16 channels, max 200MHz.\nsr: kingst-la2016: FPGA bitstream file 'kingst-la2016a2-fpga.bitstream'.\nsr: kingst-la2016: Could re-use current FPGA bitstream. No upload required.\nsr: session: Starting.\ncli: Received SR_DF_HEADER.\ncli: Received SR_DF_FRAME_BEGIN.\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\nsr: output/srzip: output unit size 2, feed unit size 2.\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (7730304 bytes, unitsize = 2).\ncli: Received SR_DF_FRAME_END.\ncli: Received SR_DF_END.\nsr: session: Stopped.\nsr: kingst-la2016: Closing device on <dynamic USB address> interface 0.\n",
+  "capture_sha256": "d477bcb119e14971eed3a94d611e441347c808c935b405ed372c35d48a64c57f",
+  "capture_started_unix": 1793016467.6559913,
+  "dpidr_triggered_unix": 1793016467.773471,
+  "remote_exit": 1,
+  "remote_stderr": "Traceback (most recent call last):\n  File \"<string>\", line 23, in <module>\nAssertionError: IMAGE_CHANGED\n",
+  "remote_stdout": ""
+}

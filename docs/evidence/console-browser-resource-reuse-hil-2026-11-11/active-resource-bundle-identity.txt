@@ -1,0 +1,26 @@
+Active Resource / Bundle identity for job-20261111-002355-13e83290. Every value is quoted from the raw file named on the line.
+
+Resource Set SHA256     39e4bf851bdc0128cfbfd502532d235d05dd0423e4e9ada9c865260f18f5e9a7
+  Manager plan.resource.resource_set_sha256 / ppu_reported (state VERIFIED) ... manager-run-48ed5e17a6555c269afc6808d4f266f6.json
+  Manager receipt expected = observed ......................................... manager-run-receipt.json
+  PPU job.job_binding.resource_set_sha256 ..................................... ppu-job-20261111-002355-13e83290.json
+  PPU ppu.active_resources (state VERIFIED), read after the Job ............... site2-status.json
+Active Asset Set SHA256 387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c, generation 15
+  Manager plan.active_asset_set, steps[RESOURCE_REUSE], receipt .............. manager-run-48ed5e17a6555c269afc6808d4f266f6.json
+  PPU job.active_asset_set (state ACTIVE), job.job_binding ................... ppu-job-20261111-002355-13e83290.json
+  /opt/plasma/assets/active.json, read after the Job ......................... z2-snapshot.txt
+  Bootstrap deployment.result.active_asset_set (bundle bluepill-site2-fw-v02)  manager-z2-bootstrap-status.json
+Job Bundle (Manager plan.bundle, built for this run; not uploaded, not activated)
+  archive_sha256        4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467
+  bundle_name           stm32f103c8t6-site2-img-8d3ffb02b80f, schema plasma.ppu.bundle.v3
+  provider / profile    openocd-platform-reference / stm32f103c8t6-site2
+Image
+  image SHA256          8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d, 18768 bytes (plasma-blue-pill-cdc.bin)
+  image_asset_sha256    80d6d142858934c421cd0b2c716a3a5960d5269cb7e820694b0767c82de74568
+Job Binding SHA256      10bbf176c63982fb8f4d9bd792f5db2322b47bc1d98fac95cd2ccc63e8484ef0
+  operation flash_cycle, range address 134217728 (0x08000000), length 18768, ppu z2-hil, site 2
+Provider identity reported by the Job (ppu-job-...json, result.details.flash_cycle)
+  opf_profile_sha256                 644a76fd5ed433e568e26f8a57761840f4ab7fe3b66430f797ddf9df23bbbdd0
+  opf_openocd_sha256                 b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861
+  opf_engine_selection_sha256        c07ba04c7398979adc7860aea5e0ec54ab088fec2c5891b6f9248ed749b31b05 (= /etc/plasma/site-worker-engine.json SHA256 in z2-snapshot.txt)
+  opf_driver_abi plasma_swd:5, adapter z2-abi5-swd-openocd5088, adapter_khz 2000, openocd_rc 0

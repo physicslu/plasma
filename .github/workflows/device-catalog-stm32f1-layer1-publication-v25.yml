@@ -11,8 +11,6 @@ on:
       - 'data/device-catalog/research/validate_stm32f1_commercial_icpn.py'
       - 'data/device-catalog/research/test_stm32f1_canonical_admission.py'
       - 'data/device-catalog/research/test_stm32f1_phase2_9_scaleout.py'
-      - 'data/ic-support/test_coverage_inventory.py'
-      - 'software/python/tests/test_device_catalog.py'
       - '.github/workflows/device-catalog-validation.yml'
       - '.github/workflows/device-catalog-stm32f1-layer1-publication-v25.yml'
 

@@ -77,7 +77,7 @@ test("Registration owns Console programming admission, not Platform maintenance"
   assert.match(registration, /Programming Registration is still pending/);
   assert.match(registration, /Platform maintenance remains a separate lifecycle/);
   assert.match(registration, /Bootstrap maintenance authorization used by Platform Release update is a separate Platform security boundary/);
-  assert.doesNotMatch(registration, /pairManagerPpuBootstrap|startManagerPpuBootstrapDeployment/);
+  assert.doesNotMatch(registration, /enrollManagerPpuBootstrap|pairManagerPpuBootstrap|startManagerPpuBootstrapDeployment/);
 });
 
 test("Registration keeps Lifecycle, Connectivity, and Health as orthogonal observations", () => {
@@ -138,7 +138,7 @@ test("PPU topology remains observed while Site desired configuration is PPU-owne
   assert.match(ppuSiteDesiredCore, /saveManagerPpuSite/);
   assert.match(ppuSiteDesiredCore, /Desired Enabled/);
   assert.match(ppuSiteDesiredCore, /Desired Interface/);
-  assert.match(ppuSiteDesiredCore, /Desired Target/);
+  assert.doesNotMatch(ppuSiteDesiredCore, /Desired Target/); // ICPN is selected per Job
   assert.match(ppuSiteDesiredCore, /<th>Runtime<\/th>/);
   assert.match(ppuSiteDesiredCore, /<th>Reconciliation<\/th>/);
   assert.match(ppuSiteDesiredCore, /Stop or cancel active Jobs before changing Site desired configuration/);

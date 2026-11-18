@@ -1,3 +1,5 @@
+# RETIRED: historical Tcl retained for offline code/tests only.
+error "RETIRED_Z2_SWD_GPIO: retired FPGA image build entrypoint"
 # Recreate the Z2 PS EMIO GPIO + AXI-Lite identity block design.
 # Caller must create the project, add RTL, set the PYNQ-Z2 BOARD_PART and
 # include pl/build/z2-swd-gpio/generated before sourcing this file.

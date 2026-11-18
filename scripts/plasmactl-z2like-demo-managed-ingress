@@ -88,14 +88,6 @@ server {
         limit_except GET { deny all; }
         proxy_pass $qemu_gateway_root;
     }
-    location = /api/security/me {
-        limit_except GET { deny all; }
-        proxy_pass $qemu_gateway_root;
-    }
-    location = /api/devices/search {
-        limit_except GET { deny all; }
-        proxy_pass $qemu_gateway_root;
-    }
     location = /api/engineering/targets {
         limit_except GET { deny all; }
         proxy_pass $qemu_gateway_root;
@@ -200,6 +192,10 @@ server {
         limit_except GET { deny all; }
         proxy_pass $qemu_bootstrap_root/v1/status;
     }
+    location = $bootstrap_prefix/v1/auth/challenge {
+        limit_except GET { deny all; }
+        proxy_pass $qemu_bootstrap_root/v1/auth/challenge;
+    }
     location = $bootstrap_prefix/v1/uploads {
         limit_except POST { deny all; }
         proxy_pass $qemu_bootstrap_root/v1/uploads;
@@ -224,6 +220,8 @@ server {
     # - POST /api/settings/ppu-network
     # - POST /api/settings/gateway
     # - arbitrary /api/* paths
+    # - /api/devices/search (Device Selector is owned by Manager, PR-C2;
+    #   the PPU Gateway has no Selector route since S5-B)
     # - arbitrary Bootstrap /v1/* paths
     # - direct public access to QEMU/SWPC :18081
     location / { return 404; }

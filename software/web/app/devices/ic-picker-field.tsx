@@ -8,19 +8,20 @@ import {
 import "./ic-picker-field.css";
 
 export type ICPickerFieldProps = {
-  apiBase: string;
   value: DeviceSearchResult | null;
   onChange: (device: DeviceSearchResult | null) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** Catalog Levels offered; display filter only, never an execution gate. */
+  levels?: Array<1 | 2 | 3>;
 };
 
 export function ICPickerField({
-  apiBase,
   value,
   onChange,
   disabled = false,
   placeholder = "Search admitted ICPN...",
+  levels = [2, 3],
 }: ICPickerFieldProps) {
   const [query, setQuery] = useState(value?.icpn ?? value?.identifier ?? "");
   const [results, setResults] = useState<DeviceSearchResult[]>([]);
@@ -37,9 +38,8 @@ export function ICPickerField({
       setLoading(true);
       try {
         const response = await searchDevices(normalized, {
-          apiBase,
           limit: 8,
-          levels: [2, 3],
+          levels,
           signal: controller.signal,
         });
         if (!controller.signal.aborted) {
@@ -57,7 +57,7 @@ export function ICPickerField({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [apiBase, query, value]);
+  }, [query, value, levels.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function choose(device: DeviceSearchResult) {
     const label = device.icpn ?? device.identifier;

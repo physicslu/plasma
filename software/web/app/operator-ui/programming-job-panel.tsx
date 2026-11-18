@@ -5,8 +5,19 @@ import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
 import { OperatorPanel, OperatorPanelToggle } from "./operator-panel";
+import type { ProgrammingSource } from "../engineering/bundle-programming-api";
+import { ProgrammingSourceSelector } from "./programming-source-selector";
 import "./programming-job-controls.css";
 import "./production-workflow-guidance.css";
+
+/**
+ * Console chapter that owns the Programming Job in every mode.
+ *
+ * The chapter order is identical in EMode and PMode:
+ * 1. SYSTEM SETUP & TARGETING · 2. PROGRAMMING JOB · 3. LIVE SITE STATUS ·
+ * 4. ENGINEERING JOB LOG / FACTORY LOG.
+ */
+export const PROGRAMMING_JOB_SECTION = 2;
 
 export type ProgrammingJobOperation = {
   key: string;
@@ -32,6 +43,8 @@ export type ProgrammingJobPolicy = {
   retryLabel: string;
   retryValue: string;
   retryDisabled: boolean;
+  /** Upper bound of the Retry input (default 20). */
+  retryMax?: number;
   retryAriaLabel: string;
   onRetryChange: (value: string) => void;
   stopLabel: string;
@@ -40,6 +53,15 @@ export type ProgrammingJobPolicy = {
   stopAriaLabel: string;
   stopOptions: ProgrammingJobPolicyOption[];
   onStopChange: (value: string) => void;
+  /** Shown under the controls, e.g. why a policy is unavailable. */
+  note?: ReactNode;
+};
+
+/** Programming Image / Bundle selector; only the formal managed backend offers it. */
+export type ProgrammingJobSource = {
+  value: ProgrammingSource;
+  disabled: boolean;
+  onChange: (source: ProgrammingSource) => void;
 };
 
 export type ProgrammingJobImage = {
@@ -47,10 +69,14 @@ export type ProgrammingJobImage = {
   title?: string;
   source?: string;
   hint: ReactNode;
+  /** Size and format of the picked file, shown under its name. */
+  details?: ReactNode;
   browseLabel: string;
   browseDisabled: boolean;
   inputDisabled: boolean;
   inputAriaLabel: string;
+  /** File types offered by the picker; defaults to a binary Image. */
+  accept?: string;
   onFileChange: (file: File | null, event: ChangeEvent<HTMLInputElement>) => void;
 };
 
@@ -61,14 +87,15 @@ export function ProgrammingJobPanel({
   onToggleCollapsed,
   expandLabel,
   collapseLabel,
-  apiBase,
   targetDevice,
   onTargetChange,
   targetDisabled,
   targetPlaceholder,
   targetLabel,
+  targetLevels,
   imageLabel,
   image,
+  source,
   operationsLabel,
   operations,
   policyLabel,
@@ -89,14 +116,16 @@ export function ProgrammingJobPanel({
   onToggleCollapsed: () => void;
   expandLabel: string;
   collapseLabel: string;
-  apiBase: string;
   targetDevice: DeviceSearchResult | null;
   onTargetChange: (device: DeviceSearchResult | null) => void;
   targetDisabled: boolean;
   targetPlaceholder?: string;
   targetLabel: string;
+  /** Catalog Levels offered by the IC Picker (display filter, never a gate). */
+  targetLevels?: Array<1 | 2 | 3>;
   imageLabel: string;
   image: ProgrammingJobImage;
+  source?: ProgrammingJobSource;
   operationsLabel: string;
   operations: ProgrammingJobOperation[];
   policyLabel: string;
@@ -114,13 +143,16 @@ export function ProgrammingJobPanel({
   const { locale } = useI18n();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const modeLabel = mode === "production" ? "Production" : "Engineering";
+  // Single source of the Programming Job numbering for both modes: the fields
+  // are sub-items of section 2, so they are 2-1 … 2-4 in EMode and PMode alike.
+  const fieldNumber = (index: number) => `${PROGRAMMING_JOB_SECTION}-${index}.`;
   const statusText = typeof statusValue === "string" ? statusValue : null;
   const readinessGuidance = statusText ? batchReadinessGuidanceFromLabel(statusText, locale) : null;
   const disabledStartTitle = startDisabled && statusText !== "BATCH READY" ? readinessGuidance ?? undefined : undefined;
 
   return (
     <OperatorPanel
-      number={2}
+      number={PROGRAMMING_JOB_SECTION}
       title={title}
       className={`programmingJobPanel unifiedBatchControlStack ${collapsed ? "is-collapsed" : ""}`}
       ariaLabel={`${modeLabel} Programming Job`}
@@ -137,36 +169,51 @@ export function ProgrammingJobPanel({
       {!collapsed && (
         <div className="programmingJobGrid" data-programming-job-fields={mode}>
           <div className="programmingJobField" data-programming-job-field="target">
-            <strong>1. {targetLabel}</strong>
+            <strong>{fieldNumber(1)} {targetLabel}</strong>
             <ICPickerField
-              apiBase={apiBase}
               value={targetDevice}
               onChange={onTargetChange}
               disabled={targetDisabled}
               placeholder={targetPlaceholder}
+              levels={targetLevels}
             />
           </div>
 
           <div className="programmingJobField programmingJobImageField" data-programming-job-field="image">
-            <strong>2. {imageLabel}</strong>
-            <div className="programmingJobImageControl">
-              <span data-image-source={image.source} title={image.title ?? image.name}>{image.name}</span>
-              <button type="button" disabled={image.browseDisabled} onClick={() => imageInputRef.current?.click()}>{image.browseLabel}</button>
-              <input
-                ref={imageInputRef}
-                type="file"
-                aria-label={image.inputAriaLabel}
-                accept=".bin,application/octet-stream"
-                hidden
-                disabled={image.inputDisabled}
-                onChange={event => image.onFileChange(event.target.files?.[0] ?? null, event)}
-              />
+            <strong>{fieldNumber(2)} {imageLabel}</strong>
+            <div className="programmingJobImageContent">
+              {source && (
+                <ProgrammingSourceSelector
+                  value={source.value}
+                  disabled={source.disabled}
+                  ariaLabel={`${modeLabel} Programming Source`}
+                  onChange={next => {
+                    // A file picked for one Source must never be sent as the other.
+                    if (imageInputRef.current) imageInputRef.current.value = "";
+                    source.onChange(next);
+                  }}
+                />
+              )}
+              <div className="programmingJobImageControl">
+                <span data-image-source={image.source} title={image.title ?? image.name}>{image.name}</span>
+                <button type="button" disabled={image.browseDisabled} onClick={() => imageInputRef.current?.click()}>{image.browseLabel}</button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  aria-label={image.inputAriaLabel}
+                  accept={image.accept ?? ".bin,application/octet-stream"}
+                  hidden
+                  disabled={image.inputDisabled}
+                  onChange={event => image.onFileChange(event.target.files?.[0] ?? null, event)}
+                />
+              </div>
+              {image.details && <small className="programmingJobImageDetails" data-image-details>{image.details}</small>}
+              <small className="programmingJobImageHint">{image.hint}</small>
             </div>
-            <small>{image.hint}</small>
           </div>
 
           <div className="programmingJobField" data-programming-job-field="operations">
-            <strong>3. {operationsLabel}</strong>
+            <strong>{fieldNumber(3)} {operationsLabel}</strong>
             <div className="programmingJobOperationChecks" role="group" aria-label={`${modeLabel} batch operations`}>
               {operations.map(operation => (
                 <label key={operation.key}>
@@ -186,16 +233,17 @@ export function ProgrammingJobPanel({
           </div>
 
           <div className="programmingJobField" data-programming-job-field="policy">
-            <strong>4. {policyLabel}</strong>
+            <strong>{fieldNumber(4)} {policyLabel}</strong>
             <div className="programmingJobPolicyControls">
               <label>{policy.repeatLabel}<input data-programming-job-policy="repeat" aria-label={policy.repeatAriaLabel} type="number" min="1" max="10000" value={policy.repeatValue} disabled={policy.repeatDisabled} onChange={event => policy.onRepeatChange(event.target.value)} /></label>
-              <label>{policy.retryLabel}<input data-programming-job-policy="retry" aria-label={policy.retryAriaLabel} type="number" min="0" max="20" value={policy.retryValue} disabled={policy.retryDisabled} onChange={event => policy.onRetryChange(event.target.value)} /></label>
+              <label>{policy.retryLabel}<input data-programming-job-policy="retry" aria-label={policy.retryAriaLabel} type="number" min="0" max={policy.retryMax ?? 20} value={policy.retryValue} disabled={policy.retryDisabled} onChange={event => policy.onRetryChange(event.target.value)} /></label>
               <label>{policy.stopLabel}
                 <select data-programming-job-policy="stop" aria-label={policy.stopAriaLabel} value={policy.stopValue} disabled={policy.stopDisabled} onChange={event => policy.onStopChange(event.target.value)}>
                   {policy.stopOptions.map(option => <option value={option.value} key={option.value || "never"}>{option.label}</option>)}
                 </select>
               </label>
             </div>
+            {policy.note && <small className="programmingJobPolicyNote" data-programming-job-policy="note">{policy.note}</small>}
           </div>
         </div>
       )}

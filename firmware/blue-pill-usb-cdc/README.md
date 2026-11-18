@@ -161,3 +161,63 @@ live probe is not run in Phase A.** Neither
 these tests nor the static artifact check prove enumeration, real USB timing,
 electrical behavior, disconnect/reconnect, LED operation, or physical CDC
 transmission on a Blue Pill. Those outcomes are `NOT_RUN` in Phase A.
+
+## v0.2 A/B alternate-programming diagnostic image (Host-only Gate 1)
+
+Build v0.1 and v0.2 independently from the same checked-in sources. The
+**original v0.1 remains unchanged in its wire protocol and timing** (0.5s
+heartbeat; PC13 LED toggles every 0.5s). v0.2 identifies itself as
+`ID PLASMA_BLUE_PILL_CDC/0.2` and sends
+`HB version=0.2 seq=<n> uptime_ms=<ms>` every **1.0s after successful
+CDC configuration/transmit**. PC13 (active low) toggles every **1.0s**,
+regardless of whether USB is configured; this means a **2-second ON/OFF
+cycle**, not a 1-second complete blink. Existing manual LED overrides and
+PA12 startup-only D+ pulse/recovery behavior are shared. As with v0.1,
+replies may defer heartbeat transmission while USB CDC TX is busy.
+
+For Flash workload characterization only, v0.2 contains a **fixed-seed
+43 KiB (44,032-byte) SHA256-counter pseudorandom byte array** generated
+from seed `0x504c4153`. The generator is
+`host/generate_flash_payload.py`; its output is a deterministic build
+byproduct (not 43 KiB checked into Git). A dedicated
+`.flash_test_payload` linker section with `KEEP` ensures these bytes
+occupy **loadable Flash**. They do not enter RAM, are not executable,
+and do not claim any run-time randomness/security. Flash measurement is
+based on actual BIN/ELF content, not ELF size alone, BSS, or sparse zero
+padding. The v0.2 acceptance checker requires **61,440–65,536 bytes**
+(60–64 KiB) and verifies exact array bytes inside the loadable Flash
+image, while retaining the original 20 KiB RAM/stack bounds. STM32F103C8T6
+must have **64 KiB of usable Flash from 0x08000000**, with **no Flash
+bootloader or reserved region**. Do not flash this image to a board with
+smaller usable Flash or unknown reserved pages.
+
+With the same pinned STM32CubeF1 + ARM toolchain described above,
+CMake builds both variants and distinct files:
+
+```text
+plasma-blue-pill-cdc.elf/.hex/.bin/.map          (v0.1)
+plasma-blue-pill-cdc-v0.2.elf/.hex/.bin/.map     (v0.2)
+```
+
+```bash
+cmake --build /tmp/plasma-blue-pill-build
+python3 firmware/blue-pill-usb-cdc/host/check_artifacts.py \
+  /tmp/plasma-blue-pill-build /tmp/plasma-arm-toolchain/usr/bin --variant v0.1
+python3 firmware/blue-pill-usb-cdc/host/check_artifacts.py \
+  /tmp/plasma-blue-pill-build /tmp/plasma-arm-toolchain/usr/bin --variant v0.2
+gcc -std=c11 -Wall -Wextra -Werror -fsanitize=undefined \
+  -Ifirmware/blue-pill-usb-cdc/include \
+  -D'APP_VERSION="0.2"' -DAPP_LED_PERIOD_MS=1000u -DAPP_HEARTBEAT_PERIOD_MS=1000u \
+  firmware/blue-pill-usb-cdc/src/app.c \
+  firmware/blue-pill-usb-cdc/tests/test_app_v02.c -o /tmp/plasma-blue-pill-v02-test
+/tmp/plasma-blue-pill-v02-test
+python3 -m unittest discover -s firmware/blue-pill-usb-cdc/host -p 'test_*.py' -v
+```
+
+For **later separately authorized physical testing only**, the existing
+CDC probe defaults to v0.1, or accepts `--version 0.2` to check the
+v0.2 1-second heartbeat/ID. This Gate 1 creates code, CI and a Draft
+PR; **it does not operate USB, SWPC, PYNQ-Z2, ST-LINK, LA2016 or DUT**.
+Build PASS proves neither physical Flash/Readback Verify nor actual
+USB/LED operation; those remain `NOT_RUN` until separately authorized.
+Both variants use experimental `CAFE:4001`, not a production VID/PID.

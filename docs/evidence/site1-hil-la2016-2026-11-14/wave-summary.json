@@ -1,0 +1,34 @@
+{
+  "schema": "plasma.site1.la2016-summary.v1",
+  "channels": {
+    "CH3": {
+      "signal": "SWCLK",
+      "edges": 1817878
+    },
+    "CH4": {
+      "signal": "SWDIO",
+      "edges": 273948
+    },
+    "CH5": {
+      "signal": "DUT_supply_digital_probe",
+      "edges": 0
+    }
+  },
+  "threshold_v": 1.4,
+  "samplerate_hz": 20000000,
+  "actual_samples": 1000001576,
+  "duration_s": 50.0000788,
+  "modal_swclk_rising_period_samples": 10,
+  "modal_swclk_hz": 2000000,
+  "ack_ok": 16822,
+  "ack_wait": 0,
+  "ack_fault": 0,
+  "dpidr_decode_count": 1,
+  "capture_armed": "2026-11-14T12:49:03.739369Z",
+  "job_started": "2026-11-14T12:49:05.757074Z",
+  "job_completed": "2026-11-14T12:49:12.248010Z",
+  "raw_file": "site1-epv.sr",
+  "raw_bytes": 2250393,
+  "raw_sha256": "9ff7c4df08caa46832a6e7f364507023a2ddaaf857069abfa1696bb513b45bf0",
+  "raw_in_github_artifact": 14115251160
+}

@@ -1,0 +1,556 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later
+ * Host-only C test: every bus operation is injected fake, no real MMIO.
+ */
+#include "../plasma_swd_fifo_core.h"
+
+#include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+#define FAKE_Q 64u
+struct fake_bus {
+    uint32_t base, mode, status, meta, rx, levels, pushed_cmd;
+    uint32_t swj_len, stage[8], push_count, word_writes, barriers;
+    uint32_t fail_barrier, fail_read, ack, completion_status;
+    uint32_t fail_write_on_push;
+    uint32_t idle, idle_writes, idle_at_push[8];
+    uint32_t wait_left, aborts; /* WAIT the next N non-ABORT transfers */
+    uint32_t error_clears, discards;
+    /* RTL model: in-order retained completions, at most FAKE_Q. */
+    uint32_t q_meta[FAKE_Q], q_rx[FAKE_Q], q_head, q_count;
+    uint32_t unexecuted;      /* pushed while the fault latch stops dispatch */
+    uint32_t max_outstanding; /* completions + unexecuted, ever observed */
+    bool latched;             /* PARITY/TIMEOUT/ABORT latch (fault_q) */
+    bool no_orun;             /* target without ORUNDETECT */
+    bool orun;                /* DP overrun: WAIT every transfer until ABORT */
+    uint32_t inject_at, inject_status, inject_ack; /* Nth push (1-based) */
+};
+
+static void fake_sync(struct fake_bus *f)
+{
+    f->levels = f->q_count ? 2u : 0u;
+    f->meta = f->q_count ? f->q_meta[f->q_head] : 0u;
+    f->rx = f->q_count ? f->q_rx[f->q_head] : 0u;
+}
+
+/* A completion retained by a previous (killed) owner. */
+static void fake_retain(struct fake_bus *f, uint32_t meta)
+{
+    f->q_meta[(f->q_head + f->q_count) % FAKE_Q] = meta;
+    f->q_rx[(f->q_head + f->q_count) % FAKE_Q] = 0u;
+    ++f->q_count;
+    fake_sync(f);
+}
+
+static int fake_read(void *ctx, uint32_t address, uint32_t *v)
+{
+    struct fake_bus *f = ctx;
+    if (f->fail_read || !v || address < f->base || address >= f->base + 4096u)
+        return -1;
+    const uint32_t off = address - f->base;
+    switch (off) {
+    case 0x00u: *v = PLASMA_SWD_ABI_V5 |
+        (f->base == PLASMA_SWD_SITE1_BASE ? 1u : 2u); break;
+    case 0x04u: *v = f->status | (f->mode << 4); break;
+    case 0x18u: *v = f->meta; break;
+    case 0x1Cu: *v = f->rx; break;
+    case 0x24u: *v = f->levels; break;
+    case 0x38u: *v = f->mode; break;
+    case 0x68u: *v = f->idle; break;
+    default: *v = 0; break;
+    }
+    return 0;
+}
+
+static int fake_write(void *ctx, uint32_t address, uint32_t v)
+{
+    struct fake_bus *f = ctx;
+    if (address < f->base || address >= f->base + 4096u)
+        return -1;
+    const uint32_t off = address - f->base;
+    if (f->fail_write_on_push && off == 0x14u)
+        return -1;
+    ++f->word_writes;
+    if (off == 0x38u) {
+        f->mode = v;
+        if (v == 0u)
+            f->idle = 8u; /* RTL: MODE OFF restores the default */
+    }
+    if (off == 0x68u) {
+        assert(f->mode == 1u && v >= 8u && v <= 255u);
+        f->idle = v;
+        ++f->idle_writes;
+    }
+    if (off == 0x28u) {
+        if (v == 4u) { /* fault-only discard of unexecuted commands */
+            assert(f->latched);
+            f->unexecuted = 0u;
+            ++f->discards;
+        } else
+            f->status = v & 1u;
+    }
+    if (off == 0x64u)
+        f->swj_len = v;
+    if (off == 0x2Cu && v == 1u) { /* RW1C needs an empty command FIFO */
+        assert(f->latched && f->unexecuted == 0u);
+        f->latched = false;
+        ++f->error_clears;
+    }
+    if (off >= 0x44u && off <= 0x60u)
+        f->stage[(off - 0x44u) / 4u] = v;
+    if (off == 0x14u) {
+        f->pushed_cmd = v & 0x1FFu;
+        if (f->push_count < 8u)
+            f->idle_at_push[f->push_count] = f->idle;
+        ++f->push_count;
+        const bool swj = (v & 0x100u) != 0;
+        const bool reading = !swj && (v & 2u) != 0;
+        const bool abort = !swj && (v & 0xFFu) == 0u; /* DP write ABORT */
+        if (f->latched) {
+            ++f->unexecuted; /* dispatch stopped: no completion */
+        } else {
+            if (abort)
+                ++f->aborts;
+            uint32_t ack = f->ack ? f->ack : (swj ? 0u : 1u);
+            uint32_t status = f->completion_status;
+            if (!swj && !abort && (f->wait_left || f->orun)) {
+                if (!f->orun) /* overrun WAITs do not consume real WAITs */
+                    --f->wait_left;
+                ack = 2u;
+                status = 3u;
+                f->orun = !f->no_orun;
+            }
+            if (abort)
+                f->orun = false;
+            if (f->inject_at && f->push_count == f->inject_at) {
+                status = f->inject_status;
+                ack = f->inject_ack;
+            }
+            if (status >= 6u && status <= 8u)
+                f->latched = true;
+            assert(f->q_count < FAKE_Q);
+            const uint32_t at = (f->q_head + f->q_count++) % FAKE_Q;
+            f->q_meta[at] = (v & 0xFFFF0000u) |
+                (uint32_t)(reading ? 0x80u : 0u) | (ack << 4) | status;
+            f->q_rx[at] = 0x1BA01477u;
+        }
+        if (f->q_count + f->unexecuted > f->max_outstanding)
+            f->max_outstanding = f->q_count + f->unexecuted;
+        fake_sync(f);
+    }
+    if (off == 0x20u) {
+        assert(f->q_count && v == f->q_meta[f->q_head] >> 16);
+        f->q_head = (f->q_head + 1u) % FAKE_Q;
+        --f->q_count;
+        fake_sync(f);
+    }
+    return 0;
+}
+
+static int fake_barrier(void *ctx)
+{
+    struct fake_bus *f = ctx;
+    ++f->barriers;
+    return f->fail_barrier ? -1 : 0;
+}
+
+static void setup(struct fake_bus *f, struct plasma_swd_fifo *s,
+                  unsigned int site)
+{
+    memset(f, 0, sizeof(*f));
+    f->idle = 8u;
+    f->base = site == 1u ? PLASMA_SWD_SITE1_BASE : PLASMA_SWD_SITE2_BASE;
+    const struct plasma_swd_word_io ops = {
+        .ctx = f, .read32 = fake_read,
+        .write32 = fake_write, .write_barrier = fake_barrier,
+    };
+    assert(plasma_swd_fifo_init(s, &ops, site, 8u) == 0);
+    assert(f->word_writes == 0u); /* inert constructor */
+    assert(plasma_swd_fifo_queue_read(s, 0x24u, &f->rx, 0u) ==
+           PLASMA_SWD_NOT_READY);
+    assert(plasma_swd_fifo_admit(s) == 0);
+}
+
+static void test_two_sites_ordered_reads_and_writes(void)
+{
+    struct fake_bus a, b;
+    struct plasma_swd_fifo site1, site2;
+    setup(&a, &site1, 1);
+    setup(&b, &site2, 2);
+    uint32_t got1 = 0, got2 = 0;
+    assert(plasma_swd_fifo_queue_read(&site1, 0x24u, &got1, 0u) == 0);
+    assert(plasma_swd_fifo_queue_write(&site1, 0x3Au, 0xDEADBEEFu, 0u) == 0);
+    assert(plasma_swd_fifo_queue_read(&site2, 0x24u, &got2, 0u) == 0);
+    assert(a.push_count == 0u && b.push_count == 0u);
+    assert(plasma_swd_fifo_run(&site1) == 0);
+    assert(plasma_swd_fifo_run(&site2) == 0);
+    assert(got1 == 0x1BA01477u && got2 == got1);
+    assert(a.push_count == 2u && b.push_count == 1u);
+    assert(a.pushed_cmd == 0x0Du && b.pushed_cmd == 0x02u);
+    assert(a.word_writes == a.barriers);
+    assert(b.word_writes == b.barriers);
+    assert(plasma_swd_fifo_run(&site1) == 0);
+    assert(a.push_count == 2u); /* no replay */
+}
+
+static void test_exact_atomic_swj_and_negative_inputs(void)
+{
+    struct fake_bus f;
+    struct plasma_swd_fifo site;
+    setup(&f, &site, 1);
+    const uint8_t swj136[17] = {
+        0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x9E,0xE7,
+        0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,
+    };
+    assert(plasma_swd_fifo_queue_swj(&site, swj136, 136u) == 0);
+    assert(plasma_swd_fifo_run(&site) == 0);
+    assert(f.swj_len == 136u);
+    assert(f.stage[0] == 0xFFFFFFFFu);
+    assert(f.stage[1] == 0x9EFFFFFFu);
+    assert(f.pushed_cmd == (0x100u | 136u));
+    const uint8_t one[] = {0xFF};
+    assert(plasma_swd_fifo_queue_swj(&site, one, 1u) ==
+           PLASMA_SWD_BAD_ARG); /* nonzero padding */
+    assert(plasma_swd_fifo_queue_swj(&site, one, 0u) ==
+           PLASMA_SWD_BAD_ARG);
+    assert(plasma_swd_fifo_queue_read(&site, 0x04u, &f.rx, 0u) ==
+           PLASMA_SWD_BAD_ARG); /* parity/direction mismatch */
+    assert(plasma_swd_fifo_queue_read(&site, 0x25u, &f.rx, 0u) ==
+           PLASMA_SWD_BAD_ARG);
+    assert(plasma_swd_fifo_queue_write(&site, 0x18u, 1u, 0u) ==
+           PLASMA_SWD_UNSUPPORTED); /* DP TARGETSEL no-ACK */
+}
+
+static void test_ap_delay_hint_programs_idle_cycles_only_on_change(void)
+{
+    /* OpenOCD 5088: AP transfers carry ap->memaccess_tck (default 255,
+     * Cortex-M examine sets 8); DP transfers carry 0. Regression for the
+     * Z2 Blue Pill "Could not find MEM-AP" failure (hint was rejected). */
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 2);
+    uint32_t idr = 0u, rd = 0u;
+    assert(plasma_swd_fifo_queue_read(&s, 0x24u, NULL, 0u) == 0);  /* DP */
+    assert(plasma_swd_fifo_queue_read(&s, 0x1Eu, &idr, 255u) == 0); /* AP IDR */
+    assert(plasma_swd_fifo_queue_read(&s, 0x1Eu, &idr, 1000u) == 0);/* saturate */
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 0x5u, 8u) == 0);  /* AP DRW */
+    assert(plasma_swd_fifo_queue_read(&s, 0x06u, &rd, 4u) == 0);   /* AP <8 */
+    assert(plasma_swd_fifo_queue_read(&s, 0x3Cu, &rd, 0u) == 0);   /* DP RDBUFF */
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(f.push_count == 6u);
+    const uint32_t want[6] = {8u, 255u, 255u, 8u, 8u, 8u};
+    for (unsigned int i = 0; i < 6u; ++i)
+        assert(f.idle_at_push[i] == want[i]);
+    assert(f.idle_writes == 2u); /* 255 once, back to 8 once */
+    /* A hint <= 8 session never touches the register (old-Image safe). */
+    struct fake_bus g;
+    struct plasma_swd_fifo t;
+    setup(&g, &t, 1);
+    assert(plasma_swd_fifo_queue_read(&t, 0x1Eu, &idr, 8u) == 0);
+    assert(plasma_swd_fifo_queue_write(&t, 0x3Au, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_run(&t) == 0);
+    assert(g.idle_writes == 0u && g.push_count == 2u);
+}
+
+static void test_wait_is_retried_after_dp_abort(void)
+{
+    /* STM32 AHB-AP may answer WAIT while the bus is busy: the transfer was
+     * not accepted, so clear sticky/overrun (ABORT 0x1E) and retry it. */
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 2);
+    uint32_t v = 0u;
+    f.wait_left = 3u;
+    assert(plasma_swd_fifo_queue_read(&s, 0x1Eu, &v, 8u) == 0);
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 7u, 8u) == 0);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(v == 0x1BA01477u && !s.blocked);
+    /* Pipelined: the read WAITs, the already-pushed write is WAITed by the
+     * DP overrun (ORUNDETECT); each round = ABORT + both re-pushed. */
+    assert(f.aborts == 3u && f.push_count == 2u + 3u * (1u + 2u));
+    assert(f.q_count == 0u);
+    /* Persistent WAIT: bounded retries, then the Site is blocked. */
+    f.wait_left = 1000u;
+    f.aborts = 0u;
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 8u, 8u) == 0);
+    assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_ACK_WAIT);
+    assert(s.blocked && f.aborts == PLASMA_SWD_WAIT_RETRIES);
+}
+
+static void test_pipeline_error_mid_batch(void)
+{
+    uint32_t v[10];
+    /* 1. Latched PARITY at transfer 4 of 10: the RTL stops; the 6 commands
+     * still in its FIFO are discarded (CONTROL=4) and the latch cleared. */
+    {
+        struct fake_bus f;
+        struct plasma_swd_fifo s;
+        setup(&f, &s, 1);
+        f.inject_at = 4u; f.inject_status = 6u; f.inject_ack = 1u;
+        for (unsigned int i = 0; i < 10u; ++i)
+            assert(plasma_swd_fifo_queue_read(&s, 0x1Eu, &v[i], 8u) == 0);
+        v[0] = 0u;
+        assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_BAD_RESPONSE);
+        assert(v[0] == 0u); /* nothing published */
+        assert(f.push_count == 10u && f.discards == 1u && f.error_clears == 1u);
+        assert(!f.latched && f.unexecuted == 0u && f.q_count == 0u);
+        assert(!s.blocked && plasma_swd_fifo_queue_read(&s, 0x1Eu, &v[0], 8u) == 0);
+        assert(plasma_swd_fifo_run(&s) == 0 && v[0] == 0x1BA01477u);
+    }
+    /* 2. FAULT at transfer 3: later completions drained, Site usable. */
+    {
+        struct fake_bus f;
+        struct plasma_swd_fifo s;
+        setup(&f, &s, 2);
+        f.inject_at = 3u; f.inject_status = 4u; f.inject_ack = 4u;
+        for (unsigned int i = 0; i < 10u; ++i)
+            assert(plasma_swd_fifo_queue_write(&s, 0x3Au, i, 8u) == 0);
+        assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_ACK_FAULT);
+        assert(f.push_count == 10u && f.q_count == 0u && !s.blocked);
+    }
+    /* 3. WAIT without ORUNDETECT: a later transfer completed OK, i.e. ran
+     * out of order -> reported, never retried. */
+    {
+        struct fake_bus f;
+        struct plasma_swd_fifo s;
+        setup(&f, &s, 1);
+        f.no_orun = true;
+        f.wait_left = 1u;
+        assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 1u, 8u) == 0);
+        assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 2u, 8u) == 0);
+        assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_BAD_RESPONSE);
+        assert(f.push_count == 2u && f.aborts == 0u && f.q_count == 0u);
+    }
+}
+
+static void test_half_period_program_and_bounds(void)
+{
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 2);
+    const uint32_t before = f.word_writes;
+    assert(plasma_swd_fifo_set_half_period(&s, 100u) == 0); /* 500 kHz */
+    assert(f.word_writes == before + 1u);
+    assert(plasma_swd_fifo_set_half_period(&s, 3u) == PLASMA_SWD_BAD_ARG);
+    assert(plasma_swd_fifo_set_half_period(&s, 65536u) == PLASMA_SWD_BAD_ARG);
+    const uint32_t pushes = f.push_count;
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 1u, 0u) == 0);
+    assert(plasma_swd_fifo_set_half_period(&s, 25u) == 0); /* flushes first */
+    assert(s.count == 0u && f.push_count == pushes + 1u);
+}
+
+static void test_discarded_read_runs_on_wire_without_publication(void)
+{
+    /* OpenOCD dap_dp_init(): dap_queue_dp_read(dap, DP_CTRL_STAT, NULL). */
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 2);
+    uint32_t kept = 0u;
+    assert(plasma_swd_fifo_queue_read(&s, 0x24u, NULL, 0u) == 0);
+    assert(plasma_swd_fifo_queue_read(&s, 0x24u, &kept, 0u) == 0);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(f.push_count == 2u); /* the discarded read was a real transfer */
+    assert(kept == 0x1BA01477u);
+    f.ack = 4u;
+    f.completion_status = 4u;
+    assert(plasma_swd_fifo_queue_read(&s, 0x24u, NULL, 0u) == 0);
+    assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_ACK_FAULT); /* still checked */
+}
+
+static void test_wait_fault_no_replay_and_pointer_safety(void)
+{
+    for (unsigned int mode = 0; mode < 2; ++mode) {
+        struct fake_bus f;
+        struct plasma_swd_fifo s;
+        setup(&f, &s, 1);
+        f.ack = mode ? 4u : 2u;
+        f.completion_status = mode ? 4u : 3u;
+        uint32_t read_result = 0xC0FFEEu;
+        assert(plasma_swd_fifo_queue_read(&s, 0x24u, &read_result, 0u) == 0);
+        assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 0xAABBCCDDu, 0u) == 0);
+        assert(plasma_swd_fifo_run(&s) ==
+               (mode ? PLASMA_SWD_ACK_FAULT : PLASMA_SWD_ACK_WAIT));
+        assert(read_result == 0xC0FFEEu); /* not published on failure */
+        /* Pipelined: both were pushed; the write's completion (FAULT, or
+         * WAIT) is drained, never re-pushed. WAIT adds one ABORT, which
+         * itself WAITs here -> blocked. */
+        assert(f.push_count == (mode ? 2u : 3u) && f.q_count == 0u);
+        if (mode) {
+            /* FAULT is target-side: the Site stays usable so OpenOCD can
+             * reconnect (line reset + DPIDR + ABORT). */
+            assert(!s.blocked && f.levels == 0u);
+            f.ack = 0u;
+            f.completion_status = 0u;
+            assert(plasma_swd_fifo_queue_line_reset(&s) == 0);
+            assert(plasma_swd_fifo_queue_read(&s, 0x24u, &read_result, 0u) == 0);
+            assert(plasma_swd_fifo_run(&s) == 0 && read_result == 0x1BA01477u);
+        } else {
+            /* WAIT on the DP ABORT itself is not recoverable -> blocked. */
+            assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_NOT_READY);
+            assert(f.push_count == 3u);
+        }
+    }
+    /* No-ACK / parity / timeout: completion released, RTL latch cleared
+     * (RW1C ERROR) only for the latched statuses, Site still usable. */
+    const uint32_t statuses[4] = {5u, 6u, 7u, 8u};
+    for (unsigned int i = 0; i < 4u; ++i) {
+        struct fake_bus f;
+        struct plasma_swd_fifo s;
+        setup(&f, &s, 1);
+        f.ack = statuses[i] == 5u ? 7u : 1u;
+        f.completion_status = statuses[i];
+        uint32_t v = 0u;
+        assert(plasma_swd_fifo_queue_read(&s, 0x24u, &v, 0u) == 0);
+        assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_BAD_RESPONSE);
+        assert(!s.blocked && f.levels == 0u);
+        assert(f.error_clears == (statuses[i] == 5u ? 0u : 1u));
+    }
+    {
+        /* CONFIG (driver bug) remains fail-closed. */
+        struct fake_bus f;
+        struct plasma_swd_fifo s;
+        setup(&f, &s, 1);
+        f.completion_status = 1u;
+        assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 1u, 0u) == 0);
+        assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_BAD_RESPONSE);
+        assert(s.blocked);
+    }
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 2);
+    f.fail_barrier = 1u;
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 2u, 0u) == 0);
+    assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_IO_UNCERTAIN);
+    assert(s.blocked && !s.admitted);
+    assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_NOT_READY);
+    assert(f.push_count == 0u); /* barrier failed after TX, before PUSH */
+}
+
+static void test_fifo_queue_bounds_and_tags(void)
+{
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 1);
+    /* OpenOCD queues a 1-KiB block (256 words); more than the software queue
+     * flushes automatically. Execution keeps <= 16 commands in the RTL. */
+    enum { N = PLASMA_SWD_MAX_QUEUE + 40u };
+    static uint32_t rd[N];
+    for (unsigned int i = 0; i < N; ++i)
+        assert(plasma_swd_fifo_queue_read(&s, 0x1Eu, &rd[i], 8u) == 0);
+    assert(f.push_count == PLASMA_SWD_MAX_QUEUE && s.count == 40u);
+    assert(rd[0] == 0x1BA01477u && rd[PLASMA_SWD_MAX_QUEUE - 1u] == 0x1BA01477u);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(f.push_count == N && rd[N - 1u] == 0x1BA01477u);
+    assert(f.max_outstanding == PLASMA_SWD_PIPELINE_DEPTH && f.q_count == 0u);
+    const uint32_t base_push = f.push_count;
+    /* Tags wrap 65535 -> 1 (never 0, never stalls a long session). */
+    s.next_tag = 65535u;
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 0u, 0u) == 0);
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 1u, 0u) == 0);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(s.next_tag == 2u && f.push_count == base_push + 2u);
+    /* A failed automatic flush is reported by the next run(). */
+    for (unsigned int i = 0; i < PLASMA_SWD_MAX_QUEUE; ++i)
+        assert(plasma_swd_fifo_queue_write(&s, 0x3Au, i, 0u) == 0);
+    f.ack = 4u;
+    f.completion_status = 4u;
+    assert(plasma_swd_fifo_queue_write(&s, 0x3Au, 99u, 0u) ==
+           PLASMA_SWD_ACK_FAULT);
+    assert(!s.blocked && s.count == 0u); /* the triggering op is not queued */
+    assert(plasma_swd_fifo_run(&s) == PLASMA_SWD_ACK_FAULT); /* deferred */
+    assert(s.count == 0u && plasma_swd_fifo_run(&s) == 0);
+}
+
+static void test_new_fifo_rejects_prior_normal_mode_and_unknown_completion(void)
+{
+    /* A fresh FIFO instance may follow an Owner killed by SIGKILL. The
+     * prior process's FIFO state is gone, while synthetic PL still reports
+     * NORMAL with an unconsumed completion. Admission must not clear it or
+     * permit a write. This is not persistent recovery evidence. */
+    struct fake_bus f = {0};
+    struct plasma_swd_fifo new_owner;
+    f.base = PLASMA_SWD_SITE1_BASE;
+    f.mode = 1u;
+    f.status = 1u;
+    fake_retain(&f, 1u << 16);
+    const struct plasma_swd_word_io io = {
+        .ctx = &f, .read32 = fake_read,
+        .write32 = fake_write, .write_barrier = fake_barrier,
+    };
+    assert(plasma_swd_fifo_init(&new_owner, &io, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_admit(&new_owner) == PLASMA_SWD_NOT_READY);
+    assert(new_owner.blocked && !new_owner.admitted);
+    assert(f.word_writes == 0u && f.push_count == 0u);
+    assert(plasma_swd_fifo_queue_write(&new_owner, 0x3Au, 0x1234u, 0u)
+           == PLASMA_SWD_NOT_READY);
+}
+
+static void test_line_reset_encoding_and_stale_recover_off(void)
+{
+    struct fake_bus f;
+    struct plasma_swd_fifo s;
+    setup(&f, &s, 1u);
+    /* LINE_RESET is the dedicated RTL encoding: bit8 set, zero length. */
+    assert(plasma_swd_fifo_queue_line_reset(&s) == 0);
+    assert(plasma_swd_fifo_run(&s) == 0);
+    assert(f.pushed_cmd == 0x100u && f.push_count == 1u);
+
+    /* Already OFF: no write at all. */
+    struct fake_bus off = {0};
+    struct plasma_swd_fifo o;
+    int recovered = -1;
+    off.base = PLASMA_SWD_SITE1_BASE;
+    const struct plasma_swd_word_io io_off = {
+        .ctx = &off, .read32 = fake_read,
+        .write32 = fake_write, .write_barrier = fake_barrier,
+    };
+    assert(plasma_swd_fifo_init(&o, &io_off, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_recover_off(&o, &recovered) == 0);
+    assert(recovered == 0 && off.word_writes == 0u);
+
+    /* Stale NORMAL, idle, one retained completion: pop, disable, OFF. */
+    struct fake_bus st = {0};
+    st.base = PLASMA_SWD_SITE1_BASE;
+    st.mode = 1u; st.status = 1u;
+    fake_retain(&st, 7u << 16);
+    const struct plasma_swd_word_io io_st = {
+        .ctx = &st, .read32 = fake_read,
+        .write32 = fake_write, .write_barrier = fake_barrier,
+    };
+    assert(plasma_swd_fifo_init(&o, &io_st, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_recover_off(&o, &recovered) == 0);
+    assert(recovered == 1 && st.mode == 0u && st.status == 0u &&
+           st.levels == 0u && st.push_count == 0u);
+    assert(plasma_swd_fifo_admit(&o) == 0); /* clean re-admission */
+
+    /* Busy engine: refuse without any write. */
+    struct fake_bus busy = {0};
+    busy.base = PLASMA_SWD_SITE1_BASE;
+    busy.mode = 1u; busy.status = 3u;
+    const struct plasma_swd_word_io io_b = {
+        .ctx = &busy, .read32 = fake_read,
+        .write32 = fake_write, .write_barrier = fake_barrier,
+    };
+    assert(plasma_swd_fifo_init(&o, &io_b, 1u, 8u) == 0);
+    assert(plasma_swd_fifo_recover_off(&o, &recovered) ==
+           PLASMA_SWD_NOT_READY);
+    assert(busy.word_writes == 0u && busy.mode == 1u);
+}
+
+int main(void)
+{
+    test_two_sites_ordered_reads_and_writes();
+    test_exact_atomic_swj_and_negative_inputs();
+    test_ap_delay_hint_programs_idle_cycles_only_on_change();
+    test_wait_is_retried_after_dp_abort();
+    test_half_period_program_and_bounds();
+    test_pipeline_error_mid_batch();
+    test_discarded_read_runs_on_wire_without_publication();
+    test_wait_fault_no_replay_and_pointer_safety();
+    test_fifo_queue_bounds_and_tags();
+    test_new_fifo_rejects_prior_normal_mode_and_unknown_completion();
+    test_line_reset_encoding_and_stale_recover_off();
+    puts("PLASMA_NATIVE_SWD_C_HOST_ONLY_PASS");
+    return 0;
+}

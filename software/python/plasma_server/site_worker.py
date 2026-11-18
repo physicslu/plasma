@@ -11,9 +11,11 @@ from plasma_core.config import SiteConfig
 from plasma_core.enums import JobState, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.failure_policy import terminal_state_for_error
+from plasma_core import job_timing
 from plasma_core.job_logging import JobEventLogger, OutputManager
 from plasma_core.models import ErrorDetail, ExecutionOutput, JobAttemptResult, JobResult, iso_now
 from plasma_handlers.base import BaseHandler
+from plasma_interfaces.runtime_context import RuntimeJobContext
 
 from .job_manager import JobRuntime
 
@@ -173,7 +175,12 @@ class SiteWorker:
                 original_exception=failure,
             )
         try:
-            await self.handler.interface.safe_shutdown()
+            selected_interface = (
+                self.handler.interface_for(request)
+                if callable(getattr(self.handler, "interface_for", None))
+                else self.handler.interface
+            )
+            await selected_interface.safe_shutdown()
         except Exception as exc:
             shutdown_error = (
                 exc
@@ -253,6 +260,14 @@ class SiteWorker:
         }
 
     async def _process(self, runtime: JobRuntime) -> None:
+        # The Job timing sink is bound only while this Job is processed.
+        token = job_timing.bind(None)
+        try:
+            await self._process_job(runtime)
+        finally:
+            job_timing.unbind(token)
+
+    async def _process_job(self, runtime: JobRuntime) -> None:
         request = runtime.request
         logger = JobEventLogger(self.log_root, request.site_id, request.job_id)
         if runtime.cancel_requested:
@@ -281,6 +296,19 @@ class SiteWorker:
                 image_reference_scheme=request.image_ref.scheme if request.image_ref else None,
             )
             started_monotonic = time.monotonic()
+
+            def timing_sink(phase: str, **fields: Any) -> None:
+                logger.event("stage_timing", phase=phase,
+                             t_ms=round((time.monotonic() - started_monotonic) * 1000.0, 1),
+                             **fields)
+
+            job_timing.bind(timing_sink)
+            job_timing.mark("job_admission", **(runtime.admission_timing_ms or {}))
+            job_timing.mark("queued", duration_ms=round(
+                (started_monotonic - runtime.created_monotonic) * 1000.0, 1))
+            # One Job budget includes every attempt, cleanup, and retry delay.
+            job_deadline = started_monotonic + request.timeout_s
+            runtime.deadline_monotonic = job_deadline
             attempts = 0
             output = ExecutionOutput()
             final_error: PlasmaError | None = None
@@ -308,6 +336,12 @@ class SiteWorker:
                 self.output.write_state(request.job_id, self._state_payload(runtime))
                 logger.event(f"stage_{event}", level=level, stage=name, **fields)
 
+            # Job-scoped Provider selection; same SiteWorker and PPU lease.
+            selected_interface = (
+                self.handler.interface_for(request)
+                if callable(getattr(self.handler, "interface_for", None))
+                else self.handler.interface
+            )
             while attempts <= request.max_retries:
                 attempts += 1
                 runtime.attempt = attempts
@@ -315,12 +349,25 @@ class SiteWorker:
                 attempt_started_at = iso_now()
                 attempt_started_monotonic = time.monotonic()
                 logger.event("attempt_started", attempt=attempts)
+                # Every interface is bound through the same trusted context,
+                # rebuilt for each attempt. SiteWorker never decides which
+                # authorization an interface may use: the context carries at
+                # most one, and the interface refuses what it cannot consume.
+                selected_interface.bind_runtime_job(RuntimeJobContext(
+                    job_id=request.job_id,
+                    site_id=request.site_id,
+                    deadline_monotonic=job_deadline,
+                    active_asset_set=runtime.active_asset_set,
+                    admitted_job_binding=runtime.job_binding,
+                    trusted_provider=runtime.trusted_provider,
+                ))
                 runtime.active_task = asyncio.create_task(
                     self.handler.execute(request, stage_callback),
                     name=f"{request.job_id}-attempt-{attempts}",
                 )
                 try:
-                    output = await asyncio.wait_for(runtime.active_task, timeout=request.timeout_s)
+                    output = await asyncio.wait_for(
+                        runtime.active_task, timeout=max(0.0, job_deadline - time.monotonic()))
                     final_error = None
                 except TimeoutError as exc:
                     final_error = PlasmaError(
@@ -363,6 +410,7 @@ class SiteWorker:
                     not cancelled
                     and final_error.recoverable
                     and attempts <= request.max_retries
+                    and time.monotonic() < job_deadline
                 )
                 attempt_error = ErrorDetail.from_exception(
                     final_error,
@@ -397,8 +445,9 @@ class SiteWorker:
                         backoff_s=request.retry_backoff_s,
                     )
                     try:
-                        await self.handler.interface.safe_shutdown()
+                        await selected_interface.safe_shutdown()
                     except Exception as exc:
+                        runtime.attempt_history[-1].retry_scheduled = False
                         final_error = (
                             exc
                             if isinstance(exc, PlasmaError)
@@ -414,11 +463,13 @@ class SiteWorker:
                         try:
                             await asyncio.wait_for(
                                 runtime.cancel_event.wait(),
-                                timeout=request.retry_backoff_s,
+                                timeout=min(request.retry_backoff_s,
+                                            max(0.0, job_deadline - time.monotonic())),
                             )
                         except TimeoutError:
                             pass
                     if runtime.cancel_requested:
+                        runtime.attempt_history[-1].retry_scheduled = False
                         cancelled = True
                         final_error = PlasmaError(
                             ErrorCode.OPERATION_CANCELLED,
@@ -434,7 +485,7 @@ class SiteWorker:
             elapsed_ms = round((time.monotonic() - started_monotonic) * 1000)
             shutdown_error: PlasmaError | None = None
             try:
-                await self.handler.interface.safe_shutdown()
+                await selected_interface.safe_shutdown()
             except Exception as exc:
                 logger.event("safe_shutdown_failed", level="ERROR", error=str(exc))
                 shutdown_error = (

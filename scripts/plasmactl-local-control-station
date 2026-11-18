@@ -19,6 +19,14 @@ unit_dir="$config_home/systemd/user"
 manager_unit="$unit_dir/plasma-local-manager.service"
 console_unit="$unit_dir/plasma-control-station.service"
 unit_marker="# Managed by Plasma local-control-station profile"
+registry_state="$state_dir/registry.json"
+dev_fresh_state=0
+# Manager-owned Device Selector Catalog (OPF S5 / PR-C2). A non-editable venv
+# cannot locate repository data, so each immutable release ships the committed
+# data/release trees and the Manager unit points at them explicitly.
+release_catalog_dir="catalog"
+catalog_manifest_relative="data/device-catalog/production/icpn-v1-manifest.json"
+selector_probe_query="q=STM32F103&limit=1"
 prepared_release=""
 
 # Environment overrides win over persisted profile configuration.
@@ -38,6 +46,7 @@ fi
 [[ -n "$env_manager_port" ]] && PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT="$env_manager_port"
 
 base_python="${PLASMA_LOCAL_CONTROL_STATION_PYTHON:-}"
+plasma_python_root="/opt/plasma/python"
 ppu_alias="${PLASMA_LOCAL_CONTROL_STATION_PPU_ALIAS:-local-ppu}"
 ppu_endpoint="${PLASMA_LOCAL_CONTROL_STATION_PPU_ENDPOINT:-}"
 console_host="127.0.0.1"
@@ -108,8 +117,9 @@ PY
 }
 
 resolve_base_python() {
-  local candidate
+  local candidate canonical
   local -a candidates=()
+  local -A seen=()
   if [[ -n "$base_python" ]]; then
     [[ -x "$base_python" ]] || die "configured Python is not executable: $base_python"
     python_is_supported "$base_python" || die "local Control Station requires Python >= 3.11: $base_python"
@@ -117,8 +127,14 @@ resolve_base_python() {
   fi
 
   shopt -s nullglob
-  for candidate in /opt/plasma/python/*/bin/python3; do
-    [[ -x "$candidate" ]] && python_is_supported "$candidate" && candidates+=("$candidate")
+  for candidate in "$plasma_python_root"/*/bin/python3; do
+    [[ -x "$candidate" ]] || continue
+    python_is_supported "$candidate" || continue
+    canonical="$(readlink -e -- "$candidate")" || continue
+    [[ -z "${seen[$canonical]:-}" ]] || continue
+    seen["$canonical"]=1
+    # Select the actual interpreter, not a venv alias with different sys.prefix.
+    candidates+=("$canonical")
   done
   shopt -u nullglob
   if (( ${#candidates[@]} == 1 )); then
@@ -138,7 +154,10 @@ resolve_base_python() {
 }
 
 require_clean_source() {
-  [[ -d "$repo_root/.git" ]] || die "repository metadata is missing: $repo_root"
+  # A linked git worktree has a .git file rather than a directory.
+  [[ -e "$repo_root/.git" ]] || die "repository metadata is missing: $repo_root"
+  [[ "$(git -C "$repo_root" rev-parse --show-toplevel 2>/dev/null)" == "$repo_root" ]] || \
+    die "repository root is not a git work tree: $repo_root"
   [[ -d "$python_project" && -d "$web_dir" ]] || die "repository layout is incomplete: $repo_root"
   local changes
   changes="$(git -C "$repo_root" status --porcelain --untracked-files=normal)"
@@ -173,11 +192,77 @@ if payload.get("schema_version") != 1 or payload.get("git_sha") != expected:
 PY
 }
 
+# Build-time gate: the release's own venv must serve the Manager Device
+# Selector from the release's own Catalog bytes, with no repository fallback.
+validate_release_selector() {
+  local release="$1" catalog
+  catalog="$release/$release_catalog_dir"
+  [[ -f "$catalog/$catalog_manifest_relative" && -d "$catalog/data/ic-support" ]] || return 1
+  [[ -f "$release/venv/bin/python" ]] || return 1
+  (
+    cd "$catalog"
+    env PLASMA_DEVICE_CATALOG_MANIFEST="$catalog/$catalog_manifest_relative" \
+      PLASMA_IC_SUPPORT_ROOT="$catalog/data/ic-support" \
+      PLASMA_RUNTIME_EVIDENCE_ROOT="$catalog" \
+      "$release/venv/bin/python" -I -B - "$selector_probe_query" <<'PY'
+import sys
+
+import plasma_manager.bootstrap_server  # noqa: F401  Bootstrap routes must be importable
+from plasma_web import legacy_device_selector
+
+status, payload = legacy_device_selector.search_response(sys.argv[1])
+if status != 200 or payload.get("ok") is not True or not payload.get("catalog_size"):
+    raise SystemExit(f"Manager Device Selector self-test failed: HTTP {status}")
+PY
+  ) >/dev/null
+}
+
+export_release_catalog() {
+  local destination="$1"
+  mkdir -p "$destination"
+  # Committed bytes only (Catalog loaders verify SHA-256 / Git blob identity).
+  git -C "$repo_root" -c core.autocrlf=false -c core.eol=lf \
+    archive --format=tar HEAD -- data release | tar -x -C "$destination"
+  # The L3 physical-compatibility loader replay-checks the HIL receipts its
+  # reviewed manifests reference under docs/evidence/. Ship exactly those.
+  local evidence
+  evidence="$("$base_python" -I -B - "$destination/release/physical-compatibility" <<'PY'
+import json, pathlib, sys
+
+found = set()
+def walk(value):
+    if isinstance(value, dict):
+        for item in value.values():
+            walk(item)
+    elif isinstance(value, list):
+        for item in value:
+            walk(item)
+    elif isinstance(value, str) and value.startswith("docs/evidence/"):
+        parts = pathlib.PurePosixPath(value).parts
+        if ".." in parts or value.startswith("/"):
+            raise SystemExit(f"unsafe evidence path: {value}")
+        found.add(value)
+root = pathlib.Path(sys.argv[1])
+for manifest in sorted(root.glob("*.json")) if root.is_dir() else ():
+    walk(json.loads(manifest.read_text(encoding="utf-8")))
+print("\n".join(sorted(found)))
+PY
+)" || die "cannot resolve L3 physical-compatibility evidence paths"
+  if [[ -n "$evidence" ]]; then
+    local -a evidence_paths
+    mapfile -t evidence_paths <<<"$evidence"
+    git -C "$repo_root" -c core.autocrlf=false -c core.eol=lf \
+      archive --format=tar HEAD -- "${evidence_paths[@]}" | tar -x -C "$destination"
+  fi
+}
+
 prepare_release() {
   local sha="$1" release staging npm_bin node_bin
   release="$(release_dir_for_sha "$sha")"
   if [[ -e "$release" ]]; then
     validate_release "$release" "$sha" || die "existing release is incomplete or belongs to another revision: $release"
+    validate_release_selector "$release" || \
+      die "existing release lacks a working Manager Device Selector Catalog: $release"
     prepared_release="$release"
     return 0
   fi
@@ -209,6 +294,8 @@ prepare_release() {
   mkdir -p "$staging/web"
   cp -a "$web_dir/dist/standalone/." "$staging/web/"
   [[ -f "$staging/web/server.js" ]] || die "Control Station standalone build did not produce server.js"
+  export_release_catalog "$staging/$release_catalog_dir"
+  validate_release_selector "$staging" || die "Manager Device Selector self-test failed for release ${sha:0:12}"
   "$base_python" - "$staging/release.json" "$sha" <<'PY'
 import json
 import sys
@@ -237,13 +324,16 @@ write_profile_config() {
 write_manager_config() {
   mkdir -p "$config_dir" "$state_dir"
   "$base_python" - "$manager_config" "$manager_host" "$manager_port" \
-    "$state_dir/manager-observations.sqlite3" "$ppu_alias" "$ppu_endpoint" <<'PY'
+    "$state_dir/manager-observations.sqlite3" "$registry_state" "$ppu_alias" "$ppu_endpoint" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-path, host, port, observation_db, alias, endpoint = sys.argv[1:]
+path, host, port, observation_db, registry_state, alias, endpoint = sys.argv[1:]
 q = json.dumps
+# registry_state_path makes the Manager runtime registry durable/mutable
+# (Validate & Enable, Bootstrap pairing). The ppus list below only seeds the
+# FIRST start; once registry.json exists it is the Manager-owned inventory.
 text = (
     "manager:\n"
     f"  host: {q(host)}\n"
@@ -251,6 +341,7 @@ text = (
     "  request_timeout_s: 10.0\n"
     "  poll_interval_s: 2.0\n"
     f"  observation_db_path: {q(observation_db)}\n"
+    f"  registry_state_path: {q(registry_state)}\n"
     "ppus:\n"
     f"  - alias: {q(alias)}\n"
     f"    endpoint: {q(endpoint)}\n"
@@ -275,7 +366,10 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$state_dir
 Environment=PYTHONUNBUFFERED=1
-ExecStart=$current_link/venv/bin/python -m plasma_manager.server --config $manager_config
+Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$current_link/$release_catalog_dir/$catalog_manifest_relative
+Environment=PLASMA_IC_SUPPORT_ROOT=$current_link/$release_catalog_dir/data/ic-support
+Environment=PLASMA_RUNTIME_EVIDENCE_ROOT=$current_link/$release_catalog_dir
+ExecStart=$current_link/venv/bin/python -m plasma_manager.bootstrap_server --config $manager_config
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
@@ -412,7 +506,15 @@ verify_profile() {
   grep -Fq 'Environment=PLASMA_CONTROL_STATION_MODE=managed' "$console_unit" || die "Console unit is not in managed mode"
   grep -Fq "Environment=PLASMA_MANAGER_API_URL=http://$manager_host:$manager_port" "$console_unit" || die "Console unit has the wrong Manager API URL"
   grep -Fq "Environment=PLASMA_MANAGER_PPU_ALIAS=$ppu_alias" "$console_unit" || die "Console unit has the wrong fixed PPU alias"
+  grep -Fq "plasma_manager.bootstrap_server --config $manager_config" "$manager_unit" || \
+    die "Manager unit does not run the Bootstrap-capable Manager"
+  grep -Fq "Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$current_link/$release_catalog_dir/" "$manager_unit" || \
+    die "Manager unit does not point at the release Device Selector Catalog"
+  grep -Fxq "  registry_state_path: \"$registry_state\"" "$manager_config" || \
+    die "Manager configuration lacks the profile runtime registry state path"
   wait_for_http "http://$manager_host:$manager_port/api/health/live" "Manager" || die "Manager liveness failed"
+  wait_for_http "http://$manager_host:$manager_port/api/devices/search?$selector_probe_query" "Manager Device Selector" || \
+    die "Manager Device Selector is unavailable (expected HTTP 200 from the Manager-owned Catalog)"
   wait_for_http "http://$console_host:$console_port/" "Control Station Console" || die "Control Station Console health failed"
   say "PASS: local Control Station Console + Manager are healthy on loopback"
   say "qualification boundary: Control Station runtime only; PPU/PS/PL/Site/IC readiness is separate"
@@ -475,6 +577,51 @@ backup_file_if_present() {
   [[ -f "$source" ]] && cp -a "$source" "$target"
 }
 
+run_deployment_preflight() {
+  # This is a read-only transaction/PPU-idle snapshot, not an admission lock.
+  # Check again after the possibly lengthy release build, before changing
+  # the current release or restarting the Manager.
+  "$current_link/venv/bin/python" "$repo_root/scripts/plasma_cs_deploy_preflight.py" \
+    --state-dir "$state_dir" \
+    --manager-config "$manager_config" \
+    --manager-url "http://$manager_host:$manager_port" \
+    --ppu-endpoint "$ppu_endpoint" || \
+      die "deployment blocked by Manager transaction or PPU execution preflight"
+}
+
+check_development_ppu_idle() {
+  # Dev-only cutover: ignore completed *historical* ledgers, never ignore a
+  # currently executing PPU Job or unobservable execution owner.
+  "$base_python" - "$ppu_endpoint" <<'PY_PPU_IDLE'
+import json
+import sys
+from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+
+url = sys.argv[1].rstrip("/") + "/api/status"
+parts = urlsplit(url)
+if parts.scheme not in ("http", "https") or not parts.hostname:
+    raise SystemExit("BLOCKED: invalid configured PPU endpoint")
+try:
+    with urlopen(Request(url, headers={"Accept": "application/json"}), timeout=5) as reply:
+        if reply.status != 200:
+            raise ValueError("non-200 status")
+        status = json.load(reply)
+except (OSError, ValueError, KeyError, TypeError) as exc:
+    raise SystemExit("BLOCKED: PPU execution is unobservable") from exc
+ppu = status.get("ppu") if isinstance(status, dict) else None
+execution = ppu.get("execution") if isinstance(ppu, dict) else None
+if (not isinstance(execution, dict)
+        or execution.get("busy") is not False
+        or type(execution.get("active_job_count")) is not int
+        or execution["active_job_count"] != 0
+        or execution.get("owner_kind", "MISSING") is not None
+        or execution.get("owner_id", "MISSING") is not None):
+    raise SystemExit("BLOCKED: PPU is busy or execution ownership is unknown")
+print("PASS: PPU idle, zero active Jobs, no execution owner (snapshot)")
+PY_PPU_IDLE
+}
+
 deploy_profile() {
   require_linux_user_runtime
   require_command git
@@ -483,13 +630,30 @@ deploy_profile() {
   validate_settings
   require_clean_source
   require_owned_installation
+  if (( dev_fresh_state )); then
+    # Development uses the canonical new Manager schema in a fresh namespace.
+    # Existing historical journals stay intact in their archived directory.
+    systemctl --user is-active --quiet plasma-local-manager.service ||
+      die "dev-fresh requires the current Manager service to be active"
+    systemctl --user is-active --quiet plasma-control-station.service ||
+      die "dev-fresh requires the current Console service to be active"
+    check_development_ppu_idle
+  else
+    run_deployment_preflight
+  fi
 
-  local sha release previous_release backup_dir
+  local sha release previous_release backup_dir dev_archive_dir="" dev_failed_dir="" dev_archived=0
   sha="$(current_sha)"
   prepare_release "$sha"
   release="$prepared_release"
+  if (( dev_fresh_state )); then
+    check_development_ppu_idle
+  else
+    run_deployment_preflight
+  fi
   previous_release="$(readlink -f "$current_link")"
-  backup_dir="$(mktemp -d "$state_dir/deploy-backup.XXXXXX")"
+  # A dev-fresh cutover moves the old state tree. Keep rollback inputs OUTSIDE it.
+  backup_dir="$(mktemp -d "$state_home/plasma/local-control-station-deploy-backup.XXXXXX")"
   backup_file_if_present "$config_file" "$backup_dir/profile.env"
   backup_file_if_present "$manager_config" "$backup_dir/manager.yaml"
   backup_file_if_present "$evidence" "$backup_dir/install.json"
@@ -501,6 +665,22 @@ deploy_profile() {
     trap - ERR
     say "activation failed; restoring previous local Control Station release/configuration"
     set +e
+    if (( dev_archived )); then
+      # Stop any new Manager instance before restoring its previous state.
+      systemctl --user stop plasma-control-station.service
+      systemctl --user stop plasma-local-manager.service
+      if [[ -d "$state_dir" && ! -L "$state_dir" ]]; then
+        # Preserve failed fresh data too, for engineering diagnosis.
+        if ! mv "$state_dir" "$dev_failed_dir"; then
+          say "BLOCKED: failed to preserve fresh state; original at $dev_archive_dir"
+          exit "$rc"
+        fi
+      fi
+      if [[ -e "$state_dir" || -L "$state_dir" ]] || ! mv "$dev_archive_dir" "$state_dir"; then
+        say "BLOCKED: manual recovery needed; original at $dev_archive_dir"
+        exit "$rc"
+      fi
+    fi
     ln -sfn "$previous_release" "$current_link"
     [[ -f "$backup_dir/profile.env" ]] && cp -a "$backup_dir/profile.env" "$config_file"
     [[ -f "$backup_dir/manager.yaml" ]] && cp -a "$backup_dir/manager.yaml" "$manager_config"
@@ -515,6 +695,38 @@ deploy_profile() {
     exit "$rc"
   }
   trap rollback ERR
+
+  if (( dev_fresh_state )); then
+    # Stop the only managed admission entrypoint before swapping state.
+    # Never stop/restart the Z2 PPU or turn DUT power off from this command.
+    systemctl --user stop plasma-control-station.service
+    systemctl --user stop plasma-local-manager.service
+    check_development_ppu_idle
+    [[ -d "$state_dir" && ! -L "$state_dir" ]] || {
+      say "BLOCKED: dev-fresh state directory is missing or is a symlink"
+      false
+    }
+    dev_archive_dir="$state_home/plasma/local-control-station.archive.$(date -u +%Y%m%dT%H%M%SZ).pid$BASHPID"
+    dev_failed_dir="$state_home/plasma/local-control-station.failed.$(date -u +%Y%m%dT%H%M%SZ).pid$BASHPID"
+    [[ ! -e "$dev_archive_dir" && ! -L "$dev_archive_dir" ]] ||
+      { say "BLOCKED: dev-fresh archive destination exists"; false; }
+    [[ ! -e "$dev_failed_dir" && ! -L "$dev_failed_dir" ]] ||
+      { say "BLOCKED: dev-fresh recovery destination exists"; false; }
+    mv "$state_dir" "$dev_archive_dir"
+    dev_archived=1
+    mkdir -m 700 "$state_dir"
+    local pairing_file
+    for pairing_file in registry.json bootstrap-credentials.json; do
+      if [[ -e "$dev_archive_dir/$pairing_file" || -L "$dev_archive_dir/$pairing_file" ]]; then
+        [[ -f "$dev_archive_dir/$pairing_file" && ! -L "$dev_archive_dir/$pairing_file" ]] || {
+          say "BLOCKED: dev-fresh pairing state is not a regular file: $pairing_file"
+          false
+        }
+        cp -p -- "$dev_archive_dir/$pairing_file" "$state_dir/$pairing_file"
+      fi
+    done
+    say "dev-fresh: archived previous state at $dev_archive_dir (no journal migration)"
+  fi
 
   write_profile_config
   write_manager_config
@@ -533,6 +745,9 @@ deploy_profile() {
   trap - ERR
   rm -rf --one-file-system "$backup_dir"
   say "deployment complete: ${sha:0:12}"
+  if (( dev_fresh_state )); then
+    say "dev-fresh PASS: current canonical state is new; historical state preserved at $dev_archive_dir"
+  fi
 }
 
 parse_options() {
@@ -553,6 +768,8 @@ parse_options() {
       --manager-port)
         (($# >= 2)) || die "--manager-port requires PORT"
         manager_port="$2"; shift 2 ;;
+      --dev-fresh-state)
+        dev_fresh_state=1; shift ;;
       -h|--help)
         usage; exit 0 ;;
       *) die "unknown option: $1" ;;
@@ -570,6 +787,7 @@ Linux reference deployment for the local Control Station role:
 Commands:
   install   Build immutable runtime, write user-systemd units/config, do not start
   deploy    Activate current clean committed source, restart and verify local runtime
+            --dev-fresh-state: archive old development State and start clean (no migration)
   verify    Verify Console + Manager only; target PPU reachability is reported separately
   status    Show release, target configuration and user-service state
 
@@ -596,6 +814,9 @@ EOF
 command="${1:-help}"
 shift || true
 parse_options "$@"
+if (( dev_fresh_state )) && [[ "$command" != "deploy" ]]; then
+  die "--dev-fresh-state is valid only for deploy"
+fi
 case "$command" in
   install) install_profile ;;
   deploy) deploy_profile ;;

@@ -226,7 +226,7 @@ async function installApi(
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: `unhandled ${path}` } }) });
   });
 
-  await page.route("**/api/devices/search**", async route => {
+  await page.route("**/api/manager/devices/search**", async route => {
     const query = new URL(route.request().url()).searchParams.get("q") ?? "";
     await route.fulfill({
       status: 200,
@@ -278,16 +278,20 @@ test("Engineering Programming renders the approved workflow and binds Target IC 
   const job = programmingJob(page, "engineering");
   await expectProgrammingJobContract(job);
   await expect(page.getByRole("heading", { name: "SINGLE PPU PROGRAMMING" })).toBeVisible();
-  await expect(page.locator(".targetingCard > header")).toContainText("SYSTEM SETUP & TARGETING");
+  await expect(page.locator(".targetingCard .operatorPanelTitle")).toHaveText(/^1\.\s*SYSTEM SETUP & TARGETING$/);
   await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
   await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("LIVE SITE STATUS", { exact: true })).toBeVisible();
+  await expect(page.locator(".liveSiteStatus .operatorPanelTitle")).toHaveText(/^3\.\s*LIVE SITE STATUS/);
   await expect(page.locator(".engineeringProgrammingV2 .recentEvents")).toHaveCount(0);
   await expect(page.getByText("RECENT EVENTS", { exact: true })).toHaveCount(0);
   await expect(programmingJobPolicy(job, "retry")).toHaveValue("3");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
   await expect(page.getByLabel("Batch select SITE 2")).toBeChecked();
+  await expect(page.getByLabel("Engineering batch read")).toHaveCount(0);
+  await expect(page.getByLabel("SITE 1 Read Memory")).toBeVisible();
+  await expect(page.getByLabel("SITE 2 Read Memory")).toBeVisible();
+  await expect(page.getByText("OPERATIONS (E/P/V)", { exact: true })).toBeVisible();
 
   const layout = await page.locator(".engineeringProgrammingV2").evaluate(root => {
     const box = (selector: string) => root.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
@@ -346,6 +350,20 @@ test("Engineering Programming renders the approved workflow and binds Target IC 
   await expect(siteOne.locator(".engineeringResult")).toHaveText("PASS");
 });
 
+test("Read Memory starts an independent single-Site Job without submitting a Batch", async ({ page }) => {
+  const submissions: Array<Record<string, unknown>> = [];
+  const batchSubmissions: Array<Record<string, unknown>> = [];
+  await installApi(page, submissions, batchSubmissions);
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+
+  await page.getByLabel("SITE 1 Read Memory").click();
+  await expect.poll(() => submissions.length).toBe(1);
+  expect(submissions[0].site_id).toBe(1);
+  expect(submissions[0].operation).toBe("read");
+  expect(batchSubmissions).toHaveLength(0);
+});
+
 test("unselected Sites stay visible and START PROGRAMMING snapshots only checked Sites into one server Batch", async ({ page }) => {
   const directSubmissions: Array<Record<string, unknown>> = [];
   const batchSubmissions: Array<Record<string, unknown>> = [];
@@ -362,6 +380,7 @@ test("unselected Sites stay visible and START PROGRAMMING snapshots only checked
   await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
 
   await programmingJobOperation(job, "erase").check();
+  await programmingJobOperation(job, "read").waitFor({ state: "detached" });
   await programmingJobPolicy(job, "repeat").fill("2");
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary.getByText("BATCH SUMMARY", { exact: true })).toBeVisible();

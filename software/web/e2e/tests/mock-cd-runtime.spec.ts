@@ -26,7 +26,8 @@ const operationLabels: Record<Operation, string> = {
   verify: "驗證",
   read: "讀取",
 };
-const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
+const perSiteOperationOrder: Operation[] = ["erase", "program", "verify", "read"];
+const batchOperationOrder: Operation[] = ["erase", "program", "verify"];
 
 const engineeringLog = (page: Page) => page.getByLabel("Engineering job log");
 const engineeringRow = (page: Page, siteId: number) => {
@@ -63,7 +64,7 @@ async function setEngineeringBatchSites(page: Page, siteIds: number[]) {
 
 async function setEngineeringBatchOperations(page: Page, operations: Operation[]) {
   const desired = new Set(operations);
-  for (const operation of operationOrder) {
+  for (const operation of batchOperationOrder) {
     const checkbox = page.getByLabel(`Engineering batch ${operation}`);
     const checked = await checkbox.isChecked();
     if (desired.has(operation) && !checked) await checkbox.check();
@@ -130,10 +131,12 @@ test("EMode owns real per-Site E/P/V/R and Read download through the Python Engi
 
   const siteId = engineeringPpuSites;
   const row = engineeringRow(page, siteId);
-  for (const operation of operationOrder) {
+  for (const operation of perSiteOperationOrder) {
     await test.step(`${engineeringFacilityId}/${engineeringPpuId}/SITE-${siteId}: ${operation}`, async () => {
       const before = engineeringStarts.length;
-      await page.getByLabel(`SITE ${siteId} ${operationLabels[operation]}`).click();
+      await page.getByLabel(operation === "read"
+        ? `SITE ${siteId} Read Memory`
+        : `SITE ${siteId} ${operationLabels[operation]}`).click();
       await expect.poll(() => engineeringStarts.length, { timeout: 15_000 }).toBe(before + 1);
       expect(engineeringStarts[before]).toEqual({ siteId, operation });
       await expect(row.locator(".state")).toHaveText("SUCCESS", { timeout: 30_000 });
@@ -165,9 +168,15 @@ test("EMode server-owned Batch carries selected Sites and operations", async ({ 
 
   await openEngineeringProgramming(page);
   const selectedSites = engineeringPpuSites >= 3 ? [1, 3, engineeringPpuSites] : [1, engineeringPpuSites];
-  const operations: Operation[] = ["erase", "read"];
+  const operations: Operation[] = ["erase", "program"];
   await setEngineeringBatchSites(page, selectedSites);
   await setEngineeringBatchOperations(page, operations);
+  await expect(page.getByLabel("Engineering batch read")).toHaveCount(0);
+  await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
+    name: "engineering-batch-runtime.bin",
+    mimeType: "application/octet-stream",
+    buffer: imageAssetBytes,
+  });
 
   const start = page.getByRole("button", { name: /START PROGRAMMING/ });
   await expect(start).toBeEnabled();

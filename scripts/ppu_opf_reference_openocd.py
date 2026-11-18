@@ -1,0 +1,491 @@
+"""OPF-4A: verified Bundle v3 OpenOCD reference route into the existing C-3 Worker.
+
+The production Runtime dispatcher below binds its admitted Job to this executor.
+The trusted Runtime owns the Job, its deadline, the actual hardware observation
+and the Bundle-derived C-3 profile. C-3 remains the sole flash executor and owner
+of Site admission, image binding, cancellation, SAFE_OFF and sealing.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Mapping
+
+from plasma_interfaces.site_worker_c3 import (
+    SiteWorkerControlClient, SiteWorkerRefused, run_job_operations,
+)
+from plasma_opf import TimeoutPolicy, parse_programming_selection
+from plasma_core import job_timing
+from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_core.models import JobRequest
+
+import ppu_asset_set
+import ppu_opf_site_session
+import ppu_provider_contract
+import ppu_site_engine
+import ppu_site_worker
+
+
+PROFILE_FILE = "data/plasma-flash-profile.json"
+PROFILE_SCHEMA = "plasma.ppu.openocd-flash-profile.v1"
+
+
+class ReferenceDenied(ValueError):
+    """Reference admission failed; error codes contain no Bundle-supplied values."""
+
+
+def _need(condition: bool, code: str) -> None:
+    if not condition:
+        raise ReferenceDenied(code)
+
+
+@dataclass(frozen=True)
+class ReferenceBinding:
+    route: ppu_provider_contract.ProviderRoute
+    profile: dict[str, Any]
+    engine: ppu_site_engine.EngineSelection
+    profile_sha256: str
+
+
+PROGRAMMING = ppu_provider_contract.PROGRAMMING
+JOB_OPERATIONS = frozenset({PROGRAMMING, "read"})
+
+
+def job_operations(operation: str, job_binding: Mapping[str, Any] | None,
+                   ) -> tuple[str, ...] | None:
+    """The ordered basic operations of a ``programming`` Job (else None).
+
+    Only the admitted Job Binding names them; there is no default list.
+    """
+    _need(operation in JOB_OPERATIONS, "OPERATION_UNSUPPORTED")
+    if operation != PROGRAMMING:
+        return None
+    _need(isinstance(job_binding, Mapping) and job_binding.get("operation") == PROGRAMMING,
+          "JOB_BINDING_REQUIRED")
+    try:
+        return ppu_site_worker.parse_operations(job_binding.get("operations"))
+    except ppu_site_worker.SiteWorkerDenied as exc:
+        raise ReferenceDenied("JOB_" + exc.code) from exc
+
+
+def _takes_image(operation: str, operations: tuple[str, ...] | None) -> bool:
+    return (
+        operations is not None and ppu_site_worker.needs_image(operations))
+
+
+def _parse_profile(raw: bytes, target: str, image_size: int | None) -> dict[str, Any]:
+    """Parse hash-verified Bundle profile using the existing Worker geometry contract."""
+    _need(len(raw) <= 8192, "REFERENCE_PROFILE_INVALID")
+    try:
+        payload = json.loads(raw, object_pairs_hook=ppu_provider_contract._pairs)
+    except (ValueError, UnicodeError) as exc:
+        raise ReferenceDenied("REFERENCE_PROFILE_INVALID") from exc
+    required = {"schema", "icpn", "target_config", "flash_base", "flash_size",
+                "erase_granularity"}
+    _need(type(payload) is dict and required <= set(payload)
+          and set(payload) <= required | {"transport_settings"}
+          and payload.get("schema") == PROFILE_SCHEMA, "REFERENCE_PROFILE_INVALID")
+    values = {key: value for key, value in payload.items() if key != "schema"}
+    try:
+        checked = ppu_site_worker.parse_flash_profile(values)
+    except ppu_site_worker.SiteWorkerDenied as exc:
+        raise ReferenceDenied(exc.code) from exc
+    _need(checked.icpn == target, "REFERENCE_TARGET_MISMATCH")
+    # An erase-only or read Job carries no Image (``None``); its range is
+    # proven by ``job_operation_range`` instead.
+    _need(image_size is None
+          or type(image_size) is int and 0 < image_size <= checked.flash_size,
+          "REFERENCE_IMAGE_OUT_OF_BOUNDS")
+    return values
+
+
+def job_operation_range(profile: Mapping[str, Any], *, profile_package: str, site_id: int,
+                        operation: str, job_binding: Mapping[str, Any] | None) -> dict[str, int]:
+    """The exact ``{"address", "length"}`` of an erase-only or read Job.
+
+    Only the admitted Job Binding names it: there is no default range. It is
+    re-proven inside the Profile bank (erase: whole erase units) here and
+    again by the Worker.
+    """
+    _need(operation in (PROGRAMMING, "read") and isinstance(job_binding, Mapping),
+          "JOB_BINDING_REQUIRED")
+    job_range = job_binding.get("range")
+    _need(job_binding.get("operation") == operation
+          and (operation == "read" or job_binding.get("operations") == ["erase"])
+          and job_binding.get("site_id") == site_id
+          and job_binding.get("profile") == profile_package
+          and job_binding.get("image_asset_sha256") is None
+          and type(job_range) is dict and set(job_range) == {"address", "length"}
+          and type(job_range["address"]) is int and type(job_range["length"]) is int,
+          "JOB_BINDING_RANGE_MISMATCH")
+    try:
+        checked = ppu_site_worker.FlashRange(
+            ppu_site_worker.parse_flash_profile(dict(profile)),
+            "read" if operation == "read" else "erase",
+            job_range["address"], job_range["length"])
+    except ppu_site_worker.SiteWorkerDenied as exc:
+        raise ReferenceDenied("JOB_" + exc.code) from exc
+    return {"address": checked.address, "length": checked.length}
+
+
+def job_flash_window(profile: Mapping[str, Any], *, profile_package: str, site_id: int,
+                     image_size: int, job_binding: Mapping[str, Any] | None,
+                     operation: str = PROGRAMMING) -> dict[str, int]:
+    """The Flash window one Job writes: ``{"load_address", "erase_length"}``.
+
+    ``flash_base`` is the physical start of the Flash bank; the Job write
+    address is the admitted Job Binding ``range.address``. Every Job requires an admitted Binding. Every
+    window is re-proven in-bank, aligned and non-empty, erase rounding included.
+    """
+    _need(isinstance(job_binding, Mapping), "JOB_BINDING_REQUIRED")
+    job_range = job_binding.get("range")
+    _need(job_binding.get("operation") == operation
+          and job_binding.get("site_id") == site_id
+          and job_binding.get("profile") == profile_package
+          and type(job_range) is dict and set(job_range) == {"address", "length"}
+          and type(job_range["address"]) is int and job_range["length"] == image_size
+          and type(job_range["length"]) is int, "JOB_BINDING_RANGE_MISMATCH")
+    address = job_range["address"]
+    try:
+        checked = ppu_site_worker.parse_flash_profile(dict(profile))
+        erase_address, erase_length = checked.flash_window(address, image_size)
+    except ppu_site_worker.SiteWorkerDenied as exc:
+        raise ReferenceDenied("JOB_" + exc.code) from exc
+    return {"load_address": erase_address, "erase_length": erase_length}
+
+
+def preflight_runtime_flash(*, product_root: Path, active_asset_set: Mapping[str, Any] | None,
+                            target: str, site_id: int, image_size: int,
+                            job_binding: Mapping[str, Any] | None,
+                            provider: str | None = None, profile: str | None = None,
+                            operation: str = PROGRAMMING) -> dict[str, Any]:
+    """Verify the pinned Active Bundle Profile; no IC registry or hardware claims.
+
+    Every basic operation of the Job must be declared by the Profile
+    descriptor. A Job with an Image returns its Flash window; an erase-only or
+    read Job returns its exact range.
+    """
+    operations = job_operations(operation, job_binding)
+    image_operation = _takes_image(operation, operations)
+    _need(isinstance(active_asset_set, Mapping)
+          and active_asset_set.get("state") == "ACTIVE", "OPF_ACTIVE_SET_REQUIRED")
+    digest = active_asset_set.get("asset_set_sha256")
+    _need(type(digest) is str and ppu_provider_contract.SHA64.fullmatch(digest) is not None,
+          "ASSET_SET_IDENTITY_INVALID")
+    try:
+        active = ppu_asset_set.read_active(product_root)
+    except ppu_asset_set.AssetSetError as exc:
+        raise ReferenceDenied("ACTIVE_SET_UNTRUSTED:" + str(exc)) from exc
+    _need(active == dict(active_asset_set), "ACTIVE_SET_MISMATCH")
+    staged = product_root / "assets" / "staged" / digest
+    try:
+        manifest = json.loads((staged / "manifest.json").read_bytes(),
+                              object_pairs_hook=ppu_provider_contract._pairs)
+        _need(manifest.get("schema") == "plasma.ppu.bundle.v3", "BUNDLE_SCHEMA_INVALID")
+        profiles = [p for p in manifest["packages"] if p["kind"] == "programming-profile"]
+        if profile is None and provider is None:
+            _need(len(profiles) == 1, "OPF_PROFILE_MISSING_OR_AMBIGUOUS")
+            selected = profiles[0]
+        else:
+            _need(type(profile) is str and type(provider) is str,
+                  "OPF_SELECTION_INCOMPLETE")
+            selected = next((p for p in profiles if p["id"] == profile), None)
+            _need(selected is not None, "PROFILE_MISSING_OR_AMBIGUOUS")
+        prefix = f"payload/packages/{selected['id']}/"
+        entries = {x["path"]: x for x in selected["files"]}
+        descriptor = json.loads((staged / (prefix + ppu_provider_contract.DESCRIPTOR)).read_bytes(),
+                                object_pairs_hook=ppu_provider_contract._pairs)
+        _need(type(descriptor) is dict
+              and descriptor.get("schema") == ppu_provider_contract.SCHEMA
+              and descriptor.get("target") == target, "REFERENCE_TARGET_MISMATCH")
+        _need(provider is None or descriptor.get("provider_package") == provider,
+              "PROVIDER_SELECTION_MISMATCH")
+        _need(type(site_id) is int and site_id >= 1, "SITE_ID_INVALID")
+        _need(all(op in descriptor["operations"] for op in (operations or (operation,))),
+              "OPERATION_UNSUPPORTED")
+        _need(not image_operation
+              or type(image_size) is int and 0 < image_size <= descriptor["max_image_bytes"],
+              "IMAGE_OUT_OF_BOUNDS")
+        profile_path = prefix + PROFILE_FILE
+        entry = entries[profile_path]
+        raw = (staged / profile_path).read_bytes()
+        _need(entry["executable"] is False and entry["size"] == len(raw)
+              and hashlib.sha256(raw).hexdigest() == entry["sha256"],
+              "REFERENCE_PROFILE_CHANGED")
+        profile = _parse_profile(raw, target, image_size if image_operation else None)
+    except (KeyError, OSError, TypeError, UnicodeError) as exc:
+        raise ReferenceDenied("REFERENCE_PROFILE_INVALID") from exc
+    if image_operation:
+        window = job_flash_window(profile, profile_package=selected["id"], site_id=site_id,
+                                  image_size=image_size, job_binding=job_binding,
+                                  operation=operation)
+    else:
+        window = job_operation_range(profile, profile_package=selected["id"],
+                                     site_id=site_id, operation=operation,
+                                     job_binding=job_binding)
+    return {"asset_set_sha256": digest, "profile_package": selected["id"],
+            "provider_package": descriptor["provider_package"],
+            "profile_sha256": entry["sha256"], "profile": profile, **window}
+
+
+def qualify_reference(
+    *, product_root: Path, asset_set_sha256: str,
+    selection: Mapping[str, Any], policy: TimeoutPolicy, target: str,
+    site_id: int, image_size: int, hardware: Mapping[str, Any],
+    engine_record: Path = ppu_site_engine.ENGINE_SELECTION,
+    engine_base: Path = ppu_site_engine.ENGINE_BASE,
+    require_root: bool = True,
+    operation: str = PROGRAMMING,
+    operations: tuple[str, ...] | None = None,
+) -> ReferenceBinding:
+    """Bind immutable Provider/Profile files to the installed selected engine.
+
+    The Bundle does *not* supply a command, a host path or an execution grant.
+    The selected engine is independently checked by the existing root-owned
+    engine-selection verifier. The actual C-3 Worker enforces its own ABI and
+    FPGA identity on session admission and execution.
+    """
+    selected = parse_programming_selection(selection, policy=policy)
+    route = ppu_provider_contract.resolve(
+        product_root, asset_set_sha256=asset_set_sha256, target=target,
+        provider=selected.provider, profile=selected.profile,
+        operation=operation, site_id=site_id, image_size=image_size,
+        hardware=hardware, options=selected.options, operations=operations)
+    _need(route.transport == "fpga",
+          "REFERENCE_TRANSPORT_UNSUPPORTED")
+    # No option is silently ignored. Job options cannot override the
+    # Bundle-bound Programming Profile's transport clock.
+    _need(route.options_json == b"{}", "REFERENCE_OPTIONS_UNSUPPORTED")
+    try:
+        engine = ppu_site_engine.load_engine(
+            record=engine_record, base=engine_base, require_root=require_root)
+    except ppu_site_engine.EngineNotReady as exc:
+        raise ReferenceDenied("REFERENCE_ENGINE_NOT_READY:" + exc.code) from exc
+    _need(route.driver_abi == f"{engine.adapter_driver}:{engine.driver_abi}",
+          "REFERENCE_DRIVER_ABI_MISMATCH")
+
+    staged = product_root / "assets" / "staged" / asset_set_sha256
+    # The platform Engine is independently verified by load_engine.
+    # Only a native-c Provider carrying executable bytes must bind those
+    # Bundle bytes to the installed Engine.
+    try:
+        manifest = json.loads((staged / "manifest.json").read_bytes())
+        packages = {item["id"]: item for item in manifest["packages"]}
+        provider = packages[route.provider_package]
+        profile_package = packages[route.profile_package]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ReferenceDenied("REFERENCE_MANIFEST_INVALID") from exc
+    _need(provider["kind"] in ("native-c", "platform-provider"),
+          "REFERENCE_PROVIDER_KIND_UNSUPPORTED")
+
+    def exact_file(package: Mapping[str, Any], suffix: str) -> tuple[bytes, str]:
+        name = f"payload/packages/{package['id']}/{suffix}"
+        entries = [entry for entry in package["files"] if entry["path"] == name]
+        _need(len(entries) == 1, "REFERENCE_PACKAGE_FILE_MISSING")
+        entry = entries[0]
+        try:
+            raw = (staged / name).read_bytes()
+        except OSError as exc:
+            raise ReferenceDenied("REFERENCE_PACKAGE_FILE_UNREADABLE") from exc
+        digest = hashlib.sha256(raw).hexdigest()
+        _need(len(raw) == entry["size"] and digest == entry["sha256"],
+              "REFERENCE_PACKAGE_FILE_CHANGED")
+        return raw, digest
+
+    if provider["kind"] == "native-c":
+        _, binary_sha = exact_file(provider, "bin/openocd")
+        _need(binary_sha == engine.openocd_sha256, "REFERENCE_ENGINE_BINARY_MISMATCH")
+        _need(any(entry["path"] == f"payload/packages/{provider['id']}/bin/openocd"
+                  and entry["executable"] is True for entry in provider["files"]),
+              "REFERENCE_ENGINE_NOT_EXECUTABLE")
+
+    profile_raw, profile_sha = exact_file(profile_package, PROFILE_FILE)
+    profile = _parse_profile(profile_raw, target,
+                             image_size if _takes_image(operation, operations) else None)
+    return ReferenceBinding(route, profile, engine, profile_sha)
+
+
+async def execute_reference_flash(
+    client: SiteWorkerControlClient, *, product_root: Path,
+    asset_set_sha256: str, selection: Mapping[str, Any], policy: TimeoutPolicy,
+    job_id: str, site_id: int, target: str, image: bytes,
+    image_root: Path, hardware: Mapping[str, Any],
+    job_deadline_monotonic: float,
+    job_timeout_s: float,
+    job_binding: Mapping[str, Any] | None,
+    engine_record: Path = ppu_site_engine.ENGINE_SELECTION,
+    engine_base: Path = ppu_site_engine.ENGINE_BASE,
+    require_root: bool = True,
+    operation: str = PROGRAMMING,
+) -> dict[str, Any]:
+    """Run the *existing* native ABI-v5 flash cycle through C-3; no Provider subprocess.
+
+    The Runtime production dispatcher calls this with its pinned Job. The C-3 control
+    socket, staging, profile binding, readback checking and close/SAFE_OFF
+    handling remain exactly the same as the pre-OPF Runtime flash path.
+    """
+    operations = job_operations(operation, job_binding)
+    image_operation = _takes_image(operation, operations)
+    # An erase-only or read Job carries no Image; every other Job needs its bytes.
+    _need(type(image) is bytes and (len(image) > 0) == image_operation,
+          "REFERENCE_IMAGE_INVALID")
+    selected = parse_programming_selection(selection, policy=policy)
+    _need(type(job_timeout_s) in (int, float)
+          and math.isfinite(job_timeout_s)
+          and job_timeout_s == selected.timeout_ms / 1000.0
+          and type(job_deadline_monotonic) in (int, float)
+          and math.isfinite(job_deadline_monotonic),
+          "REFERENCE_JOB_DEADLINE_MISMATCH")
+    # Blocking file reads and SHA256 checks run off the Runtime event loop so
+    # one Job's verification never stalls another Site's Job.
+    binding = await job_timing.in_thread(
+        "qualify_reference", qualify_reference,
+        product_root=product_root, asset_set_sha256=asset_set_sha256,
+        selection=selection, policy=policy, target=target, site_id=site_id,
+        image_size=len(image), hardware=hardware,
+        engine_record=engine_record, engine_base=engine_base, require_root=require_root,
+        operation=operation, operations=operations)
+    if image_operation:
+        window = job_flash_window(binding.profile, profile_package=binding.route.profile_package,
+                                  site_id=site_id, image_size=len(image),
+                                  job_binding=job_binding, operation=operation)
+    else:
+        job_range = job_operation_range(
+            binding.profile, profile_package=binding.route.profile_package,
+            site_id=site_id, operation=operation, job_binding=job_binding)
+
+    worker_receipt: ppu_opf_site_session.BoundSession | None = None
+
+    def open_session() -> dict[str, Any]:
+        nonlocal worker_receipt
+        bound = ppu_opf_site_session.open_provider_job_session(
+            client, product_root=product_root, asset_set_sha256=asset_set_sha256,
+            selection=selection, policy=policy, job_id=job_id, target=target,
+            operation=operation, operations=operations,
+            site_id=site_id, image_size=len(image),
+            hardware=hardware, job_deadline_monotonic=job_deadline_monotonic,
+            job_timeout_s=job_timeout_s, profile=binding.profile,
+            expected_engine_selection_sha256=binding.engine.record_sha256,
+            expected_worker_identity=hardware.get("worker_identity"))
+        if bound.route != binding.route:
+            client.call("close_session", session_id=bound.session_id)
+            raise ReferenceDenied("REFERENCE_ROUTE_CHANGED")
+        worker_receipt = bound
+        return {"session_id": bound.session_id}
+
+    result = await run_job_operations(
+            client, operation=operation, operations=operations, job_id=job_id,
+            site_id=site_id, icpn=binding.profile["icpn"],
+            image=image if image_operation else None,
+            image_root=image_root, max_runtime_s=math.ceil(job_timeout_s),
+            session_factory=open_session,
+            address=window["load_address"] if image_operation else job_range["address"],
+            length=len(image) if image_operation else job_range["length"],
+            erase_range=((window["load_address"], window["erase_length"])
+                         if image_operation else None))
+    _need(worker_receipt is not None, "WORKER_ENGINE_RECEIPT_MISSING")
+    return {**result, "opf_provider_package": binding.route.provider_package,
+            "opf_profile_package": binding.route.profile_package,
+            "opf_asset_set_sha256": binding.route.asset_set_sha256,
+            "opf_profile_sha256": binding.profile_sha256,
+            "opf_driver_abi": binding.route.driver_abi,
+            "opf_openocd_sha256": binding.engine.openocd_sha256,
+            "opf_engine_selection_sha256": binding.engine.record_sha256,
+            "opf_worker_engine_selection_sha256": worker_receipt.worker_engine_selection_sha256,
+            "opf_worker_epoch": worker_receipt.worker_epoch,
+            "job_binding_sha256": (None if job_binding is None
+                                   else job_binding.get("job_binding_sha256"))}
+
+
+def _staged_profile_and_handoff(product_root: Path, digest: str,
+                                profile_package: str) -> tuple[dict[str, Any], Any]:
+    staged = product_root / "assets" / "staged" / digest
+    manifest = json.loads((staged / "manifest.json").read_bytes())
+    # No StopIteration may cross the thread boundary into the event loop.
+    profile = next((p for p in manifest["packages"] if p["id"] == profile_package), None)
+    _need(profile is not None, "PROFILE_MISSING_OR_AMBIGUOUS")
+    handoff = (ppu_asset_set.resolve_staged_fpga_handoff(product_root, digest)
+               if any(p["kind"] == "fpga-image" for p in manifest["packages"]) else None)
+    return profile, handoff
+
+
+async def execute_runtime_flash(
+    client: SiteWorkerControlClient, *, product_root: Path, request: JobRequest,
+    active_asset_set: Mapping[str, Any] | None, job_deadline_monotonic: float,
+    image_root: Path, job_binding: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Production REST Flash cutover; no direct-C3 fallback.
+
+    The Runtime supplies the Set pinned under its execution lease and the one
+    Job deadline (including retries). Select the requested Bundle Profile
+    and its declared Provider. No Job/Bundle path or hardware claim is used.
+    The authenticated root Worker observes its existing Root journal; native
+    admission still verifies current PL identity and holds the reload fence.
+    """
+    operation = request.operation.value
+    try:
+        # Blocking file reads and SHA256 checks run off the Runtime event loop
+        # (asyncio.to_thread) so concurrent Sites do not queue behind them.
+        pinned_profile = await job_timing.in_thread(
+            "preflight", preflight_runtime_flash,
+            product_root=product_root, active_asset_set=active_asset_set,
+            target=request.target, site_id=request.site_id, image_size=len(request.image),
+            job_binding=job_binding,
+            provider=request.metadata.get("provider"), profile=request.metadata.get("profile"),
+            operation=operation)
+        digest = pinned_profile["asset_set_sha256"]
+        profile, handoff = await job_timing.in_thread(
+            "staged_manifest", _staged_profile_and_handoff,
+            product_root, digest, pinned_profile["profile_package"])
+        timeout_ms = round(request.timeout_s * 1000)
+        _need(timeout_ms / 1000.0 == request.timeout_s, "OPF_TIMEOUT_PRECISION_UNSUPPORTED")
+        policy = TimeoutPolicy(timeout_ms, 3600000)  # existing C-3 session ceiling
+        selection = {"schema": "plasma.opf.programming.v1",
+                     "provider": pinned_profile["provider_package"],
+                     "profile": profile["id"], "options": {}}
+        engine = await job_timing.in_thread(
+            "load_engine", ppu_site_engine.load_engine, require_root=True)
+        remaining = job_deadline_monotonic - time.monotonic()
+        _need(math.isfinite(remaining) and remaining > 0, "JOB_DEADLINE_EXPIRED")
+        status = await job_timing.in_thread(
+            "worker_status", client.call, "status", timeout_s=remaining)
+        _need(not status.get("not_ready"), "REFERENCE_ENGINE_NOT_READY")
+        identity = status.get("identity", {})
+        fpga = handoff["fpga_image"] if handoff else None
+        # Root/native admission owns same-boot qualification and the reload
+        # fence. Ordinary Jobs bind the loaded image and unchanged Worker
+        # session; historical qualification metadata is not a new Job gate.
+        identity_verified = (
+            identity.get("status") == "IMAGE"
+            and type(identity.get("image_id")) is str and bool(identity["image_id"])
+            and identity.get("boot_id") == Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+            and type(identity.get("firmware_sha256")) is str
+            and ppu_provider_contract.SHA64.fullmatch(identity["firmware_sha256"]) is not None
+            and (fpga is None or identity["image_id"] == fpga["image_id"]))
+        _need(identity_verified,
+              "OPF_FPGA_IDENTITY_UNVERIFIED")
+        # Platform comes from the authenticated installed Worker adapter, not
+        # from the Bundle's target declarations. Live C3 Root admission still
+        # verifies PL/ABI, ownership and SAFE_OFF before hardware execution.
+        hardware = {**status.get("platform", {}), "sites": status["supported_sites"],
+                    "loaded_fpga_package": fpga["package_id"] if fpga else None,
+                    "driver_abi": f"{engine.adapter_driver}:{engine.driver_abi}",
+                    "fpga_identity_proven": identity_verified, "worker_identity": identity}
+        return await execute_reference_flash(
+            client, product_root=product_root, asset_set_sha256=digest,
+            selection=selection, policy=policy, job_id=request.job_id,
+            site_id=request.site_id, target=request.target, image=request.image,
+            image_root=image_root, hardware=hardware,
+            job_deadline_monotonic=job_deadline_monotonic, job_timeout_s=request.timeout_s,
+            job_binding=job_binding, operation=operation)
+    except SiteWorkerRefused as exc:
+        raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED,
+                          "OPF_WORKER_OBSERVATION_DENIED:" + exc.code) from exc
+    except (ValueError, KeyError, TypeError, OSError, ppu_asset_set.AssetSetError,
+            ppu_site_engine.EngineNotReady) as exc:
+        raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                          "OPF_FLASH_DENIED:" + str(exc)) from exc

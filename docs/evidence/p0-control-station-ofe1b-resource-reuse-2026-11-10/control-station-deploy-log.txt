@@ -1,0 +1,83 @@
+[plasmactl local-control-station] building immutable local Control Station release 728e55e529b5
+Processing ./software/python
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting PyYAML>=6.0 (from plasma-multichannel==0.3.2)
+  Using cached pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+Using cached pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+Building wheels for collected packages: plasma-multichannel
+  Building wheel for plasma-multichannel (pyproject.toml): started
+  Building wheel for plasma-multichannel (pyproject.toml): finished with status 'done'
+  Created wheel for plasma-multichannel: filename=plasma_multichannel-0.3.2-py3-none-any.whl size=423957 sha256=b5381ff48829473cad96f3260cafd6b96c3aa7e8703b8a77f00a2cd6a90d6580
+  Stored in directory: /tmp/pip-ephem-wheel-cache-s2eguovy/wheels/73/cc/8e/8a87dcfc222cf62a052cf76a1b65d567296232dc89184fb624
+Successfully built plasma-multichannel
+Installing collected packages: PyYAML, plasma-multichannel
+Successfully installed PyYAML-6.0.3 plasma-multichannel-0.3.2
+
+> plasma-programmer-console@0.1.0 install:ci
+> bash scripts/install-ci.sh
+
+/usr/bin/flock
+/usr/bin/timeout
+/usr/bin/curl
+/usr/bin/sha256sum
+[sites] validating writable install environment
+[sites] environment passed: HOME=/storage/projects/plasma-wt-cs-728e55e52/software/web/.sites-runtime/home, cache=/storage/projects/plasma-wt-cs-728e55e52/software/web/.sites-runtime/npm-cache
+[sites] downloading the complete locked vinext tarball
+[sites] verifying locked vinext tarball integrity
+[sites] network and integrity preflight passed
+[sites] running exactly one bounded npm ci
+npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+
+added 507 packages in 46s
+[sites] npm ci passed and vinext is available
+
+> plasma-programmer-console@0.1.0 build:product
+> node scripts/build-product.mjs && node scripts/validate-product-runtime.mjs
+
+Applied pinned vinext Windows static-asset compatibility patch: /storage/projects/plasma-wt-cs-728e55e52/software/web/node_modules/vinext/dist/server/static-file-cache.js
+
+  vinext build  (Vite 8.0.13)
+
+[1/5] analyze client references...
+[2Ktransforming...✓ 154 modules transformed.
+rendering chunks...
+✓ built in 469ms
+[2/5] analyze server references...
+[2Ktransforming...✓ 143 modules transformed.
+rendering chunks...
+✓ built in 326ms
+[3/5] build rsc environment...
+[2Ktransforming...✓ 160 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 404ms
+[4/5] build client environment...
+[2Ktransforming...✓ 154 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 338ms
+[5/5] build ssr environment...
+[2Ktransforming...✓ 144 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 267ms
+  Generated standalone output in dist/standalone/
+  Start it with: node dist/standalone/server.js
+
+Validated Control Station standalone Web runtime: /storage/projects/plasma-wt-cs-728e55e52/software/web/dist/standalone
+[plasmactl local-control-station] Manager healthy: http://127.0.0.1:18280/api/health/live
+[plasmactl local-control-station] Control Station Console healthy: http://127.0.0.1:18190/
+[plasmactl local-control-station] Manager healthy: http://127.0.0.1:18280/api/health/live
+[plasmactl local-control-station] Manager Device Selector healthy: http://127.0.0.1:18280/api/devices/search?q=STM32F103&limit=1
+[plasmactl local-control-station] Control Station Console healthy: http://127.0.0.1:18190/
+[plasmactl local-control-station] PASS: local Control Station Console + Manager are healthy on loopback
+[plasmactl local-control-station] qualification boundary: Control Station runtime only; PPU/PS/PL/Site/IC readiness is separate
+[plasmactl local-control-station] target PPU probe: ONLINE (swpc-ppu -> http://127.0.0.1:18080)
+[plasmactl local-control-station] target PPU managed-control probe: READY (swpc-ppu -> http://127.0.0.1:18080)
+[plasmactl local-control-station] deployment complete: 728e55e529b5

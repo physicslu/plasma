@@ -1,142 +1,131 @@
 # Plasma Autonomous Development Contract
 
-This is PLASMA's **primary operating contract** and the **compact Codex instruction entrypoint**. Read it before any code, configuration, documentation, deployment or hardware change. The [complete detailed clauses](docs/development/plasma-autonomous-development-contract-full.md) remain normative and are incorporated by reference. Read **relevant detailed sections on demand**; do not preload the entire detailed document for unrelated tasks. If an operation touches privileges, electrical safety, deployment, Git history or architecture, read the matching detailed clauses before acting. An abbreviated instruction never grants permissions that the full contract or an executable guard denies. For privileged Z2 FPGA Manager/MMIO operations, only the existing trusted root executor may run approved protected stages; normal owner-approved SWPC USB/TTY development tools run without a new Stage.
+This is PLASMA's **primary operating contract** and the **compact Codex instruction entrypoint**. Read it before any code, configuration, documentation, deployment or hardware change. Load detailed contracts **on demand** only for the scopes you actually touch.
 
-**Exactly two owner approval gates:** Gate 1 — Plan Approval *before any new implementation*; Gate 2 — Merge Approval for a specific merge-ready PR. No third gate for Ready, hardware, runtime or deployment. Once Gate 1 is approved, autonomously complete all in-scope work and actual acceptance, including fixes and CI; do not request repeated approval. Material scope change requires a revised Gate 1. **Never merge without Gate 2.**
+- Shared detailed clauses: [plasma-development-common.md](docs/development/plasma-development-common.md)
+- Path 2 (SWPC CLI): [plasma-path2-cli.md](docs/development/plasma-path2-cli.md)
+- Path 3 (SWPC Codex): [plasma-path3-codex.md](docs/development/plasma-path3-codex.md)
+- Domain contracts: see routing table below
 
-**Default mode: DEVELOPMENT MODE — owner-operated prototype.** Optimize Build -> Run -> Observe -> Fix and the smallest meaningful real result, not ceremonies or production/fleet policy. This does not remove electrical, OS permission, hardware ownership or recovery guards. PASS/FAIL/NOT_RUN must correspond to observed execution.
+An abbreviated instruction never grants permissions that the full contract or an executable guard denies. ChatGPT Direct is the unnumbered default; do not renumber historical Path 2/3 identifiers.
 
-## 1. Project purpose and canonical domain
+**Exactly two owner approval gates:**
+- **Gate 1** — Plan Approval *before any new implementation*
+- **Gate 2** — Merge Approval for a specific merge-ready PR
 
-PLASMA is a configurable, multi-Site IC programmer; PYNQ-Z2 is the prototype target. Hierarchy: Facility -> PPU -> SITE 1..N (one-based site_id = 1..N); Socket is a fixture, not Site identity. PPU exposes the **Plasma Gateway** service, its **Plasma Gateway API** and **Plasma Gateway Endpoint**. The Linux **Default Gateway** is an unrelated layer-3 next-hop; do not conflate them. The canonical Protocol v3.3 uses PLASMA33 and site_id 1..N; Web REST contract v3 is canonical. **Plasma Manager** implements bounded managed PPU command routing, not a central universal scheduler. Programming Asset is input; Normalized Image is the execution model. Never reintroduce retired zero-based Channel/Programmer identity into production paths.
+No third gate for Ready, hardware, runtime or deployment. Once Gate 1 is approved, autonomously complete all in-scope work and actual acceptance (including fixes and CI). Material scope change requires a revised Gate 1. **Never merge without Gate 2.**
 
-Repository: pl/ FPGA and verification; software/python/ embedded/control/REST; software/web/ Console; scripts/ integration and orchestration; docs/ design and operation.
+**Default mode: DEVELOPMENT MODE — owner-operated prototype.** Optimize Build → Run → Observe → Fix and the smallest meaningful real result. This does not remove electrical, OS permission, hardware ownership or recovery guards. PASS/FAIL/NOT_RUN must correspond to observed execution.
 
-## 1A. Prototype-first engineering policy (normative)
+**Development priority — EFFICIENCY FIRST, essential safety always (normative).** In owner-operated prototype development, optimize for the shortest safe path to an observed functional result, not maximum preflight coverage or production-style qualification. Reuse qualified evidence and prefer existing commands, focused delta checks, bounded experiments and rapid Build → Run → Observe → Fix. **Apply only safeguards tied to a concrete relevant hazard or invariant** (electrical/power safety, OS/device ownership, resource isolation, durable state and UNKNOWN/no-blind-resend); do not waive them to gain speed. Any proposed additional test, stop or prerequisite must identify the actual risk and use the least burdensome effective mitigation. Defer unrelated, speculative or production-only checks as NOT_RUN/NOT_VERIFIED without blocking otherwise authorised development. Where a small reversible experiment can safely answer the question, prefer it to another broad audit.
 
-Prototype outcomes require the smallest authentic build/test/HIL result. Hosted mocks never prove SWPC, FPGA load, Z2, DUT, voltage or real IC programming. Reuse prior valid board enrollment, identity, artifacts and recovery evidence when applicable, but check current ownership, permissions, candidate identity and actual hazard conditions. Default Z2 internal-loopback HIL to the existing development profile when that HIL is explicitly authorized; qualification profile is only for deliberate qualification.
+## Development autonomy and restriction provenance (normative)
 
-For healthy normal development aim for at most 180 seconds of pre-experiment checks; this is an objective, **not** permission to omit real safeguards. Preserve legal voltages, current PL/MMIO ownership, artifact identity, rollback image and recovery. Stop on actual SIGBUS, conflicting drivers, dangerous power/voltage, missing root authority or uncertain restoration. Never equate a file hash or CI green check with physical safety.
+- **Do not invent restrictions.** Do not add unrequested approval steps, blanket deployment/FPGA/Site bans, arbitrary test limits or production-grade prerequisites without a basis in the owner-approved Gate 1, applicable repository contracts, executable guards or demonstrated engineering safety. Missing evidence is NOT_VERIFIED, not proof of failure or an automatic ban on unrelated safe work.
+- **Execute the approved scope end-to-end.** After Gate 1, autonomously perform necessary in-scope configuration, code/RTL changes, testing, diagnosis, deployment/restarts, resource activation and hardware work **when those operations are included in the authorization**. Do not subdivide approved work into repeated owner approvals. Actual OS privileges, resource locks, electrical safety and recovery guards remain binding.
+- **Separate development from production.** Do not silently impose future factory/fleet/production controls on a development experiment. Honor owner-approved development exceptions within their exact scope, and report excluded validation as NOT_RUN or NOT_VERIFIED; never claim production qualification, Power Control or electrical SAFE_OFF without physical evidence.
+- **Explain real blockers.** For any new restriction or stop condition, state its precise source (owner decision, repository contract, live configuration, executable guard or physical hazard), observed evidence, material risk and least-restrictive safe resolution. Distinguish a temporary configuration gap from a policy prohibition. Ask the owner only when facts cannot be established safely or a material scope change requires a revised Gate 1.
+- **Preserve two Gates and task-specific limits.** Gate 1 authorizes the bounded work; Gate 2 alone authorizes PR merge. Do not introduce a third Gate or re-request granted permission. Task-specific Flash quotas, hardware permissions and experimental exceptions must not become global defaults.
+- **Do not bypass real protections.** Preserve electrical safety, exact target/route admission, Site ownership, transaction consistency, OUTCOME_UNKNOWN no-blind-resend, recovery and truthful evidence. Development autonomy removes redundant human checkpoints, not technical safety controls.
 
-### 1A.1 Development Mode — single-owner, shared-runner, efficiency-first (normative)
+**PPU Bundle v3 (PR #1225):** Canonical deployment hierarchy is **Bundle → Packages → Files**: `plasma.ppu.bundle.v3`, manifest `packages[]` (1–32), `payload/packages/<package-id>/...`, with package `id`, `kind`, `version`, `requires`, `files`. Retired Bundle v2 `components` and Package v1 are not new accepted wire formats; do not confuse these with legitimate FPGA/UI components. See [Bundle v3 contract](docs/architecture/ppu-canonical-bundle-packages.md) and [Target Platform Identity proposal](docs/architecture/ppu-target-platform-identity.md). This does not authorize deployment, FPGA/DUT operation, or bypass Gate 2.
 
-- **No overengineering.** Prefer the current Work Order, generic Dispatcher, trusted-main stage adapter, existing scripts and Runner. Do not introduce a per-task Workflow, Registry ID, Runner, security platform, evidence system or third approval gate for ordinary development. A genuinely new mechanism with new consequences needs explicit approval in Gate 1.
-- **Choose an appropriate Path at Gate 1.** Path 1: ChatGPT Direct for code/docs/Host-only CI. Path 2: SWPC fixed CLI for deterministic real SWPC work. Path 3: existing SWPC Codex CLI for real SWPC plus autonomous diagnosis/repair. Prefer Path 1 unless SWPC required; prefer Path 2 unless agentic iteration needed.
-- **Path 3 is not Host-only.** Under an owner-approved Gate 1 Work Order, the existing Path 3 Codex on SWPC may use ordinary USB/TTY tools directly, including OpenOCD, sigrok and CDC, within actual Linux device permissions. Do not add a separate Lab Mode, Session, per-DUT core Stage or execution path. Privileged Z2 FPGA Manager/MMIO, power changes and protected stages still require their existing authorization and executor. If access fails, report NOT_RUN, not PASS.
-- Path 2 and Path 3 may share existing SWPC-plasma-codex Runner when the approved task and current host permissions allow. Do not require extra OS/Runner isolation without demonstrated risk.
-- **One full readiness review per unchanged PR HEAD.** Revalidate affected deltas and dependencies only. Immediately before an authorized Gate 2 merge, check live HEAD/main, necessary CI, Rulesets, Reviews, unresolved Threads, dependencies and Mergeability. Stop on changes.
-- If approved Path 2/3 acceptance requires real SWPC, execute/review it in Gate 1 before merge; GitHub-hosted simulation and a proposed Run ID do not qualify. Preserve actual exit, Run/Job ID, evidence and recovery outcome. Do not merge untested changes merely to trigger a main-only dispatcher. Explicit owner-approved deferral must be documented.
-- Preserve only real boundaries: no unapproved deployment, destructive Git, privilege escalation, device operation or credential exposure. Return to revised Gate 1 for materially expanded work.
+## Project purpose and hard boundaries
 
-### 1A.2 Development Mode — shared execution and safety
+PLASMA is a configurable, multi-Site IC programmer; **PPU means Plasma Programming Unit** (the hardware product identity), while PYNQ-Z2 is only the current prototype board. Keep product-wide tools named for PPU and reserve Z2 names for board-specific drivers, installers and enrollment details. Hierarchy: Facility → PPU → SITE 1..N (one-based `site_id`). Socket is a fixture, not Site identity. Protocol v3.3 (PLASMA33) and Web REST v3 are canonical. PPU exposes the **Plasma Gateway** service, its **Plasma Gateway API** and **Plasma Gateway Endpoint**. The Linux **Default Gateway** is an unrelated layer-3 next-hop; do not conflate them. Plasma Manager provides bounded managed PPU routing, not a universal scheduler. Programming Asset is input; Normalized Image is the execution model. Never reintroduce retired zero-based Channel/Programmer identity.
 
-Use the existing trusted-main Dispatcher, existing Work Order and Runner, not speculative alternate infrastructure. SWPC's ordinary USB/TTY development tools are available to the approved Path 3 Codex process, subject to the worker's real OS privileges, B1 owner/scope authorization and electrical/device-ownership safety. Privileged protected stages retain B1/B2/B3 and their trusted executor. Authentic exits, hashes and physical evidence are required for any PASS; unknown electrical/recovery state stops unsafe repeats. The [full contract](docs/development/plasma-autonomous-development-contract-full.md) remains authoritative for protected operations.
+**Hardware execution boundary (normative; CI-enforced):**
+- **SWPC runs Web / Controller / BFF** and sends high-level commands over Ethernet.
+- **Z2 PS runs the embedded Linux programming runtime**, including the live OpenOCD process and its PS-local WordPort/Remote Bitbang bridge.
+- **Z2 PL** executes FPGA SWD/SPI hardware I/O to the DUT.
 
-## 1B. Canonical Codex task/SSH execution contract (normative)
+SWPC may build/test OpenOCD offline but must **not** host live OpenOCD or forward per-bit SWD traffic as the product path. Changing this placement requires an explicit revised Gate 1 architecture decision plus synchronized contract, implementation and CI. See [OpenOCD architecture](docs/architecture/ic-support-openocd-plan-executor.md).
 
-A Codex task is an execution assignment within an approved Gate 1, not a new planning request. Perform accessible authorized tests, diagnosis, repairs and evidence collection autonomously. Do not assume ability to SSH or sudo because credentials exist or instructions request it. Consult the [full SSH and HIL contract](docs/development/plasma-autonomous-development-contract-full.md) and the dedicated Z2 HIL command document for any authorized Z2 task.
+**ST-LINK control group (owner-approved 2026-11-15):** an ST-LINK attached to SWPC may run OpenOCD against a DUT as an independent verification control group (for example, reading DPIDR to separate a DUT fault from a Z2/PL/wiring fault). It is not the product path, and its result is never Site, Z2 or E/P/V evidence. It may stay wired alongside the Z2 PMOD; the operator must not drive both at the same time.
 
-Approved Z2 development credentials remain exclusively in the private owner-controlled host credential source. Never commit, print, log, transmit to unrelated endpoints or include in PR artifacts. Do not change sudoers, grant new privileges or use credentials to bypass an actual sandbox denial. Do not invent device IP addresses or operating state. For authorized FPGA load, require candidate identity, known-good rollback and confirmed restoration even on failure; no intentional AXI-fault or external SWD operations in internal-loopback-only tasks.
+**Current Z2 Blue Pill physical SWD path (normative):** Z2 PS-local OpenOCD `plasma_swd` adapter → paired PL ABI-v5 SWD engine image → PMOD (WordPort/Remote Bitbang is kept only as an experiment/comparison path). Do not select retired SWD entrypoints. Details: [SWD retirement](docs/development/swd-legacy-path-retirement.md) and the FPGA / Embedded contracts.
 
-## 2. Programming data model
+## Domain contract routing (normative)
 
-Keep canonical Site, Programming Asset, Normalized Image, Job and Batch semantics. A Program operation writes only; Erase, Program, Verify and Read are separately selected. A complete flow states its stages explicitly. Site execution is independent except genuine shared physical resources. Do not infer supported IC models, OpenOCD qualification or board behavior from catalog metadata alone. Consult full contract and domain tests before altering execution semantics.
+Load [Common](docs/development/plasma-development-common.md) and **only** the applicable domain contracts according to the actual changed interfaces (not according to the execution Path):
 
-## 3. Source-of-truth priority
+| Changed scope | Required domain contract | Also load when interfaces affected |
+| --- | --- | --- |
+| FPGA RTL / XDC / PL image / MMIO | [FPGA](docs/development/plasma-fpga.md) | [Embedded](docs/development/plasma-embedded.md) for PS-facing ABI |
+| Z2 Linux / OpenOCD / PS driver | [Embedded](docs/development/plasma-embedded.md) | [FPGA](docs/development/plasma-fpga.md) for PL ABI |
+| Manager / Gateway / backend REST | [Manager](docs/development/plasma-manager.md) | [Embedded](docs/development/plasma-embedded.md) or [Web](docs/development/plasma-web.md) |
+| Web UI / frontend | [Web](docs/development/plasma-web.md) | [Manager](docs/development/plasma-manager.md) for changed REST APIs |
+| Cross-layer API / protocol | Common + every affected domain | Validate producers and consumers |
 
-When statements disagree: (1) executable code/check-in config, (2) scripts/plasmactl for integration-host operations, (3) Python/Web package manifests, (4) tests, (5) current architecture/development docs including detailed clauses, (6) historical discussions. Do not silently resurrect stale behavior or stale unsupported claims.
+Path 2 / Path 3 are selected independently of domain. Skipping unrelated documents never waives interface compatibility, Root Guard, Gate approvals, hardware ownership, electrical safety or evidence requirements.
 
-## 4. Execution zones
+### Path selection (normative)
 
-- **Cloud / GitHub-hosted:** source changes, deterministic host-only tests, PR/CI. Never claim real SWPC, FPGA, voltage, Z2 or DUT success from these.
-- **SWPC / integration host:** licensed builds, scoped host validation and owner-authorized USB/TTY experiments by existing Path 3 Codex. The rootless Codex device namespace exposes /dev/bus/usb and current /dev/ttyACM* and /dev/ttyUSB* nodes without per-VID/PID core allowlists; real Linux DAC/ACL continues to apply. Check workspace branch/state before changes; never overwrite unrelated work.
-- **Z2 / hardware:** real FPGA/PS/PL/DUT operations only with explicit Gate 1 and effective guard/ownership/recovery checks. Hardware observations are not inherited from software success.
-- Default workspace is the PLASMA repository. Do not inspect unrelated personal files, system settings, credential stores or external repos except already-authorized task-specific resources.
+- Default: ChatGPT Direct (code, docs, host-only CI).
+- **Path 2**: deterministic SWPC CLI / CPU-only / operator CLI / Vivado. When selected, read [Path 2 contract](docs/development/plasma-path2-cli.md).
+- **Path 3**: SWPC Codex for autonomous diagnosis/repair and approved hardware tasks. When selected, read [Path 3 contract](docs/development/plasma-path3-codex.md). Ordinary Path 3 explicitly pins `--sandbox workspace-write`. **Do not apply retired Issue #981 read-only Pilot or no-hardware Runner restrictions to current Path 3.** Owner-approved, SHA-pinned guarded-hardware Work Orders may use native SSH/USB/TTY and DUT tests under verified Linux DAC/ACL, device ownership and Root safety checks; historical Runner UID or a sandbox mode alone proves neither permission nor prohibition.
 
-## 5. Current software architecture
+Select the smallest capable Path. Choosing a Path never grants additional authority beyond the approved Gate 1 scope, actual Linux privileges, Root Guard and safety checks.
 
-Use software/python and software/web canonical source and test manifests. Plasma Gateway uses standard-library HTTP + REST polling; it is not FastAPI/WebSocket. Do not invent implicit Gateway endpoints, switch network ports or assume a central fleet scheduler. Inspect current source before changing APIs or protocol.
+## Core engineering policies
 
-## 6. Python environment and domain rules
+**Delta Verification / reuse accepted evidence (normative; ChatGPT Direct, Path 2, Path 3)**
 
-Python supports 3.11+; use the repo's actual development environment. Keep Protocol v3.3 and Web REST v3 identity canonical. Never equate a generated image, target description or host-only OpenOCD config with qualified real programming support. Check relevant source/tests and the detailed rules before modifying those domains.
+- **Start from the last accepted baseline, not from zero.** For each request, identify the actual source/config/interface/hardware delta and the specific new outcome. Reuse prior observed PASS, approved Gates and immutable evidence when their tested conditions still apply. Do not restart a repository-wide architecture/ADR/PR/CI audit or ask the owner to restate known decisions merely because a new task begins.
+- **Verify the affected surface only.** Execute the smallest relevant functional check, boundary/negative regression and applicable safety guard for the delta. Expand only when a material dependency changed, evidence no longer covers the requested behavior, an observed failure points outside the initial scope, or an executable policy explicitly requires it. A checklist is not evidence that every item must be rerun.
+- **Preserve evidence type and validity.** Confirm only the baseline identity and conditions needed for reuse (e.g. exact source/test SHA, changed dependencies, runtime configuration and hardware mapping). Hosted CI/Mock PASS is reusable software evidence, never a substitute for new physical HIL. A materially changed source requires the relevant new tests and the required exact-HEAD CI/merge checks; unchanged historical checks do not become new work.
+- **Do not manufacture approval gates or blanket prohibitions.** An already approved Gate 1 covers its bounded work; Gate 2 still governs PR merge. Distinguish legitimate safety checks before an authorized hardware operation from fresh owner approval, speculative factory prerequisites and unrelated full requalification.
+- **Example — WP-01 after #1439/#1441 merge:** Retain accepted architecture and Hosted CI evidence; the next unsolved question is whether the real Z2 PPU can run its two installed Sites concurrently. Check effective PPU concurrency and shared electrical/FPGA ownership, then prove two real overlapping Flash/Verify executions with independent Job/Receipt and safe outcomes under an authorized HIL scope. Do **not** redo all single-Site or 8-Site Host-only work just to start 2-Site qualification.
+- **Report the delta, not a recycled audit.** Summarize (1) reused evidence, (2) new checks actually run and their PASS/FAIL/NOT_RUN, (3) specific unresolved blockers and next action. Never represent a prior PASS as a new execution, or omit a necessary safety check in the name of efficiency.
 
-## 7. Web environment
+**Engineering simplicity and scope control (normative; no new Gate)**
 
-Use the actual Web package.json, scripts and components; do not assume a framework. Apply Web REST v3 and normalized execution semantics; run affected lint/unit/build validation. Frontend simulation does not prove PPU Runtime or FPGA hardware.
+1. **Existing First — execute before expanding.** For an approved bounded task, use the existing canonical command/API and current proven route first. Do not add a wrapper, service, architecture layer or new implementation without a specific demonstrated gap. Respect existing admission, authorization and physical safety guards.
+2. **Minimal Scope — solve only the requested problem.** Keep implementation and verification limited to the requested outcome and its necessary dependencies. Do not turn one-Site/one-Flash work into unsolicited A/B/A, burn-in, multi-Site Scheduler changes, CDC qualification, deployment, or broad re-audits. Distinguish required Flash safety from optional post-Flash observations.
+3. **One Task, One Result — no silent amplification.** A request for one Flash authorizes at most one intended programming attempt, not extra repetitions or automatic retries. Record the real Job/Receipt and report PASS, FAIL, BLOCKED or NOT_RUN. If submission outcome is unknown, reconcile it; never blindly resubmit.
+4. **Evidence Before Code — diagnose the actual failure.** Inspect the existing implementation and observed error before modifying code. A successful workflow/Codex exit is not a substitute for the requested functional or physical result. Fix the smallest evidence-backed cause, then run the relevant focused regression and safety checks; do not claim unrun checks as PASS.
+5. **Complexity Budget — default to zero new files.** Prefer simplifying or deleting duplicate paths over adding abstractions. For engineering changes, report added LOC, removed LOC, net LOC, new files and why each addition was necessary. Zero new files is the default target, not an excuse to omit necessary tests or safety fixes.
 
-## 8. Runtime services and ports
+These rules apply to ChatGPT Direct, Path 2 and Path 3. They do not add approval gates, weaken safety/transaction guarantees, or override the exact owner-approved task scope.
 
-Read scripts/plasmactl and runtime configuration before changing any service or port. Plasma Gateway integration endpoint normally uses port 18080; some code-level defaults differ. Desired configuration persistence is not Runtime activation. No unapproved activation, restart, service/network exposure or production deployment.
+**Replace-by-Default.** New versions replace old versions directly across API, Schema, Protocol, Package, FPGA IP, Driver and tools. Migrate dependents (implementation, callers, tests, docs, CI) in the same change. Do not keep Compatibility Layers or dual-track architectures merely for old tests. Exceptions require explicit owner approval.
 
-## 9. Site execution invariants
+**Anti-Resurrection (normative; enforce Replace-by-Default).** A deliberate deletion remains a constraint across new files, workflows and deployment paths: before restoring a removed component, compatibility branch, static version allowlist or build dependency, inspect the merged removal decision and current callers, and prove why the existing canonical route cannot serve the need. Renaming or relocating the retired behavior does not make it new. Do **not** silently restore `ppu-z2-installer-core.py` as a shipped/installed executable path (#1433), Bundle-side Engine/Admission SHA version pins (#1329), or Python Admission changes as an OpenOCD *binary compilation* trigger; preserve source-appropriate Host-only validation instead. Per-artifact SHA256 integrity, selected Engine/Root ownership, driver ABI, exact-source evidence and safety interlocks remain required and must **not** be mistaken for forbidden static update-version allowlists. A bounded one-shot maintenance tool is not a precedent for a generic deployment policy. Any genuine old-device migration exception needs explicit owner approval and a removal boundary; reject disguised permanent compatibility. Keep focused negative regression coverage in existing tests/CI; no new gate or duplicate policy system.
 
-Sites remain independent except genuine common hardware/resource synchronization. Per-Site cancellation must not cancel unrelated Sites. Batch cancellation retains authoritative batch classification while preserving truthful final Job outcome. Program is write-only. A common Normalized Image lease may synchronize Sites when one PPU shares the execution image.
+**Source priority:** executable code/config > `scripts/plasmactl` > package manifests > tests > current docs > historical discussion. Inspect actual implementation; never infer support from metadata or mocks.
 
-## 10. Service and process safety
+**Evidence:** Hosted CI / mocks never prove Z2, FPGA load, DUT, voltage or real IC programming. Record authentic PASS / FAIL / NOT_RUN. Keep Loaded after proven successful FPGA Download is the default; functional FAIL alone is not a Golden Restore trigger. Details live in the FPGA and Embedded contracts.
 
-Identify exact PIDs/service owners before stopping processes. Never use broad pkill/killall by language/runtime name; do not stop unrelated host services, networking, SSH or storage. Never expose internal ports to untrusted networks to bypass connectivity problems.
+**Process safety:** Identify precise service/PIDs before stopping. No broad `pkill`/`killall`. No unapproved deployment, destructive Git, privilege escalation or credential disclosure.
 
-## 11. Autonomous task execution contract
+## Codex token efficiency (advisory; no new Gate)
 
-### 11.1 Exact two-gate workflow
+- Minimize **model round-trips and context size** together. Follow the domain routing above; bound searches and file/CI output to relevant excerpts, and do not repeatedly read unchanged files without a new reason.
+- Batch independent read-only inspections when safe; keep dependent edits, failures and verification visible. Reuse evidence for unchanged HEAD, but run all required focused, regression, negative and safety checks for the approved scope.
+- For CI, prefer a single bounded status collection and asynchronous waiting over repeated model-driven polling. Fetch detailed logs for failed or ambiguous jobs; do not recheck unchanged successful results without cause.
+- For small/medium host-only tasks, review tool churn and remaining acceptance at about **20 top-level tool calls**; at about **35**, record a concise efficiency checkpoint and reduce redundant work. These are **advisory checkpoints**, not stop conditions, test limits, approval gates or permission to leave Gate 1 incomplete.
+- Continue the approved Build → Run → Observe → Fix → Retest loop to observed PASS or an actionable blocker. Safety, recovery, interface compatibility and Gate evidence take precedence over token savings; only a material scope change requires revised Gate 1.
+- When metrics are available, report model/effort, tool calls and cached/non-cached/output tokens as observed. Do not infer five-hour subscription allowance consumption from local token counters. Stop nonessential inspection after required Gate readiness evidence is complete.
 
-1. Before any new code/config/docs/PR/host or hardware modification, inspect read-only, present the bounded Plan and Path, and obtain explicit **Gate 1** approval.
-2. Execute the authorized scope independently through actual acceptance (including real SWPC/Z2 only if included). Record real output/exit/status; diagnose, fix and retest in the same Gate 1. A missing capability is NOT_RUN, not PASS.
-3. Prepare branch and PR with required CI, Ruleset/Review/Thread and evidence. Move Draft -> Ready when complete; no intermediate human approval gate.
-4. Obtain explicit **Gate 2** approval for a specific PR and HEAD, then recheck live GitHub state and use authorized merge method. Confirm Merge SHA, both Parents and Git Tree.
-5. Post-merge deployment or physical operations proceed only if explicitly covered by Gate 1; otherwise request revised Gate 1. Never treat merge as permission to deploy.
+## Approval, Git and completion
 
-### 11.1A Clickable owner approval choices (normative UX; no new gate)
+Gate 1 = bounded plan before implementation. After approval, finish all in-scope work autonomously. Gate 2 = explicit merge approval for a specific merge-ready PR (verify HEAD, CI, Rulesets, Reviews, Threads, Mergeability). Merge does not authorize deployment or hardware operations.
 
-Use up to four explicit scoped choices when appropriate, but buttons do not themselves create new gates. Present only the currently applicable Gate and never ask twice after explicit owner approval. Gate 2 merge choice only when PR is merge-ready. Non-approval choices do not authorize implementation or merge.
+Report: exact SHA, Path, executor/Runner, run/job ID (if any), observed result, blocked/not-run items, changed files, tests/CI, outstanding safety/recovery concerns, next Gate. Be concise; never portray intended tests as completed.
 
-### 11.1B Three-Path Work Execution Model (normative)
+## Workspace boundary
 
-- Path 1: ChatGPT Direct Work -> GitHub PR -> GitHub-hosted CI; for software/docs/Host-only engineering.
-- Path 2: existing GitHub Actions -> authorized SWPC fixed CLI -> real exit/evidence, when deterministic commands suffice.
-- Path 3: existing GitHub Actions -> authorized SWPC-plasma-codex Runner -> rootless USB/TTY-visible Codex CLI autonomous work -> authentic evidence -> PR/CI. Device visibility is not blanket approval to actuate; the existing Gate 1 defines permitted experiments.
-- Path choice belongs to Gate 1. **No silent route fallback**, no simulated or assumed GitHub Dispatch, no unintended SWPC activity or privilege bypass. Ordinary Gate 1-authorized USB/TTY experiments require actual Linux permissions and safety checks; privileged Z2/MMIO/FPGA stages still require the protected executor.
-- The detailed Three-Path design is in [docs/development/plasma-three-path-execution-model.md](docs/development/plasma-three-path-execution-model.md).
+Do not read or publish private prompts, SSH credentials, API tokens, raw Codex transcripts, operator home directories or unrelated files. Credentials stay in the owner-controlled private store (see Embedded contract). No hardware access without approved Gate 1 scope.
 
-### 11.2 Routine autonomous work after Gate 1
+Root AGENTS.md is deliberately concise to fit the default Codex project instruction budget. This does **not** relax any constraint present in the full domain or Path contracts.
 
-Do not repeatedly seek confirmation for ordinary in-scope edits, builds, CI repairs or polling. Avoid redundant comprehensive readiness reviews for unchanged SHA. Stop only on material scope expansion, real access/safety blocker or Gate 2 merge decision.
+<!-- CODEGRAPH_START -->
+## CodeGraph
 
-## 12. Scope coverage and escalation — no third gate
+In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
 
-Explicit Gate 1 scope is required for runtime/deployment/restart/network configuration, physical power/voltage/FPGA/IC programming, destructive or history-rewriting Git operations, and material architecture or security changes. No force-push, rebase of shared history, git reset --hard or git clean that can discard user work without such scope. Merge to main always requires Gate 2.
+- **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
+- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
 
-## 13. Merge-ready definition
-
-Implementation and diff reviewed; applicable tests/CI PASS; no blocking Rulesets/Reviews/unresolved Threads; exact HEAD and base verified; mergeability confirmed; real required SWPC/hardware evidence available or explicitly deferred by owner. No invented PASS claims. Then Ready for Review and Gate 2, not an automatic merge.
-
-## 14. Git publication policy
-
-Use feature branch and PR, preserve other contributors' changes. No direct feature commits to main, no force-push or history rewrite for aesthetics. Confirm HEAD, branch, worktree and target main before edits. Verify merge commit SHA/Parents/Tree after owner Gate 2.
-
-## 15. Validation policy
-
-Development Mode uses the minimum sufficient authentic experiment. Stop after one complete PASS; only FAIL or insufficient evidence warrants targeted diagnosis, repair and retest. Program/Readback/Verify have no numerical retry quota; this is not permission for uncontrolled loops or unsafe repeats. Never automatically repeat an operation after uncertain electrical state, unreaped process or uncertain recovery. Run smallest focused tests first and full relevant CI before readiness. Python and PL source tests, Web lint/test/artifact checks, cross-stack integration and physical HIL are distinct layers; a lower layer does not certify a higher one. Never infer hardware acceptance from hosted mocks.
-
-## 16. FPGA / PL rules
-
-For pl/ or hardware-visible changes read pl/AGENTS.md and the FPGA development/verification guides. Production RTL uses SystemVerilog and canonical Site naming. Validate CDC/reset/clock/XDC/register maps, PS/PYNQ access, simulation/lint/SVA/cocotb as applicable. Claim synthesis, timing, BIT/HWH and real Z2 outcomes only when executed and observed.
-
-## 17. Z2 production direction
-
-Z2 is an embedded PPU, not a clone of the workstation. Do not transplant developer tools, credentials or build-time infrastructure into the runtime by default. Check PYNQ/XRT compatibility before standardizing runtime dependencies.
-
-## 18. Current known boundaries / technical debt
-
-Preserve current implementation limits: Python >=3.11; integration Gateway normally port 18080; REST polling; canonical-only Protocol v3.3 and Web REST v3; not every declared Programming Asset type is implemented; Recipe/Package remains evolving; fleet Manager is not unrestricted proxy/scheduler; Desired persistence does not mean activation; SWPC mock does not certify DUT programming. Consult [detailed contract](docs/development/plasma-autonomous-development-contract-full.md) before advancing unsupported features.
-
-## 19. Communication and completion report
-
-Report exact checked SHA and execution Path, real executor/Runner, run/job ID where applicable, observed result, blocked/not-run operations, changed files, tests and CI, outstanding safety/recovery concerns, and next Gate. Be concise; never portray intended tests as completed.
-
-## 20. Workspace and information boundary
-
-Do not read or publish private prompts, SSH credentials, API tokens, raw Codex Session transcripts, operator home directories or other unrelated files. The owner may explicitly authorize a bounded resource for a task; redact any sensitive output and honor actual permissions. The detailed F1-B stage-transport contract and B1/B2/B3 ownership/restoration checks are authoritative for authorized hardware work. No hardware access without approved scope.
-
-**On-demand contract routing:** For a narrowly scoped task, read the relevant section(s) of [the complete detailed contract](docs/development/plasma-autonomous-development-contract-full.md) and affected nested AGENTS.md files; do not preload all 62 KiB without technical need. Root AGENTS.md is concise to fit the default Codex project instruction budget; this does **not** relax any full-contract constraint.
+If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
+<!-- CODEGRAPH_END -->

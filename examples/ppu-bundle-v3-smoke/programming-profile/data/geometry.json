@@ -1,0 +1,6 @@
+{
+  "flash_base": "0x08000000",
+  "flash_bytes": 65536,
+  "page_bytes": 1024,
+  "fixture_only": true
+}

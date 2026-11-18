@@ -43,7 +43,6 @@ def test_z2_server_and_gateway_share_one_explicit_canonical_config(tmp_path: Pat
         paths=paths,
         python_runtime=installer.PythonRuntime(python_path, "3.11.9", "armv7l"),
         gateway_host="192.168.2.99",
-        catalog_relative="data/device-catalog/production/icpn-v1-manifest.json",
     )
     config = paths.config_root / "ppu.yaml"
     server = units["plasma-server.service"]
@@ -81,7 +80,9 @@ def test_z2_config_directory_permission_migration_is_rollback_safe(
 
 
 def test_ppu_runtime_manifest_requires_gateway_and_server_config_identity() -> None:
-    manifest = runtime._manifest(python_requirement=">=3.11", pyyaml_version="6.0.2")
+    manifest = runtime._manifest(python_requirement=">=3.11", pyyaml_version="6.0.2",
+                                 site_worker_protocol="plasma.ppu.site-worker.v3")
+    assert manifest["control_plane"]["path"] == "control-plane"
     processes = manifest["processes"]
     server_args = processes["server"]["arguments"]
     assert server_args[:3] == ["server", "--config", "<ppu-config>"]

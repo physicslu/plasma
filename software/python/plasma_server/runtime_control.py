@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import socket
+import struct
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -63,6 +66,24 @@ class RuntimeQuiesceGate:
         self._deadline_monotonic = time.monotonic() + ttl_s
         return {"token": token, "ttl_s": ttl_s}
 
+    def acquire_held(self) -> dict[str, Any]:
+        """Connection-lifetime exclusive lease: released only on socket EOF.
+
+        Unlike a TTL lease, this cannot expire during a partially completed
+        atomic Asset Set switch; a crashed caller closes its connection and
+        the server releases the lease. This does not authorize FPGA loading.
+        """
+        self._expire_if_needed()
+        if self._token is not None:
+            raise PlasmaError(
+                ErrorCode.PPU_BUSY,
+                "PPU runtime already has an exclusive quiescence owner",
+                recoverable=True,
+            )
+        self._token = f"asset-set-{uuid.uuid4().hex}"
+        self._deadline_monotonic = None
+        return {"token": self._token, "lease_kind": "connection_held"}
+
     def release(self, token: str) -> None:
         self._expire_if_needed()
         if self._token is None:
@@ -83,11 +104,26 @@ class RuntimeQuiesceGate:
         }
 
 
+class PackageActionFailed(RuntimeError):
+    pass
+
+
+def _peer_uid(writer: asyncio.StreamWriter) -> int | None:
+    sock = writer.get_extra_info("socket")
+    try:
+        raw = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+    except (AttributeError, OSError):
+        return None
+    return struct.unpack("3i", raw)[1]
+
+
 class RuntimeControlServer:
     """Local Unix-socket control plane for authoritative quiesce operations."""
 
-    def __init__(self, manager: Any, socket_path: Path) -> None:
+    def __init__(self, manager: Any, socket_path: Path, package_actions: Any | None = None) -> None:
         self.manager = manager
+        # Optional Stage C PackageActionRuntime; None keeps the op disabled.
+        self.package_actions = package_actions
         self.socket_path = socket_path.expanduser().resolve()
         self._server: asyncio.AbstractServer | None = None
 
@@ -110,42 +146,107 @@ class RuntimeControlServer:
         except FileNotFoundError:
             pass
 
+    async def _package_action(self, request: dict, reader: asyncio.StreamReader,
+                              writer: asyncio.StreamWriter) -> Any:
+        """Stage C: run ONE Package Action for a local ROOT operator.
+
+        Only a root peer (SO_PEERCRED uid 0; the root operator CLI that
+        already verified the owner asset.execute authorization with the
+        Bootstrap credential) may call this. The Runtime receives a one-time
+        credential bound to this job, never the Bootstrap token. Closing the
+        connection cancels the action.
+        """
+        if self.package_actions is None:
+            raise RuntimeControlError("package actions are not enabled on this Runtime")
+        if _peer_uid(writer) != 0:
+            raise RuntimeControlError("package_action requires the local root operator")
+        if set(request) != {"operation", "request", "authorization", "ephemeral_credential", "device_id"}:
+            raise RuntimeControlError("package_action request fields are invalid")
+        cancel = threading.Event()
+        loop = asyncio.get_running_loop()
+        if (isinstance(request["request"], dict)
+                and "programming" in request["request"]):
+            # Same root-only Package Action entry, but executed by a real
+            # SiteManager Programming Job; no second engine or Root endpoint.
+            work = asyncio.create_task(self.package_actions.run_programming_control(
+                request["request"], request["authorization"],
+                request["ephemeral_credential"], request["device_id"], cancel))
+        else:
+            work = loop.run_in_executor(None, self.package_actions.run_control,
+                                        request["request"], request["authorization"],
+                                        request["ephemeral_credential"], request["device_id"], cancel)
+        eof = asyncio.ensure_future(reader.read(1))
+        done, _ = await asyncio.wait({work, eof}, return_when=asyncio.FIRST_COMPLETED)
+        if work not in done:
+            cancel.set()          # operator disconnected: cancel, then report
+        if not eof.done():
+            eof.cancel()
+        try:
+            return await work
+        except Exception as exc:  # deny / launch errors become a structured failure
+            raise PackageActionFailed(str(exc)[:200] or type(exc).__name__) from None
+
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        held_token: str | None = None
         try:
-            raw = await reader.readline()
-            if not raw or len(raw) > MAX_CONTROL_REQUEST_BYTES:
-                raise RuntimeControlError("runtime control request is empty or too large")
-            request = json.loads(raw.decode("utf-8"))
-            if not isinstance(request, dict):
-                raise RuntimeControlError("runtime control request must be a JSON object")
-            operation = request.get("operation")
-            if operation == "quiesce":
-                if set(request) != {"operation", "ttl_s"}:
-                    raise RuntimeControlError("quiesce request fields are invalid")
-                result = self.manager.acquire_runtime_quiesce(request["ttl_s"])
-            elif operation == "status":
-                if set(request) != {"operation"}:
-                    raise RuntimeControlError("status request fields are invalid")
-                result = self.manager.runtime_quiesce_snapshot()
-            elif operation == "release":
-                if set(request) != {"operation", "token"} or not isinstance(request.get("token"), str):
-                    raise RuntimeControlError("release request fields are invalid")
-                self.manager.release_runtime_quiesce(request["token"])
-                result = self.manager.runtime_quiesce_snapshot()
-            else:
-                raise RuntimeControlError("unsupported runtime control operation")
-            payload = {"ok": True, "result": result}
-        except (UnicodeDecodeError, json.JSONDecodeError, RuntimeControlError, PlasmaError) as exc:
-            payload = {
-                "ok": False,
-                "error": {
-                    "message": str(exc),
-                    "code": exc.code.value if isinstance(exc, PlasmaError) else "runtime_control_error",
-                },
-            }
-        writer.write((json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8"))
-        try:
+            try:
+                raw = await reader.readline()
+                if not raw or len(raw) > MAX_CONTROL_REQUEST_BYTES:
+                    raise RuntimeControlError("runtime control request is empty or too large")
+                request = json.loads(raw.decode("utf-8"))
+                if not isinstance(request, dict):
+                    raise RuntimeControlError("runtime control request must be a JSON object")
+                operation = request.get("operation")
+                if operation == "quiesce":
+                    if set(request) != {"operation", "ttl_s"}:
+                        raise RuntimeControlError("quiesce request fields are invalid")
+                    result = self.manager.acquire_runtime_quiesce(request["ttl_s"])
+                elif operation == "hold_asset_activation":
+                    # This private Unix socket is owned by the Runtime and
+                    # mode 0600. Never expose this operation over public HTTP.
+                    if set(request) != {"operation"}:
+                        raise RuntimeControlError("asset lease request fields are invalid")
+                    result = self.manager.acquire_asset_set_quiesce()
+                    held_token = result["token"]
+                elif operation == "status":
+                    if set(request) != {"operation"}:
+                        raise RuntimeControlError("status request fields are invalid")
+                    result = self.manager.runtime_quiesce_snapshot()
+                elif operation == "execution_lease":
+                    # Read-only C-1 lease snapshot for the local Site Worker
+                    # (Stage C-3) to confirm a Package Action Job holds it.
+                    if set(request) != {"operation"}:
+                        raise RuntimeControlError("execution_lease request fields are invalid")
+                    result = self.manager.execution_lease_snapshot()
+                elif operation == "package_action":
+                    result = await self._package_action(request, reader, writer)
+                elif operation == "release":
+                    if set(request) != {"operation", "token"} or not isinstance(request.get("token"), str):
+                        raise RuntimeControlError("release request fields are invalid")
+                    self.manager.release_runtime_quiesce(request["token"])
+                    result = self.manager.runtime_quiesce_snapshot()
+                else:
+                    raise RuntimeControlError("unsupported runtime control operation")
+                payload = {"ok": True, "result": result}
+            except (UnicodeDecodeError, json.JSONDecodeError, RuntimeControlError, PlasmaError,
+                    PackageActionFailed) as exc:
+                payload = {
+                    "ok": False,
+                    "error": {
+                        "message": str(exc),
+                        "code": exc.code.value if isinstance(exc, PlasmaError) else "runtime_control_error",
+                    },
+                }
+            writer.write((json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8"))
             await writer.drain()
+            if held_token is not None:
+                # Hold the SiteManager admission gate until the client closes
+                # or crashes. Neither a status snapshot nor a timeout is an
+                # authority to release a still-running atomic switch.
+                while await reader.read(4096):
+                    pass
         finally:
+            if held_token is not None:
+                self.manager.release_runtime_quiesce(held_token)
             writer.close()
             await writer.wait_closed()

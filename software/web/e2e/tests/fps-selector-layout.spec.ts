@@ -102,7 +102,7 @@ test("desktop Production Site Selection uses a wide multi-column tree with bound
 test("iPad landscape hides only the Production Site Selection body", async ({ page }) => {
   await openProduction(page, { width: 1194, height: 834 });
 
-  const selection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
+  const selection = page.getByRole("region", { name: "SYSTEM SETUP & TARGETING" });
   const programmingJob = page.getByRole("region", { name: "PROGRAMMING JOB" });
   const liveStatus = page.getByRole("region", { name: "LIVE SITE STATUS" });
   await expect(selection.locator(".operatorPanelBody")).toBeVisible();

@@ -224,9 +224,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     token = _live._read_pairing_token(args.container)
     try:
         status, paired, _ = session.request(
-            f"/api/manager/registry/{args.alias}/bootstrap/pair",
+            f"/api/manager/registry/{args.alias}/bootstrap/enrollment",
             method="POST",
-            body={"token": token},
+            body={"entry": "ticket", "ticket": token},
         )
     finally:
         token = ""

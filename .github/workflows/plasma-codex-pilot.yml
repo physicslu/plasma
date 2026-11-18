@@ -1,9 +1,8 @@
-name: PLASMA Codex isolated read-only pilot (Issue 981)
+name: PLASMA historical Codex pilot contract tests (host-only)
 
 # Bootstrap only: a separately reviewed main-branch workflow. No PR code runs on SWPC.
+# Legacy Issue #981 /plasma-codex runtime dispatch retired; hosted CI only.
 on:
-  issue_comment:
-    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-codex-pilot.yml"
@@ -11,7 +10,7 @@ on:
       - "scripts/plasma-codex-pilot-contract.py"
       - "scripts/plasma-codex-pilot-acceptance.py"
       - "scripts/tests/test_plasma_codex_pilot_acceptance.py"
-      - "docs/development/plasma-codex-pilot.md"
+      - "scripts/tests/test_path3_current_authority.py"
   push:
     branches: [main]
     paths:
@@ -20,7 +19,7 @@ on:
       - "scripts/plasma-codex-pilot-contract.py"
       - "scripts/plasma-codex-pilot-acceptance.py"
       - "scripts/tests/test_plasma_codex_pilot_acceptance.py"
-      - "docs/development/plasma-codex-pilot.md"
+      - "scripts/tests/test_path3_current_authority.py"
 
 permissions:
   contents: read
@@ -42,6 +41,7 @@ jobs:
         run: |
           python3 scripts/plasma-codex-pilot-contract.py check
           python3 scripts/tests/test_plasma_codex_pilot_acceptance.py
+          python3 scripts/tests/test_path3_current_authority.py
           python3 -m py_compile scripts/plasma-codex-pilot-acceptance.py scripts/tests/test_plasma_codex_pilot_acceptance.py
           bash -n scripts/plasma-codex-pilot.sh scripts/plasma-codex-pilot-inner.sh
 
@@ -66,8 +66,8 @@ jobs:
   pilot:
     needs: authorize
     if: ${{ needs.authorize.result == 'success' }}
-    # Must be a NEW dedicated runner with a Linux account that cannot control Z2.
-    # Do not add this label to the existing plasma-integration/plasma-ci runner.
+    # Historical pilot fixture only, not an authority for current Path 3 hardware rights.
+    # This job is unreachable via retired issue_comment dispatch.
     runs-on: [self-hosted, linux, x64, plasma-codex]
     timeout-minutes: 20
     permissions:

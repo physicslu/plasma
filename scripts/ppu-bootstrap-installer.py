@@ -23,14 +23,81 @@ from typing import Callable, Sequence
 
 REQUIRED_SCRIPTS = (
     "ppu-bootstrap.py",
+    "ppu-bootstrap-installer.py",
     "ppu-bootstrap-service.py",
     "ppu-bootstrap-deployment.py",
     "ppu-bootstrap-kit.py",
+    "ppu_unified_deployment.py",
+    "ppu_owner_authorization.py",
+    "ppu_bootstrap_request_auth.py",
+    "ppu_local_enrollment.py",
+    "ppu_controller.py",
+    "ppu-enroll.py",
+    "ppu_fpga_qualification.py",
+    "ppu_asset_set.py",
+    "ppu_asset_execution.py",
+    "ppu_privileged_source.py",
+    "ppu-privileged-source-install.py",
+    # Stage C control plane (code only; units are rendered, not installed here).
+    "ppu_package_launcher.py",
+    "ppu_package_entry.py",
+    "ppu_package_unit_helper.py",
+    "ppu_package_units.py",
+    "ppu_package_action.py",
+    "ppu_site_worker.py",
+    "ppu_site_worker_service.py",
+    "ppu_site_engine.py",
+    "ppu_site_adapter_abi5.py",
+    "ppu_site_recovery.py",
+    "ppu_opf_reference_openocd.py",
+    "ppu_opf_site_session.py",
+    "ppu_provider_contract.py",
+    "ppu_provider_options.py",
 )
+
+# B2 static FPGA qualification reuses the ONE protected Root Image Manifest
+# parser. It ships beside the Bootstrap as <install_root>/pl/hil; importing it
+# has no FPGA, firmware or hardware side effect.
+ROOT_PARSER_FILES = (
+    "fpga_image_root.py",
+    "fpga_image_guard.py",
+    "fpga_image_admission.py",
+)
+
+# Generic Bundle v3 B3 capability ships inside the SAME Bootstrap layer.
+# Root-owned development-mode policy is factory provisioned, not an HTTP grant.
+B3_FILES = (
+    "ppu-z2-installer.py",
+    "ppu-bundle-install-policy.json",
+)
+
+
+# Immutable privileged Root source inputs shipped as source-only data.
+PRIVILEGED_SOURCE_INPUTS = (
+    "software/python/plasma_interfaces/__init__.py",
+    "software/python/plasma_interfaces/linux_mmio.py",
+    "z2/plasma-path2-root-entry",
+)
+
+# PR-B Full-Copy: once a PPU Runtime release has installed its same-commit
+# control plane, this identity record binds the Bootstrap tree to that Runtime
+# release. A separate factory install/refresh would silently break that binding.
+CONTROL_PLANE_IDENTITY = "control-plane.json"
 
 
 class BootstrapInstallError(RuntimeError):
     pass
+
+
+def control_plane_files() -> tuple[str, ...]:
+    """Every file the Bootstrap layer installs, relative to install_root.
+
+    The PPU Runtime release ships exactly this set (same commit) and the
+    deployment coordinator installs it with ``_copy_scripts``.
+    """
+    return (*REQUIRED_SCRIPTS, *B3_FILES,
+            *(f"pl/hil/{name}" for name in ROOT_PARSER_FILES),
+            *PRIVILEGED_SOURCE_INPUTS)
 
 
 @dataclass(frozen=True)
@@ -50,19 +117,141 @@ def _load_base(path: Path):
     return module
 
 
+def _root_parser_source(source_root: Path) -> Path:
+    """Factory bundle layout first (<scripts>/pl/hil), then a source checkout."""
+    for base in (source_root, source_root.parent):
+        folder = base / "pl" / "hil"
+        if all((folder / name).is_file() for name in ROOT_PARSER_FILES):
+            return folder
+    raise BootstrapInstallError("factory bundle is missing the Root FPGA Image Manifest parser")
+
+
+def _copy_root_parser(source_root: Path, install_root: Path) -> None:
+    source = _root_parser_source(source_root)
+    destination_root = install_root / "pl" / "hil"
+    for folder in (install_root / "pl", destination_root):
+        if folder.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap destination symlink denied")
+        folder.mkdir(exist_ok=True)
+        folder.chmod(0o755)
+    for name in ROOT_PARSER_FILES:
+        if (source / name).is_symlink() or source.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap source symlink denied")
+        destination = destination_root / name
+        temporary = destination.with_name(destination.name + ".new")
+        if destination.is_symlink() or temporary.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap destination symlink denied")
+        shutil.copyfile(source / name, temporary)
+        temporary.chmod(0o644)
+        os.replace(temporary, destination)
+
+
+def _copy_privileged_source_inputs(source_root: Path, install_root: Path) -> None:
+    """Ship immutable FPGA Source inputs; NOT a root-loader activation.
+
+    Provisioning under /opt/plasma/privileged is an explicit step after an
+    operator qualifies the Z2 runtime, Root Guard and recovery boundary.
+    """
+    for relative in PRIVILEGED_SOURCE_INPUTS:
+        sources = [
+            source_root / relative,
+            source_root.parent / relative,
+        ]
+        src = next((item for item in sources if item.is_file() and
+                    not item.is_symlink()), None)
+        if src is None:
+            raise BootstrapInstallError("factory privileged code source missing: " + relative)
+        dst = install_root / relative
+        for directory in reversed((dst.parent, *dst.parent.parents)):
+            if directory == install_root.parent:
+                break
+            if directory.is_symlink():
+                raise BootstrapInstallError("factory privileged destination symlink denied")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dst.with_name(dst.name + ".new")
+        if dst.is_symlink() or tmp.is_symlink():
+            raise BootstrapInstallError("factory privileged destination symlink denied")
+        shutil.copyfile(src, tmp)
+        tmp.chmod(0o644 if relative.endswith(".py") else 0o755)
+        os.replace(tmp, dst)
+
+
 def _copy_scripts(source_root: Path, install_root: Path) -> None:
     source_root = source_root.resolve()
+    # Reject an incomplete bundle before touching a previously installed service.
+    for name in REQUIRED_SCRIPTS:
+        if not (source_root / name).is_file():
+            raise BootstrapInstallError(f"factory bundle is missing required script: {name}")
+    _root_parser_source(source_root)
     install_root.mkdir(parents=True, exist_ok=True)
     install_root.chmod(0o755)
-    for name in REQUIRED_SCRIPTS:
+    # The factory grants only explicit B3 modes for owner-admitted Bundles;
+    # hardware activation still requires separate FPGA-load authority.
+    policy_present = (source_root / "ppu-bundle-install-policy.json").is_file()
+    b3_present = list(B3_FILES) if policy_present else []
+    if policy_present and not all((source_root / name).is_file() for name in B3_FILES):
+        raise BootstrapInstallError("factory B3 source set is incomplete")
+    if policy_present:
+        try:
+            policy = json.loads((source_root / "ppu-bundle-install-policy.json").read_text())
+        except (OSError, ValueError) as exc:
+            raise BootstrapInstallError("factory B3 policy unreadable") from exc
+        if (type(policy) is not dict
+                or set(policy) != {"schema", "mode", "modes", "actions"}
+                or policy.get("schema") != "plasma.ppu.b3-install-policy.v2"
+                or policy.get("mode") != "development"
+                or policy.get("modes") != ["activate", "stage_only"]
+                or policy.get("actions") != ["install", "verify"]):
+            raise BootstrapInstallError("factory B3 policy invalid")
+    for name in (*REQUIRED_SCRIPTS, *(B3_FILES if b3_present else ())):
         source = source_root / name
-        if not source.is_file():
-            raise BootstrapInstallError(f"factory bundle is missing required script: {name}")
+        if source.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap source symlink denied")
         destination = install_root / name
+        if destination.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap destination symlink denied")
         temporary = destination.with_name(destination.name + ".new")
+        if temporary.is_symlink():
+            raise BootstrapInstallError("factory Bootstrap temp symlink denied")
         shutil.copyfile(source, temporary)
-        temporary.chmod(0o755)
+        if name.endswith("-policy.json"):
+            mode = 0o600
+        elif name.endswith(".json"):
+            mode = 0o644  # trusted read-only contract data, not a secret
+        else:
+            mode = 0o755
+        temporary.chmod(mode)
         os.replace(temporary, destination)
+    _copy_root_parser(source_root, install_root)
+    _copy_privileged_source_inputs(source_root, install_root)
+
+
+ENROLL_BOOT_UNIT = "plasma-enroll-boot.service"
+
+
+def render_enroll_boot_unit(*, python_executable: str, script_path: str, state_root: str,
+                            boot_partition: str = "/boot") -> str:
+    return "\n".join([
+        "[Unit]",
+        "Description=Plasma PPU local enrollment: consume SD boot-partition ticket (rescue)",
+        "DefaultDependencies=yes",
+        "Before=plasma-bootstrap.service",
+        f"ConditionPathIsMountPoint={boot_partition}",
+        "",
+        "[Service]",
+        "Type=oneshot",
+        "User=root",
+        "Group=root",
+        "NoNewPrivileges=true",
+        "PrivateTmp=true",
+        "ProtectHome=true",
+        (f"ExecStart={python_executable} {script_path} --state-root {state_root} "
+         f"boot-consume --boot-partition {boot_partition}"),
+        "",
+        "[Install]",
+        "WantedBy=multi-user.target",
+        "",
+    ])
 
 
 def install_bootstrap(
@@ -73,8 +262,45 @@ def install_bootstrap(
     python_executable: str,
     paths: InstallPaths,
     enable_now: bool = False,
+    refresh_only: bool = False,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> dict[str, object]:
+    identity = paths.install_root / CONTROL_PLANE_IDENTITY
+    if identity.exists() or identity.is_symlink():
+        # The Runtime release owns this tree now; update both together through
+        # the Bootstrap deployment coordinator (Full-Copy), never separately.
+        raise BootstrapInstallError("BOOTSTRAP_MANAGED_BY_FULL_COPY_DEPLOYMENT")
+    if refresh_only:
+        # One-board development B3 upgrade: update ONLY the existing factory
+        # scripts, preserving systemd unit, enrollment, token and Runtime.
+        if enable_now:
+            raise BootstrapInstallError("B3_REFRESH_CANNOT_ENABLE_SERVICE")
+        if not (paths.install_root.is_dir()
+                and not paths.install_root.is_symlink()
+                and (paths.install_root / "ppu-bootstrap-service.py").is_file()
+                and paths.state_root.is_dir()
+                and not paths.state_root.is_symlink()
+                and not paths.systemd_unit.is_symlink()
+                and paths.systemd_unit.is_file()):
+            raise BootstrapInstallError("B3_REFRESH_REQUIRES_EXISTING_FACTORY")
+        if (source_root / "ppu-bundle-install-policy.json").is_symlink() or not (
+                source_root / "ppu-bundle-install-policy.json").is_file():
+            raise BootstrapInstallError("B3_REFRESH_SOURCE_POLICY_REQUIRED")
+        _copy_scripts(source_root, paths.install_root)
+        return {
+            "schema_version": 1,
+            "result": "PASS",
+            "operation": "refresh_only",
+            "install_root": str(paths.install_root),
+            "state_root": str(paths.state_root),
+            "systemd_unit": str(paths.systemd_unit),
+            "service": "plasma-bootstrap.service",
+            "unit_changed": False,
+            "service_restarted": False,
+            "control_token_provisioned": False,
+            "runtime_installed": False,
+            "fpga_update": False,
+        }
     _copy_scripts(source_root, paths.install_root)
     paths.state_root.mkdir(parents=True, exist_ok=True)
     paths.state_root.chmod(0o700)
@@ -92,10 +318,22 @@ def install_bootstrap(
     temporary.write_text(unit, encoding="utf-8")
     temporary.chmod(0o644)
     os.replace(temporary, paths.systemd_unit)
+    # LOM-P2A-2 SD rescue entry: consume a boot-partition ticket once per boot,
+    # before the Bootstrap service can accept any mutation.
+    enroll_unit = paths.systemd_unit.with_name(ENROLL_BOOT_UNIT)
+    temporary = enroll_unit.with_name(enroll_unit.name + ".new")
+    temporary.write_text(render_enroll_boot_unit(
+        python_executable=python_executable,
+        script_path=str(paths.install_root / "ppu-enroll.py"),
+        state_root=str(paths.state_root),
+    ), encoding="utf-8")
+    temporary.chmod(0o644)
+    os.replace(temporary, enroll_unit)
 
     if enable_now:
         for argv in (
             ["systemctl", "daemon-reload"],
+            ["systemctl", "enable", ENROLL_BOOT_UNIT],
             ["systemctl", "enable", "--now", "plasma-bootstrap.service"],
         ):
             completed = runner(
@@ -139,6 +377,8 @@ def _parser() -> argparse.ArgumentParser:
         default=Path("/etc/systemd/system/plasma-bootstrap.service"),
     )
     parser.add_argument("--enable-now", action="store_true")
+    parser.add_argument("--refresh-only", action="store_true",
+                        help="Refresh B3 scripts only; preserve existing factory unit/token/state")
     return parser
 
 
@@ -152,6 +392,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             python_executable=args.python_executable,
             paths=InstallPaths(args.install_root, args.state_root, args.systemd_unit),
             enable_now=args.enable_now,
+            refresh_only=args.refresh_only,
         )
     except BootstrapInstallError as exc:
         print(f"ppu-bootstrap-installer: {exc}", file=sys.stderr)

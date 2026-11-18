@@ -8,8 +8,6 @@ on:
       - 'data/device-catalog/research/validate_stm32f0_layer1_publication_v23.py'
       - 'data/device-catalog/research/STM32F0_LAYER1_PRODUCTION_PUBLICATION_V23.md'
       - 'scripts/device-catalog-family-ci.py'
-      - 'data/ic-support/test_coverage_inventory.py'
-      - 'software/python/tests/test_device_catalog.py'
       - '.github/workflows/device-catalog-stm32f0-layer1-publication-v23.yml'
 
 permissions:

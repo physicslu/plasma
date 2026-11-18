@@ -1,0 +1,15 @@
+{
+  "closed_unix_ns": 1793111894068631647,
+  "heartbeat_count": 1,
+  "label": "after",
+  "opened_unix_ns": 1793111888068108258,
+  "samples": [
+    {
+      "host_unix_ns": 1793111888068151573,
+      "seq": 15,
+      "uptime_ms": 85164869
+    }
+  ],
+  "strictly_increasing_seq": true,
+  "strictly_increasing_uptime": true
+}

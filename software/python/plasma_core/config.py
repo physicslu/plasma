@@ -34,7 +34,9 @@ class SiteConfig:
     id: int
     enabled: bool = False
     interface: str = "mock"
-    target: str = "STM32F103C8T6"
+    # Legacy Mock simulation fixture only; never a real-hardware Job default.
+    # A real Job must declare its exact ICPN independently of Site selection.
+    target: str | None = None
     operation_timeout_s: float = 30.0
     max_retries: int = 0
     retry_backoff_s: float = 0.05

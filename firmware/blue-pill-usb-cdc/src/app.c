@@ -24,7 +24,7 @@ void app_link(app_t *app, bool configured, uint32_t now_ms) {
     app->line_len = 0;
     app->line_overflow = false;
     app->reply_tail = app->reply_head;
-    if (configured) app->next_heartbeat_ms = now_ms + 500u;
+    if (configured) app->next_heartbeat_ms = now_ms + APP_HEARTBEAT_PERIOD_MS;
 }
 
 static void queue_reply(app_t *app, const char *value) {
@@ -78,10 +78,10 @@ static void command(app_t *app, uint32_t now_ms) {
 
 void app_process(app_t *app, uint32_t now_ms) {
     /* Independent of link/TX state; unsigned elapsed time survives tick wrap. */
-    if (!app->led_manual && (uint32_t)(now_ms - app->led_last_ms) >= 500u) {
-        uint32_t periods = (uint32_t)(now_ms - app->led_last_ms) / 500u;
+    if (!app->led_manual && (uint32_t)(now_ms - app->led_last_ms) >= APP_LED_PERIOD_MS) {
+        uint32_t periods = (uint32_t)(now_ms - app->led_last_ms) / APP_LED_PERIOD_MS;
         if (periods & 1u) app->led_on = !app->led_on;
-        app->led_last_ms += periods * 500u;
+        app->led_last_ms += periods * APP_LED_PERIOD_MS;
     }
     while (app->rx_tail != app->rx_head) {
         uint8_t c = app->rx[app->rx_tail];
@@ -120,7 +120,7 @@ size_t app_next(app_t *app, uint32_t now_ms, char *out, size_t capacity, bool *h
 void app_sent(app_t *app, uint32_t now_ms, bool heartbeat) {
     if (heartbeat) {
         ++app->sequence;
-        app->next_heartbeat_ms = now_ms + 500u;
+        app->next_heartbeat_ms = now_ms + APP_HEARTBEAT_PERIOD_MS;
     } else if (app->reply_tail != app->reply_head) {
         app->reply_tail = (uint8_t)((app->reply_tail + 1u) % APP_REPLY_CAPACITY);
     }

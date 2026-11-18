@@ -69,7 +69,7 @@ class ManagerSiteCasRelayTests(unittest.TestCase):
 
     def test_site_if_match_is_forwarded_without_opening_generic_header_proxy(self):
         body = json.dumps(
-            {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            {"enabled": True, "interface": "openocd"},
             separators=(",", ":"),
         ).encode("utf-8")
         revision = "sha256:" + "a" * 64

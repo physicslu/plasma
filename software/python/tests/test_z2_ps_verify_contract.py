@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import shlex
 from pathlib import Path
 
 
@@ -9,47 +7,31 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 Z2_PS = REPO_ROOT / "scripts" / "plasmactl-z2-ps"
 
 
-def test_z2_ps_verify_request_matches_current_loopback_contract() -> None:
-    source = Z2_PS.read_text(encoding="utf-8")
-    line = next(
-        line.strip()
-        for line in source.splitlines()
-        if line.strip().startswith('loopback_request="')
-    )
-    assignment = shlex.split(line)[0]
-    body = assignment.split("=", 1)[1].replace("$test_id", "z2-regression")
-    request = json.loads(body)
+def test_z2_ps_verify_uses_read_only_g13_readiness_not_an_unsigned_write() -> None:
+    """LOM-P2A-2 P0: the kit is not the controller and never sends a Gateway write.
 
-    assert request == {
-        "endpoint": "ps",
-        "test_id": "z2-regression",
-        "sequence": 1,
-        "pattern": "zero",
-        "seed": "",
-        "payload_length": 1,
-        "payload_base64": "AA==",
-        "tx_crc32": "d202ef8d",
-        "timeout_ms": 5000,
-    }
-    assert '-H "Idempotency-Key: $test_id"' in source
+    The former unsigned ``curl`` PS loopback POST was refused by G13 (401) on the
+    real Z2 and left Bootstrap tx ``370e51bc…`` ``coordinator_result_unreconciled``.
+    """
+    source = Z2_PS.read_text(encoding="utf-8")
+    verify = source[source.index("verify_runtime() {"):source.index("show_status() {")]
+    assert 'loopback_request="' not in source
+    assert "diagnostics/loopback" not in verify
+    assert '"$readiness_tool" --gateway "$base"' in verify
+    assert '--bootstrap "http://$gateway_host:18081"' in verify
+    assert "signed PS loopback: delegated to the controller-authorized Manager acceptance" in verify
 
 
 def test_z2_ps_verify_matches_current_readiness_contract() -> None:
-    source = Z2_PS.read_text(encoding="utf-8")
+    source = (REPO_ROOT / "scripts" / "ppu_runtime_local_readiness.py").read_text(encoding="utf-8")
 
     assert 'ready.get("gateway") != "alive"' in source
     assert 'ready.get("execution") != "ready"' in source
     assert 'ready.get("gateway") != "ready"' not in source
 
 
-def test_z2_ps_verify_reads_nested_loopback_evidence() -> None:
-    source = Z2_PS.read_text(encoding="utf-8")
-
-    assert 'response = json.loads(sys.argv[2])' in source
-    assert 'response.get("ok") is not True' in source
-    assert 'loopback = response.get("loopback")' in source
-    assert 'loopback.get("endpoint") != "ps"' in source
-    assert 'loopback.get("source") != "ps"' in source
-    assert 'loopback.get("tx_crc32") != "d202ef8d"' in source
-    assert 'loopback.get("rx_crc32") != "d202ef8d"' in source
-    assert 'response.get("payload_base64") != "AA=="' in source
+def test_z2_ps_readiness_tool_checks_g13_refusal_and_identity() -> None:
+    tool = (REPO_ROOT / "scripts" / "ppu_runtime_local_readiness.py").read_text(encoding="utf-8")
+    assert '"/api/auth/challenge"' in tool and '"/v1/status"' in tool
+    assert '"POST"' not in tool and "--data" not in tool          # GET-only: no write of any kind
+    assert '"signed_ps_loopback": "DELEGATED_TO_MANAGER_ACCEPTANCE"' in tool

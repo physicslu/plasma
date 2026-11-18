@@ -1,0 +1,12 @@
+{
+  "schema": "plasma.ppu.openocd-evidence.v1",
+  "site": 1,
+  "openocd_rc": 0,
+  "safe_off_marker_present": true,
+  "safe_off_verified": true,
+  "admission_revoked": true,
+  "stdout_bytes": 1003,
+  "stdout_file": "site1-v2hj3mmh.stdout",
+  "stdout_sha256": "45dd5e64fec5875e2e13a6ac2051c5471fb60fa95b4123b911695aae5c0f28ce",
+  "termination_reason": null
+}

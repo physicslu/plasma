@@ -1,0 +1,80 @@
+{
+  "closed_unix_ns": 1793111980122037664,
+  "heartbeat_count": 14,
+  "label": "after_reset",
+  "opened_unix_ns": 1793111974121972442,
+  "samples": [
+    {
+      "host_unix_ns": 1793111974122001918,
+      "seq": 1,
+      "uptime_ms": 1013
+    },
+    {
+      "host_unix_ns": 1793111974122011564,
+      "seq": 2,
+      "uptime_ms": 22742
+    },
+    {
+      "host_unix_ns": 1793111974621716713,
+      "seq": 3,
+      "uptime_ms": 23242
+    },
+    {
+      "host_unix_ns": 1793111975121455433,
+      "seq": 4,
+      "uptime_ms": 23742
+    },
+    {
+      "host_unix_ns": 1793111975621409153,
+      "seq": 5,
+      "uptime_ms": 24242
+    },
+    {
+      "host_unix_ns": 1793111976121362403,
+      "seq": 6,
+      "uptime_ms": 24742
+    },
+    {
+      "host_unix_ns": 1793111976621581848,
+      "seq": 7,
+      "uptime_ms": 25242
+    },
+    {
+      "host_unix_ns": 1793111977121645941,
+      "seq": 8,
+      "uptime_ms": 25742
+    },
+    {
+      "host_unix_ns": 1793111977621605649,
+      "seq": 9,
+      "uptime_ms": 26242
+    },
+    {
+      "host_unix_ns": 1793111978121568858,
+      "seq": 10,
+      "uptime_ms": 26742
+    },
+    {
+      "host_unix_ns": 1793111978621539986,
+      "seq": 11,
+      "uptime_ms": 27242
+    },
+    {
+      "host_unix_ns": 1793111979121526324,
+      "seq": 12,
+      "uptime_ms": 27742
+    },
+    {
+      "host_unix_ns": 1793111979621383888,
+      "seq": 13,
+      "uptime_ms": 28242
+    },
+    {
+      "host_unix_ns": 1793111980121462158,
+      "seq": 14,
+      "uptime_ms": 28742
+    }
+  ],
+  "strictly_increasing_seq": true,
+  "strictly_increasing_uptime": true
+}

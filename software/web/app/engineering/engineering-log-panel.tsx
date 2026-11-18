@@ -89,6 +89,7 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
   return (
     <OperatorLogPanel
       entries={allLogs}
+      number={4}
       title={t("engineeringProgramming.jobLog")}
       clearLabel={t("engineeringProgramming.clear")}
       onClear={clearLog}

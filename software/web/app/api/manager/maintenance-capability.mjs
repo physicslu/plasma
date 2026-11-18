@@ -82,7 +82,7 @@ export function maintenanceCapabilityRequired() {
       ok: false,
       error: {
         code: "maintenance_authorization_required",
-        message: "Verify the PPU Bootstrap pairing token before lifecycle or Runtime maintenance",
+        message: "Enroll this Control Station with the PPU (enrollment button or engineering ticket) before lifecycle or Runtime maintenance",
       },
     },
     {

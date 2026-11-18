@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import re
 import socketserver
@@ -8,7 +9,7 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from threading import RLock
+from threading import RLock, Thread
 from typing import Any
 from urllib.parse import unquote, urlparse
 
@@ -40,6 +41,33 @@ PS_LOOPBACK_ROUTE_PREFIX = "/api/ppus/"
 PS_LOOPBACK_ROUTE_SUFFIX = "/diagnostics/loopback"
 MANAGED_PPU_ROUTE_PREFIX = "/api/ppus/"
 MANAGED_PPU_ROUTE_MARKER = "/gateway"
+# Manager owns the Catalog-only Device Selector (OPF S5 / PR-C2). It is served
+# in-process from Catalog data available to this Manager, never relayed to a
+# PPU (a Catalog-free PPU answers 503). Absent module/data => explicit 503.
+DEVICE_SEARCH_ROUTE = "/api/devices/search"
+DEVICE_SELECTOR_MODULE = "plasma_web.legacy_device_selector"
+
+
+def _device_selector() -> Any | None:
+    try:
+        return importlib.import_module(DEVICE_SELECTOR_MODULE)
+    except ImportError:
+        return None
+
+
+def warm_device_selector() -> bool:
+    """Best-effort Selector warm-up; never a Manager startup dependency."""
+    selector = _device_selector()
+    if selector is None:
+        print("Manager Device Selector unavailable: Catalog modules are not installed")
+        return False
+    try:
+        counts = selector.warm()
+    except Exception as exc:  # Selector must never block fleet management.
+        print(f"Manager Device Selector unavailable: {type(exc).__name__}: {exc}")
+        return False
+    print("Manager Device Selector ready: " + " ".join(f"L{k}={v}" for k, v in counts.items()))
+    return True
 REGISTRY_ROUTE = "/api/registry"
 REGISTRY_ROUTE_PREFIX = "/api/registry/"
 NETWORK_COMMISSIONING_SUFFIX = "/network-commissioning"
@@ -60,8 +88,6 @@ _MANAGED_GET_PATTERNS = tuple(
         r"^/api/settings/ppu-network$",
         r"^/api/settings/sites$",
         r"^/api/mock/runtime$",
-        r"^/api/security/me$",
-        r"^/api/devices/search$",
         r"^/api/engineering/targets$",
         rf"^/api/jobs/{_SEGMENT}/files/{_SEGMENT}$",
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/status$",
@@ -192,6 +218,15 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         if self.config is None:
             raise RuntimeError("Plasma Manager configuration is not configured")
         return self.config
+
+    def _ppu_client(self, alias: str, endpoint: str) -> PPUHttpClient:
+        """PPU Gateway client; the Bootstrap-enabled Manager attaches the
+        enrolled controller write signer (LOM-P2A-2 G13)."""
+        return PPUHttpClient(endpoint, self._config().request_timeout_s)
+
+    def _ppu_write_error(self, exc: Exception) -> bool:
+        """Map a controller-signing failure to a response; False = not handled."""
+        return False
 
     def _operation_gate(self) -> PPUOperationGate:
         return type(self).operation_gate
@@ -674,12 +709,40 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/fleet":
             self._json(HTTPStatus.OK, self._poller().snapshot())
             return
+        if parsed.path == DEVICE_SEARCH_ROUTE:
+            self._handle_device_search(parsed.query)
+            return
         managed = self._parse_managed_ppu_route(parsed.path)
         if managed is not None:
             alias, target_path = managed
             self._relay_managed_ppu_request(alias, target_path, parsed.query)
             return
         self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
+
+    def _handle_device_search(self, raw_query: str) -> None:
+        selector = _device_selector()
+        if selector is None:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "ok": False,
+                    "error": {
+                        "error_type": "DEVICE_SELECTOR_UNAVAILABLE",
+                        "message": "Device Selector Catalog modules are not installed on this Manager",
+                        "recoverable": True,
+                    },
+                },
+            )
+            return
+        try:
+            status, payload = selector.search_response(raw_query)
+        except Exception as exc:
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                selector.unavailable_payload(f"Device Selector failed: {type(exc).__name__}: {exc}"),
+            )
+            return
+        self._json(status, payload)
 
     def _relay_ps_loopback(self, alias: str) -> None:
         entry = self._resolve_ppu_alias(alias)
@@ -718,11 +781,18 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             )
             return
 
-        client = PPUHttpClient(entry.endpoint, self._config().request_timeout_s)
+        client = self._ppu_client(alias, entry.endpoint)
         relay_timeout_s = min(max(timeout_ms / 1000.0 + 1.0, self._config().request_timeout_s), 121.0)
         started = time.monotonic()
         try:
-            status, payload = client.ps_loopback(body, timeout_s=relay_timeout_s)
+            try:
+                status, payload = client.ps_loopback(body, timeout_s=relay_timeout_s)
+            except (PPUTransportError, PPUHTTPError):
+                raise
+            except Exception as exc:
+                if self._ppu_write_error(exc):
+                    return
+                raise
         except PPUTransportError:
             manager_rtt_ms = round((time.monotonic() - started) * 1000, 3)
             self._log_ps_loopback_relay(
@@ -852,7 +922,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             if key.lower() in FORWARDED_REQUEST_HEADERS
         }
         target = target_path + (f"?{query}" if query else "")
-        client = PPUHttpClient(entry.endpoint, self._config().request_timeout_s)
+        client = self._ppu_client(alias, entry.endpoint)
         started = time.monotonic()
         try:
             status, response_headers, response_body = client.relay(
@@ -887,6 +957,17 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.BAD_GATEWAY,
                 {"ok": False, "error": {"code": "ppu_protocol_error", "message": "PPU response exceeded Manager relay contract"}},
+            )
+            return
+        except Exception as exc:
+            if not self._ppu_write_error(exc):
+                raise
+            self._log_managed_relay(
+                alias=alias,
+                method=self.command,
+                target_path=target_path,
+                result="controller_write_refused",
+                http_status=HTTPStatus.CONFLICT,
             )
             return
 
@@ -997,6 +1078,7 @@ def serve(config: ManagerConfig) -> None:
     PlasmaManagerHandler.network_commissioning = commissioning
     server = PlasmaManagerHTTPServer((config.host, config.port), PlasmaManagerHandler)
     poller.start(prime_cache=False)
+    Thread(target=warm_device_selector, name="plasma-device-selector-warm", daemon=True).start()
     print(f"Plasma Manager listening on http://{config.host}:{config.port}")
     try:
         server.serve_forever()

@@ -7,6 +7,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit, urlunsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
+from .shared_control import SharedControlError
+
 
 class PPUHTTPError(RuntimeError):
     """Raised when a configured PPU cannot satisfy the fleet-facing REST contract."""
@@ -56,12 +58,12 @@ def _cloudflare_access_headers(endpoint: str) -> dict[str, str]:
     if not any(value is not None for value in configured):
         return {}
     if not all(isinstance(value, str) and value.strip() for value in configured):
-        raise PPUTransportError("Manager Cloudflare Access service identity is incomplete")
+        raise SharedControlError("Manager Cloudflare Access service identity is incomplete")
 
     normalized_origin = _normalize_origin(origin or "")
     normalized_endpoint = _normalize_origin(endpoint)
     if normalized_origin is None:
-        raise PPUTransportError("Manager Cloudflare Access origin is invalid")
+        raise SharedControlError("Manager Cloudflare Access origin is invalid")
     if normalized_endpoint != normalized_origin:
         return {}
     return {
@@ -71,10 +73,14 @@ def _cloudflare_access_headers(endpoint: str) -> dict[str, str]:
 
 
 class PPUHttpClient:
-    def __init__(self, endpoint: str, timeout_s: float) -> None:
+    def __init__(self, endpoint: str, timeout_s: float, *, write_signer=None) -> None:
         self.endpoint = endpoint.rstrip("/")
         self.timeout_s = timeout_s
         self._service_headers = _cloudflare_access_headers(self.endpoint)
+        # LOM-P2A-2 G13: when set, every POST is sent through the enrolled
+        # controller signer ``(client, path, headers, body, timeout_s) ->
+        # (status, headers, body)``, which uses ``_raw_relay`` underneath.
+        self.write_signer = write_signer
 
     def _request_json(
         self,
@@ -95,6 +101,19 @@ class PPUHttpClient:
         }
         if data is not None and "Content-Type" not in request_headers:
             request_headers["Content-Type"] = "application/json"
+        if method == "POST" and self.write_signer is not None:
+            status, _headers, response_data = self.write_signer(
+                self, path, {k: v for k, v in request_headers.items() if k not in self._service_headers},
+                data, self.timeout_s if timeout_s is None else timeout_s)
+            if status not in accepted_statuses:
+                raise PPUHTTPError(f"{path} returned HTTP {status}")
+            try:
+                payload = json.loads(response_data)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise PPUHTTPError(f"{path} returned invalid JSON") from exc
+            if not isinstance(payload, dict):
+                raise PPUHTTPError(f"{path} JSON payload must be an object")
+            return status, payload
         request = Request(
             f"{self.endpoint}{path}",
             data=data,
@@ -135,6 +154,24 @@ class PPUHttpClient:
         body: bytes | None,
         timeout_s: float,
         max_response_bytes: int,
+        extra_response_headers: frozenset[str] = frozenset(),
+    ) -> tuple[int, dict[str, str], bytes]:
+        if method == "POST" and self.write_signer is not None:
+            return self.write_signer(self, path_and_query, dict(headers), body, timeout_s)
+        return self._raw_relay(method, path_and_query, headers=headers, body=body,
+                               timeout_s=timeout_s, max_response_bytes=max_response_bytes,
+                               extra_response_headers=extra_response_headers)
+
+    def _raw_relay(
+        self,
+        method: str,
+        path_and_query: str,
+        *,
+        headers: dict[str, str],
+        body: bytes | None,
+        timeout_s: float,
+        max_response_bytes: int,
+        extra_response_headers: frozenset[str] = frozenset(),
     ) -> tuple[int, dict[str, str], bytes]:
         """Relay one Manager-approved PPU REST request.
 
@@ -168,7 +205,7 @@ class PPUHttpClient:
                         "content-type",
                         "content-disposition",
                         "cache-control",
-                    }
+                    } or key.lower() in extra_response_headers
                 }
                 response_data = response.read(max_response_bytes + 1)
         except (URLError, OSError, TimeoutError) as exc:

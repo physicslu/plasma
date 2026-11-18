@@ -213,7 +213,7 @@ class JobRequest:
         max_retries: int = 0,
         retry_backoff_s: float = 0.05,
         client_id: str = "local",
-        target: str = "STM32F103C8T6",
+        target: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         self.site_id = validate_site_id(site_id)
@@ -273,7 +273,11 @@ class JobRequest:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "retry_backoff_s must be a finite non-negative number")
         if not isinstance(self.client_id, str) or not self.client_id or len(self.client_id) > 256:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "client_id must be 1-256 characters")
-        if not isinstance(self.target, str) or not self.target or len(self.target) > 256:
+        # None = "use the operator's explicit Site target"; the PPU resolves it
+        # at enqueue and refuses when neither exists. There is no default ICPN.
+        if self.target is not None and (
+            not isinstance(self.target, str) or not self.target or len(self.target) > 256
+        ):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "target must be 1-256 characters")
 
     @property
@@ -308,10 +312,11 @@ class JobRequest:
             "max_retries": self.max_retries,
             "retry_backoff_s": self.retry_backoff_s,
             "client_id": self.client_id,
-            "target": self.target,
             "image_size": self.image_size,
             "image_sha256": self.image_sha256,
         }
+        if self.target is not None:
+            result["target"] = self.target
         if self.image_ref is not None:
             result["execution_image_ref"] = self.image_ref.to_dict()
         return result

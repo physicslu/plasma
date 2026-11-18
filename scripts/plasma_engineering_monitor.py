@@ -25,6 +25,9 @@ import termios
 import time
 import tty
 import unicodedata
+from zoneinfo import ZoneInfo
+
+import plasma_engineering_activity as engineering_activity
 
 BASE = Path("/run/plasma-codex")
 MONITOR = BASE / "engineering-monitor"
@@ -35,6 +38,224 @@ PATHS = ("path2", "path3")
 CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 RUN_ID = re.compile(r"[0-9]{1,20}\Z")
 TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
+PR_NUMBER = re.compile(r"(?:0|[1-9][0-9]{0,7})\Z")
+WORK_ORDER_SHA256 = re.compile(r"[a-f0-9]{64}\Z")
+# Defense-in-depth: hosted Authorizer independently validates the source.
+# The monitor may display only an explicitly submitted public metadata field.
+MONITOR_SUMMARY = re.compile(
+    r"[A-Za-z0-9\u4e00-\u9fff]"
+    r"[A-Za-z0-9\u4e00-\u9fff ._()/+-]{6,78}"
+    r"[A-Za-z0-9\u4e00-\u9fff)]\Z"
+)
+MONITOR_SENSITIVE = re.compile(
+    r"\b(?:password|passwd|secret|credential|token|bearer|"
+    r"private.key|api.key|authorization)\b|[a-fA-F0-9]{32,}",
+    re.IGNORECASE,
+)
+# One layout for both paths. Terminal widths are display cells, not letters.
+MAX_DISPLAY_COLUMNS = 100
+MONITOR_STAGES = frozenset({
+    "CPU-only CLI", "Native preflight", "Vivado host build",
+    "Guarded Download", "Guarded Test", "Guarded Restore",
+    "Codex workspace",
+})
+# Narrow receipt projection; a filesystem JSON file is NOT an independently
+# authenticated verification receipt. Project known categorical DENIAL only.
+RECEIPT_PERMISSION_STAGES = frozenset({
+    "CLI_WRAPPER", "CLI_MANIFEST", "PLATFORM_MANIFEST", "NATIVE_BINARY",
+})
+RECEIPT_PERMISSION_CAUSES = frozenset({"OWNER_MISMATCH", "PEER_WRITABLE"})
+MAX_RECEIPT_BYTES = 8192
+# This describes Owner intent only. It cannot advance a runtime or prove Flash.
+PATH3_PHASES = frozenset({
+    "HOST_ONLY", "INSTALL", "RUNTIME", "PROGRAMMING_PROFILE", "FLASH_TEST",
+})
+PATH3_RECEIPT_STATUSES = frozenset({
+    "EVIDENCE_READY_REVIEW_REQUIRED",
+    "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED",
+    "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED",
+})
+PATH3_COST_STATUSES = frozenset({
+    "NOT_AVAILABLE", "NOT_APPLICABLE", "WITHIN_LIMIT", "EXCEEDED",
+})
+PATH3_FAILURE_CODES = frozenset({
+    "CODEX_CLI_NONZERO", "WALL_TIMEOUT", "TOOL_ITEMS_LIMIT",
+})
+
+
+def _receipt_permission_hint(raw: object, *, run_id: str, task: str,
+                             work_order_sha: str, exit_code: int) -> dict | None:
+    """Project only an exact known sanitized native preflight denial."""
+    if (exit_code != 2 or task != "path2-work-order" or
+            WORK_ORDER_SHA256.fullmatch(work_order_sha) is None or
+            type(raw) is not dict):
+        return None
+    if not (
+        raw.get("schema") == "plasma.codex.native_preflight.v1" and
+        raw.get("status") == "NOT_RUN_OR_FAIL" and
+        raw.get("reason") == "NATIVE_PATH_PERMISSIONS_DENIED" and
+        raw.get("github_run_id") == run_id and
+        raw.get("task_id") == task and
+        raw.get("work_order_sha256") == work_order_sha and
+        type(raw.get("denial_stage")) is str and
+        raw["denial_stage"] in RECEIPT_PERMISSION_STAGES and
+        type(raw.get("denial_cause")) is str and
+        raw["denial_cause"] in RECEIPT_PERMISSION_CAUSES and
+        raw.get("model_session") == "NOT_RUN" and
+        raw.get("hardware_access") == "NOT_RUN" and
+        raw.get("provenance") == "NOT_INDEPENDENTLY_VERIFIED" and
+        raw.get("sha256_pin_authorized") is False
+    ):
+        return None
+    index = raw.get("denial_component_index")
+    if type(index) is not int or not 1 <= index <= 24:
+        return None
+    return {
+        "reason": "NATIVE_PATH_PERMISSIONS_DENIED",
+        "stage": raw["denial_stage"],
+        "cause": raw["denial_cause"],
+        "component_index": index,
+    }
+
+
+def _safe_stored_receipt_hint(value: object) -> dict | None:
+    """Validate the monitor snapshot again; it is group-readable metadata."""
+    if type(value) is not dict or set(value) != {
+            "reason", "stage", "cause", "component_index"}:
+        return None
+    if (value["reason"] != "NATIVE_PATH_PERMISSIONS_DENIED" or
+            type(value["stage"]) is not str or
+            value["stage"] not in RECEIPT_PERMISSION_STAGES or
+            type(value["cause"]) is not str or
+            value["cause"] not in RECEIPT_PERMISSION_CAUSES or
+            type(value["component_index"]) is not int or
+            not 1 <= value["component_index"] <= 24):
+        return None
+    return value
+
+
+def _read_path2_receipt_hint(*, runner_temp: object, run_id: str,
+                             task: str, work_order_sha: str,
+                             exit_code: int) -> dict | None:
+    """Read only the fixed Runner Temp receipt, never user-supplied paths.
+
+    No arbitrary output, filenames, stack traces or command arguments are
+    copied into the Monitor. Any absence/race/error fails closed.
+    """
+    if (type(runner_temp) is not str or not runner_temp or
+            not Path(runner_temp).is_absolute() or len(runner_temp) > 512 or
+            run_id == "unknown"):
+        return None
+    # Exact file name is from the trusted workflow, not the Work Order.
+    file_path = Path(runner_temp) / "plasma-path2-receipt.json"
+    fd = -1
+    try:
+        fd = os.open(file_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        st = os.fstat(fd)
+        if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid() or
+                st.st_nlink != 1 or st.st_mode & 0o022 or
+                not 0 < st.st_size <= MAX_RECEIPT_BYTES):
+            return None
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            body = stream.read(MAX_RECEIPT_BYTES + 1)
+        if len(body) > MAX_RECEIPT_BYTES:
+            return None
+        raw = json.loads(body.decode("utf-8"))
+        return _receipt_permission_hint(
+            raw, run_id=run_id, task=task,
+            work_order_sha=work_order_sha, exit_code=exit_code)
+    except (OSError, ValueError, UnicodeError, TypeError):
+        return None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+
+
+def _safe_path3_receipt_hint(raw: object, *, run_id: str, task: str,
+                             work_order_sha: str, wrapper_exit: int) -> dict | None:
+    """Project trusted-wrapper categories, never an acceptance or DUT result."""
+    if (task != "path3-work-order" or
+            WORK_ORDER_SHA256.fullmatch(work_order_sha) is None or
+            type(raw) is not dict or raw.get("github_run_id") != run_id or
+            raw.get("task_id") != task or
+            raw.get("work_order_sha256") != work_order_sha or
+            raw.get("execution_path") != "path3-codex" or
+            raw.get("functional_acceptance") != "UNVERIFIED" or
+            raw.get("acceptance") != "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG"):
+        return None
+    admission = raw.get("worker_admission")
+    if (type(admission) is not dict or
+            admission.get("status") != "WORKER_SOURCE_ADMITTED" or
+            admission.get("execution_path") != "path3-codex" or
+            admission.get("task_id") != task):
+        return None
+    status, cost, code = (raw.get("status"), raw.get("cost_budget_status"),
+                          raw.get("codex_exit_code"))
+    if (type(status) is not str or status not in PATH3_RECEIPT_STATUSES or
+            type(cost) is not str or cost not in PATH3_COST_STATUSES or
+            type(code) is not int or not -255 <= code <= 255 or
+            raw.get("codex_execution_status") !=
+                ("EXIT_ZERO" if code == 0 else "EXIT_NONZERO") or
+            (status == "EVIDENCE_READY_REVIEW_REQUIRED") !=
+                (wrapper_exit == 0 and code == 0)):
+        return None
+    reason = raw.get("failure_reason")
+    if (reason is not None and
+            (type(reason) is not str or reason not in PATH3_FAILURE_CODES)):
+        return None
+    if ((status == "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED" and
+         (code == 0 or reason != "CODEX_CLI_NONZERO")) or
+            (status == "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED" and
+             reason not in ("WALL_TIMEOUT", "TOOL_ITEMS_LIMIT"))):
+        return None
+    return {"result": status, "cost": cost,
+            "failure": reason if reason is not None else "NONE"}
+
+
+def _read_path3_receipt_hint(*, runner_temp: object, run_id: str,
+                             task: str, work_order_sha: str,
+                             exit_code: int) -> dict | None:
+    """Read the existing exact Runner Temp receipt, without trusting paths."""
+    if (type(runner_temp) is not str or not runner_temp or
+            not Path(runner_temp).is_absolute() or len(runner_temp) > 512 or
+            run_id == "unknown"):
+        return None
+    fd = -1
+    try:
+        file_path = Path(runner_temp) / "plasma-path3-receipt.json"
+        fd = os.open(file_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        st = os.fstat(fd)
+        if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid() or
+                st.st_nlink != 1 or st.st_mode & 0o022 or
+                not 0 < st.st_size <= MAX_RECEIPT_BYTES):
+            return None
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            body = stream.read(MAX_RECEIPT_BYTES + 1)
+        if len(body) > MAX_RECEIPT_BYTES:
+            return None
+        return _safe_path3_receipt_hint(
+            json.loads(body.decode("utf-8")), run_id=run_id,
+            task=task, work_order_sha=work_order_sha, wrapper_exit=exit_code)
+    except (OSError, ValueError, UnicodeError, TypeError):
+        return None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def _safe_stored_path3_receipt_hint(value: object) -> dict | None:
+    if type(value) is not dict or set(value) != {"result", "cost", "failure"}:
+        return None
+    if (type(value["result"]) is not str or
+            value["result"] not in PATH3_RECEIPT_STATUSES or
+            type(value["cost"]) is not str or
+            value["cost"] not in PATH3_COST_STATUSES or
+            type(value["failure"]) is not str or
+            value["failure"] not in PATH3_FAILURE_CODES | {"NONE"}):
+        return None
+    return value
 
 
 def _valid_dir(path: Path, uid: int, gid: int) -> bool:
@@ -120,6 +341,46 @@ def _monitor_time_mark(now: dt.datetime | None = None) -> str:
     return "[MONITOR TIME MARK] " + stamp.isoformat(timespec="seconds")
 
 
+def _trusted_work_order_received(event_path: str, comment_id: str) -> str:
+    """Authenticated GitHub issue-comment creation time, not Runner start time.
+
+    The upstream trusted Authorizer passes the validated comment ID. Fail
+    closed on absent, mismatched, malformed or non-owner webhook metadata.
+    """
+    if (not comment_id.isdecimal() or not 0 < len(comment_id) <= 20 or
+            not event_path or len(event_path) > 512 or
+            not Path(event_path).is_absolute()):
+        return ""
+    try:
+        fd = os.open(event_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or not 0 < st.st_size <= 1048576:
+                return ""
+            with os.fdopen(fd, "rb", closefd=False) as src:
+                raw = json.loads(src.read(1048577))
+        finally:
+            os.close(fd)
+        comment = raw.get("comment", {})
+        if (raw.get("action") != "created" or
+                raw.get("repository", {}).get("full_name") != "physicslu/plasma" or
+                raw.get("issue", {}).get("number") != 981 or
+                raw.get("sender", {}).get("login") != "physicslu" or
+                comment.get("user", {}).get("login") != "physicslu" or
+                type(comment.get("id")) is not int or
+                str(comment["id"]) != comment_id):
+            return ""
+        timestamp = comment.get("created_at", "")
+        if (type(timestamp) is not str or
+                re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z",
+                             timestamp) is None):
+            return ""
+        parsed = dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        return parsed.isoformat(timespec="seconds")
+    except (OSError, ValueError, TypeError, AttributeError, UnicodeError):
+        return ""
+
+
 def run_job(path: str, command: list[str], directory: Path | None = None) -> int:
     if path not in PATHS or not command:
         raise ValueError("invalid path/command")
@@ -134,9 +395,48 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
         run_id = "unknown"
     if not TASK_ID.fullmatch(task):
         task = "unknown"
+    pr_number = os.environ.get("PR_NUMBER", "")
+    if not PR_NUMBER.fullmatch(pr_number):
+        pr_number = "-"
+    work_order_sha = os.environ.get("WORK_ORDER_SHA256", "")
+    summary = os.environ.get("PLASMA_MONITOR_SUMMARY", "")
+    summary_valid = (
+        task == ("path3-work-order" if path == "path3" else "path2-work-order") and
+        WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None and
+        type(summary) is str and MONITOR_SUMMARY.fullmatch(summary) is not None
+        and MONITOR_SENSITIVE.search(summary) is None
+    )
+    stage = os.environ.get("PLASMA_MONITOR_STAGE", "")
+    declared_phase = os.environ.get("PLASMA_MONITOR_PHASE", "")
+    if not (path == "path3" and task == "path3-work-order" and
+            WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None and
+            type(declared_phase) is str and declared_phase in PATH3_PHASES):
+        declared_phase = ""
+    guarded = stage.startswith("Guarded ") if type(stage) is str else False
+    # Only the digest-bound dynamic operation may publish guarded metadata.
+    guarded_verified = (task == "path2-work-order" and
+                        WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None)
+    if path == "path3":
+        # Validated Work Order category, NOT an inferred Vivado/build phase.
+        stage = ("Codex workspace" if task == "path3-work-order" and
+                 WORK_ORDER_SHA256.fullmatch(work_order_sha) is not None
+                 else "")
+    elif (type(stage) is not str or stage not in MONITOR_STAGES or
+          stage == "Codex workspace" or
+          (guarded and not guarded_verified)):
+        stage = ""
+    received = _trusted_work_order_received(
+        os.environ.get("GITHUB_EVENT_PATH", ""),
+        os.environ.get("PLASMA_MONITOR_COMMENT_ID", ""),
+    ) if task in ("path2-work-order", "path3-work-order") else ""
     state = {
         "path": path, "status": "RUNNING", "run_id": run_id,
-        "task": task, "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
+        "received": received,
+        "task": task, "pr_number": pr_number,
+        "monitor_summary": summary if summary_valid else "",
+        "monitor_stage": stage,
+        "monitor_phase": declared_phase,
+        "pid": os.getpid(), "proc_start": _proc_start(os.getpid()),
         "started": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
     }
     if live:
@@ -150,6 +450,11 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
             print("MONITOR_UNAVAILABLE: %s" % type(exc).__name__, file=sys.stderr)
             live = False
     env = os.environ.copy()
+    # Operator-only metadata never enters the engineering/Codex process env.
+    env.pop("PLASMA_MONITOR_SUMMARY", None)
+    env.pop("PLASMA_MONITOR_STAGE", None)
+    env.pop("PLASMA_MONITOR_PHASE", None)
+    env.pop("PLASMA_MONITOR_COMMENT_ID", None)
     if live and path == "path3":
         env["PLASMA_ENGINEERING_MONITOR_LIVE_LOG"] = str(log)
     else:
@@ -184,10 +489,25 @@ def run_job(path: str, command: list[str], directory: Path | None = None) -> int
     finally:
         if live:
             try:
+                # A verified Runner receipt is NOT asserted: expose only a
+                # bounded categorical hint matching this exact run/Work Order.
+                hint = (_read_path2_receipt_hint(
+                    runner_temp=os.environ.get("RUNNER_TEMP", ""),
+                    run_id=run_id, task=task,
+                    work_order_sha=work_order_sha, exit_code=rc)
+                    if path == "path2" and rc != 0 else None)
+                path3_hint = (_read_path3_receipt_hint(
+                    runner_temp=os.environ.get("RUNNER_TEMP", ""),
+                    run_id=run_id, task=task,
+                    work_order_sha=work_order_sha, exit_code=rc)
+                    if path == "path3" else None)
                 _append(log, "%s | exit=%s | Run %s" % (result, rc, run_id))
                 _write_state(directory, path, {
                     **state, "status": "IDLE", "last_result": result,
                     "exit_code": rc,
+                    **({"receipt_hint": hint} if hint is not None else {}),
+                    **({"path3_receipt_hint": path3_hint}
+                       if path3_hint is not None else {}),
                     "finished": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
                 })
             except OSError as exc:
@@ -270,69 +590,188 @@ def render_snapshot(directory: Path, path: str, *,
                     now: dt.datetime | None = None,
                     clear_from: tuple[int, int, int, str | None] | None = None,
                     prefix: str = "Ctrl+B") -> str:
+    """Compact common header; evidence-neutral activity below it."""
     if path not in PATHS:
         raise ValueError("unknown path")
-    name = "PATH 2 | SWPC CLI" if path == "path2" else "PATH 3 | SWPC Codex"
-    log_file = directory / (path + ".log")
     state = _read_state(directory, path)
     status = state.get("status", "IDLE")
     if status == "RUNNING" and not _alive(state):
         status = "IDLE (interrupted/unknown)"
     if status not in ("IDLE", "RUNNING", "IDLE (interrupted/unknown)"):
         status = "UNKNOWN"
-    lines = [name,
-             "KEYS: C Clear | %s 1/2 Switch" % prefix,
-             "      %s D Detach" % prefix,
-             "=" * 35, "STATUS: " + status,
-             "RUN: %s  TASK: %s" % (state.get("run_id", "-"), state.get("task", "-"))]
-    if status == "RUNNING":
-        started = state.get("started", "")
+    clock = dt.datetime.now().astimezone() if now is None else now
+    if clock.tzinfo is None or clock.utcoffset() is None:
+        raise ValueError("status clock requires a timezone-aware timestamp")
+    received = "—"
+    raw_received = state.get("received")
+    if type(raw_received) is str and len(raw_received) <= 40:
         try:
-            elapsed = max(0, int((dt.datetime.now(dt.timezone.utc) -
-                    dt.datetime.fromisoformat(started)).total_seconds()))
-            lines.append("ELAPSED: %ds" % elapsed)
-        except (TypeError, ValueError):
+            parsed = dt.datetime.fromisoformat(raw_received)
+            if parsed.tzinfo is not None and parsed.utcoffset() is not None:
+                received = parsed.astimezone(ZoneInfo("Asia/Taipei")).strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
             pass
+    path_name = "PATH 2" if path == "path2" else "PATH 3"
+    pr = state.get("pr_number")
+    pr_display = (" | PR #" + pr if
+                  type(pr) is str and PR_NUMBER.fullmatch(pr) and pr != "0"
+                  else "")
+    summary = state.get("monitor_summary")
+    goal = (summary if type(summary) is str and
+            MONITOR_SUMMARY.fullmatch(summary) is not None and
+            MONITOR_SENSITIVE.search(summary) is None else
+            "(operator summary not provided)")
+    run = state.get("run_id", "-")
+    if type(run) is not str or RUN_ID.fullmatch(run) is None:
+        run = "-"
+    if status == "RUNNING":
+        try:
+            started = dt.datetime.fromisoformat(state["started"])
+            elapsed = max(0, int((clock.astimezone(dt.timezone.utc) -
+                                  started).total_seconds()))
+            result = "RUNNING | ELAPSED: %ds" % elapsed
+        except (KeyError, TypeError, ValueError):
+            result = "RUNNING"
     else:
-        lines.append("LAST: %s  EXIT: %s" %
-                     (state.get("last_result", "NOT_RUN"), state.get("exit_code", "-")))
-    if path == "path3":
-        clock = dt.datetime.now().astimezone() if now is None else now
-        if clock.tzinfo is None or clock.utcoffset() is None:
-            raise ValueError("status clock requires a timezone-aware timestamp")
-        # Minute precision keeps the fixed clock legible without 1 Hz redraw.
-        lines.append("NOW: " + clock.isoformat(timespec="minutes"))
-    lines.extend(["", "RECENT OUTPUT", "-" * 35])
-    if height is not None and height <= len(lines) + 1:
-        # Give the newest log line precedence over a decorative separator
-        # on short terminals (the header now includes shortcut guidance).
-        lines.pop()
+        result = "%s (exit %s)" % (
+            state.get("last_result", "NOT_RUN"), state.get("exit_code", "-"))
+    lines = [
+        "%s | %s%s" % (path_name, status, pr_display),
+        "RECEIVED: %s | RUN: %s" % (received, run),
+        "GOAL: " + goal,
+        "RESULT: %s | ACCEPTANCE: UNVERIFIED" % result,
+    ]
+    # Source log remains operator-only and is never a verified acceptance.
+    log_file = directory / (path + ".log")
+    history_lines = []
     try:
         if log_file.is_symlink() or not stat.S_ISREG(log_file.stat().st_mode):
             raise OSError("invalid log")
         with log_file.open("rb") as f:
             st = os.fstat(f.fileno())
-            start = max(0, st.st_size - 32768)
+            scan_start = max(0, st.st_size - 524288)
+            f.seek(scan_start)
+            history_lines = f.read().decode("utf-8", errors="replace").splitlines()
+            log_lines = history_lines[-30:]
             if clear_from is not None:
                 dev, ino, offset, run_start = clear_from
                 if ((st.st_dev, st.st_ino, state.get("started")) ==
                         (dev, ino, run_start) and st.st_size >= offset):
-                    start = max(start, offset)
-                # A new job/log or truncated log is new content, not old history.
-            f.seek(start)
-            log_lines = f.read().decode("utf-8", errors="replace").splitlines()[-30:]
+                    f.seek(max(scan_start, offset))
+                    log_lines = f.read().decode("utf-8", errors="replace").splitlines()[-30:]
     except OSError:
         log_lines = ["(no local output yet)"]
+    active_items = {}
+    last_error = None
+    last_sequence = 0
+    last_work_kind = None
+    followup_after_failure = False
+    for original in history_lines:
+        event = engineering_activity.parse_public_line(original)
+        if event is None or event["seq"] <= last_sequence:
+            continue
+        last_sequence = event["seq"]
+        last_work_kind = event["kind"]
+        if last_error is not None and event["seq"] > last_error["seq"] and (
+                event["state"] == "RUNNING"):
+            followup_after_failure = True
+        if event["state"] == "RUNNING":
+            active_items[event["id"]] = event
+        else:
+            active_items.pop(event["id"], None)
+            if event["state"] == "FAIL":
+                last_error = event
+                followup_after_failure = False
+
+    def _step_label(event: dict) -> str:
+        result = event["state"]
+        if event["exit_code"] is not None:
+            result += " (exit %d)" % event["exit_code"]
+        return "[%s] %s %s | %s" % (
+            event["source"], event["kind"], result, event["detail"])
+
+    if last_error is not None:
+        warning = "WARNING: Command failure observed"
+    elif state.get("last_result") == "FAIL":
+        warning = "WARNING: Wrapper failure observed"
+    else:
+        warning = "WARNING: —"
+    lines.append(warning + (" | LOG: GitHub Actions" if run != "-" else ""))
+    lines.append("ACTIVITY TRACE [%s] | C Clear | %s 1/2 Switch" %
+                 ("CLI" if path == "path2" else "C", prefix))
+    lines.append("-" * 35)
+    if run != "-":
+        lines.append("RUN LOG: https://github.com/physicslu/plasma/actions/runs/" + run)
+    if path == "path3":
+        phase = state.get("monitor_phase")
+        if type(phase) is not str or phase not in PATH3_PHASES or (
+                state.get("task") != "path3-work-order"):
+            phase = "NOT_DECLARED"
+        lines.append("STAGE: Codex workspace | OWNER PLAN: " + phase)
+        if last_work_kind is not None:
+            # This is a Codex-reported item category, NOT verified execution.
+            lines.append("WORK TYPE: " + last_work_kind + " [OBSERVED_CODEX]")
+        if last_error is not None:
+            lines.append("ERROR: COMMAND_NONZERO (exit %d) [OBSERVED_CODEX]" %
+                         last_error["exit_code"])
+            lines.append("FOLLOW-UP: " + (
+                "ACTIVITY_OBSERVED; REPAIR_UNVERIFIED" if followup_after_failure
+                else "NOT_OBSERVED; REPAIR_UNVERIFIED"))
+        receipt = _safe_stored_path3_receipt_hint(
+            state.get("path3_receipt_hint"))
+        if receipt is not None:
+            lines.append("WRAPPER RECEIPT: %s | COST: %s" %
+                         (receipt["result"], receipt["cost"]))
+            if receipt["failure"] != "NONE":
+                lines.append("WRAPPER ERROR: " + receipt["failure"])
+        lines.append("EVIDENCE: GitHub Actions Run/Artifact; REVIEW_REQUIRED")
+    hint = _safe_stored_receipt_hint(state.get("receipt_hint"))
+    if (path == "path2" and state.get("last_result") == "FAIL" and
+            type(state.get("exit_code")) is int and
+            state["exit_code"] == 2 and
+            state.get("task") == "path2-work-order" and hint is not None):
+        lines.append("RECEIPT: %s | %s | %s | #%d" % (
+            hint["reason"], hint["stage"], hint["cause"],
+            hint["component_index"]))
+    activity_rows = []
+    sequence = 0
+    for original in log_lines:
+        event = engineering_activity.parse_public_line(original)
+        if event is None or event["seq"] <= sequence:
+            continue
+        sequence = event["seq"]
+        activity_rows.append("%s %s" % (event["time"], _step_label(event)))
+    if activity_rows:
+        log_lines = activity_rows[-30:]
+    else:
+        log_lines = [line for line in log_lines if (
+            not line.startswith(engineering_activity.PREFIX)
+            and not line.startswith("RUNNING | elapsed "))]
+    if status == "RUNNING" and active_items:
+        current = next(reversed(active_items.values()))
+        lines.append("DOING: " + _step_label(current))
+    if last_error is not None:
+        lines.append("LAST ERROR: " + _step_label(last_error))
     if height is not None:
-        # Reserve the bottom row to prevent tmux scrolling on a repaint.
-        visible_log_rows = max(0, height - 1 - len(lines))
-        log_lines = log_lines[-visible_log_rows:] if visible_log_rows else []
+        # Keep latest activity even in a 12-line pane; no terminal scrolling.
+        while len(lines) > max(0, height - 2) and len(lines) > 5:
+            if lines[-1].startswith("LAST ERROR:") and len(lines) > 7:
+                lines.pop(-1)
+            elif lines[-1] == "-" * 35:
+                lines.pop(-1)
+            elif len(lines) > 6:
+                lines.pop(-1)
+            else:
+                break
+        visible = max(0, height - 1 - len(lines))
+        log_lines = log_lines[-visible:] if visible else []
     lines.extend(log_lines)
     if height is not None:
         lines = lines[:max(0, height - 1)]
     if width is not None:
-        lines = [_clip_columns(str(line), width) for line in lines]
-    return CONTROL.sub("", "\n".join(str(x) for x in lines))
+        lines = [_clip_columns(str(line),
+                 max(0, min(width - 1, MAX_DISPLAY_COLUMNS))) for line in lines]
+    return CONTROL.sub("", "\n".join(str(line) for line in lines))
 
 
 def view_loop(path: str, *, directory: Path = MONITOR, output=None,
@@ -377,7 +816,8 @@ def view_loop(path: str, *, directory: Path = MONITOR, output=None,
                 clear_from=clear_from, prefix=prefix)
             if frame != previous or size != previous_size:
                 # Only repaint this tmux pane, not global terminal scrollback.
-                output.write("\033[H" + frame + "\033[J")
+                # Clear old cells BEFORE painting shorter replacement lines.
+                output.write("\033[H\033[J" + frame)
                 output.flush()
                 previous = frame
                 previous_size = size

@@ -31,8 +31,7 @@ test("IC lookup remains outside the canonical Product Mode navigation", async ()
   const productNav = globalNav.match(/<nav className="globalProductNav"[\s\S]*?<\/nav>/)?.[0];
   assert.ok(productNav, "canonical Product Mode navigation must exist");
   assert.doesNotMatch(productNav, /\/devices/);
-  assert.match(demo, /className=\{`demoCard utility \$\{devicesDisabled \? "disabled" : ""\}`\}[\s\S]*?href="\/devices"/);
-  assert.match(demo, /principalHasPermission\(principal, "catalog\.read"\)/);
+  assert.match(demo, /className="demoCard utility"[\s\S]*?href="\/devices"/);
   assert.doesNotMatch(demo, /blockLockedNavigation/);
 });
 
@@ -41,7 +40,7 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   const styles = await source("../app/devices/devices.css");
   const api = await source("../app/device-catalog-api.ts");
 
-  assert.match(api, /\/api\/devices\/search/);
+  assert.match(api, /\/api\/manager\/devices\/search/);
   assert.match(api, /catalog_verification/);
   assert.match(api, /physical_validation/);
   assert.match(api, /revision_sha256/);
@@ -56,6 +55,13 @@ test("IC Selector separates hardware-test status from OpenOCD and manufacturer-p
   assert.match(selector, /原廠料號 · 已確認/);
   assert.match(selector, /未實機測試/);
   assert.match(selector, /實機測試通過/);
+  assert.match(selector, /Family Ready/);
+  assert.match(selector, /此 exact ICPN 未實機驗證/);
+  assert.match(api, /ppu_readiness_source:\s*"DIRECT_HIL"\s*\|\s*"FAMILY_DERIVED"/);
+  assert.match(api, /family_ready:\s*FamilyReadyEvidence\s*\|\s*null/);
+  assert.doesNotMatch(selector, /Site 電氣相容|Site electrical/);
+  assert.doesNotMatch(selector, /<dt>Hardware Ready<\/dt>/);
+  assert.doesNotMatch(selector, /實體燒錄資格|Physical programming/);
   assert.match(selector, /device\.physical_validation\.ppu_status/);
   assert.match(selector, /device\.physical_validation\.socket_status/);
   assert.match(selector, /原廠料號已確認且 OpenOCD 設定已存在/);
@@ -76,8 +82,11 @@ test("Programming qualification derives Catalog Level 2 independently from CFG m
   assert.match(api, /programming_qualification\?:\s*ProgrammingQualification\s*\|\s*null/);
   assert.match(api, /state:\s*"UNKNOWN"\s*\|\s*"CANDIDATE"\s*\|\s*"BLOCKED"\s*\|\s*"SUPPORTED"\s*\|\s*"UNSUPPORTED"/);
   assert.match(api, /identity_state:\s*"IDENTIFIED"\s*\|\s*"NOT_IDENTIFIED"/);
-  assert.match(api, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*null/);
-  assert.match(api, /catalog_level_state:\s*"DISCOVERED"\s*\|\s*"PROGRAMMING_CANDIDATE"\s*\|\s*"PROGRAMMABLE"\s*\|\s*null/);
+  assert.match(api, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*3\s*\|\s*null/);
+  assert.match(api, /catalog_level_state:\s*"DISCOVERED"\s*\|\s*"PROGRAMMING_CANDIDATE"\s*\|\s*"PROGRAMMABLE"\s*\|\s*"PLASMA_VERIFIED"\s*\|\s*null/);
+  assert.match(api, /ppu_ready:\s*boolean/);
+  assert.match(api, /socket_ready:\s*boolean/);
+  assert.match(api, /verified_configurations:\s*VerifiedPhysicalConfiguration\[\]/);
   assert.match(api, /selector_visible:\s*boolean/);
   assert.match(api, /job_selectable:\s*boolean/);
   assert.match(api, /execution_authorized:\s*false/);
@@ -106,7 +115,10 @@ test("shared PMode and EMode picker requests only Level 2 and Level 3 ICPNs", as
   const picker = await source("../app/devices/ic-picker-field.tsx");
 
   assert.match(picker, /Search admitted ICPN/);
-  assert.match(picker, /levels:\s*\[2, 3\]/);
+  // Default stays L2/L3 for PMode/EMode; Bundle programming opts into L1-L3
+  // explicitly because Catalog Level is not an execution gate.
+  assert.match(picker, /levels = \[2, 3\]/);
+  assert.match(picker, /levels,\n/);
   assert.match(picker, /L\{device\.catalog_level\}/);
   assert.match(picker, /Exact ICPN ·/);
   assert.match(picker, /OCD Mapped/);
@@ -122,7 +134,9 @@ test("general IC Selector exposes L1-L3 filters while Level 0 stays outside the 
   assert.match(api, /levels:\s*levels\.join\(","\)/);
   assert.match(api, /scope:\s*"customer_ic_selector"/);
   assert.match(api, /catalog_level:\s*1\s*\|\s*2\s*\|\s*3/);
-  assert.doesNotMatch(api, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*3/);
+  // Qualification has a private L0 representation; the public DeviceSearchResult cannot.
+  const publicResultType = api.split("export type DeviceSearchResult = {")[1];
+  assert.doesNotMatch(publicResultType, /catalog_level:\s*0\s*\|\s*1\s*\|\s*2\s*\|\s*3/);
   assert.match(selector, /全部 L1–L3/);
   assert.match(selector, /L1 Candidate/);
   assert.match(selector, /L2 Programmable/);
@@ -226,8 +240,10 @@ test("selected IC profile presents device, programming, and Plasma compatibility
   assert.match(selector, /PLASMA Compatibility/);
   assert.match(selector, /原廠文件未明確指定/);
   assert.match(selector, /manufacturer_baseline\.sha256/);
-  assert.match(selector, /hardware_runtime_ready/);
-  assert.match(selector, /physical_programming_qualified/);
+  assert.match(selector, /physicalValidationDetail\(selected\.physical_validation\.ppu_status/);
+  assert.match(selector, /physicalValidationDetail\(selected\.physical_validation\.socket_status/);
+  assert.doesNotMatch(selector, /selected\.selected_profile\?\.plasma_compatibility\.hardware_runtime_ready/);
+  assert.doesNotMatch(selector, /selected\.selected_profile\?\.plasma_compatibility\.physical_programming_qualified/);
   assert.match(styles, /\.icSelectorProfileSection\s*\{/);
   assert.match(styles, /\.icSelectorEvidenceDetails\s*\{/);
 });

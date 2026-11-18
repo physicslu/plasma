@@ -46,9 +46,6 @@ REQUIRED_RESOLVER_CALLS = {
     "software/python/plasma_web/openocd_provider_registry.py": (
         "default_runtime_evidence_root", "source_files_available",
     ),
-    "software/python/plasma_interfaces/kl25_openocd_plan.py": (
-        "default_ic_support_root",
-    ),
 }
 
 

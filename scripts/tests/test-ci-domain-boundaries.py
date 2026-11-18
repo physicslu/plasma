@@ -164,11 +164,118 @@ def validate_catalog_family_trigger_parity() -> None:
     if ".github/workflows/device-catalog-stm32u5-hil-observer-debug-readiness-validation.yml" in u5:
         raise SystemExit("STM32U5 governance trigger still refers to a missing workflow")
 
+def validate_p1_path_filter_contracts() -> None:
+    """Keep targeted CI noise reductions without losing cross-layer acceptance."""
+    poc = "software/python/plasma_web/nxp_mcxn236_blhost_compat_poc.py"
+    # The compatibility PoC is independently tested by python-tests; it is not
+    # a Product/PPU/Browser/QEMU runtime dependency. Preserve positive filters
+    # for real runtime modules and require ordered exclusions for both events.
+    for name, positive, occurrences in (
+        ("mock-cd.yml", "software/python/**", 2),
+        ("mock-cd-browser.yml", "software/python/**", 2),
+        ("ppu-release.yml", "software/python/plasma_web/**", 1),
+        ("z2-ps-release.yml", "software/python/plasma_web/**", 2),
+        ("z2like-demo-qemu.yml", "software/python/plasma_web/**", 2),
+    ):
+        source = read(name)
+        owner = f"P1 research-only PoC routing: {name}"
+        positive_marker = f'"{positive}"'
+        negative_marker = f'"!{poc}"'
+        require_count(source, positive_marker, occurrences, owner=owner)
+        require_count(source, negative_marker, occurrences, owner=owner)
+        cursor = 0
+        for _ in range(occurrences):
+            start = source.find(positive_marker, cursor)
+            exclusion = source.find(negative_marker, start)
+            next_positive = source.find(positive_marker, start + len(positive_marker))
+            if start < 0 or exclusion < start or (
+                next_positive >= 0 and exclusion > next_positive
+            ):
+                raise SystemExit(f"{owner}: ordered paths exclusion was lost")
+            cursor = exclusion + len(negative_marker)
+
+    # Host-only C-3 Site Session changes are covered by Python PS tests, not
+    # the ARMv7 Bootstrap deploy/QEMU acceptance. Keep each ordered exclusion
+    # under the positive plasma_interfaces glob for push and pull_request.
+    qemu = read("z2like-demo-qemu.yml")
+    positive = '"software/python/plasma_interfaces/**"'
+    negative = '"!software/python/plasma_interfaces/site_worker_c3.py"'
+    require_count(qemu, positive, 2, owner="OPF C-3/QEMU path routing")
+    require_count(qemu, negative, 2, owner="OPF C-3/QEMU path routing")
+    cursor = 0
+    for _ in ("push", "pull_request"):
+        start = qemu.find(positive, cursor)
+        exclusion = qemu.find(negative, start + len(positive))
+        next_positive = qemu.find(positive, start + len(positive))
+        if start < 0 or exclusion < 0 or (
+            next_positive >= 0 and exclusion > next_positive
+        ):
+            raise SystemExit("OPF C-3/QEMU: ordered paths exclusion was lost")
+        cursor = exclusion + len(negative)
+
+    # The repository-wide docs contract owns docs/README.md. These dedicated
+    # jobs do not consume that file; retain their own domain document triggers.
+    for name in (
+        "device-catalog-st-c5-host-loader-table-v1.yml",
+        "kl25-installed-backend-lock-root-v1.yml",
+        "plasma-armv7-barrier-hil-a-contract.yml",
+        "plasma-codex-hardware-parity.yml",
+        "plasma-codex-swpc-preflight.yml",
+        "plasma-codex-z2-login.yml",
+        "plasma-codex-z2-readiness.yml",
+        "plasma-hil-a15-armv7-qemu.yml",
+    ):
+        forbid(read(name), "docs/README.md", owner=f"P1 docs trigger: {name}")
+
+    # Product release version changes require packaging acceptance. Research
+    # qualification data under release/ must not rebuild Control Station.
+    for name in ("control-station-runtime.yml", "product-release.yml"):
+        source = read(name)
+        trigger_count = sum(
+            line.strip() == '- "release/product.json"'
+            for line in source.splitlines()
+        )
+        if trigger_count != 2:
+            raise SystemExit(
+                f"P1 release: {name}: expected 2 product manifest path entries, "
+                f"got {trigger_count}"
+            )
+        forbid(source, '"release/**"', owner=f"P1 release: {name}")
+
+    # Changes to every P1-owned workflow must exercise this guard.
+    repository_contracts = read("repository-contracts.yml")
+    for name in (
+        "mock-cd.yml",
+        "mock-cd-browser.yml",
+        "control-station-runtime.yml",
+        "product-release.yml",
+        "kl25-installed-backend-lock-root-v1.yml",
+        "plasma-armv7-barrier-hil-a-contract.yml",
+        "plasma-codex-hardware-parity.yml",
+        "plasma-codex-swpc-preflight.yml",
+        "plasma-codex-z2-login.yml",
+        "plasma-codex-z2-readiness.yml",
+        "plasma-hil-a15-armv7-qemu.yml",
+    ):
+        require_count(
+            repository_contracts, f'".github/workflows/{name}"', 2,
+            owner=f"P1 CI trigger governance: {name}",
+        )
+    require(repository_contracts, '"**/*.md"', owner="REPO docs contract")
+    require(
+        read("openocd-software-qualification.yml"),
+        '"release/openocd-qualification/**"',
+        owner="OpenOCD qualification remains independent",
+    )
+
+
 def main() -> int:
     validate_catalog_family_trigger_parity()
     validate_workstream_registry()
+    validate_p1_path_filter_contracts()
 
     python_tests = read("python-tests.yml")
+    pl_host = read("pl-z2-swd-gpio.yml")
     repository_contracts = read("repository-contracts.yml")
     ppu_release = read("ppu-release.yml")
     z2_release = read("z2-ps-release.yml")
@@ -246,8 +353,15 @@ def main() -> int:
 
     # Preserve positive ownership so trigger cleanup cannot be satisfied by
     # accidentally deleting the workflows' real source boundaries.
-    require(python_tests, '"software/python/**"', owner="SW/PPU Python/PL")
-    require(python_tests, '"pl/rtl/**"', owner="SW/PPU Python/PL")
+    # PS ownership: python-tests listens to software/python/** only.
+    # PL ownership: dedicated pl-*.yml (pl-z2-swd-gpio covers pl/** host tests).
+    require(python_tests, '"software/python/**"', owner="SW/PPU Python/PS")
+    for pl_path in ('"pl/rtl/**"', '"pl/constraints/**"', '"pl/projects/**"', '"pl/tests/**"'):
+        forbid(python_tests, pl_path, owner="SW/PPU Python/PS")
+    forbid(python_tests, "software/python/tests pl/tests", owner="SW/PPU Python/PS")
+    require(python_tests, "python -m pytest -q software/python/tests", owner="SW/PPU Python/PS")
+    require(pl_host, '"pl/**"', owner="SW/PPU PL host contracts")
+    require(pl_host, "python3 -m pytest -q pl/tests", owner="SW/PPU PL host contracts")
     require(ppu_release, '"scripts/ppu-release.py"', owner="SW/PPU PPU release")
     require(ppu_release, '"scripts/ci/ppu-network-trigger.py"', owner="SW/PPU PPU network routing")
     require(ppu_release, "route-ppu-network:", owner="SW/PPU PPU network routing")

@@ -18,24 +18,27 @@ test("WorkspaceSession remains the authoritative browser routing owner", async (
   assert.match(workspace, /const API_STORAGE_KEY = "plasma-api-base"/);
   assert.match(workspace, /markGatewayRoutingResolved\(saved, nextMode\)/);
   assert.match(devicesPage, /useWorkspaceSession\(\)/);
-  assert.match(devicesPage, /<ICSelector usage="lookup" apiBase=\{apiBase\}/);
+  // PR-C2: the Device Selector is Manager-owned and same-origin (Manager BFF);
+  // it never follows the Gateway apiBase or the managed PPU relay.
+  assert.match(devicesPage, /<ICSelector usage="lookup" \/>/);
   assert.doesNotMatch(deviceApi, /localStorage/);
   assert.doesNotMatch(deviceApi, /DEFAULT_API_BASE/);
-  assert.match(deviceApi, /apiBase: string/);
+  assert.doesNotMatch(deviceApi, /apiBase: string/);
+  assert.match(deviceApi, /DEVICE_SELECTOR_PATH = "\/api\/manager\/devices\/search"/);
   assert.doesNotMatch(picker, /configuredDeviceApiBase/);
-  assert.match(picker, /apiBase: string/);
+  assert.doesNotMatch(picker, /apiBase/);
   assert.doesNotMatch(selector, /configuredDeviceApiBase/);
-  assert.match(selector, /apiBase: string/);
+  assert.doesNotMatch(selector, /apiBase/);
 });
 
 test("Managed transport rebases canonical Gateway paths after routing resolves", async () => {
-  const transport = await source("../app/security-transport.ts");
+  const transport = await source("../app/gateway-transport.ts");
 
   assert.match(transport, /type GatewayRoutingMode = "managed" \| "standalone"/);
   assert.match(transport, /gatewayRoutingMode === "managed"/);
   assert.match(transport, /directGatewayPathname\(url\.pathname\)/);
   assert.match(transport, /rebaseInput\(currentInput, directPath, url\.search\)/);
-  assert.match(transport, /url\.origin === new URL\(resolvedGatewayApiBase\)\.origin/);
+  assert.doesNotMatch(transport, /bearerToken|"Authorization"/);
   assert.match(transport, /const trimmed = apiBase\.trim\(\)/);
   assert.match(transport, /: window\.location\.origin/);
   assert.doesNotMatch(transport, /savedGatewayApiBase/);

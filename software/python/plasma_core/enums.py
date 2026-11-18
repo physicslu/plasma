@@ -8,6 +8,12 @@ class Operation(StrEnum):
     PROGRAM = "program"
     VERIFY = "verify"
     READ = "read"
+    # Complete Flash programming: Erase -> Program -> Verify -> full Readback
+    # compare as one Job. PROGRAM stays write-only; the two never substitute.
+    # One Job that runs an ordered ``operations`` list drawn from
+    # erase -> program -> verify (the list is part of its Job Binding). Every
+    # legal E/P/V selection, including all three, is this one Operation.
+    PROGRAMMING = "programming"
     STATUS = "status"
     CANCEL = "cancel"
 

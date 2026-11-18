@@ -62,8 +62,8 @@ const GUIDANCE: Record<BatchReadinessCode, Record<BatchReadinessLocale, string>>
     "en-US": "Select at least one Site.",
   },
   "no-op": {
-    "zh-TW": "請選擇 Erase / Program / Verify / Read。",
-    "en-US": "Select Erase / Program / Verify / Read.",
+    "zh-TW": "請選擇 Erase / Program / Verify。",
+    "en-US": "Select Erase / Program / Verify.",
   },
   "image-required": {
     "zh-TW": "Program／Verify 需要 Programming Image。",

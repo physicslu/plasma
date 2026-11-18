@@ -74,7 +74,7 @@ Required checks include:
 
 - `/api/manager/ppu/api/status` -> `render-demo-ppu` and eight local Mock Sites;
 - `/api/manager/ppu/api/engineering/targets` -> Web REST v3 Mock provider;
-- `/api/manager/ppu/api/devices/search` -> production Device Catalog is reachable through the managed path;
+- `/api/manager/devices/search` -> production Device Catalog is answered by the Manager-owned Device Selector (never relayed to the PPU, PR-C2);
 - `/api/manager/ppu/api/mock/runtime` -> canonical Erase / Program / Verify / Read settings structure;
 - a small SITE 1 Mock `program` Job submitted through `/api/manager/ppu/api/jobs` reaches `success`;
 - `/`, `/demo`, `/fleet`, `/engineering`, `/devices`, and `/ppu` use the `Plasma Control Station` shell and do not expose the retired `SITE MATRIX / PPU CONTROL` UI.

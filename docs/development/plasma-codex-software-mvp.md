@@ -1,27 +1,8 @@
-# PLASMA — Unified HIL: one SWPC Codex worker for SW / Z2 / LA2016
+# PLASMA — Historical SWPC Codex software-only MVP
 
-## Scope and operational model
+**Historical reference, not the active Path 3 hardware path.** The original Issue #981 C11 pilot and LA2016 experiment shared the `SWPC-plasma-codex` worker. The LA-only Supervisor, Direct A/B, and diagnosis workflows/scripts were retired in the 2026-10-26 Path 3 direct hardware CLI consolidation. The old LA Issue commands cannot dispatch hardware.
 
-**Gate 1 only: source changes and GitHub-hosted offline tests.** No software Codex
-execution, device opening, Z2 SSH, LA PWM, USB Hub power action, host provisioning,
-deployment or merge is approved by this change. A later separate Gate 2 is
-required for merge. **Merge alone is not live-execution authorization.**
-
-Use the existing, separately registered `SWPC-plasma-codex` GitHub runner and
-non-root `plasma-codex` Linux user, with its existing `plasma-codex-io`
-and `plasma-monitor` groups. Do not create another account, worker or
-hardware-control service. The three supported fixed **workloads** remain:
-
-| Workload | Workflow | One exact owner command on Issue #981 |
-| --- | --- | --- |
-| C11 SW example | `.github/workflows/plasma-codex-software-mvp.yml` | `/plasma-codex hello-c 981` |
-| Z2 SWD-05 loopback | `.github/workflows/plasma-codex-z2-swd05.yml` | `/plasma-codex z2-swd05 981` |
-| LA2016 Direct PWM / capture | `.github/workflows/plasma-codex-la2016-direct.yml` | `/plasma-codex la2016-direct 981` |
-
-All three schedule exactly the same `[self-hosted, linux, x64, plasma-codex]`
-runner. They are **not** interchangeable authorization scopes. The existing
-Z2 and LA workflows and their bounded recovery/OFF controls are unchanged by
-this PR. Their live device readiness is not certified by hosted CI.
+The C11 workflow `.github/workflows/plasma-codex-software-mvp.yml` remains dormant for its historical offline tests. It is not an authorization to use LA2016 or PYNQ-Z2. Current hardware work uses [Path 3 Direct Hardware Tools](plasma-path3-direct-hardware-tools.md) via the shared Dispatcher and approved Work Order.
 
 ## Reason for the change (evidence, not speculation)
 
@@ -60,7 +41,7 @@ already consumed that activation and failed. Merely merging this PR must
 the repo as historical provenance logic, but **no active Workflow calls it**.
 
 The fixed SW task uses the **same explicit Issue comment admission pattern**
-as the existing Z2 and LA workflows:
+as the retained LA workflow (the old Z2 SWD-05 owner command is retired):
 
 1. After an independent Gate 2 merge, the sole trusted owner
    `physicslu` may make a **separate** deliberate `created` comment,

@@ -185,11 +185,9 @@ def run_worker(bundle: dict, policy: dict, expected_digest: str,
         command = [sys.executable, str(script), *task["argv"]]
         task_input = None
     else:
-        command = [
-            "codex", "--ask-for-approval", "never",
-            "-c", "sandbox_workspace_write.network_access=false",
-            "exec", "--sandbox", "workspace-write", "-",
-        ]
+        # This legacy worker retains its attested OS isolation, without
+        # overriding the operator's Codex CLI policy.
+        command = ["codex", "exec", "-"]
         task_input = (
             task["prompt"] + "\\n\\nOnly modify these reviewed repository paths: "
             + ", ".join(order["scope"]["allow_repo_paths"])

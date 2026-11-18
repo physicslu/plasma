@@ -52,8 +52,7 @@ function overallTone(state: PPUSiteConfigurationPayload["site_configuration"]["r
 
 function sameDesired(left: PPUSiteDesired, right: PPUSiteDesired): boolean {
   return left.enabled === right.enabled
-    && left.interface === right.interface
-    && left.target === right.target;
+    && left.interface === right.interface;
 }
 
 export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution }: Props) {
@@ -294,7 +293,6 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
                 <th>Site</th>
                 <th>Desired Enabled</th>
                 <th>Desired Interface</th>
-                <th>Desired Target</th>
                 <th>Runtime</th>
                 <th>Reconciliation</th>
                 <th>Action</th>
@@ -334,17 +332,8 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
                       </select>
                     </td>
                     <td>
-                      <input
-                        value={draft.target}
-                        disabled={disabled}
-                        maxLength={256}
-                        aria-label={`SITE${site.site_id} desired target`}
-                        onChange={event => updateDraft(site.site_id, { target: event.target.value })}
-                      />
-                    </td>
-                    <td>
                       {site.actual
-                        ? `${site.actual.enabled ? "Enabled" : "Disabled"} · ${site.actual.interface ?? "—"} · ${site.actual.target ?? "—"}`
+                        ? `${site.actual.enabled ? "Enabled" : "Disabled"} · ${site.actual.interface ?? "—"}`
                         : "Unavailable"}
                     </td>
                     <td>
@@ -358,7 +347,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
                           className="ppuSiteButton primary"
                           variant="primary"
                           type="button"
-                          disabled={disabled || !isDirty || !draft.target.trim() || isConflict}
+                          disabled={disabled || !isDirty || isConflict}
                           title={isConflict ? "Reset Draft to the latest Desired state before saving" : undefined}
                           onClick={() => void saveSite(site.site_id)}
                         >
@@ -380,7 +369,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
       )}
 
       <p className="ppuSiteNote">
-        <strong>Configuration boundary:</strong> Draft is browser-local, Desired is persisted in canonical PPU configuration, and Runtime is observed separately. Each Draft keeps the exact <code>desired_revision</code> it was based on and Save Desired sends it with <code>If-Match</code>; a stale Draft receives HTTP 412 and is blocked from silently overwriting newer Desired state. Save Desired persists configuration only; when Desired and Runtime differ, the API reports <code>restart_required</code>. Runtime application is a separate PPU-level controlled activation and is exposed only when the deployment reports <code>runtime_apply_supported=true</code>. Protocol v3.3 also does not expose dormant interface/target bindings for disabled Sites; those rows remain explicitly partially observable instead of guessed.
+        <strong>Configuration boundary:</strong> Draft is browser-local, Desired is persisted in canonical PPU configuration, and Runtime is observed separately. Each Draft keeps the exact <code>desired_revision</code> it was based on and Save Desired sends it with <code>If-Match</code>; a stale Draft receives HTTP 412 and is blocked from silently overwriting newer Desired state. Save Desired persists configuration only; when Desired and Runtime differ, the API reports <code>restart_required</code>. Runtime application is a separate PPU-level controlled activation and is exposed only when the deployment reports <code>runtime_apply_supported=true</code>. The selected ICPN belongs to each Programming Job, not Site Desired configuration. Protocol v3.3 cannot observe a disabled Site&#39;s dormant interface binding.
       </p>
     </OperatorCard>
   );

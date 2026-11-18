@@ -101,6 +101,25 @@ class C5PSStaticGate(unittest.TestCase):
         self.assert_mutation_refused(
             ["gates", "official_vendor_binary_license_approved"], True)
 
+    def test_plasma_source_evidence_is_read_from_git_history_not_runtime_tree(self):
+        # Offline Catalog research must not pin current PPU Runtime files.
+        info = json.loads(gate.REPORT.read_text(encoding="utf-8"))
+        ps = dict(info["plasma_source"])
+        for key in ("openocd_executor_path", "openocd_interface_path", "site_router_path"):
+            ps[key] = "software/python/__retired_runtime_source__.py"
+        self.assertFalse((gate.ROOT / ps["openocd_executor_path"]).exists())
+        gate.validate_plasma_source_evidence(ps)
+
+    def test_plasma_source_evidence_unknown_blob_fails_closed(self):
+        for blob in ("0" * 40, "not-a-blob"):
+            with self.subTest(blob=blob):
+                with self.assertRaises((ValueError, RuntimeError)):
+                    gate.read_frozen_git_blob(blob, "openocd_executor_path")
+        info = json.loads(gate.REPORT.read_text(encoding="utf-8"))
+        ps = dict(info["plasma_source"], openocd_executor_blob_sha="0" * 40)
+        with self.assertRaisesRegex(ValueError, "source-lock digest drift"):
+            gate.validate_plasma_source_evidence(ps)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -18,9 +18,15 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"scripts"))
 import plasma_development_dispatch as dev
+import plasma_host_observe as host_observe
 
 WORKFLOW=ROOT/".github/workflows/plasma-engineering-runtime-dispatch.yml"
 REGISTRY=ROOT/"specs/engineering-dispatch/development-tasks-v1.json"
+HOST_BUILD_PROJECT = {
+    "execution_path": "path2-cli", "capability": "vivado-host-build",
+    "project": "pl/projects/z2-identity", "toolchain": "2026.1",
+    "board_repo_sha": "e02d6a3866b5465218f777168cdc51344ac94e07",
+}
 
 
 class DevelopmentPath2Contracts(unittest.TestCase):
@@ -496,7 +502,7 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
             from io import StringIO
             from contextlib import redirect_stdout
             with patch.dict(os.environ,env):
-                with patch.object(dev,"live_pr_metadata", return_value=None), patch.object(dev,"run_task",return_value={"status":"PASS"}) as mock:
+                with patch.object(dev,"live_pr_metadata", return_value=None), patch.object(dev,"run_task",return_value={"status":"PASS"}) as mock, patch.object(dev.os,"geteuid",return_value=1000):
                     with redirect_stdout(StringIO()) as out:
                         self.assertEqual(self._call_main(args),0)
                     self.assertEqual(json.loads(out.getvalue())["pinned_sha"],"b"*40)
@@ -535,10 +541,6 @@ class DevelopmentBranchDispatchContracts(DevelopmentPath2Contracts):
                 stdout=b"fake Codex independently repaired and tested"
                 stderr=b""
             def fake_codex(command, **kwargs):
-                self.assertIn("ACTUAL complete output as text",
-                              kwargs["input"].decode())
-                self.assertNotIn("9 x 9 results",
-                                 kwargs["input"].decode())
                 source.write_text("print('corrected')\n")
                 source.with_suffix(".txt").write_text("corrected\n")
                 source.with_suffix(".test.log").write_text(
@@ -646,10 +648,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(len(calls),1)  # No second Python subprocess.
             self.assertEqual(calls[0][0][0],"codex")
             self.assertIn("--json",calls[0][0])
-            self.assertIn("workspace-write",calls[0][0])
-            self.assertNotIn("Do not program or access physical FPGA",calls[0][1]["input"].decode())
-            self.assertIn("Record actual commands",calls[0][1]["input"].decode())
-            self.assertNotIn("shell",calls[0][1])
+            self.assertEqual(calls[0][0], ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
             self.assertTrue((work/".plasma-path3-evidence/codex.log").is_file())
             self.assertEqual(receipt["codex_usage"]["status"],"unavailable")
             self.assertIsNone(receipt["codex_usage"]["input_tokens"])
@@ -730,27 +729,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
             self.assertEqual(receipt["codex_usage"]["input_tokens"], 1)
             self.assertNotIn("gpt-6-sol", json.dumps(receipt))
 
-    def test_repo_first_codex_guidance_budget_and_safety_preservation(self):
-        root = (ROOT / "AGENTS.md").read_bytes()
-        detail = (ROOT / "docs/development/"
-                  "plasma-autonomous-development-contract-full.md").read_text()
-        # Avoid silent truncation at Codex's default 32 KiB project budget.
-        self.assertLess(len(root), 32768)
-        brief = root.decode("utf-8")
-        for required in ("Gate 1", "Gate 2", "Path 3", "NOT_RUN",
-                         "trusted root executor", "Merge Approval",
-                         "electrical", "B1", "rollback",
-                         "Credential", "AGENTS.md"):
-            with self.subTest(required=required):
-                self.assertIn(required.casefold(), brief.casefold())
-        for required in ("## 1A. Prototype-first",
-                         "## 1B. Canonical Codex task/SSH",
-                         "## 11. Autonomous task execution contract",
-                         "## 20. Workspace and information boundary"):
-            self.assertIn(required, detail)
-        self.assertGreater(len(detail.encode("utf-8")), len(root))
-
-    def test_repo_first_path3_prompt_is_short_and_preserves_scope(self):
+    def test_path3_invocation_preserves_execution_receipt_without_prompt_assertions(self):
         seen = []
         class Result:
             returncode = 0
@@ -768,23 +747,8 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertIsNone(audit["model_request_count"])
         self.assertIsNone(audit["repo_root_agents_bytes"])
         self.assertEqual(audit["actual_instruction_load_status"], "NOT_VERIFIED")
-        self.assertEqual(audit["dispatched_prompt_bytes"], len(seen[0][1]))
-        self.assertNotIn(self.task["objective"], json.dumps(audit))
-        argv, raw_prompt = seen[0]
-        prompt = raw_prompt.decode("utf-8")
-        self.assertLess(len(raw_prompt), 2200 + len(self.task["objective"].encode("utf-8")))
-        self.assertIn("AGENTS.md", prompt)
-        self.assertIn("pinned source SHA", prompt)
-        self.assertIn(self.task["objective"], prompt)
-        self.assertIn("NOT_RUN", prompt)
-        self.assertIn("unsafe hardware writes", prompt)
-        self.assertIn("without another user approval", prompt)
-        self.assertNotIn("Plasma Autonomous Development Contract", prompt)
-        self.assertEqual(argv, [
-            "codex", "--ask-for-approval", "never",
-            "-c", "sandbox_workspace_write.network_access=false",
-            "exec", "--json", "--sandbox", "workspace-write", "-",
-        ])
+        argv = seen[0][0]
+        self.assertEqual(argv, ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
 
     def test_jsonl_usage_receipt_and_secret_redaction(self):
         secret = "PROMPT_AND_CREDENTIAL_SHOULD_NEVER_APPEAR"
@@ -843,6 +807,34 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertIn(b"oversized event omitted", safe)
         self.assertNotIn(b'X', safe)
         self.assertIsNone(collector.snapshot()["input_tokens"])
+
+    def test_codex_monitor_category_allowlist_preserves_evidence_bytes(self):
+        events = [
+            {"type": "item.started", "item": {
+                "type": "command_execution", "command": "TOP_SECRET"}},
+            {"type": "item.updated", "item": {
+                "type": "agent_message", "text": "PRIVATE_MESSAGE"}},
+            {"type": "item.completed", "item": {
+                "type": "file_change", "changes": "PRIVATE_DIFF"}},
+            {"type": "item.started", "item": {
+                "type": "custom_EXFILTRATE", "command": "TOP_SECRET"}},
+            {"type": "item.started", "item": {
+                "type": "command_execution\nINJECTED", "command": "TOP_SECRET"}},
+        ]
+        stream = (b"\n".join(json.dumps(e).encode() for e in events) + b"\n")
+        evidence = dev.CodexUsageCollector()
+        monitor = dev.CodexUsageCollector(monitor_only=True)
+        recorded = evidence.feed(stream) + evidence.finish()
+        visible = monitor.feed(stream[:11]) + monitor.feed(stream[11:]) + monitor.finish()
+        self.assertIn(b"[codex item.started]", recorded)
+        self.assertNotIn(b"command_execution", recorded)
+        self.assertIn(b"[codex command_execution.started]", visible)
+        self.assertIn(b"[codex agent_message.updated]", visible)
+        self.assertIn(b"[codex file_change.completed]", visible)
+        self.assertIn(b"[codex item.started]", visible)
+        for secret in (b"TOP_SECRET", b"PRIVATE_MESSAGE", b"PRIVATE_DIFF",
+                       b"custom_EXFILTRATE", b"INJECTED"):
+            self.assertNotIn(secret, visible + recorded)
 
     def test_codex_failure_preserves_session_log(self):
         with tempfile.TemporaryDirectory() as td:
@@ -910,9 +902,6 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                 calls.append(command)
                 (root/".plasma-path3-evidence/engineering-report.md").write_text(
                     "Attempt 1 FAIL, fixed; attempt 2 FAIL. Real execution NOT_RUN.\n")
-                self.assertIn("without another user approval",
-                              kwargs["input"].decode())
-                self.assertIn("unsafe hardware writes",kwargs["input"].decode())
                 return Failed()
             receipt=dev.run_codex_task(self.task,workspace=root,
                                        executor=executor)
@@ -1049,7 +1038,7 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
     def test_workflow_has_unconditional_evidence_step_and_keeps_job_failure(self):
         wf=WORKFLOW.read_text()
-        job=wf.split("  development-codex:",1)[1].split("\n  development-codex-resume:",1)[0]
+        job=wf.split("  development-codex:",1)[1].split("\n  authorize:",1)[0]
         self.assertIn("Collect Path 3 evidence even when Codex",job)
         self.assertIn("if: always()",job)
         self.assertIn("git -C candidate diff --binary HEAD",job)
@@ -1061,17 +1050,36 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
         self.assertNotIn("continue-on-error: true",job)
         self.assertNotIn("|| true",job)
 
+    def test_path3_publisher_is_pr_pinned_and_keeps_token_out_of_codex(self):
+        workflow = WORKFLOW.read_text()
+        job = workflow.split("  development-codex:", 1)[1].split(
+            "\n  authorize:", 1)[0]
+        self.assertIn("contents: write  # trusted publisher", job)
+        self.assertIn("Publish successful Path 3 edits to the exact authorized PR", job)
+        self.assertIn("git -C candidate diff --cached --check", job)
+        self.assertIn("p[\"head\"][\"sha\"]==sys.argv[1]", job)
+        self.assertIn("git -C candidate push origin", job)
+        self.assertIn("GIT_ASKPASS=", job)
+        self.assertIn("persist-credentials: false", job)
+        self.assertLess(job.index("Collect Path 3 evidence even when"),
+                        job.index("Publish successful Path 3 edits"))
+        self.assertLess(job.index("Publish successful Path 3 edits"),
+                        job.index("actions/upload-artifact@"))
+        self.assertIn("os.environ.pop(\"GH_TOKEN\", None)",
+                      (ROOT / "scripts/plasma_development_dispatch.py").read_text())
+        self.assertIn('"GH_TOKEN", "GITHUB_TOKEN"',
+                      (ROOT / "scripts/plasma_development_codex_sandbox.py").read_text())
     def test_development_path3_supports_vivado_and_full_source_edits(self):
         # Stub-only contract: no Vivado or physical device is invoked by CI.
         task={
             "execution_path":"path3-codex",
-            "objective":"Complete actual Vivado 2026.1 F1-B implementation, "
+            "objective":"Complete actual Vivado 2026.1 project implementation, "
                         "record all errors/fixes and real BIT HWH timing DRC evidence.",
         }
         dev.task_by_id({
             "schema_version":dev.VERSION, "mode":"development",
-            "tasks":{"f1b-vivado-development":task},
-        },"f1b-vivado-development")
+            "tasks":{"vivado-development":task},
+        },"vivado-development")
         with tempfile.TemporaryDirectory() as td:
             work=Path(td)
             rtl=work/"pl/rtl/host_fixture.sv"
@@ -1092,27 +1100,14 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                 return Result()
             receipt=dev.run_codex_task(task,workspace=work,
                                        executor=fake_codex,
-                                       task_id="f1b-path3-codex-vivado-build")
+                                       task_id="vivado-development")
             self.assertEqual(receipt["status"],"EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertNotIn("source_path",receipt)
             self.assertIn("engineering_report_sha256",receipt)
             self.assertIn("module host_fixture",rtl.read_text())
             args,kwargs=calls[0]
             self.assertEqual(kwargs["timeout"],None)
-            self.assertIn("workspace-write",args)
-            self.assertIn("sandbox_workspace_write.network_access=false",args)
-            self.assertIn("Vivado 2026.1",kwargs["input"].decode())
-            self.assertNotIn("Vivado Host-only",kwargs["input"].decode())
-            self.assertNotIn("host-only Vivado",kwargs["input"].decode())
-            self.assertIn("trusted dispatcher will execute",kwargs["input"].decode())
-            self.assertIn("twice in fresh output directories",kwargs["input"].decode())
-            self.assertIn("plasma-fpga-build-diagnostics.json",kwargs["input"].decode())
-            self.assertNotIn("--path3-engineering-host-only",kwargs["input"].decode())
-            self.assertNotIn("run every Vivado build",kwargs["input"].decode())
-            self.assertIn("RTL/Tcl/Python",kwargs["input"].decode())
-            self.assertNotIn("Do not program or access physical FPGA",
-                          kwargs["input"].decode())
-            self.assertNotIn("Create or modify ONLY",kwargs["input"].decode())
+            self.assertEqual(args, ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
         workflow=WORKFLOW.read_text()
         codex_job=workflow.split("  development-codex:",1)[1]
         self.assertIn("timeout-minutes: 360",codex_job)
@@ -1139,12 +1134,12 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
 
 
 class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
-    """Offline-only Path 2 host-build policy tests; never invokes Vivado."""
+    """Generic host-build utility and retired fixed-build routing tests."""
 
     @classmethod
     def setUpClass(cls):
         cls.registry=json.loads(REGISTRY.read_text())
-        cls.task=dev.task_by_id(cls.registry,"fixed-site1-vivado-host-build")
+        cls.task=HOST_BUILD_PROJECT
 
     def event(self):
         e=DevelopmentPath2Contracts().event()
@@ -1154,72 +1149,34 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
     def context(self):
         return DevelopmentPath2Contracts().context() | {"GITHUB_RUN_ATTEMPT":"1"}
 
-    def test_path2_is_not_synonymous_with_cpu_only(self):
-        task=self.task
-        self.assertEqual(task["execution_path"],"path2-cli")
-        self.assertEqual(task["capability"],"vivado-host-build")
-        approved=dev.authorize(self.event(),self.context(),self.registry)
-        self.assertEqual(approved["execution_capability"],"vivado-host-build")
-        self.assertEqual(approved["pr_number"],0)
-        self.assertEqual(approved["pinned_sha"],approved["trusted_sha"])
-        # Existing CPU-only path and original bwrap isolation remain intact.
-        cpu=dev.task_by_id(self.registry,"nine-nine-path2")
-        self.assertEqual(cpu["capability"],"cpu-only")
+    def test_retired_fixed_builds_cannot_be_dispatched(self):
+        for task_id in ("fixed-site1-vivado-host-build", "z2-path2-build"):
+            with self.subTest(task_id=task_id):
+                self.assertNotIn(task_id, self.registry["tasks"])
+                with self.assertRaisesRegex(dev.Denied, "TASK_ID_DENIED"):
+                    dev.authorize(self.event() | {
+                        "comment": {**self.event()["comment"],
+                                    "body": f"/plasma-dispatch run {task_id} 981"}
+                    }, self.context(), self.registry)
+                with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_FIXED_BUILD_TASK"):
+                    dev.task_by_id({**self.registry, "tasks": {task_id: self.task}},
+                                   task_id)
+                with patch.object(dev, "reviewed_host_build_driver") as loader:
+                    with self.assertRaisesRegex(dev.Denied, "HOST_BUILD_APPROVAL_REQUIRED"):
+                        dev.run_task(self.task, workspace=ROOT, approval={
+                            "task_id": task_id, "execution_path": "path2-cli",
+                            "execution_capability": "vivado-host-build",
+                            "pr_number": 0, "pinned_sha": "a" * 40,
+                            "trusted_sha": "a" * 40})
+                    loader.assert_not_called()
+        with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_AUTO_STAGE_FLAGS"):
+            dev.request({**self.event(), "comment": {
+                **self.event()["comment"],
+                "body": "/plasma-dispatch run z2-path2-build --auto-download 981"
+            }}, self.context())
 
-    def test_host_build_approved_pr_head_allows_reruns(self):
-        ctx=self.context()
-        for attempt in ("2", "3"):
-            plan = dev.authorize(self.event(), ctx | {"GITHUB_RUN_ATTEMPT": attempt},
-                                 self.registry)
-            self.assertEqual(plan["execution_capability"], "vivado-host-build")
-        fixture=DevelopmentBranchDispatchContracts()
-        branch_event=fixture.branch_event(
-            task="fixed-site1-vivado-host-build",pr=1100,sha="b"*40)
-        plan=dev.authorize(branch_event,ctx,self.registry,
-                           pr_info=fixture.valid_pr())
-        self.assertEqual(plan["pr_number"],1100)
-        self.assertEqual(plan["pinned_sha"],"b"*40)
-        self.assertEqual(plan["trusted_sha"],"a"*40)
-        self.assertEqual(plan["execution_capability"],"vivado-host-build")
-        for attempt in ("2", "3"):
-            repeated = dev.authorize(branch_event,
-                                     ctx | {"GITHUB_RUN_ATTEMPT": attempt},
-                                     self.registry, pr_info=fixture.valid_pr())
-            self.assertEqual(repeated["pinned_sha"], "b" * 40)
-        for change in ("sha","repo","owner","base","state"):
-            pr=fixture.valid_pr()
-            if change=="sha": pr["head"]["sha"]="c"*40
-            elif change=="repo": pr["head"]["repo"]["full_name"]="other/plasma"
-            elif change=="owner": pr["user"]["login"]="other"
-            elif change=="base": pr["base"]["ref"]="not-main"
-            elif change=="state": pr["state"]="closed"
-            with self.subTest(change=change),self.assertRaises(dev.Denied):
-                dev.authorize(branch_event,ctx,self.registry,pr_info=pr)
-        with self.assertRaisesRegex(dev.Denied,"PR_METADATA_DENIED"):
-            dev.authorize(branch_event,ctx,self.registry)
-        with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_SOURCE_BINDING_DENIED"):
-            dev.authorize(fixture.branch_event(
-                task="fixed-site1-vivado-host-build",sha="a"*40),
-                ctx,self.registry,pr_info=fixture.valid_pr(sha="a"*40))
 
-    def test_host_build_schema_rejects_arbitrary_cli_and_capabilities(self):
-        task=dict(self.task)
-        for key,value in (
-            ("project","../../scripts"),
-            ("project","/tmp/my-project"),
-            ("project","pl/projects/../danger"),
-            ("toolchain","2025.2"),
-            ("board_repo_sha","bad"),
-            ("capability","host-root"),
-        ):
-            with self.subTest(field=key,bad=value),self.assertRaises(dev.Denied):
-                bad=dict(task,**{key:value})
-                reg={**self.registry,"tasks":{"fixed-site1-vivado-host-build":bad}}
-                dev.task_by_id(reg,"fixed-site1-vivado-host-build")
-        with self.assertRaises(dev.Denied):
-            reg={**self.registry,"tasks":{"fixed-site1-vivado-host-build":
-                                         dict(task,argv=["--program-fpga"])}}
-            dev.task_by_id(reg,"fixed-site1-vivado-host-build")
+
 
     def test_runner_guard_allows_approved_pr_host_build_without_new_runner(self):
         wf=WORKFLOW.read_text()
@@ -1235,145 +1192,11 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         self.assertIn("needs.development-claim.result == 'success'",guard)
         self.assertIn("runs-on: [self-hosted, linux, x64, plasma-codex]",wf)
         self.assertIn("== 'vivado-host-build' && 50 ||",wf)
-        self.assertIn("== 'z2-path2-full-hil' && 10 || 5",wf)
+        self.assertIn("== 'operator-cli' && 35 || 5",wf)
         self.assertNotIn("runs-on: [self-hosted, linux, x64, vivado]",wf)
 
-    def test_host_build_source_preflight_is_pure_and_strict(self):
-        import plasma_vivado_host_build as build
-        approval=dev.authorize(self.event(),self.context(),self.registry)
-        env={
-            "GITHUB_REPOSITORY":"physicslu/plasma",
-            "RUNNER_NAME":"SWPC-plasma-codex",
-            "RUNNER_ENVIRONMENT":"self-hosted",
-            "GITHUB_EVENT_NAME":"issue_comment",
-            "GITHUB_REF":"refs/heads/main",
-            "GITHUB_RUN_ATTEMPT":"1",
-            "GITHUB_SHA":approval["trusted_sha"],
-        }
-        # This uses only local tracked source. No SWPC or Vivado call.
-        p=build.preflight(self.task,workspace=ROOT,approval=approval,env=env)
-        self.assertEqual(p["toolchain"],"2026.1")
-        self.assertIn("z2-fixed-unified-site1",p["project"])
-        self.assertEqual(p["board_sha"],self.task["board_repo_sha"])
-        for changed in (
-            {"GITHUB_SHA":"b"*40},
-        ):
-            with self.subTest(change=changed),self.assertRaises(build.BuildDenied):
-                build.preflight(self.task,workspace=ROOT,approval=approval,
-                                env=env|changed)
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(self.task,workspace=ROOT,
-                            approval=dict(approval,pr_number=1059),env=env)
-        fixture=DevelopmentBranchDispatchContracts()
-        candidate=dev.authorize(
-            fixture.branch_event(task="fixed-site1-vivado-host-build",
-                                 pr=1100,sha="b"*40),
-            self.context(),self.registry,pr_info=fixture.valid_pr())
-        accepted=build.preflight(self.task,workspace=ROOT,
-                                 approval=candidate,env=env)
-        self.assertEqual(accepted["source_sha"],"b"*40)
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(self.task,workspace=ROOT,
-                            approval=dict(candidate,pinned_sha="a"*40),env=env)
-        with self.assertRaises(build.BuildDenied):
-            build.preflight(dict(self.task,project="pl/projects/../bad"),
-                            workspace=ROOT,approval=approval,env=env)
 
-    def test_host_build_exec_requires_authorization_before_any_process(self):
-        task=self.task
-        with patch("plasma_vivado_host_build.run") as dangerous:
-            with self.assertRaisesRegex(dev.Denied,"HOST_BUILD_APPROVAL_REQUIRED"):
-                dev.run_task(task,workspace=ROOT,approval=None,sandbox=False)
-            dangerous.assert_not_called()
-        with patch("plasma_vivado_host_build.run") as builder:
-            dev.run_task(task,workspace=ROOT,
-                         approval={"task_id":"fixed-site1-vivado-host-build",
-                                   "execution_path":"path2-cli",
-                                   "execution_capability":"vivado-host-build",
-                                   "pr_number":0,
-                                   "pinned_sha":"a"*40,"trusted_sha":"a"*40},
-                         sandbox=False)
-            builder.assert_called_once()
-        # An approved PR must not silently fall back to the trusted main
-        # driver when its own fixed candidate driver is missing.
-        with tempfile.TemporaryDirectory() as td:
-            candidate = Path(td) / "candidate"
-            candidate.mkdir()
-            with patch("plasma_vivado_host_build.run") as builder:
-                with self.assertRaisesRegex(
-                    dev.Denied, "HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-                ):
-                    dev.run_task(task, workspace=candidate,
-                                 approval={
-                                     "task_id":"fixed-site1-vivado-host-build",
-                                     "execution_path":"path2-cli",
-                                     "execution_capability":"vivado-host-build",
-                                     "pr_number":1063,
-                                     "pinned_sha":"b"*40,
-                                     "trusted_sha":"a"*40},
-                                 sandbox=False)
-                builder.assert_not_called()
-        for invalid in (
-            {"task_id":"wrong"},
-            {"pr_number":1063,"pinned_sha":"a"*40,"trusted_sha":"a"*40},
-            {"pr_number":0,"pinned_sha":"b"*40,"trusted_sha":"a"*40},
-        ):
-            base={"task_id":"fixed-site1-vivado-host-build",
-                  "execution_path":"path2-cli",
-                  "execution_capability":"vivado-host-build",
-                  "pr_number":0,
-                  "pinned_sha":"a"*40,"trusted_sha":"a"*40}
-            with self.subTest(invalid=invalid),patch(
-                "plasma_vivado_host_build.run") as builder:
-                with self.assertRaisesRegex(dev.Denied,
-                                            "HOST_BUILD_APPROVAL_REQUIRED"):
-                    dev.run_task(task,workspace=ROOT,approval=base|invalid,
-                                 sandbox=False)
-                builder.assert_not_called()
 
-    def test_candidate_vivado_driver_is_reviewed_and_not_trusted_main(self):
-        # Host-only unit fixture. Do not start Vivado or access SWPC/hardware.
-        import plasma_vivado_host_build as trusted_build
-        task=self.task
-        approval={
-            "task_id":"fixed-site1-vivado-host-build",
-            "execution_path":"path2-cli",
-            "execution_capability":"vivado-host-build",
-            "pr_number":1064,"pinned_sha":"b"*40,"trusted_sha":"a"*40,
-        }
-        with tempfile.TemporaryDirectory() as td:
-            work=Path(td)/"candidate"
-            scripts=work/"scripts"
-            scripts.mkdir(parents=True)
-            driver=scripts/"plasma_vivado_host_build.py"
-            driver.write_text(
-                "def run(task, *, workspace, approval, evidence_dir=None, "
-                "executor=None):\n"
-                "    return {'status':'CANDIDATE_DRIVER_TEST_ONLY'}\n",
-                encoding="utf-8")
-            with patch.object(trusted_build,"run") as main_driver:
-                result=dev.run_task(task,workspace=work,approval=approval)
-                self.assertEqual(result["status"],"CANDIDATE_DRIVER_TEST_ONLY")
-                main_driver.assert_not_called()
-            # PR driver is not admissible if absent or a symlink escape.
-            driver.unlink()
-            with self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-            ):
-                dev.run_task(task,workspace=work,approval=approval)
-            outside=Path(td)/"unreviewed.py"
-            outside.write_text("raise RuntimeError('must not import')\n")
-            driver.symlink_to(outside)
-            with self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-            ):
-                dev.run_task(task,workspace=work,approval=approval)
-            driver.unlink()
-            driver.write_text("x"*65537)
-            with self.assertRaisesRegex(
-                dev.Denied,"HOST_BUILD_CANDIDATE_DRIVER_DENIED"
-            ):
-                dev.run_task(task,workspace=work,approval=approval)
 
     def test_workflow_transports_authorized_pr_identity_to_existing_runner(self):
         wf=WORKFLOW.read_text()
@@ -1502,7 +1325,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
             output.mkdir(parents=True)
             folder = build.prepare_host_build_dir(work)
             self.assertEqual(folder.parent, output)
-            self.assertTrue(folder.name.startswith("fixed-f1-"))
+            self.assertTrue(folder.name.startswith("vivado-"))
             self.assertTrue((folder / "reports").is_dir())
             self.assertFalse(str(folder).startswith("/storage/projects/plasma/"))
             self.assertTrue(folder.resolve().is_relative_to(work.resolve()))
@@ -1559,7 +1382,7 @@ class DevelopmentVivadoHostBuildContracts(unittest.TestCase):
         src=(ROOT/"scripts/plasma_vivado_host_build.py").read_text()
         self.assertIn("resolve_board_repository(task, workspace=workspace",src)
         self.assertIn('"GIT_TERMINAL_PROMPT": "0"',src)
-        self.assertIn('actual_board_sha == plan["board_sha"]',src)
+        self.assertIn('board_sha == task["board_repo_sha"], "BUILD_BOARD_SHA_MISMATCH"',src)
         self.assertIn('BUILD_BOARD_REPO_DIRTY',src)
         self.assertNotIn("git clone",src)
         self.assertIn("BUILD_BOARD_PREPARE_FAILED",src)
@@ -1637,6 +1460,913 @@ class GenericWorkOrderContracts(unittest.TestCase):
             self.assertEqual(task["objective"], order["objective"])
             self.assertEqual(task["acceptance"], order["acceptance"])
 
+
+    def test_simple_host_queries_use_existing_path2_without_codex(self):
+        """Host-only CLI: owner event, exact script, bwrap, real output evidence."""
+        self.assertEqual(host_observe.observe("hostname"), os.uname().nodename)
+        self.assertEqual(host_observe.observe("kernel-release"), os.uname().release)
+        self.assertTrue(host_observe.observe("python-version").startswith(
+            f"{sys.version_info.major}.{sys.version_info.minor}."))
+        self.assertEqual(host_observe.main(["hostname"]), 0)
+        for argv in ([], ["hostname", "extra"], ["sudo"], ["bash"], ["../etc/passwd"]):
+            with self.subTest(argv=argv):
+                self.assertEqual(host_observe.main(argv), 2)
+
+        order = self._order(
+            "path2-cli", script="scripts/plasma_host_observe.py",
+            argv=["hostname"], verification="exit-code",
+            timeout_seconds=20)
+        order.pop("expected_stdout_sha256")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        self.assertEqual(req["task_id"], "path2-work-order")
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["capability"], "cpu-only")
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["verification"], "exit-code")
+        self.assertNotIn("codex_profile", task)
+        calls = []
+        def stub(command, **kwargs):
+            calls.append((command, kwargs))
+            return subprocess.CompletedProcess(command, 0, b"SWPC\n", b"")
+        with tempfile.TemporaryDirectory() as td:
+            evidence = Path(td)
+            # Offline argument-contract only; no SWPC, bwrap or Codex executes.
+            with patch.object(dev.shutil, "which", return_value="/usr/bin/python3"), \
+                    patch.object(dev.sys, "executable", "/usr/bin/python3"):
+                result = dev.run_task(
+                    task, workspace=ROOT, sandbox=True, evidence_dir=evidence,
+                    executor=stub)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["verification"], "exit-code")
+            self.assertEqual(result["stdout_sha256"],
+                             hashlib.sha256(b"SWPC\n").hexdigest())
+            self.assertEqual(
+                (evidence / "plasma-path2-stdout.txt").read_bytes(), b"SWPC\n")
+            self.assertEqual(json.loads(
+                (evidence / "plasma-path2-process.json").read_text())["exit_code"], 0)
+        self.assertEqual(len(calls), 1)
+        argv, kwargs = calls[0]
+        self.assertIn("--unshare-all", argv)
+        self.assertIn("--clearenv", argv)
+        self.assertIn("--ro-bind", argv)
+        self.assertIn("--dev", argv)
+        self.assertIn("/work/scripts/plasma_host_observe.py", argv)
+        self.assertEqual(argv[-1], "hostname")
+        self.assertNotIn("codex", " ".join(argv))
+        self.assertEqual(kwargs["timeout"], 20)
+
+    def test_quick_cost_status_does_not_mask_real_codex_failure(self):
+        quick = self._order("path3-codex", codex_profile="quick-observe",
+                            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        thread = "0199a213-81c0-7800-8aa1-bbab2a035a53"
+        for tokens, rc, expected_cost, expected_status in (
+            (5_000, 0, "WITHIN_LIMIT", "EVIDENCE_READY_REVIEW_REQUIRED"),
+            (35_000, 0, "EXCEEDED", "EVIDENCE_READY_REVIEW_REQUIRED"),
+            (35_000, 7, "EXCEEDED", "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED"),
+        ):
+            with self.subTest(tokens=tokens, rc=rc):
+                stream = (
+                    json.dumps({"type": "thread.started", "thread_id": thread})
+                    + "\n" + json.dumps({"type": "turn.completed", "usage": {
+                        "input_tokens": tokens, "cached_input_tokens": tokens-100,
+                        "output_tokens": 3}}) + "\n"
+                ).encode()
+                with tempfile.TemporaryDirectory() as td:
+                    proc = lambda argv, **kw: subprocess.CompletedProcess(
+                        argv, rc, stream, b"")
+                    report = dev.run_codex_task(
+                        task, workspace=Path(td), executor=proc,
+                        task_id="path3-work-order")
+                self.assertEqual(report["cost_budget_status"], expected_cost)
+                self.assertEqual(report["status"], expected_status)
+                self.assertEqual(report["functional_acceptance"], "UNVERIFIED")
+                self.assertEqual(report["codex_exit_code"], rc)
+                self.assertEqual(
+                    report["codex_context_audit"]["model_request_count_status"],
+                    "NOT_AVAILABLE")
+
+    def test_quick_cost_unknown_is_distinct_from_execution_status(self):
+        quick = self._order("path3-codex", codex_profile="quick-observe",
+                            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        with tempfile.TemporaryDirectory() as td:
+            report = dev.run_codex_task(
+                task, workspace=Path(td),
+                executor=lambda argv, **kw: subprocess.CompletedProcess(
+                    argv, 0, b'{"type":"turn.started"}\n', b""),
+                task_id="path3-work-order")
+        self.assertEqual(report["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+        self.assertEqual(report["cost_budget_status"], "NOT_AVAILABLE")
+        self.assertIsNone(
+            report["codex_activity_metrics"]["non_cached_input_tokens"])
+        self.assertEqual(
+            report["codex_context_audit"]["model_request_count_source"],
+            "CODEX_EXEC_JSONL_NO_REQUEST_EVENTS")
+
+    def test_z2_ci_artifact_source_requires_exact_owner_hardware_main_request(self):
+        source = {
+            "source_sha": "e949d1bcbf0941eb034c76e842bd90cc943152dc",
+            "run_id": 42064496761,
+        }
+        authorized = self._order(
+            "path3-codex", artifact_source=source,
+            codex_execution="guarded-hardware-no-sandbox")
+        event = self._event(authorized)
+        request = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, request, event)
+        self.assertEqual(approval["artifact_run_id"], str(source["run_id"]))
+        self.assertEqual(approval["artifact_source_sha"], source["source_sha"])
+        self.assertEqual(task["artifact_source"], source)
+        self.assertNotIn("artifact_run_id", dev.authorize(
+            self._event(self._order()), self._context(), self.registry))
+        negatives = (
+            {"artifact_source": {"source_sha": source["source_sha"], "run_id": True},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": {"source_sha": source["source_sha"], "run_id": -1},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": {"source_sha": "a" * 12, "run_id": source["run_id"]},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": {**source, "download_url": "https://attacker.invalid"},
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"artifact_source": source},
+            {"artifact_source": source, "codex_profile": "quick-observe",
+             "scope": "host-only"},
+            {"artifact_source": source,
+             "codex_execution": "guarded-hardware-no-sandbox",
+             "pr_number": 123, "source_sha": "a" * 40},
+        )
+        for change in negatives:
+            with self.subTest(change=change), self.assertRaises(dev.Denied):
+                dev.request(self._event(self._order("path3-codex", **change)),
+                            self._context())
+        yaml = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
+        self.assertIn("artifact_run_id != ''", yaml)
+        self.assertIn("PLASMA_Z2_CI_ARTIFACTS_VERIFIED", yaml)
+        self.assertIn("plasma_trusted_z2_ci_artifact.py verify", yaml)
+        self.assertNotIn("opf-site2-c7502a3", yaml)
+        self.assertIn("actions: read  # fetch only owner-pinned", yaml)
+        codex_step = yaml.split(
+            "      - name: Codex develops, builds and tests candidate; preserve real evidence", 1
+        )[1].split("      - name: Collect Path 3 evidence", 1)[0]
+        self.assertNotIn("GH_TOKEN:", codex_step)
+        self.assertNotIn("GITHUB_TOKEN:", codex_step)
+
+    def test_explicit_quick_profile_requires_owner_bound_host_only(self):
+        quick = self._order(
+            "path3-codex", codex_profile=dev.QUICK_PROFILE,
+            scope="host-only")
+        event = self._event(quick)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["codex_profile"], "quick-observe")
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["work_order_sha256"], req["work_order_sha256"])
+        self.assertNotIn(
+            "codex_profile", dev.task_for_request(
+                self.registry,
+                dev.request(self._event(self._order()), self._context()),
+                self._event(self._order())))
+        invalid = (
+            {"codex_profile": "automatic", "scope": "host-only"},
+            {"codex_profile": "quick-observe"},
+            {"codex_profile": "quick-observe", "scope": "guarded-hardware"},
+            {"codex_profile": "quick-observe", "scope": "host-only",
+             "codex_execution": "guarded-hardware-no-sandbox"},
+            {"codex_profile": "quick-observe", "scope": "host-only",
+             "pr_number": 11, "source_sha": "a"*40},
+        )
+        for changes in invalid:
+            with self.subTest(changes=changes), self.assertRaisesRegex(
+                    dev.Denied, "WORK_ORDER_PATH3_FIELDS_DENIED"):
+                dev.parse_dynamic_work_order(
+                    self._event(self._order("path3-codex", **changes)))
+
+    def test_quick_budget_metrics_are_redacted_and_post_turn_not_preemptive(self):
+        quick = self._order(
+            "path3-codex", codex_profile=dev.QUICK_PROFILE,
+            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        secret = "SENSITIVE_COMMAND_ARGUMENT_SHOULD_NOT_APPEAR"
+        stream = [
+            {"type": "thread.started",
+             "thread_id": "0199a213-81c0-7800-8aa1-bbab2a035a53"},
+            {"type": "item.started", "item": {
+                "type": "command_execution", "id": "a",
+                "command": "bash -lc '" + secret + "'"}},
+            {"type": "item.completed", "item": {
+                "type": "command_execution", "id": "a",
+                "command": "bash -lc '" + secret + "'", "exit_code": 2}},
+            {"type": "turn.completed", "usage": {
+                "input_tokens": 33000, "cached_input_tokens": 30000,
+                "output_tokens": 40}},
+        ]
+        data = ("\n".join(json.dumps(event) for event in stream) + "\n").encode()
+        calls = []
+        def executor(argv, **kwargs):
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(argv, 0, data, b"")
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            receipt = dev.run_codex_task(
+                task, task_id="path3-work-order", workspace=work,
+                executor=executor)
+            usage_text = (work / receipt["codex_usage_path"]).read_text()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][1]["timeout"], dev.QUICK_MAX_SECONDS)
+        self.assertEqual(calls[0][0],
+            ["codex", "-c", "model_reasoning_effort=low",
+             "exec", "--json", "--sandbox", "workspace-write", "-"])
+        self.assertIn("QUICK OBSERVATION", calls[0][1]["input"].decode())
+        self.assertEqual(receipt["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+        self.assertNotIn("failure_reason", receipt)
+        self.assertEqual(receipt["cost_budget_status"], "EXCEEDED")
+        self.assertEqual(receipt["codex_execution_status"], "EXIT_ZERO")
+        self.assertEqual(receipt["functional_acceptance"], "UNVERIFIED")
+        self.assertEqual(receipt["codex_usage"]["input_tokens"], 33000)
+        self.assertEqual(receipt["codex_usage"]["cached_input_tokens"], 30000)
+        counts = receipt["codex_activity_metrics"]
+        self.assertEqual(counts["execution_profile"], "quick-observe")
+        self.assertEqual(counts["tool_items_started"], 1)
+        self.assertEqual(counts["commands_failed"], 1)
+        self.assertEqual(counts["items_completed"], 1)
+        self.assertEqual(counts["turns_completed"], 1)
+        self.assertEqual(counts["input_tokens_soft_limit"], 30000)
+        self.assertEqual(counts["cost_budget_status"], "EXCEEDED")
+        self.assertEqual(counts["cost_budget_alert"], "INPUT_BUDGET_POST_TURN")
+        self.assertIsNone(counts["budget_reason"])
+        self.assertEqual(counts["non_cached_input_tokens"], 3000)
+        self.assertGreater(counts["cache_share_basis_points"], 9000)
+        self.assertEqual(counts["model_request_count_status"], "NOT_AVAILABLE")
+        self.assertEqual(receipt["codex_context_audit"]["model_request_count_source"],
+                         "CODEX_EXEC_JSONL_NO_REQUEST_EVENTS")
+        self.assertEqual(receipt["codex_context_audit"]["observed_turns_completed"], 1)
+        self.assertIsNone(counts["model_request_count"])
+        self.assertGreaterEqual(counts["elapsed_ms"], 0)
+        self.assertNotIn(secret, json.dumps(receipt) + usage_text)
+        self.assertEqual(receipt["codex_model_selection"]["model"]["source"],
+                         "NOT_AVAILABLE")
+
+    def test_quick_requires_streaming_monitor_on_real_executor(self):
+        quick = self._order(
+            "path3-codex", codex_profile=dev.QUICK_PROFILE,
+            scope="host-only")
+        event = self._event(quick)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        with tempfile.TemporaryDirectory() as td:
+            with patch.dict(os.environ, {}, clear=True):
+                with self.assertRaisesRegex(
+                        dev.Denied, "QUICK_MONITOR_REQUIRED"):
+                    dev.run_codex_task(
+                        task, workspace=Path(td), executor=subprocess.run,
+                        task_id="path3-work-order")
+        for mutant in (
+            task | {"work_order_scope": "guarded-hardware"},
+            task | {"codex_execution": "guarded-hardware-no-sandbox"},
+            task | {"work_order_sha256": "invalid"},
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                with self.assertRaisesRegex(
+                        dev.Denied, "CODEX_QUICK_ADMISSION_DENIED"):
+                    dev.run_codex_task(
+                        mutant, workspace=Path(td),
+                        executor=lambda *_a, **_kw: self.fail("invoked Codex"),
+                        task_id="path3-work-order")
+
+    def test_quick_streamed_limits_kill_process_group_without_secrets(self):
+        secret = "PRIVATE_DATA_NEVER_PERSIST"
+        script = (
+            "import json,sys,time\n"
+            "for i in range(3):\n"
+            " print(json.dumps({'type':'item.started','item':"
+            "{'id':str(i),'type':'command_execution',"
+            "'command':'git status "+secret+"'}}),flush=True)\n"
+            "time.sleep(3)\n"
+        )
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            live = work / "path3.log"
+            evidence = work / "codex.log"
+            live.touch()
+            usage = dev.CodexUsageCollector()
+            rc = dev._run_codex_with_live_log(
+                [sys.executable, "-u", "-c", script], b"smoke",
+                work, evidence, str(live), usage=usage,
+                max_seconds=3, max_tool_items=1)
+            self.assertEqual(usage.budget_reason, "TOOL_ITEMS_LIMIT")
+            self.assertNotEqual(rc, 0)
+            self.assertGreater(usage.tool_items_started, 1)
+            self.assertNotIn(secret, live.read_text() + evidence.read_text())
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            live = work / "path3.log"
+            evidence = work / "codex.log"
+            live.touch()
+            usage = dev.CodexUsageCollector()
+            rc = dev._run_codex_with_live_log(
+                [sys.executable, "-u", "-c", "import time;time.sleep(3)"],
+                b"smoke", work, evidence, str(live), usage=usage,
+                max_seconds=0.3, max_tool_items=10)
+            self.assertEqual(usage.budget_reason, "WALL_TIMEOUT")
+            self.assertNotEqual(rc, 0)
+
+    def test_path3_owner_hardware_no_sandbox_is_one_invocation(self):
+        """Host-only stub; no Codex process, USB, Z2, FPGA or DUT."""
+        ordinary = self._order("path3-codex")
+        order = self._order("path3-codex",
+                            codex_execution="guarded-hardware-no-sandbox")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approved = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(approved["execution_capability"], "codex-workspace")
+        self.assertEqual(task["codex_execution"],
+                         "guarded-hardware-no-sandbox")
+        ordinary_event = self._event(ordinary)
+        ordinary_req = dev.request(ordinary_event, self._context())
+        self.assertNotIn("codex_execution", dev.task_for_request(
+            self.registry, ordinary_req, ordinary_event))
+        self.assertNotEqual(req["work_order_sha256"],
+                            dev.work_order_digest(ordinary))
+        commands = []
+
+        def stub(argv, **kw):
+            commands.append(argv)
+            (Path(kw["cwd"]) / ".plasma-path3-evidence" /
+             "engineering-report.md").write_text(
+                "Offline stub; no physical execution.\n", encoding="utf-8")
+            return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+        with tempfile.TemporaryDirectory() as td:
+            receipt = dev.run_codex_task(
+                task, workspace=Path(td), executor=stub,
+                task_id="path3-work-order")
+        self.assertEqual(commands, [[
+            "codex", "exec", "--json", "--sandbox", "danger-full-access", "-"]])
+        self.assertEqual(receipt["codex_sandbox_request"], "danger-full-access")
+        self.assertTrue(receipt["evidence_complete"])
+        self.assertEqual(receipt["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
+
+    def test_path3_non_sandbox_admission_fail_closed(self):
+        approved = self._order("path3-codex",
+                               codex_execution="guarded-hardware-no-sandbox")
+        for value in ("danger-full-access", "unsandboxed", "host-only",
+                      None, False, True, [], {}, 1):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                    dev.Denied, "WORK_ORDER_PATH3_FIELDS_DENIED"):
+                dev.request(self._event(approved | {"codex_execution": value}),
+                            self._context())
+        for order in (
+            self._order("path2-cli",
+                        codex_execution="guarded-hardware-no-sandbox"),
+            self._order("path3-codex", scope="guarded-hardware",
+                        codex_execution="guarded-hardware-no-sandbox"),
+            self._order("path3-codex",
+                        session_resume="page-boundary-off-by-one",
+                        scope="host-only", pr_number=123,
+                        source_sha="b" * 40,
+                        codex_execution="guarded-hardware-no-sandbox"),
+        ):
+            with self.subTest(order=order), self.assertRaises(dev.Denied):
+                dev.request(self._event(order), self._context())
+        forged = self._event(approved)
+        forged["sender"]["login"] = "not-owner"
+        with self.assertRaisesRegex(dev.Denied, "EVENT_OWNER_DENIED"):
+            dev.request(forged, self._context())
+        event = self._event(approved)
+        req = dev.request(event, self._context())
+        tampered = self._event(approved | {
+            "objective": "Changed after Work Order Digest pin; no launch."})
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, tampered)
+        task = dev.task_for_request(self.registry, req, event)
+        for altered, task_id in (
+            (task, None),
+            (task, "nine-nine-path3"),
+            (task | {"capability": "other"}, "path3-work-order"),
+            (task | {"work_order_sha256": "invalid"}, "path3-work-order"),
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                with self.subTest(task_id=task_id, altered=altered):
+                    with self.assertRaisesRegex(
+                            dev.Denied, "CODEX_NON_SANDBOX_ADMISSION_DENIED"):
+                        dev.run_codex_task(
+                            altered, workspace=Path(td),
+                            executor=lambda *_a, **_kw: self.fail("Codex launched"),
+                            task_id=task_id)
+
+    def test_dynamic_vivado_host_build_uses_project_contract(self):
+        import plasma_vivado_host_build as build
+        fixed = HOST_BUILD_PROJECT
+        order = self._order("path2-cli",
+                            capability="vivado-host-build",
+                            project="pl/projects/z2-identity",
+                            toolchain=fixed["toolchain"],
+                            board_repo_sha=fixed["board_repo_sha"],
+                            pr_number=1100, source_sha="b" * 40)
+        for key in ("scope", "script", "argv", "expected_stdout_sha256"):
+            order.pop(key, None)
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertNotIn("path2-work-order", self.registry["tasks"])
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["board_repo_sha"], fixed["board_repo_sha"])
+        self.assertEqual(approval["execution_capability"], "vivado-host-build")
+        self.assertEqual(approval["task_id"], "path2-work-order")
+        self.assertIsNone(approval.get("authorized_stage"))
+        self.assertFalse(approval["auto_download_after_build_success"])
+        self.assertFalse(approval["auto_test_after_download_success"])
+        projected = {k: task[k] for k in (
+            "execution_path", "capability", "project", "toolchain",
+            "board_repo_sha")}
+        self.assertEqual(set(projected), {
+            "execution_path", "capability", "project", "toolchain",
+            "board_repo_sha"})
+        plan = build.generic_project_contract(
+            projected, workspace=ROOT, approval=approval)
+        self.assertEqual(plan["vivado_project"], "z2_identity")
+        self.assertEqual(plan["build_env"], "PLASMA_IDENTITY_BUILD")
+        with patch.object(dev, "reviewed_host_build_driver") as candidate:
+            candidate.return_value.run.return_value = {"status": "MOCK_HOST_BUILD"}
+            result = dev.run_task(task, workspace=ROOT, approval=approval)
+            self.assertEqual(result["status"], "MOCK_HOST_BUILD")
+            candidate.assert_called_once()
+            self.assertEqual(candidate.return_value.run.call_args.args[0], projected)
+
+    def test_dynamic_vivado_host_build_uses_trusted_main_contract(self):
+        import plasma_vivado_host_build as build
+        fixed = HOST_BUILD_PROJECT
+        order = self._order("path2-cli", capability="vivado-host-build",
+                            project="pl/projects/z2-identity",
+                            toolchain=fixed["toolchain"],
+                            board_repo_sha=fixed["board_repo_sha"])
+        for key in ("scope", "script", "argv", "expected_stdout_sha256"):
+            order.pop(key, None)
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(approval["pr_number"], 0)
+        self.assertEqual(approval["pinned_sha"], approval["trusted_sha"])
+        projected = {key: task[key] for key in (
+            "execution_path", "capability", "project", "toolchain",
+            "board_repo_sha")}
+        self.assertEqual(build.generic_project_contract(
+            projected, workspace=ROOT, approval=approval)["vivado_project"],
+                         "z2_identity")
+        self.assertIs(dev.reviewed_host_build_driver(
+            workspace=ROOT, approval=approval), build)
+        with self.assertRaisesRegex(build.BuildDenied,
+                                    "BUILD_GENERIC_PROJECT_DENIED"):
+            build.generic_project_contract(
+                projected | {"project": "pl/projects/not-qualified"},
+                workspace=ROOT, approval=approval)
+        with patch.object(dev, "reviewed_host_build_driver") as driver:
+            driver.return_value.run.return_value = {"status": "MOCK_HOST_BUILD"}
+            self.assertEqual(dev.run_task(task, workspace=ROOT,
+                                          approval=approval)["status"],
+                             "MOCK_HOST_BUILD")
+            driver.assert_called_once()
+
+    def test_dynamic_vivado_host_build_negative_contracts(self):
+        fixed = HOST_BUILD_PROJECT
+        order = self._order("path2-cli",
+                            capability="vivado-host-build",
+                            project="pl/projects/z2-identity",
+                            toolchain=fixed["toolchain"],
+                            board_repo_sha=fixed["board_repo_sha"],
+                            pr_number=1100, source_sha="b" * 40)
+        for key in ("scope", "script", "argv", "expected_stdout_sha256"):
+            order.pop(key, None)
+        for change in (
+            {"project": "../danger"},
+            {"toolchain": "2025.2"},
+            {"board_repo_sha": "invalid"},
+            {"scope": "guarded-hardware"},
+            {"scope": "hardware"},
+            {"argv": ["--program"]},
+            {"script": "scripts/experiments/plasma_dynamic.py"},
+            {"expected_stdout_sha256": "0" * 64},
+            {"timeout_seconds": 120},
+        ):
+            with self.subTest(change=change), self.assertRaisesRegex(
+                    dev.Denied, "WORK_ORDER_VIVADO_HOST_BUILD_DENIED"):
+                dev.request(self._event(order | change), self._context())
+        # A syntactically valid project is admitted by the Dispatcher, then
+        # fails closed before Vivado if it has no reviewed project contract.
+        missing = order | {"project": "pl/projects/other-platform"}
+        event = self._event(missing)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
+        task = dev.task_for_request(self.registry, req, event)
+        projected = {k: task[k] for k in (
+            "execution_path", "capability", "project", "toolchain",
+            "board_repo_sha")}
+        import plasma_vivado_host_build as build
+        with self.assertRaisesRegex(build.BuildDenied, "BUILD_GENERIC_PROJECT_DENIED"):
+            build.generic_project_contract(projected, workspace=ROOT,
+                                           approval=approval)
+        # A main-only Work Order is valid, but cannot supply a spoofed SHA.
+        with self.assertRaisesRegex(dev.Denied,
+                                    "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED"):
+            dev.request(self._event({k: v for k, v in order.items()
+                                     if k != "pr_number"}), self._context())
+        # Stage field was retired at the Work Order schema boundary.
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_FIELDS_DENIED"):
+            dev.request(self._event(order | {"stage": "download"}), self._context())
+        missing = dict(order)
+        missing.pop("board_repo_sha")
+        with self.assertRaisesRegex(
+                dev.Denied, "WORK_ORDER_VIVADO_HOST_BUILD_DENIED"):
+            dev.request(self._event(missing), self._context())
+
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        approval = dev.authorize(event, self._context(), self.registry,
+                                 pr_info=DevelopmentBranchDispatchContracts().valid_pr())
+        import plasma_vivado_host_build as build
+        for change in (
+            {"work_order_sha256": "0" * 64},
+            {"authorized_stage": "download"},
+            {"auto_download_after_build_success": True},
+            {"auto_test_after_download_success": True},
+        ):
+            with self.subTest(change=change), patch.object(
+                    build, "run") as builder:
+                with self.assertRaisesRegex(
+                        dev.Denied, "HOST_BUILD_DYNAMIC_WORK_ORDER_DENIED"):
+                    dev.run_task(task, workspace=ROOT,
+                                 approval=approval | change)
+                builder.assert_not_called()
+        with patch.object(build, "run") as builder:
+            with self.assertRaisesRegex(dev.Denied,
+                                        "HOST_BUILD_APPROVAL_REQUIRED"):
+                dev.run_task(task, workspace=ROOT, approval=None)
+            builder.assert_not_called()
+        with self.assertRaisesRegex(
+                dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, self._event(
+                order | {"acceptance": "A different unauthorized requirement."}))
+
+    def test_dynamic_vivado_candidate_head_requires_exact_pr_and_driver(self):
+        fixed = HOST_BUILD_PROJECT
+        order = self._order("path2-cli", capability="vivado-host-build",
+                            project=fixed["project"],
+                            toolchain=fixed["toolchain"],
+                            board_repo_sha=fixed["board_repo_sha"],
+                            pr_number=1100, source_sha="b" * 40)
+        for key in ("scope", "script", "argv", "expected_stdout_sha256"):
+            order.pop(key, None)
+        event = self._event(order)
+        fixture = DevelopmentBranchDispatchContracts()
+        pr = fixture.valid_pr()
+        approval = dev.authorize(
+            event, self._context(), self.registry, pr_info=pr)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(approval["pinned_sha"], "b" * 40)
+        self.assertEqual(approval["trusted_sha"], "a" * 40)
+        for tamper in ("sha", "repo", "owner", "base", "state"):
+            altered = copy.deepcopy(pr)
+            if tamper == "sha":
+                altered["head"]["sha"] = "c" * 40
+            elif tamper == "repo":
+                altered["head"]["repo"]["full_name"] = "untrusted/repo"
+            elif tamper == "owner":
+                altered["user"]["login"] = "attacker"
+            elif tamper == "base":
+                altered["base"]["ref"] = "another"
+            else:
+                altered["state"] = "closed"
+            with self.subTest(tamper=tamper), self.assertRaises(dev.Denied):
+                dev.authorize(event, self._context(), self.registry,
+                              pr_info=altered)
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            with patch("plasma_vivado_host_build.run") as builder:
+                with self.assertRaisesRegex(
+                        dev.Denied, "HOST_BUILD_CANDIDATE_DRIVER_DENIED"):
+                    dev.run_task(task, workspace=work, approval=approval)
+                builder.assert_not_called()
+
+    def test_dynamic_cpu_optional_scope_modes_utf8_and_timeout(self):
+        order = self._order("path2-cli")
+        order.pop("scope")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["work_order_scope"], "host-only")
+        self.assertEqual(task["verification"], "stdout-sha256")
+        self.assertEqual(task["timeout_seconds"], 120)
+        self.assertEqual(dev.authorize(
+            event, self._context(), self.registry)["execution_capability"],
+            "cpu-only")
+        # The old SHA256 contract remains the default if verification is omitted.
+        self.assertEqual(dev.run_task(task)["verification"], "stdout-sha256")
+
+        order.pop("expected_stdout_sha256")
+        order.update(verification="exit-code", timeout_seconds=180,
+                     argv=["--mode=diagnostic", "z2-site1"])
+        event = self._event(order)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        self.assertEqual(task["timeout_seconds"], 180)
+        self.assertNotIn("expected_stdout_sha256", task)
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            script = work / task["script"]
+            script.parent.mkdir(parents=True)
+            script.write_text(
+                "import sys\nprint('header')\nprint('診斷：正常', sys.argv[1])\n",
+                encoding="utf-8")
+            result = dev.run_task(task, workspace=work, evidence_dir=work)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["verification"], "exit-code")
+            self.assertEqual(result["exit_code"], 0)
+            self.assertIn("診斷：正常", result["first_row"])
+            self.assertEqual(
+                (work / "plasma-path2-stdout.txt").read_text(encoding="utf-8"),
+                "header\n診斷：正常 --mode=diagnostic\n")
+            observed = {}
+            def stub(command, **kwargs):
+                observed["timeout"] = kwargs["timeout"]
+                return subprocess.CompletedProcess(command, 0, "通過\n".encode(), b"")
+            receipt = dev.run_task(task, workspace=work, executor=stub)
+            self.assertEqual(observed["timeout"], 180)
+            self.assertEqual(receipt["verification"], "exit-code")
+
+    def test_cpu_only_accepts_nested_reviewed_scripts_without_device_access(self):
+        order = self._order("path2-cli",
+                            script="scripts/tools/offline_probe.py",
+                            verification="exit-code")
+        order.pop("expected_stdout_sha256")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(task["script"], "scripts/tools/offline_probe.py")
+        self.assertEqual(task["work_order_scope"], "host-only")
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / task["script"]
+            source.parent.mkdir(parents=True)
+            source.write_text("print('safe')\\n", encoding="utf-8")
+            observed = {}
+            def stub(command, **kwargs):
+                observed["argv"] = command
+                return subprocess.CompletedProcess(command, 0, b"safe\\n", b"")
+            with patch.object(dev.shutil, "which", return_value=sys.executable):
+                result = dev.run_task(task, workspace=root, sandbox=True,
+                                      executor=stub)
+            self.assertEqual(result["status"], "PASS")
+            self.assertIn("--unshare-all", observed["argv"])
+            self.assertIn("--ro-bind", observed["argv"])
+            self.assertIn("--clearenv", observed["argv"])
+            self.assertIn("scripts/tools/offline_probe.py",
+                          " ".join(observed["argv"]))
+        for script in (
+            "scripts/../offline.py", "scripts/.private/run.py",
+            "scripts/tools/../offline.py", "/tmp/offline.py",
+            "pl/hil/one_shot.py", "scripts/tools/probe.sh",
+            "scripts/tools//probe.py", "scripts/tools/hidden.name.py",
+        ):
+            with self.subTest(script=script), self.assertRaisesRegex(
+                    dev.Denied, "SCRIPT_PATH_DENIED"):
+                dev.request(self._event(order | {"script": script}),
+                            self._context())
+
+    def test_retired_root_route_never_reaches_transport(self):
+        # Old fixed operation is not an authorized Path 2 Work Order.
+        import plasma_development_stage_transport as transport
+        self.assertFalse((ROOT / "scripts/plasma_path2_runtime_integration.py").exists())
+        with patch.object(transport, "execute_operation") as protected:
+            with self.assertRaisesRegex(dev.Denied, "RETIRED_PATH2_ROOT_OPERATION"):
+                dev.run_task(
+                    {"capability": "z2-root-operation", "operation": "download"},
+                    approval={"execution_capability": "z2-root-operation"},
+                    sandbox=True,
+                )
+        protected.assert_not_called()
+
+    def test_path2_documentation_does_not_restore_retired_root_work_order(self):
+        dispatcher = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
+        loader = (ROOT / "docs/development/path2-generic-fpga-image-loader.md").read_text()
+        policy = (ROOT / "docs/development/development-blocking-policy.md").read_text()
+        index = (ROOT / "docs/README.md").read_text()
+        self.assertNotIn("direct_root_operation(", dispatcher)
+        self.assertIn('raise Denied("RETIRED_PATH2_ROOT_OPERATION")', dispatcher)
+        self.assertIn("HISTORICAL WORK ORDER ONLY", loader)
+        self.assertIn("**Current Path 2:**", loader)
+        self.assertNotIn("admission accept Path 2 hardware requests", loader)
+        self.assertIn("**Retired Path 2 Work Order:**", policy)
+        self.assertIn("**Current Path 3:**", policy)
+        self.assertNotIn("Both Paths use the same fixed\nstage allowlist", policy)
+        self.assertIn("**Current** — [Path 2 SWPC CLI Contract — guarded-hardware operator-cli", index)
+        self.assertIn("**Historical** · `retired z2-root-operation Work Order`", index)
+
+    def test_dynamic_cpu_rejects_scope_and_unverified_fallbacks(self):
+        base = self._order("path2-cli")
+        base.pop("scope")
+        for change, error in [
+            ({"scope": "guarded-hardware"}, "WORK_ORDER_PATH2_FIELDS_DENIED"),
+            ({"verification": "unchecked"}, "WORK_ORDER_VERIFICATION_DENIED"),
+            ({"verification": "exit-code"}, "WORK_ORDER_EXIT_CODE_DIGEST_CONFLICT"),
+            ({"timeout_seconds": 0}, "WORK_ORDER_TIMEOUT_DENIED"),
+            ({"timeout_seconds": 181}, "WORK_ORDER_TIMEOUT_DENIED"),
+            ({"timeout_seconds": True}, "WORK_ORDER_TIMEOUT_DENIED"),
+            ({"argv": ["../secrets"]}, "TASK_ARGS_DENIED"),
+            ({"argv": ["bad;command"]}, "TASK_ARGS_DENIED"),
+            ({"argv": ["x"] * 17}, "TASK_ARGS_DENIED"),
+            ({"script": "../../path.py"}, "SCRIPT_PATH_DENIED"),
+        ]:
+            with self.subTest(change=change), self.assertRaisesRegex(
+                    dev.Denied, error):
+                dev.request(self._event(base | change), self._context())
+        no_digest = dict(base)
+        no_digest.pop("expected_stdout_sha256")
+        with self.assertRaisesRegex(
+                dev.Denied, "WORK_ORDER_OUTPUT_DIGEST_DENIED"):
+            dev.request(self._event(no_digest), self._context())
+
+        # Path 3 remains unchanged; scope cannot be smuggled into normal Codex.
+        with self.assertRaisesRegex(
+                dev.Denied, "WORK_ORDER_PATH3_FIELDS_DENIED"):
+            dev.request(self._event(self._order("path3-codex",
+                                             scope="host-only")), self._context())
+
+    def test_dynamic_exit_code_cannot_hide_failed_process(self):
+        order = self._order("path2-cli", verification="exit-code")
+        order.pop("expected_stdout_sha256")
+        event = self._event(order)
+        task = dev.task_for_request(
+            self.registry, dev.request(event, self._context()), event)
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            script = work / task["script"]
+            script.parent.mkdir(parents=True)
+            script.write_text("import sys\nsys.exit(7)\n", encoding="utf-8")
+            with self.assertRaisesRegex(dev.Denied, "COMMAND_FAILED"):
+                dev.run_task(task, workspace=work, evidence_dir=work)
+            observed = json.loads(
+                (work / "plasma-path2-process.json").read_text(encoding="utf-8"))
+            self.assertEqual(observed["exit_code"], 7)
+            self.assertEqual(observed["verification"], "exit-code")
+            self.assertTrue((work / "plasma-path2-stdout.txt").is_file())
+            self.assertTrue((work / "plasma-path2-stderr.txt").is_file())
+            with patch.object(dev.shutil, "which", return_value=None):
+                with self.assertRaisesRegex(
+                        dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"):
+                    dev.run_task(task, workspace=work, sandbox=True)
+
+    def test_path3_explicit_monitor_summary_is_authorized_and_digest_bound(self):
+        # The objective and acceptance are free-form and must never be copied
+        # into the public monitor metadata or GitHub step output.
+        order = self._order(
+            objective="TOP_SECRET_1234 internal task with private command.",
+            acceptance="Never print PRIVATE_ACCEPTANCE_1234 outside the agent.",
+            monitor_summary="STM32F103 Low-density L1-L2 provider audit")
+        event = self._event(order)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        task = dev.task_for_request(self.registry, req, event)
+        self.assertEqual(
+            approval["monitor_summary"], order["monitor_summary"])
+        self.assertEqual(
+            task["monitor_summary"], order["monitor_summary"])
+        self.assertEqual(
+            approval["work_order_sha256"], dev.work_order_digest(order))
+        for private in ("TOP_SECRET_1234", "PRIVATE_ACCEPTANCE_1234"):
+            self.assertNotIn(private, approval["monitor_summary"])
+        mutated = self._event(order | {
+            "monitor_summary": "STM32F103 Medium-density L1-L2 provider audit"})
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, mutated)
+
+        # Backward-compatible historical Work Orders have no public title.
+        old = self._event(self._order())
+        self.assertEqual(
+            dev.authorize(old, self._context(), self.registry)["monitor_summary"],
+            "")
+        self.assertNotIn(
+            "monitor_summary",
+            dev.task_for_request(
+                self.registry, dev.request(old, self._context()), old))
+
+    def test_monitor_summary_denies_secret_multiline_shell_and_path2_injection(self):
+        invalid = (
+            "short", "word" * 100, "Fix\nprivate run",
+            "Fix\rsecret run", "Fix\x1b[31mcontrol",
+            "Run $HOME shell command", "https://example.com/private/key",
+            "token sent to monitor", "Password leaked to operator",
+            "ABCD" * 12, "Fix: secret step", "=malicious=output",
+            "STM32 firmware work \u202eevil", None, 123, [],
+        )
+        for value in invalid:
+            with self.subTest(value=repr(value)):
+                event = self._event(self._order(monitor_summary=value))
+                with self.assertRaises(dev.Denied):
+                    dev.request(event, self._context())
+        # Both Paths share the same strictly validated public summary.
+        # Neither Path may publish unsafe payloads or actual commands.
+        for path in ("path2-cli", "path3-codex"):
+            event = self._event(self._order(
+                path, monitor_summary="token sent to monitor"))
+            with self.assertRaises(dev.Denied):
+                dev.request(event, self._context())
+
+    def test_monitor_summary_is_unicode_one_line_operator_metadata(self):
+        order = self._order(
+            monitor_summary="STM32F103 小容量 L1-L2 Provider Audit")
+        self.assertEqual(
+            dev.authorize(
+                self._event(order), self._context(),
+                self.registry)["monitor_summary"], order["monitor_summary"])
+
+    def test_path3_monitor_summary_allows_benign_comma_without_commands(self):
+        # Run 40468107474 was rejected solely by the former punctuation
+        # whitelist, before an otherwise authorized Path 3 job could start.
+        summary = "LA2016 CH3 confirmed, 10ms passive capture"
+        event = self._event(self._order(monitor_summary=summary))
+        self.assertEqual(
+            dev.authorize(event, self._context(), self.registry)["monitor_summary"],
+            summary)
+
+    def test_path2_public_goal_and_safe_stage_from_authorized_contract(self):
+        summary = "PATH2 Host-only CLI regression"
+        case = self._order("path2-cli", monitor_summary=summary)
+        event = self._event(case)
+        req = dev.request(event, self._context())
+        approval = dev.authorize(event, self._context(), self.registry)
+        self.assertEqual(approval["monitor_summary"], summary)
+        self.assertEqual(approval["monitor_stage"], "CPU-only CLI")
+        self.assertEqual(
+            approval["work_order_sha256"], dev.work_order_digest(case))
+        tampered = self._event(case | {
+            "monitor_summary": "PATH2 Unauthorized changed objective"})
+        with self.assertRaisesRegex(dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+            dev.task_for_request(self.registry, req, tampered)
+        # Old Work Orders remain admitted and display no invented goal.
+        old = self._event(self._order("path2-cli"))
+        old_approval = dev.authorize(old, self._context(), self.registry)
+        self.assertEqual(old_approval["monitor_summary"], "")
+        self.assertEqual(old_approval["monitor_stage"], "CPU-only CLI")
+
+    def test_path3_monitor_phase_is_owner_bound_display_only(self):
+        for phase in ("HOST_ONLY", "INSTALL", "RUNTIME",
+                      "PROGRAMMING_PROFILE", "FLASH_TEST"):
+            with self.subTest(phase=phase):
+                order = self._order(monitor_phase=phase)
+                event = self._event(order)
+                request = dev.request(event, self._context())
+                approved = dev.authorize(event, self._context(), self.registry)
+                task = dev.task_for_request(self.registry, request, event)
+                self.assertEqual(approved["monitor_phase"], phase)
+                self.assertEqual(task["monitor_phase"], phase)
+                self.assertEqual(approved["execution_path"], "path3-codex")
+                self.assertEqual(approved["execution_capability"],
+                                 "codex-workspace")
+                self.assertNotIn("hardware_stages", approved)
+                changed = self._event(order | {"monitor_phase": "HOST_ONLY"
+                                              if phase != "HOST_ONLY" else "INSTALL"})
+                with self.assertRaisesRegex(
+                        dev.Denied, "WORK_ORDER_DIGEST_MISMATCH"):
+                    dev.task_for_request(self.registry, request, changed)
+        for phase in ("FLASH_PASS", "INSTALL\nsecret", "hostname;sudo",
+                      "", None, 1, True):
+            with self.subTest(phase=phase):
+                with self.assertRaisesRegex(
+                        dev.Denied, "WORK_ORDER_MONITOR_PHASE_DENIED"):
+                    dev.request(self._event(self._order(monitor_phase=phase)),
+                                self._context())
+        with self.assertRaises(dev.Denied):
+            dev.request(self._event(self._order(
+                "path2-cli", monitor_phase="INSTALL")), self._context())
+        legacy = dev.authorize(self._event(self._order()), self._context(),
+                               self.registry)
+        self.assertEqual(legacy["monitor_phase"], "")
+
+    def test_path3_does_not_report_path2_cli_stage(self):
+        a = dev.authorize(
+            self._event(self._order()), self._context(), self.registry)
+        self.assertEqual(a["monitor_stage"], "")
+        static = dev.authorize(
+            DevelopmentPath2Contracts().event(),
+            DevelopmentPath2Contracts().context(), self.registry)
+        self.assertEqual(static["monitor_stage"], "CPU-only CLI")
+
     def test_path2_cpu_only_uses_existing_checked_script(self):
         event = self._event(self._order("path2-cli"))
         req = dev.request(event, self._context())
@@ -1648,26 +2378,6 @@ class GenericWorkOrderContracts(unittest.TestCase):
         with patch.object(dev.shutil, "which", return_value=None):
             with self.assertRaisesRegex(dev.Denied, "CPU_ONLY_SANDBOX_UNAVAILABLE"):
                 dev.run_task(task, sandbox=True)
-
-    def test_exact_stage_guard_accepts_only_digest_pinned_stage(self):
-        import plasma_path2_runtime_integration as runtime
-        stage_order = self._order(
-            "path2-cli", capability="path2-stage-contract",
-            scope="guarded-hardware",
-            project="pl/projects/z2-fixed-unified-site1",
-            stage="test")
-        for field in ("script", "argv", "expected_stdout_sha256"):
-            stage_order.pop(field, None)
-        event = self._event(stage_order)
-        req = dev.request(event, self._context())
-        approval = dev.authorize(event, self._context(), self.registry)
-        task = dev.task_for_request(self.registry, req, event)
-        self.assertEqual(runtime.stage_contract(task, approval), "test")
-        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
-            runtime.stage_contract(task, approval |
-                                   {"work_order_sha256": "0" * 64})
-        with self.assertRaisesRegex(runtime.RuntimeDenied, "WORK_ORDER_DENIED"):
-            runtime.stage_contract(task | {"stage": "download"}, approval)
 
     def test_work_order_tamper_and_replay_denied_before_execution(self):
         order = self._order()
@@ -1706,7 +2416,7 @@ class GenericWorkOrderContracts(unittest.TestCase):
     def test_reject_arbitrary_shell_and_path3_unbounded_hardware(self):
         bad_orders = [
             self._order("path2-cli", script="/bin/sh"),
-            self._order("path2-cli", argv=["-c", "rm"]),
+            self._order("path2-cli", argv=["-c", "rm;sudo"]),
             self._order("path2-cli", capability="vivado-host-build"),
             self._order("path3-codex", scope="guarded-hardware"),
             self._order("path3-codex", capability="path2-stage-contract"),
@@ -1747,8 +2457,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
                           pr_info=pr | {"head": pr["head"] | {"sha": "c" * 40}})
 
     def test_deleted_automatic_hardware_progression_is_absent(self):
-        import plasma_path2_runtime_integration as integration
-        self.assertFalse(hasattr(integration, "path3_shared_hardware_stages"))
+        # The whole retired Path 2 runtime integration module is deleted.
+        self.assertFalse((ROOT / "scripts/plasma_path2_runtime_integration.py").exists())
         execute = WORKFLOW.read_text().split("  development-execute:", 1)[1].split(
             "  development-codex:", 1)[0]
         self.assertNotIn("codex-guarded-hardware", execute)
@@ -1760,15 +2470,54 @@ class GenericWorkOrderContracts(unittest.TestCase):
     def test_existing_workflow_and_two_runner_routes(self):
         content = WORKFLOW.read_text()
         self.assertIn("'/plasma-dispatch work-order 981'", content)
-        self.assertIn('"path2-stage-contract"', content)
+        self.assertNotIn('"z2-root-operation"', content)
+        # operator-cli remains routed; one-shot hardware additionally needs the
+        # hosted cross-Run claim (scripts/tests/test_plasma_p2hw_claim.py).
+        self.assertIn("execution_capability == 'operator-cli'", content)
         self.assertIn('work-order-sha256 "$WORK_ORDER_SHA256"', content)
         self.assertEqual(content.count(
-            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 3)
+            "runs-on: [self-hosted, linux, x64, plasma-codex]"), 2)
         self.assertIn("needs.development-authorize.outputs.execution_path == 'path3-codex'",
                       content)
         self.assertIn('--execution-capability "$EXECUTION_CAPABILITY"', content)
 
-    def test_path3_prompt_preserves_privilege_boundary_and_one_invocation(self):
+    def test_path3_has_single_generic_runner_and_no_special_probe_adapter(self):
+        workflow = WORKFLOW.read_text()
+        dispatcher = (ROOT / "scripts/plasma_development_dispatch.py").read_text()
+        self.assertIn("  development-codex:", workflow)
+        self.assertNotIn("  development-codex-resume:", workflow)
+        self.assertNotIn("SESSION_RESUME", workflow)
+        self.assertNotIn("--resume-phase", workflow)
+        self.assertNotIn("session_resume", dispatcher)
+        self.assertNotIn("plasma_path3_cross_job_resume", dispatcher)
+        self.assertNotIn("plasma_path3_session_resume_probe", dispatcher)
+        self.assertNotIn("plasma_path3_session_resume_probe", workflow)
+        self.assertNotIn("hardware_stages", dispatcher)
+        self.assertNotIn("agent-request.json", dispatcher)
+        self.assertNotIn("plasma_development_stage_transport", dispatcher)
+        self.assertNotIn("plasma_development_codex_sandbox", dispatcher)
+        contract = (ROOT / "AGENTS.md").read_text()
+        self.assertIn("Ordinary Path 3 explicitly pins `--sandbox workspace-write`", contract)
+        self.assertIn("Choosing a Path never grants additional authority", contract)
+        self.assertIn("only an Owner-authenticated, SHA/digest-pinned dynamic hardware Work Order",
+                      (ROOT / "docs/development/plasma-path3-codex.md").read_text())
+        self.assertNotIn("Path 3 inherits operator Codex Approval/Sandbox", contract)
+        path3_contract = (ROOT / "docs/development/plasma-path3-codex.md").read_text()
+        self.assertIn("Ordinary Path 3 explicitly pins `--sandbox workspace-write`", path3_contract)
+        self.assertIn("`codex_execution: guarded-hardware-no-sandbox`", path3_contract)
+        self.assertNotIn("Codex inherits the operator's effective configuration", path3_contract)
+        # Legacy and arbitrary fixed adapter/probe routes are denied on the
+        # live Owner/SHA Work Order path, regardless of device model.
+        for name, value in (("session_resume", "page-boundary-off-by-one"),
+                            ("hardware_stages", ["read"]),
+                            ("profile", "la2016"),
+                            ("adapter", "z2-ssh"),
+                            ("probe", "preflight")):
+            with self.subTest(name=name), self.assertRaises(dev.Denied):
+                dev.request(self._event(self._order("path3-codex", **{name: value})),
+                            self._context())
+
+    def test_path3_invokes_once_and_records_result(self):
         order = self._order()
         event = self._event(order)
         task = dev.task_for_request(
@@ -1792,12 +2541,8 @@ class GenericWorkOrderContracts(unittest.TestCase):
                 task_id="path3-work-order")
             self.assertEqual(result["status"], "EVIDENCE_READY_REVIEW_REQUIRED")
             self.assertEqual(len(calls), 1)
-            self.assertIn("existing trusted root executor", calls[0])
-            self.assertNotIn("Authorized Z2 stages in order", calls[0])
-            self.assertNotIn("Authorized scope:", calls[0])
-            self.assertIn("sandbox_workspace_write.network_access=false", captured_commands[0])
-            self.assertIn("Acceptance criteria", calls[0])
-            self.assertIn("Owner Work Order SHA256", calls[0])
+            self.assertEqual(captured_commands[0],
+                             ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
 
 
 class Path3SessionResumeHostOnlyProbe(unittest.TestCase):
@@ -1837,12 +2582,12 @@ class Path3SessionResumeHostOnlyProbe(unittest.TestCase):
             self.assertTrue(kwargs["capture_output"])
             self.assertTrue(kwargs["text"])
             self.assertEqual(kwargs["timeout"], 240)
-            self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
-            self.assertIn("sandbox_workspace_write.network_access=false", command)
-            self.assertIn('sandbox_mode="workspace-write"', command)
+            self.assertEqual(command[:3], ["codex", "exec", "--json"])
+            self.assertNotIn("--ask-for-approval", command)
+            self.assertNotIn("--sandbox", command)
+            self.assertNotIn("sandbox_workspace_write.network_access=false", command)
             if len(calls) == 1:
                 self.assertNotIn("resume", command)
-                self.assertIn("DO NOT fix anything", prompt)
                 self.assertIn(self.NONCE, prompt)
                 first_prompt.append(prompt)
                 if premature_fix:

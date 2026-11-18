@@ -19,6 +19,8 @@ export type ProductionLogEntry = {
 
 type ProductionLogPanelProps = {
   logs: ProductionLogEntry[];
+  /** Section number in the Console chapter order (PMode: 4. FACTORY LOG). */
+  number?: number;
   title: string;
   clearLabel: string;
   onClear: () => void;
@@ -54,7 +56,7 @@ function productionLogClassification(message: string): ProductionLogClassificati
   return { category: "SYS", message };
 }
 
-export default function ProductionLogPanel({ logs, title, clearLabel, onClear }: ProductionLogPanelProps) {
+export default function ProductionLogPanel({ logs, number, title, clearLabel, onClear }: ProductionLogPanelProps) {
   const { sessionAuditEntries, clearSessionAuditEntries } = useWorkspaceSession();
   const allLogs = useMemo<OperatorLogEntry[]>(() => {
     const localLogs = logs.map(entry => {
@@ -86,6 +88,7 @@ export default function ProductionLogPanel({ logs, title, clearLabel, onClear }:
   return (
     <OperatorLogPanel
       entries={allLogs}
+      number={number}
       title={title}
       clearLabel={clearLabel}
       onClear={clearLog}

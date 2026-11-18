@@ -1,6 +1,6 @@
 # Plasma Server-side Batch Runtime
 
-Status: current server-side Batch execution baseline
+Status: current **legacy Gateway/Mock** server-side Batch execution baseline. For future canonical **Manager-owned** unified Site Scheduler/Repeat and MES Work Order quantity semantics, see [Unified 8-Site Scheduler Contract v1](unified-8site-scheduler-repeat-work-order-v1.md) (owner-approved Plan, **not implemented**). The `repeat_count` described below is **not** evidence that the current canonical Manager Batch supports `repeat > 1`.
 
 ## Purpose
 

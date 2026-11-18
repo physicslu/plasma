@@ -34,6 +34,7 @@ function logDownloadTimestamp(date: Date): string {
 
 export function OperatorLogPanel({
   entries,
+  number,
   title,
   clearLabel,
   onClear,
@@ -45,6 +46,7 @@ export function OperatorLogPanel({
   className = "",
 }: {
   entries: OperatorLogEntry[];
+  number?: number;
   title: string;
   clearLabel: string;
   onClear: () => void;
@@ -88,7 +90,7 @@ export function OperatorLogPanel({
 
   return (
     <section className={`logCard operatorLogCard ${className}`.trim()}>
-      <OperatorPanelHeader title={title} actions={actions} />
+      <OperatorPanelHeader number={number} title={title} actions={actions} />
       <div className="operatorLogFilters" role="group" aria-label={filterAriaLabel}>
         <button
           type="button"

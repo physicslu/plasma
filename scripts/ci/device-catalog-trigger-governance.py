@@ -121,6 +121,56 @@ def governed_violations() -> set[tuple[str, str]]:
     return violations
 
 
+SHARED_CANONICAL_TRIGGER_PATHS = frozenset(
+    {
+        "data/ic-support/test_coverage_inventory.py",
+        "software/python/tests/test_device_catalog.py",
+    }
+)
+
+
+def shared_canonical_trigger_violations(paths: list[str]) -> set[str]:
+    """Reject publication-specific reruns for globally owned test changes."""
+    return SHARED_CANONICAL_TRIGGER_PATHS.intersection(paths)
+
+
+def validate_shared_canonical_trigger_ownership() -> None:
+    """Keep common Canonical tests owned by their existing global workflows."""
+    ic_support = (WORKFLOWS / "ic-support-validation.yml").read_text(encoding="utf-8")
+    python_tests = (WORKFLOWS / "python-tests.yml").read_text(encoding="utf-8")
+    if (
+        trigger_paths(ic_support).count("data/ic-support/**") != 2
+        or "run: python data/ic-support/test_coverage_inventory.py" not in ic_support
+    ):
+        fail("IC Support must own coverage inventory tests on PR and main push")
+    if (
+        trigger_paths(python_tests).count("software/python/**") != 2
+        or "run: python -m pytest -q software/python/tests" not in python_tests
+    ):
+        fail("Python Tests must own runtime Catalog tests on PR and push")
+
+    publication_workflows = sorted(
+        WORKFLOWS.glob("device-catalog-stm32*-layer1-publication-*.yml")
+    )
+    if len(publication_workflows) != 12:
+        fail("expected 12 STM32 Layer-1 publication workflows; audit scope drift")
+    for workflow in publication_workflows:
+        source = workflow.read_text(encoding="utf-8")
+        redundant = shared_canonical_trigger_violations(trigger_paths(source))
+        if redundant:
+            fail(
+                f"{workflow.name}: redundant global Canonical test triggers: "
+                f"{', '.join(sorted(redundant))}"
+            )
+        body = source.split("jobs:", 1)[-1]
+        if (
+            "python scripts/ci/device-catalog-production-invariants.py" not in body
+            or "software/python/tests/test_device_catalog.py" not in body
+        ):
+            fail(f"{workflow.name}: publication acceptance steps were removed")
+    print("Device Catalog shared Canonical trigger ownership: PASS")
+
+
 def load_debt_bytes(data: bytes, *, source: str) -> set[tuple[str, str]]:
     try:
         payload = json.loads(data)
@@ -191,11 +241,15 @@ def self_test() -> None:
             "data/device-catalog/production/icpn-v1-manifest.json",
         ]
     )
+    assert shared_canonical_trigger_violations(["software/python/tests/test_device_catalog.py"])
+    assert shared_canonical_trigger_violations(["data/ic-support/test_coverage_inventory.py"])
+    assert not shared_canonical_trigger_violations(["data/device-catalog/research/stm32f2-commercial-icpn.csv"])
     print("Device Catalog CI trigger governance self-test: PASS")
 
 
 def main() -> int:
     self_test()
+    validate_shared_canonical_trigger_ownership()
     actual = governed_violations()
     debt = load_current_debt()
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -53,6 +54,7 @@ def test_z2_installer_preserves_existing_desired_state_and_bounds_privilege() ->
     spec = importlib.util.spec_from_file_location("ppu_z2_p3", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     source = path.read_text(encoding="utf-8")
     assert 'if path == config_path and existing_config.existed:' in source
@@ -121,17 +123,33 @@ def test_swpc_surrogate_reuses_p3_privilege_boundary_and_preserves_desired_state
     assert "retired SWPC host ingress is still listening" in control
 
 
-def test_release_workflows_ship_both_installer_bootstrap_files() -> None:
+def test_release_workflows_ship_one_canonical_installer() -> None:
     z2 = (ROOT / ".github/workflows/z2-ps-release.yml").read_text(encoding="utf-8")
     ppu = (ROOT / ".github/workflows/ppu-release.yml").read_text(encoding="utf-8")
     for source in (z2, ppu):
         assert "scripts/ppu-z2-installer.py" in source
-        assert "scripts/ppu-z2-installer-core.py" in source
-        assert "python -m py_compile scripts/ppu-z2-installer.py scripts/ppu-z2-installer-core.py" in source
-    assert 'cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"' in z2
-    assert 'test -f "$root/scripts/ppu-z2-installer-core.py"' in z2
-    assert 'installer_core="$output/ppu-z2-installer-core.py"' in ppu
-    assert 'sha256sum "$(basename "$installer_core")"' in ppu
+        assert "cp scripts/ppu-z2-installer-core.py" not in source
+        assert "python -m py_compile scripts/ppu-z2-installer.py" in source
+    assert "scripts/ppu-z2-installer-core.py" not in ppu
+    # Only the one-time #1433 transition: pinned old bytes as kit data, never built or run.
+    mentions = [line.strip() for line in z2.splitlines() if "ppu-z2-installer-core.py" in line]
+    assert mentions and all(
+        line.startswith('git show "$LEGACY_INSTALLER_CORE_COMMIT:scripts/ppu-z2-installer-core.py"')
+        or '"$root/scripts/ppu-z2-installer-core.py"' in line
+        or "$root/scripts/ppu-z2-installer-core.py\" | sha256sum -c -" in line
+        for line in mentions), mentions
+    assert 'cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"' in z2
+    assert 'test -f "$root/scripts/ppu-z2-installer.py"' in z2
+    assert 'sha256sum "$(basename "$installer")"' in ppu
+    assert "installer_core" not in ppu
+    # #1433: retired installer-core must not return through any canonical
+    # shipped, kit-verification or on-device Bootstrap execution path.
+    assert not (ROOT / "scripts/ppu-z2-installer-core.py").exists()
+    bootstrap_kit = (ROOT / "scripts/ppu-bootstrap-kit.py").read_text(encoding="utf-8")
+    bootstrap_service = (ROOT / "scripts/ppu-bootstrap-service.py").read_text(encoding="utf-8")
+    installer_source = (ROOT / "scripts/ppu-z2-installer.py").read_text(encoding="utf-8")
+    for source in (bootstrap_kit, bootstrap_service, installer_source):
+        assert "ppu-z2-installer-core.py" not in source
 
 
 def test_web_exposes_one_ppu_level_activation_action() -> None:

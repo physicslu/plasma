@@ -1,0 +1,12 @@
+{
+ "activation": {
+  "result": "ACTIVATED",
+  "asset_set_sha256": "957ac4e62d23507fd577300c3dc827777fa1ccddb0fffdb13911dc9e8b8d8d83",
+  "transaction_id": "bbbb6f26a9284288992ef07e776e3968"
+ },
+ "after": {
+  "state": "ACTIVE",
+  "asset_set_sha256": "957ac4e62d23507fd577300c3dc827777fa1ccddb0fffdb13911dc9e8b8d8d83",
+  "generation": 25
+ }
+}

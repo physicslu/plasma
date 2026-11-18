@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 import threading
 from http.client import HTTPConnection
-from http.server import ThreadingHTTPServer
 
 from plasma_web.device_catalog import get_default_device_catalog
-from plasma_web.gateway import PlasmaWebHandler
+from plasma_manager.server import PlasmaManagerHandler, PlasmaManagerHTTPServer
 
 EXPECTED_ICPNS = {
     "STM32F469NEH6": ("STM32F469NE", "512 KiB", "-40 to 85 C"),
@@ -35,7 +34,7 @@ def test_phase42aa_exact_icpns_are_resolved_by_runtime_catalog() -> None:
 
 
 def test_phase42aa_exact_icpns_are_exposed_by_rest_catalog() -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
+    server = PlasmaManagerHTTPServer(("127.0.0.1", 0), PlasmaManagerHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

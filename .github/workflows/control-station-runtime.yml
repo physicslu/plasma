@@ -18,11 +18,13 @@ on:
       - "!software/web/e2e/**"
       - "!software/web/tests/**"
       - "software/python/plasma_manager/**"
+      - "software/python/plasma_web/legacy_device_selector.py"
+      - "data/device-catalog/production/**"
       - "software/python/pyproject.toml"
       - "software/python/tests/test_control_station_runtime.py"
       - "software/python/tests/test_control_station_release.py"
       - "software/python/tests/test_render_deployment.py"
-      - "release/**"
+      - "release/product.json"
       - ".github/workflows/control-station-runtime.yml"
   pull_request:
     paths:
@@ -40,11 +42,13 @@ on:
       - "!software/web/e2e/**"
       - "!software/web/tests/**"
       - "software/python/plasma_manager/**"
+      - "software/python/plasma_web/legacy_device_selector.py"
+      - "data/device-catalog/production/**"
       - "software/python/pyproject.toml"
       - "software/python/tests/test_control_station_runtime.py"
       - "software/python/tests/test_control_station_release.py"
       - "software/python/tests/test_render_deployment.py"
-      - "release/**"
+      - "release/product.json"
       - ".github/workflows/control-station-runtime.yml"
 
 concurrency:

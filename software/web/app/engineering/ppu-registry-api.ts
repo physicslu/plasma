@@ -68,7 +68,6 @@ export type PPUNetworkDesiredInput = {
 export type PPUSiteDesired = {
   enabled: boolean;
   interface: string;
-  target: string;
 };
 
 export type PPUSiteActual = {

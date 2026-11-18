@@ -45,7 +45,8 @@ test("Microchip detailed information uses dynamic exact state and family-specifi
 
 test("upstream evidence projection cannot mutate qualification, mapping or runtime", async () => {
   const code = await read("../../python/plasma_web/microchip_upstream_openocd_evidence.py");
-  const gateway = await read("../../python/plasma_web/gateway.py");
+  // PR-C1: the Selector projection lives in the optional legacy adapter, not gateway.py.
+  const gateway = await read("../../python/plasma_web/legacy_device_selector.py");
   assert.match(code, /PIC32MX_BASE_DEVID\.get\(row\.base_device\)/);
   assert.match(code, /expected_devid=\{devid\}/);
   assert.match(code, /source_commit=\{PIC32_PINNED_COMMIT\}/);

@@ -144,3 +144,12 @@
   .productionProgrammingCard > header { align-items: flex-start; }
   .operatorPanelTitle { flex-wrap: wrap; }
 }
+
+/*
+ * Engineering sections 1 and 3 keep their domain body but use the shared
+ * OperatorPanelHeader, so both modes number and style every chapter title the
+ * same way. The trailing actions still own the far-right edge.
+ */
+.productionProgrammingCard > .operatorPanelHeader > .operatorPanelActions {
+  margin-left: auto;
+}

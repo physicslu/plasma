@@ -33,7 +33,6 @@ QUOTES = {
     mod.FILES[4]: (
         'COMMAND = "/plasma-codex pilot 981" verifies exact action identity against owner context.'
     ),
-    mod.FILES[5]: "docs/development/plasma-codex-pilot.md describes the verified evidence process.",
 }
 
 
@@ -98,7 +97,7 @@ class PilotAcceptanceTests(unittest.TestCase):
 
     def test_grounded_guard_tmux_evidence_success(self):
         report = mod.verify(self.root, self.out, 0)
-        self.assertEqual(report["source_file_count"], 6)
+        self.assertEqual(report["source_file_count"], 5)
         self.assertEqual(report["topics"], ["evidence", "guard", "tmux"])
         self.assertFalse(report["hardware_verified"])
         self.assertFalse(report["os_file_isolation_verified"])

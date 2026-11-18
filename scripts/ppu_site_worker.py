@@ -1,0 +1,1054 @@
+#!/usr/bin/env python3
+"""Stage C-3: single-appliance Site Worker core (one local process, Unix socket).
+
+The Worker is the ONLY path by which a non-root Package Action (C-2) may use a
+Programming Site. It is deliberately small:
+
+* one Unix stream socket, one JSON line request -> one JSON line response;
+  no TCP/HTTP, no session database (sessions live in memory: a Worker crash
+  invalidates every session by design);
+* callers are identified by Linux peer credentials, never by claims:
+  - control operations (open/close a session) are accepted ONLY from the
+    trusted Runtime process (``runtime_pid()``, e.g. plasma-server MainPID)
+    and only while the existing C-1 Job lease is held for that job
+    (``lease_verifier(job_id)``);
+  - transport operations are accepted ONLY from a process whose process
+    group is the registered Package Action process group, with the same uid;
+* operations are an adapter-declared allowlist (no shell, executable path or
+  raw MMIO read/write API); one in-flight operation per Site;
+* the trusted Runtime may also open a session for its own REST Job
+  (``open_job_session``) and run an allowlisted operation on the control
+  socket (``run``); such a session has no Package peer;
+* fail-closed: an adapter outcome that cannot be proven safe seals the Site
+  (persisted marker, never auto-retried); a live external owner is checked at
+  each admission without creating a historical seal; an FPGA identity change invalidates
+  the session; expiry / cancel / close end the session. FPGA Image management
+  belongs to the PPU Loader.
+
+The target (OpenOCD target config, Flash geometry) of a Flash operation is
+resolved by the Runtime from the selected verified Bundle Profile and bound per session;
+this core holds no IC, image ID, build or versioned path.
+
+Hardware specifics live behind a replaceable adapter (see
+``ppu_site_adapter_abi5.py``); this core knows no FPGA, address or register.
+"""
+from __future__ import annotations
+
+import base64
+import json
+import os
+import re
+import secrets
+import hashlib
+import stat
+import socket
+import struct
+import subprocess
+import threading
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Mapping, Protocol
+
+PROTOCOL = "plasma.ppu.site-worker.v3"
+MAX_REQUEST = 4096
+# Same canonical Job ID rule as plasma_core.models.JOB_ID_PATTERN (REST Jobs
+# and Package Action Jobs share it; a test keeps the two in lockstep).
+JOB_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+SESSION_ID = re.compile(r"[0-9a-f]{32}\Z")
+CONTROL_OPS = frozenset({"open_session", "open_job_session", "close_session", "status",
+                         "bind_image", "bind_range", "run"})
+# Flash operations of one bound Profile. ``programming`` runs the session's
+# ordered ``operations`` list (erase -> program -> verify) as ONE operation;
+# ``read`` is an independent operation.
+PROGRAMMING = "programming"
+SEQUENCE_OPERATIONS = ("erase", "program", "verify")
+FLASH_OPERATIONS = frozenset({PROGRAMMING, "read"})
+
+
+def parse_operations(raw: object) -> tuple[str, ...]:
+    """A legal ``programming`` list: unique, in the fixed order, never empty.
+
+    ``erase`` + ``verify`` without ``program`` has no defined expected data
+    (a blank IC can never equal the Image) and is refused.
+    """
+    _require(type(raw) in (list, tuple) and bool(raw)
+             and all(type(item) is str for item in raw)
+             and list(raw) == [op for op in SEQUENCE_OPERATIONS if op in raw],
+             "OPERATIONS_INVALID")
+    _require(list(raw) != ["erase", "verify"], "OPERATIONS_ERASE_VERIFY_UNSUPPORTED")
+    return tuple(raw)
+
+
+def needs_image(operations: tuple[str, ...]) -> bool:
+    return "program" in operations or "verify" in operations
+TARGET_CONFIG = re.compile(r"target/[A-Za-z0-9_][A-Za-z0-9._-]{0,63}(/[A-Za-z0-9_][A-Za-z0-9._-]{0,63}){0,3}\.cfg\Z")
+MAX_SESSION_S = 3600
+OWNER_PACKAGE = "package_action"
+OWNER_REST_JOB = "rest_job"
+
+
+class SiteWorkerDenied(Exception):
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+class TransportDenied(Exception):
+    """Adapter refused BEFORE touching hardware (Site stays usable)."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+class TransportUnknown(Exception):
+    """Hardware outcome cannot be proven safe: the Site must be sealed."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+class TransportFailed(Exception):
+    """Operation failed after the adapter proved release and SAFE_OFF."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class FlashProfile:
+    """Runtime-resolved Bundle Flash target, bound once per session."""
+    icpn: str
+    target_config: str
+    flash_base: int
+    flash_size: int
+    erase_granularity: int
+    # Bundle Profile SWD clock; None retains the selected Engine default.
+    clock_hz: int | None = None
+
+    def erase_length(self, size: int) -> int:
+        """Image size rounded up to whole erase units."""
+        unit = self.erase_granularity
+        return -(-size // unit) * unit
+
+    def flash_window(self, load_address: object, size: object) -> tuple[int, int]:
+        """(erase_address, erase_length) for one Image at the Job address.
+
+        ``flash_base`` is only the physical start of the Flash bank; the Job
+        Binding's ``load_address`` is where this Job writes. Both the Image and
+        its whole rounded-up erase range must lie inside the bank, start on an
+        erase boundary and be non-empty. Raises SiteWorkerDenied.
+        """
+        _require(type(load_address) is int and type(size) is int, "FLASH_RANGE_INVALID")
+        end = self.flash_base + self.flash_size
+        _require(size > 0 and self.flash_base <= load_address < end
+                 and (load_address - self.flash_base) % self.erase_granularity == 0,
+                 "FLASH_RANGE_INVALID")
+        length = self.erase_length(size)
+        _require(length >= size and load_address + length <= end, "FLASH_RANGE_INVALID")
+        return load_address, length
+
+
+@dataclass(frozen=True)
+class FlashImage:
+    """Exact Job Image bytes bound to the Job's verified write address."""
+    profile: FlashProfile
+    payload: bytes
+    sha256: str
+    load_address: int
+
+    def __post_init__(self) -> None:
+        self.profile.flash_window(self.load_address, len(self.payload))
+
+    @property
+    def icpn(self) -> str:
+        return self.profile.icpn
+
+    @property
+    def erase_range(self) -> tuple[int, int]:
+        return self.profile.flash_window(self.load_address, len(self.payload))
+
+
+@dataclass(frozen=True)
+class FlashRange:
+    """Exact Job range of an ``erase`` or ``read`` (no Image), bound once."""
+    profile: FlashProfile
+    operation: str
+    address: int
+    length: int
+
+    def __post_init__(self) -> None:
+        profile = self.profile
+        _require(self.operation in ("erase", "read") and type(self.address) is int
+                 and type(self.length) is int, "FLASH_RANGE_INVALID")
+        offset = self.address - profile.flash_base
+        _require(self.length > 0 and offset >= 0
+                 and offset + self.length <= profile.flash_size, "FLASH_RANGE_INVALID")
+        if self.operation == "erase":
+            _require(offset % profile.erase_granularity == 0
+                     and self.length % profile.erase_granularity == 0, "FLASH_RANGE_INVALID")
+
+    @property
+    def icpn(self) -> str:
+        return self.profile.icpn
+
+
+def programming_receipt_error(operations: tuple[str, ...], result: Mapping[str, Any], *,
+                              image: FlashImage | None,
+                              flash_range: FlashRange | None) -> str | None:
+    """Why a ``programming`` PASS is not proven (None: every step is proven)."""
+    steps = result.get("steps")
+    if (result.get("operations") != list(operations) or type(steps) is not dict
+            or set(steps) != set(operations)):
+        return "OPERATIONS_NOT_VERIFIED"
+    for operation in operations:
+        if type(steps[operation]) is not dict:
+            return "OPERATIONS_NOT_VERIFIED"
+        error = operation_receipt_error(operation, steps[operation], image=image,
+                                        flash_range=flash_range)
+        if error is not None:
+            return error
+    return None
+
+
+def operation_receipt_error(operation: str, result: Mapping[str, Any], *,
+                            image: FlashImage | None,
+                            flash_range: FlashRange | None) -> str | None:
+    """Why one step's (or a read's) PASS evidence is not proven (None: proven).
+
+    The Adapter reports what it executed and observed; a PASS is accepted only
+    for exactly the bound Image / range. With an Image the erase range is the
+    Image's whole erase window.
+    """
+    if operation == "program":
+        if (image is None or result.get("write_address") != image.load_address
+                or result.get("bytes_written") != len(image.payload)):
+            return "PROGRAM_RANGE_NOT_VERIFIED"
+    elif operation == "verify":
+        if (image is None or result.get("verify_address") != image.load_address
+                or result.get("readback_sha256") != image.sha256
+                or result.get("bytes_verified") != len(image.payload)):
+            return "VERIFY_NOT_VERIFIED"
+    elif operation == "erase":
+        expected = (image.erase_range if image is not None
+                    else None if flash_range is None
+                    else (flash_range.address, flash_range.length))
+        if (expected is None
+                or (result.get("erase_address"), result.get("erase_length")) != expected
+                # Erase-only proves a blank range; before Program the write
+                # itself is the next proven step.
+                or (image is None and (result.get("blank_verified") is not True
+                                       or result.get("bytes_verified") != expected[1]))):
+            return "ERASE_RANGE_NOT_VERIFIED"
+    elif operation == "read":
+        data = result.get("data_base64")
+        try:
+            raw = base64.b64decode(data, validate=True) if type(data) is str else None
+        except ValueError:
+            raw = None
+        if (flash_range is None or raw is None
+                or result.get("read_address") != flash_range.address
+                or result.get("read_length") != flash_range.length
+                or len(raw) != flash_range.length
+                or result.get("bytes_read") != flash_range.length
+                or result.get("sha256") != hashlib.sha256(raw).hexdigest()):
+            return "READ_RESULT_NOT_VERIFIED"
+    return None
+
+
+
+
+
+
+
+
+def parse_flash_profile(raw: object) -> FlashProfile:
+    """Validate the Runtime-supplied profile shape; raises SiteWorkerDenied."""
+    required = {"icpn", "target_config", "flash_base", "flash_size", "erase_granularity"}
+    _require(type(raw) is dict and required <= set(raw)
+             and set(raw) <= required | {"transport_settings"}, "PROFILE_INVALID")
+    icpn, cfg = raw["icpn"], raw["target_config"]
+    base, size, unit = raw["flash_base"], raw["flash_size"], raw["erase_granularity"]
+    _require(type(icpn) is str and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}", icpn)
+             is not None, "PROFILE_ICPN_INVALID")
+    _require(type(cfg) is str and TARGET_CONFIG.fullmatch(cfg) is not None
+             and ".." not in cfg.split("/"), "PROFILE_TARGET_CONFIG_INVALID")
+    _require(all(type(v) is int for v in (base, size, unit)) and base >= 0 and size > 0
+             and unit > 0 and unit & (unit - 1) == 0 and size % unit == 0
+             and base % unit == 0 and base + size <= 1 << 32, "PROFILE_GEOMETRY_INVALID")
+    clock_hz = None
+    if "transport_settings" in raw:
+        settings = raw["transport_settings"]
+        _require(type(settings) is dict and set(settings) == {"protocol", "clock_hz"}
+                 and settings["protocol"] == "swd", "PROFILE_TRANSPORT_INVALID")
+        clock_hz = settings["clock_hz"]
+        # Current ABI-v5: OpenOCD accepts integer kHz, PL FCLK=100 MHz,
+        # HALF_PERIOD >= 4. Never round an unrepresentable Profile silently.
+        _require(type(clock_hz) is int and 1000 <= clock_hz <= 12_500_000
+                 and clock_hz % 1000 == 0, "PROFILE_CLOCK_INVALID")
+    return FlashProfile(icpn, cfg, base, size, unit, clock_hz)
+
+
+class SiteTransportAdapter(Protocol):
+    name: str
+    supported_sites: frozenset[int]
+    operations: frozenset[str]
+
+    def identity(self) -> Mapping[str, Any]: ...
+    def startup_sealed_sites(self) -> set[int]: ...
+    def run(self, site: int, operation: str, *, deadline: float,
+            cancel: threading.Event, image: FlashImage | None = None,
+            flash_range: FlashRange | None = None,
+            operations: tuple[str, ...] | None = None) -> Mapping[str, Any]: ...
+
+
+def _require(ok: bool, code: str) -> None:
+    if not ok:
+        raise SiteWorkerDenied(code)
+
+
+@dataclass
+class _Session:
+    session_id: str
+    job_id: str
+    sites: frozenset[int]
+    pgid: int | None  # None: Runtime-owned REST Job session (no Package peer)
+    uid: int | None
+    expires: float
+    identity: Mapping[str, Any]
+    owner_kind: str = OWNER_PACKAGE
+    runtime_pid: int = 0
+    cancel: threading.Event = field(default_factory=threading.Event)
+    closed: bool = False
+    sealed_during: set[int] = field(default_factory=set)
+    image: FlashImage | None = None
+    flash_range: FlashRange | None = None
+    profile: FlashProfile | None = None
+    provider_route: Mapping[str, Any] | None = None
+
+
+def proc_peer(pid: int, proc_root: Path = Path("/proc")) -> tuple[int, int]:
+    """(pgid, sid) of a live peer, read from the kernel, never from the peer."""
+    raw = (proc_root / str(pid) / "stat").read_text()
+    rest = raw[raw.rindex(")") + 2:].split()
+    return int(rest[2]), int(rest[3])
+
+
+class SiteWorkerCore:
+    def __init__(self, adapter: SiteTransportAdapter, *,
+                 runtime_pid: Callable[[], int | None],
+                 lease_verifier: Callable[[str, str], bool],
+                 seal_dir: Path,
+                 image_root: Path = Path("/run/plasma-server/normalized-images"),
+                 clock: Callable[[], float] = time.monotonic,
+                 peer_groups: Callable[[int], tuple[int, int]] = proc_peer) -> None:
+        self.adapter = adapter
+        # Immutable startup snapshot. An updated selection file cannot claim
+        # that this already-running Worker switched its OpenOCD executable.
+        self.engine_selection_sha256 = getattr(adapter, "engine_selection_sha256", None)
+        self.runtime_pid = runtime_pid
+        self.lease_verifier = lease_verifier
+        self.seal_dir = Path(seal_dir)
+        self.image_root = Path(image_root)
+        self.clock = clock
+        self.peer_groups = peer_groups
+        self.epoch = secrets.token_hex(16)
+        self._lock = threading.Lock()
+        self._site_locks = {site: threading.Lock() for site in adapter.supported_sites}
+        # Existing seals remain migration blockers; current external owners
+        # are checked at admission and must not become historical seals.
+        self._sessions: dict[str, _Session] = {}
+        self._site_owners: dict[int, str] = {}
+        self.seal_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self._sealed: set[int] = set(self._persisted_seals())
+
+    # --- seals (persisted markers; cleared only by an operator recovery) ---------
+    def _persisted_seals(self) -> list[int]:
+        out = []
+        for path in self.seal_dir.glob("site*.sealed"):
+            match = re.fullmatch(r"site([0-9]+)\.sealed", path.name)
+            if match:
+                out.append(int(match.group(1)))
+        return out
+
+    def _persist_seal(self, site: int, code: str) -> None:
+        path = self.seal_dir / f"site{site}.sealed"
+        if path.exists():
+            return
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            json.dump({"site": site, "code": code, "epoch": self.epoch, "time": time.time()}, stream)
+
+    def _seal(self, site: int, code: str, session: _Session | None = None) -> None:
+        with self._lock:
+            self._sealed.add(site)
+            if session is not None:
+                # Recorded on the session that ran the operation, even if the
+                # Runtime already closed it (cancel race).
+                session.sealed_during.add(site)
+        self._persist_seal(site, code)
+
+    def _begin_operation_guard(self, site: int) -> None:
+        """Persist a fail-closed *in-flight* Site marker before Adapter I/O.
+
+        An unexpected Worker crash or lost hardware outcome must be visible
+        across restarts. Root/native admission is still the hardware owner:
+        this is a durable software hazard marker, not a second Site lock.
+        """
+        path = self.seal_dir / f"site{site}.sealed"
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w") as stream:
+                json.dump({"site": site, "code": "OPERATION_IN_PROGRESS",
+                           "epoch": self.epoch, "time": time.time()}, stream)
+                stream.flush()
+                os.fsync(stream.fileno())
+            dir_fd = os.open(self.seal_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except (OSError, ValueError):
+            # Never execute hardware when durable hazard recording cannot be
+            # proven. A partial marker is conservatively left for Recovery.
+            with self._lock:
+                self._sealed.add(site)
+            raise SiteWorkerDenied("OPERATION_GUARD_NOT_DURABLE") from None
+
+    def _clear_operation_guard(self, site: int, session: _Session) -> None:
+        """Clear the pre-I/O marker ONLY after verified safe termination."""
+        path = self.seal_dir / f"site{site}.sealed"
+        try:
+            path.unlink()
+            dir_fd = os.open(self.seal_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            # Failure to clear even a known-safe attempt must not leak an
+            # unowned Site. Keep the marker/lease failure visible.
+            self._seal(site, "OPERATION_GUARD_RELEASE_FAILED", session)
+            raise SiteWorkerDenied("OPERATION_GUARD_RELEASE_FAILED") from None
+
+    # --- dispatch ------------------------------------------------------------------
+    def _drop_if_runtime_restarted(self) -> None:
+        """Cancel stale Runtime sessions without releasing an in-flight Site."""
+        current = self.runtime_pid()
+        with self._lock:
+            for session_id, sess in list(self._sessions.items()):
+                # A closed Session in the *current* Runtime is retained
+                # until its explicit close_session can return the seal receipt.
+                if sess.runtime_pid == current:
+                    continue
+                sess.closed = True
+                sess.cancel.set()
+                # Do not re-admit this Site before its adapter has exited.
+                if any(self._site_locks[site].locked() for site in sess.sites):
+                    continue
+                for site in sess.sites:
+                    if self._site_owners.get(site) == session_id:
+                        del self._site_owners[site]
+                del self._sessions[session_id]
+
+    def handle(self, request: object, peer: tuple[int, int, int],
+               role: str | None = None) -> dict[str, Any]:
+        try:
+            _require(isinstance(request, dict) and request.get("protocol") == PROTOCOL
+                     and type(request.get("op")) is str, "REQUEST_INVALID")
+            op = request["op"]
+            # Production uses two sockets: control (Runtime group) and
+            # transport (Package group). Each accepts only its own class.
+            if role == "control":
+                _require(op in CONTROL_OPS, "OPERATION_DENIED_ON_CONTROL_SOCKET")
+            elif role == "transport":
+                _require(op not in CONTROL_OPS, "CONTROL_PEER_DENIED")
+            self._drop_if_runtime_restarted()
+            if op in CONTROL_OPS:
+                return {"ok": True, "result": self._control(op, request, peer)}
+            return {"ok": True, "result": self._transport(op, request, peer)}
+        except SiteWorkerDenied as exc:
+            return {"ok": False, "error": exc.code}
+
+    def _control(self, op: str, request: dict, peer: tuple[int, int, int]) -> dict[str, Any]:
+        pid, _uid, _gid = peer
+        trusted = self.runtime_pid()
+        _require(trusted is not None and pid == trusted, "CONTROL_PEER_DENIED")
+        if op == "status":
+            _require(set(request) == {"protocol", "op"}, "REQUEST_INVALID")
+            with self._lock:
+                sessions = [
+                    {"job_id": sess.job_id, "sites": sorted(sess.sites),
+                     "owner_kind": sess.owner_kind}
+                    for sess in sorted(
+                        self._sessions.values(), key=lambda x: (min(x.sites), x.job_id)
+                    )
+                ]
+                return {"epoch": self.epoch, "adapter": self.adapter.name,
+                        "platform": dict(getattr(self.adapter, "platform", {})),
+                        "supported_sites": sorted(self.adapter.supported_sites),
+                        "operations": sorted(self.adapter.operations),
+                        "sealed_sites": sorted(self._sealed),
+                        "not_ready": getattr(self.adapter, "not_ready", None),
+                        "identity": dict(self.adapter.identity()),
+                        "sessions": sessions,
+                        "session": sessions[0] if sessions else None}
+        if op == "bind_image":
+            _require(set(request) == {
+                "protocol", "op", "session_id", "image_sha256", "image_size", "load_address"
+            }, "REQUEST_INVALID")
+            _require(type(request["session_id"]) is str
+                     and type(request["image_sha256"]) is str
+                     and type(request["image_size"]) is int
+                     and type(request["load_address"]) is int, "REQUEST_INVALID")
+            size = request["image_size"]
+            digest = request["image_sha256"]
+            load_address = request["load_address"]
+            _require(re.fullmatch(r"[0-9a-f]{64}", digest) is not None, "IMAGE_SHA256_INVALID")
+            with self._lock:
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None and not s.closed, "SESSION_UNKNOWN")
+                _require(s.image is None and s.flash_range is None, "IMAGE_ALREADY_BOUND")
+                _require(s.provider_route is None
+                         or (s.provider_route["operation"] == PROGRAMMING
+                             and needs_image(tuple(s.provider_route["operations"]))),
+                         "OPERATION_TAKES_NO_IMAGE")
+                _require(self.clock() < s.expires, "SESSION_EXPIRED")
+                profile = s.profile
+                _require(profile is not None, "PROFILE_NOT_BOUND")
+                _require(0 < size <= profile.flash_size, "IMAGE_SIZE_INVALID")
+                # The Worker re-derives the whole erase window itself; the
+                # Runtime's address is never trusted without this check.
+                erase_address, erase_length = profile.flash_window(load_address, size)
+                if s.provider_route is not None:
+                    _require(size <= s.provider_route["max_image_bytes"], "IMAGE_SIZE_INVALID")
+                # Only the trusted Runtime stages this exact Job-owned image.
+                # No file path or command is accepted from the caller.
+                path = self.image_root / (s.job_id + ".bin")
+                try:
+                    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+                    with os.fdopen(fd, "rb") as stream:
+                        info = os.fstat(stream.fileno())
+                        _require(stat.S_ISREG(info.st_mode) and info.st_size == size,
+                                 "IMAGE_SIZE_MISMATCH")
+                        payload = stream.read(size + 1)
+                except (OSError, ValueError) as exc:
+                    raise SiteWorkerDenied("IMAGE_NOT_STAGED") from exc
+                _require(len(payload) == size, "IMAGE_SIZE_MISMATCH")
+                _require(hashlib.sha256(payload).hexdigest() == digest, "IMAGE_SHA256_MISMATCH")
+                # One PPU may flash only the same MCU/firmware while its
+                # concurrently admitted Site Sessions are active. The
+                # existing Runtime owner lease alone does not prove this.
+                _require(all(
+                    other is s or other.image is None
+                    or (other.image.sha256 == digest and other.image.profile == profile
+                        and other.image.load_address == load_address)
+                    for other in self._sessions.values()
+                ), "PPU_IMAGE_OR_TARGET_CONFLICT")
+                s.image = FlashImage(profile, payload, digest, load_address)
+                return {"job_id": s.job_id, "icpn": profile.icpn,
+                        "target_config": profile.target_config,
+                        "image_sha256": digest, "image_size": size,
+                        "load_address": load_address, "erase_address": erase_address,
+                        "erase_length": erase_length, "bound": True}
+        if op == "bind_range":
+            _require(set(request) == {"protocol", "op", "session_id", "address", "length"}
+                     and type(request["session_id"]) is str
+                     and type(request["address"]) is int
+                     and type(request["length"]) is int, "REQUEST_INVALID")
+            with self._lock:
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None and not s.closed, "SESSION_UNKNOWN")
+                _require(s.image is None and s.flash_range is None, "RANGE_ALREADY_BOUND")
+                _require(self.clock() < s.expires, "SESSION_EXPIRED")
+                profile = s.profile
+                _require(profile is not None, "PROFILE_NOT_BOUND")
+                # Only a Runtime Job whose verified route is a read or an
+                # erase-only programming list binds a range; the Worker
+                # re-proves it against the session Profile.
+                route = s.provider_route
+                _require(s.owner_kind == OWNER_REST_JOB and route is not None
+                         and (route["operation"] == "read"
+                              or (route["operation"] == PROGRAMMING
+                                  and route["operations"] == ["erase"])),
+                         "OPERATION_TAKES_NO_RANGE")
+                operation = "read" if route["operation"] == "read" else "erase"
+                s.flash_range = FlashRange(profile, operation,
+                                           request["address"], request["length"])
+                return {"job_id": s.job_id, "icpn": profile.icpn,
+                        "target_config": profile.target_config, "operation": operation,
+                        "address": s.flash_range.address, "length": s.flash_range.length,
+                        "bound": True}
+        if op == "run":
+            _require(set(request) == {"protocol", "op", "session_id", "site", "operation"}
+                     and type(request["session_id"]) is str and type(request["site"]) is int
+                     and type(request["operation"]) is str, "REQUEST_INVALID")
+            with self._lock:
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None and not s.closed, "SESSION_UNKNOWN")
+                _require(s.owner_kind == OWNER_REST_JOB, "SESSION_NOT_RUNTIME_OWNED")
+                if s.provider_route is not None:
+                    _require(request["site"] == s.provider_route["site_id"]
+                             and request["operation"] == s.provider_route["operation"],
+                             "PROVIDER_ROUTE_MISMATCH")
+            return self._execute(s, request["site"], request["operation"])
+        if op == "close_session":
+            _require(set(request) == {"protocol", "op", "session_id"}
+                     and type(request["session_id"]) is str, "REQUEST_INVALID")
+            with self._lock:
+                s = self._sessions.get(request["session_id"])
+                _require(s is not None, "SESSION_UNKNOWN")
+                s.closed = True
+                s.cancel.set()
+            # Ownership must outlive an in-flight operation and its SAFE_OFF
+            # verification, even when close races a cancellation.
+            for site in sorted(s.sites):
+                lock = self._site_locks[site]
+                lock.acquire()
+                lock.release()
+            with self._lock:
+                if self._sessions.get(s.session_id) is s:
+                    del self._sessions[s.session_id]
+                    for site in s.sites:
+                        if self._site_owners.get(site) == s.session_id:
+                            del self._site_owners[site]
+            return {"session_id": s.session_id, "closed": True,
+                    "sealed_sites": sorted(s.sealed_during)}
+        # open_session (Package Action peer) / open_job_session (Runtime REST Job)
+        package = op == "open_session"
+        fields = {"protocol", "op", "job_id", "sites", "max_runtime_s"}
+        if package:
+            fields |= {"pgid", "uid"}
+        if "profile" in request:
+            fields.add("profile")
+        route = request.get("provider_route") if not package else None
+        if route is not None:
+            fields |= {"provider_route", "deadline_monotonic"}
+        expected_engine = request.get("expected_engine_selection_sha256")
+        if "expected_engine_selection_sha256" in request:
+            fields.add("expected_engine_selection_sha256")
+        _require(set(request) == fields, "REQUEST_INVALID")
+        job, sites = request["job_id"], request["sites"]
+        _require(type(job) is str and JOB_ID.fullmatch(job) is not None
+                 and type(sites) is list and 0 < len(sites) <= 8
+                 and all(type(x) is int for x in sites) and sites == sorted(set(sites))
+                 and type(request["max_runtime_s"]) is int
+                 and 0 < request["max_runtime_s"] <= MAX_SESSION_S, "REQUEST_INVALID")
+        if package:
+            _require(type(request["pgid"]) is int and request["pgid"] > 1
+                     and type(request["uid"]) is int and request["uid"] > 0, "REQUEST_INVALID")
+        profile = parse_flash_profile(request["profile"]) if "profile" in request else None
+        if route is not None:
+            _require(type(route) is dict and set(route) == {
+                "asset_set_sha256", "provider_package", "profile_package",
+                "descriptor_sha256", "options_schema_sha256", "options_sha256",
+                "operation", "site_id", "transport", "driver_abi",
+                "fpga_package", "max_image_bytes"} | (
+                    {"operations"} if route.get("operation") == PROGRAMMING else set()),
+                "PROVIDER_ROUTE_INVALID")
+            if route["operation"] == PROGRAMMING:
+                # The ordered list is pinned in the session route, like the
+                # single operation of every other route.
+                route = {**route, "operations": list(parse_operations(route["operations"]))}
+            _require(all(type(route[key]) is str and bool(route[key]) for key in (
+                "asset_set_sha256", "provider_package", "profile_package",
+                "descriptor_sha256", "options_schema_sha256", "options_sha256",
+                "operation", "transport")), "PROVIDER_ROUTE_INVALID")
+            _require(type(route["site_id"]) is int and sites == [route["site_id"]]
+                     and route["operation"] in self.adapter.operations
+                     and type(route["max_image_bytes"]) is int
+                     and route["max_image_bytes"] > 0
+                     and (route["driver_abi"] is None or type(route["driver_abi"]) is str)
+                     and (route["fpga_package"] is None or type(route["fpga_package"]) is str),
+                     "PROVIDER_ROUTE_INVALID")
+            if route["operation"] in FLASH_OPERATIONS:
+                _require(profile is not None, "PROFILE_REQUIRED")
+            deadline = request["deadline_monotonic"]
+            _require(type(deadline) in (int, float) and self.clock() < deadline
+                     <= self.clock() + request["max_runtime_s"], "JOB_DEADLINE_INVALID")
+        if "expected_engine_selection_sha256" in request:
+            _require(route is not None and type(expected_engine) is str
+                     and re.fullmatch(r"[0-9a-f]{64}", expected_engine) is not None,
+                     "WORKER_ENGINE_BINDING_INVALID")
+            _require(type(self.engine_selection_sha256) is str,
+                     "WORKER_ENGINE_UNVERIFIED")
+            _require(expected_engine == self.engine_selection_sha256,
+                     "WORKER_ENGINE_SELECTION_MISMATCH")
+        not_ready = getattr(self.adapter, "not_ready", None)
+        _require(not not_ready, f"ENGINE_NOT_READY:{not_ready}")
+        _require(set(sites) <= self.adapter.supported_sites, "SITE_NOT_SUPPORTED")
+        owner_kind = OWNER_PACKAGE if package else OWNER_REST_JOB
+        _require(self.lease_verifier(job, owner_kind), "JOB_LEASE_NOT_HELD")
+        identity = dict(self.adapter.identity())
+        with self._lock:
+            _require(not (set(sites) & self._sealed), "SITE_SEALED")
+            _require(not (set(sites) & self.adapter.startup_sealed_sites()),
+                     "EXTERNAL_SITE_OWNER_PRESENT")
+            _require(not (set(sites) & self._site_owners.keys()), "SITE_BUSY")
+            if route is not None:
+                _require(not any(other.job_id == job for other in self._sessions.values()),
+                         "JOB_SESSION_ALREADY_ACTIVE")
+            if package:
+                _require(not any(
+                    other.owner_kind == OWNER_PACKAGE
+                    and other.pgid == request["pgid"] and other.uid == request["uid"]
+                    for other in self._sessions.values()
+                ), "PACKAGE_SESSION_ALREADY_ACTIVE")
+            s = _Session(secrets.token_hex(16), job, frozenset(sites),
+                         request["pgid"] if package else None,
+                         request["uid"] if package else None,
+                         deadline if route is not None else self.clock() + request["max_runtime_s"], identity,
+                         owner_kind=owner_kind, runtime_pid=pid)
+            s.provider_route = dict(route) if route is not None else None
+            s.profile = profile
+            self._sessions[s.session_id] = s
+            for site in sites:
+                self._site_owners[site] = s.session_id
+        return {"session_id": s.session_id, "epoch": self.epoch, "sites": sorted(s.sites),
+                "owner_kind": owner_kind,
+                **({"worker_engine_selection_sha256": self.engine_selection_sha256}
+                   if expected_engine is not None else {}),
+                **({"provider_route": dict(route), "deadline_monotonic": deadline,
+                    "identity": dict(identity)}
+                   if route is not None else {})}
+
+    def _transport(self, op: str, request: dict, peer: tuple[int, int, int]) -> dict[str, Any]:
+        pid, uid, _gid = peer
+        _require(set(request) == {"protocol", "op", "site"} and type(request["site"]) is int,
+                 "REQUEST_INVALID")
+        _require(op in self.adapter.operations, "OPERATION_DENIED")
+        site = request["site"]
+        try:
+            pgid, _sid = self.peer_groups(pid)
+        except (OSError, ValueError, IndexError):
+            raise SiteWorkerDenied("PEER_UNVERIFIABLE") from None
+        with self._lock:
+            matches = [
+                candidate for candidate in self._sessions.values()
+                if not candidate.closed and candidate.owner_kind == OWNER_PACKAGE
+                and pgid == candidate.pgid and uid == candidate.uid
+            ]
+            _require(len(matches) == 1, "NO_SESSION_FOR_PEER")
+            s = matches[0]
+        return self._execute(s, site, op)
+
+    def _execute(self, s: _Session, site: int, op: str) -> dict[str, Any]:
+        _require(op in self.adapter.operations, "OPERATION_DENIED")
+        with self._lock:
+            _require(not s.closed, "SESSION_CLOSED")
+            _require(self.clock() < s.expires, "SESSION_EXPIRED")
+            _require(site in s.sites, "SITE_NOT_AUTHORIZED")
+            _require(site not in self._sealed, "SITE_SEALED")
+            steps: tuple[str, ...] | None = None
+            if op == PROGRAMMING:
+                _require(s.provider_route is not None
+                         and s.provider_route["operation"] == PROGRAMMING,
+                         "OPERATIONS_NOT_BOUND")
+                steps = tuple(s.provider_route["operations"])
+                if needs_image(steps):
+                    _require(s.image is not None, "IMAGE_NOT_BOUND")
+                else:
+                    _require(s.flash_range is not None
+                             and s.flash_range.operation == "erase", "RANGE_NOT_BOUND")
+            elif op == "read":
+                _require(s.flash_range is not None and s.flash_range.operation == "read",
+                         "RANGE_NOT_BOUND")
+        _require(self.lease_verifier(s.job_id, s.owner_kind), "JOB_LEASE_NOT_HELD")
+        if dict(self.adapter.identity()) != s.identity:
+            with self._lock:
+                if self._sessions.get(s.session_id) is s:
+                    s.closed = True
+                    s.cancel.set()
+            raise SiteWorkerDenied("SESSION_INVALIDATED_FPGA_IDENTITY_CHANGED")
+        lock = self._site_locks[site]
+        _require(lock.acquire(blocking=False), "SITE_BUSY")
+        safe_to_clear_guard = False
+        try:
+            _require(not s.cancel.is_set(), "SESSION_CLOSED")
+            # Crash consistency: the persisted marker MUST exist and be
+            # fsynced before native admission, SWD, MMIO or OpenOCD can start.
+            self._begin_operation_guard(site)
+            try:
+                if op == PROGRAMMING:
+                    result = dict(self.adapter.run(
+                        site, op, deadline=s.expires, cancel=s.cancel, image=s.image,
+                        flash_range=s.flash_range, operations=steps
+                    ))
+                elif op == "read":
+                    result = dict(self.adapter.run(
+                        site, op, deadline=s.expires, cancel=s.cancel,
+                        flash_range=s.flash_range
+                    ))
+                else:
+                    result = dict(self.adapter.run(
+                        site, op, deadline=s.expires, cancel=s.cancel
+                    ))
+            except TransportDenied as exc:
+                # Contract: Adapter refused before hardware was touched.
+                safe_to_clear_guard = True
+                raise SiteWorkerDenied("TRANSPORT_DENIED:" + exc.code) from None
+            except TransportFailed as exc:
+                # Contract: native owner release and SAFE_OFF verified.
+                safe_to_clear_guard = True
+                raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + exc.code) from None
+            except TransportUnknown as exc:
+                self._seal(site, exc.code, s)
+                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + exc.code) from None
+            except Exception:
+                # Adapter code may fail *after* SWD/MMIO access. A generic
+                # exception proves neither owner release nor SAFE_OFF.
+                # Unlike TransportDenied (pre-I/O) or TransportFailed
+                # (verified cleanup), the outcome must remain UNKNOWN.
+                self._seal(site, "UNCLASSIFIED_ADAPTER_EXCEPTION", s)
+                raise SiteWorkerDenied(
+                    "OUTCOME_UNKNOWN_SITE_SEALED:UNCLASSIFIED_ADAPTER_EXCEPTION"
+                ) from None
+            # The post-I/O identity observation is itself a hardware safety
+            # condition. If the observer crashes, an unchanged FPGA image and
+            # safe release are not proven; persist a Site seal.
+            try:
+                post_identity = dict(self.adapter.identity())
+            except Exception:
+                self._seal(site, "FPGA_IDENTITY_OBSERVATION_FAILED", s)
+                raise SiteWorkerDenied(
+                    "OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_OBSERVATION_FAILED"
+                ) from None
+            if post_identity != s.identity:
+                self._seal(site, "FPGA_IDENTITY_CHANGED_DURING_OPERATION", s)
+                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:FPGA_IDENTITY_CHANGED_DURING_OPERATION")
+            if result.get("safe_off") is not True:
+                self._seal(site, "SAFE_OFF_NOT_VERIFIED", s)
+                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:SAFE_OFF_NOT_VERIFIED")
+            unproven = None
+            if result.get("result") == "PASS" and op == PROGRAMMING:
+                unproven = programming_receipt_error(
+                    steps, result, image=s.image, flash_range=s.flash_range)
+            elif result.get("result") == "PASS" and op == "read":
+                unproven = operation_receipt_error(
+                    op, result, image=None, flash_range=s.flash_range)
+            if unproven is not None and op == PROGRAMMING and steps != ("verify",):
+                # A write whose executed range is not proven is never a PASS
+                # and never a retryable failure.
+                self._seal(site, unproven, s)
+                raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + unproven)
+            # Safe release and exact readback are proven before clearing the
+            # durable operation marker, even if a close/cancel raced.
+            safe_to_clear_guard = True
+            if unproven is not None:
+                # verify-only / read never write: SAFE_OFF is proven, the result is not.
+                raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + unproven)
+            # A cancelled or invalidated Session must not claim Job PASS even
+            # when its adapter eventually completes with proven SAFE_OFF.
+            # Serialize the final decision against close/restart invalidation.
+            with self._lock:
+                _require(not s.closed and not s.cancel.is_set(), "SESSION_CLOSED")
+            return {"site": site, "operation": op, "adapter": self.adapter.name, **result}
+        finally:
+            try:
+                if safe_to_clear_guard:
+                    self._clear_operation_guard(site, s)
+            finally:
+                lock.release()
+
+
+# --- Unix socket transport ---------------------------------------------------------
+
+def peer_credentials(conn: socket.socket) -> tuple[int, int, int]:
+    raw = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+    return struct.unpack("3i", raw)
+
+
+class SiteWorkerServer:
+    """Threaded Unix-socket front end. The socket file is the only endpoint."""
+
+    def __init__(self, core: SiteWorkerCore, socket_path: Path, *, mode: int = 0o660,
+                 group: int | None = None, role: str | None = None) -> None:
+        if role not in (None, "control", "transport"):
+            raise ValueError("role must be control or transport")
+        self.role = role
+        self.core = core
+        self.socket_path = Path(socket_path)
+        self.mode = mode
+        self.group = group
+        self._sock: socket.socket | None = None
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        try:
+            self.socket_path.unlink()
+        except FileNotFoundError:
+            pass
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.bind(str(self.socket_path))
+        os.chmod(self.socket_path, self.mode)
+        if self.group is not None:
+            os.chown(self.socket_path, -1, self.group)
+        sock.listen(16)
+        self._sock = sock
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+        self._thread.start()
+
+    def _serve(self) -> None:
+        sock = self._sock
+        assert sock is not None
+        while True:
+            try:
+                conn, _ = sock.accept()
+            except OSError:
+                return
+            threading.Thread(target=self._one, args=(conn,), daemon=True).start()
+
+    def _one(self, conn: socket.socket) -> None:
+        with conn:
+            conn.settimeout(10)
+            try:
+                peer = peer_credentials(conn)
+                data = b""
+                while not data.endswith(b"\n") and len(data) <= MAX_REQUEST:
+                    chunk = conn.recv(MAX_REQUEST + 1)
+                    if not chunk:
+                        break
+                    data += chunk
+                if len(data) > MAX_REQUEST or not data.endswith(b"\n"):
+                    response = {"ok": False, "error": "REQUEST_INVALID"}
+                else:
+                    try:
+                        request = json.loads(data.decode("utf-8"))
+                    except (ValueError, UnicodeDecodeError):
+                        request = None
+                    response = self.core.handle(request, peer, self.role)
+                conn.sendall((json.dumps(response, sort_keys=True) + "\n").encode())
+            except OSError:
+                pass
+
+    def close(self) -> None:
+        if self._sock is not None:
+            self._sock.close()
+            self._sock = None
+        try:
+            self.socket_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+class SiteWorkerClient:
+    """Runtime-side client (control ops). Packages speak the same JSON line."""
+
+    def __init__(self, socket_path: Path, timeout_s: float = 60.0) -> None:
+        self.socket_path = Path(socket_path)
+        self.timeout_s = timeout_s
+
+    def call(self, op: str, **fields: Any) -> dict[str, Any]:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.settimeout(self.timeout_s)
+            sock.connect(str(self.socket_path))
+            sock.sendall((json.dumps({"protocol": PROTOCOL, "op": op, **fields}) + "\n").encode())
+            data = b""
+            while not data.endswith(b"\n"):
+                chunk = sock.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+        reply = json.loads(data.decode("utf-8"))
+        if not reply.get("ok"):
+            raise SiteWorkerDenied(str(reply.get("error")))
+        return reply["result"]
+
+    def open_session(self, *, job_id: str, sites: list[int], pgid: int, uid: int,
+                     max_runtime_s: int, profile: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        return self.call("open_session", job_id=job_id, sites=sites, pgid=pgid, uid=uid,
+                         max_runtime_s=max_runtime_s,
+                         **({"profile": dict(profile)} if profile is not None else {}))
+
+    def close_session(self, session_id: str) -> dict[str, Any]:
+        return self.call("close_session", session_id=session_id)
+
+    def open_job_session(self, *, job_id: str, sites: list[int],
+                         max_runtime_s: int,
+                         profile: Mapping[str, Any] | None = None,
+                         provider_route: Mapping[str, Any] | None = None,
+                         deadline_monotonic: float | None = None,
+                         expected_engine_selection_sha256: str | None = None) -> dict[str, Any]:
+        extra = ({} if provider_route is None else {
+            "provider_route": dict(provider_route),
+            "deadline_monotonic": deadline_monotonic})
+        if expected_engine_selection_sha256 is not None:
+            extra["expected_engine_selection_sha256"] = expected_engine_selection_sha256
+        if profile is not None:
+            extra["profile"] = dict(profile)
+        return self.call("open_job_session", job_id=job_id, sites=sites,
+                         max_runtime_s=max_runtime_s, **extra)
+
+    def bind_range(self, session_id: str, *, address: int, length: int) -> dict[str, Any]:
+        return self.call("bind_range", session_id=session_id, address=address, length=length)
+
+    def bind_image(
+        self, session_id: str, *, image_sha256: str, image_size: int, load_address: int
+    ) -> dict[str, Any]:
+        return self.call("bind_image", session_id=session_id,
+                         image_sha256=image_sha256, image_size=image_size,
+                         load_address=load_address)
+
+    def run(self, session_id: str, *, site: int, operation: str) -> dict[str, Any]:
+        return self.call("run", session_id=session_id, site=site, operation=operation)
+
+
+# --- production trust providers ----------------------------------------------------
+
+def systemd_main_pid(unit: str = "plasma-server.service") -> Callable[[], int | None]:
+    """The trusted Runtime is the unit's MainPID (a Package child never is)."""
+    def provider() -> int | None:
+        out = subprocess.run(["systemctl", "show", "-p", "MainPID", "--value", unit],
+                             capture_output=True, text=True, timeout=5,
+                             env={"PATH": "/usr/bin:/bin", "LANG": "C"})
+        value = out.stdout.strip()
+        return int(value) if out.returncode == 0 and value.isdigit() and int(value) > 1 else None
+    return provider
+
+
+def runtime_lease_snapshot(control_socket: Path, timeout_s: float = 5.0) -> dict | None:
+    """Read-only C-1 ``execution_lease`` snapshot; None if the Runtime is unreachable."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout_s)
+            sock.connect(str(control_socket))
+            sock.sendall(b'{"operation":"execution_lease"}\n')
+            data = b""
+            while not data.endswith(b"\n"):
+                chunk = sock.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+        reply = json.loads(data.decode("utf-8"))
+    except (OSError, ValueError):
+        return None
+    lease = reply.get("result") if isinstance(reply, dict) and reply.get("ok") else None
+    return lease if isinstance(lease, dict) else None
+
+
+def runtime_lease_verifier(control_socket: Path,
+                           timeout_s: float = 5.0) -> Callable[[str, str], bool]:
+    """Ask the Runtime (C-1 SiteManager) whether job_id holds the PPU execution lease.
+
+    ``package_action``: the lease owner is exactly that Package Action Job.
+    ``rest_job``: a Runtime Site Job (REST, batch or client owner) that is one
+    of the lease's active Jobs; a Package Action lease never qualifies.
+    """
+    def verify(job_id: str, owner_kind: str) -> bool:
+        lease = runtime_lease_snapshot(control_socket, timeout_s)
+        if not (isinstance(lease, dict) and lease.get("busy") is True):
+            return False
+        if owner_kind == OWNER_PACKAGE:
+            if lease.get("owner_kind") == OWNER_PACKAGE:
+                return lease.get("owner_id") == job_id
+            jobs = lease.get("job_ids")
+            delegates = lease.get("delegated_package_job_ids")
+            return (isinstance(jobs, list) and job_id in jobs
+                    and isinstance(delegates, list) and job_id in delegates)
+        jobs = lease.get("job_ids")
+        return (owner_kind == OWNER_REST_JOB and lease.get("owner_kind") != OWNER_PACKAGE
+                and isinstance(jobs, list) and job_id in jobs)
+    return verify

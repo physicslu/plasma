@@ -193,7 +193,8 @@ def assert_contracts(origin: str, *, timeout: float, report: SmokeReport) -> Non
     report.checks["api:engineering-targets"] = "PASS"
 
     if report.expected_commit is not None:
-        device_search = request_json(origin, f"{prefix}/api/devices/search?q=stm32&limit=1", timeout=timeout)
+        # PR-C2: the Device Selector is owned by Manager (Console BFF), never a PPU relay.
+        device_search = request_json(origin, "/api/manager/devices/search?q=stm32&limit=1", timeout=timeout)
         results = device_search.get("results")
         catalog_size = device_search.get("catalog_size")
         if device_search.get("ok") is not True or device_search.get("rest_contract_version") != "3":

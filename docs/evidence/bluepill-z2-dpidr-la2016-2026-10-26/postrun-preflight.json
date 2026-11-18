@@ -1,0 +1,89 @@
+{
+  "boot_id": "4cefdc0c-f586-4d19-b126-1d8e1108c8f1",
+  "candidate_sha256": "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1",
+  "checkpoint": {
+    "boot_id": "4cefdc0c-f586-4d19-b126-1d8e1108c8f1",
+    "download_count": 2,
+    "evidence_sha256": "b57869e1b9e3c7f6eaeb902e938af4b01379a1d2833d14a9be1365d1f339d6e7",
+    "firmware_sha256": "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1",
+    "image": "plasma-bluepill-swd-65dca783.bin",
+    "image_id": "z2-bluepill-swd-gpio-65dca783-offline",
+    "last_error": "",
+    "manifest_sha256": "5f5fa580e9b437ce3a9377313bdfb4fc6012031270e1544c12034ccf3ca0fb98",
+    "restore_count": 1,
+    "schema": "plasma.fpga.image-deployment.v3",
+    "session_id": "fpga-bba6ef6827374286a54b13b7623229cd",
+    "status": "IMAGE",
+    "test_count": 3
+  },
+  "fuser_mem": {
+    "busy": false,
+    "exit": 1
+  },
+  "fuser_uio1": {
+    "busy": false,
+    "exit": 1
+  },
+  "golden_sha256": "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
+  "manager_last_load": "[177886.726246] fpga_manager fpga0: writing plasma-bluepill-swd-65dca783.bin to Xilinx Zynq FPGA Manager",
+  "manager_state": "operating",
+  "manifest": {
+    "abi_offset": 4,
+    "abi_version": 65536,
+    "axi_base": 1073774592,
+    "axi_bytes": 4096,
+    "board_id": "pynq-z2",
+    "expected_uio": {
+      "driver": "uio_pdrv_genirq",
+      "irq_counts": [
+        0,
+        0
+      ],
+      "maps": [
+        [
+          1073741824,
+          65536
+        ]
+      ],
+      "runtime": "suspended",
+      "uio": "uio1"
+    },
+    "firmware_name": "plasma-bluepill-swd-65dca783.bin",
+    "firmware_sha256": "bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1",
+    "fpga_part": "xc7z020clg400-1",
+    "identity_words": [
+      [
+        0,
+        1346523991,
+        4294967295
+      ],
+      [
+        4,
+        65536,
+        4294967295
+      ],
+      [
+        12,
+        8,
+        4294967294
+      ]
+    ],
+    "image_id": "z2-bluepill-swd-gpio-65dca783-offline",
+    "owner_base": 1073741824,
+    "owner_bytes": 65536,
+    "recovery_name": "base.bin",
+    "recovery_sha256": "c6768695213c4a9725108351310dc2e23fa4029dbfe9120e155c676cce89e19c",
+    "schema": "plasma.fpga.image.v1",
+    "site_bitmap": 1,
+    "site_bitmap_offset": null,
+    "soc_compatible": "xlnx,zynq-7000",
+    "uio_name": "uio1"
+  },
+  "manifest_sha256": "5f5fa580e9b437ce3a9377313bdfb4fc6012031270e1544c12034ccf3ca0fb98",
+  "openocd_binaries": [
+    "/opt/plasma/programming-engines/openocd/0.12.0-9ea7f3d647c8/bin/openocd",
+    "/opt/plasma/programming-engines/openocd/0.12.0-5088db4c9154/bin/openocd"
+  ],
+  "root_entry_installed": true,
+  "source_pin": "55f6db3bc5fa866135e5a9070175928d044e53ce"
+}

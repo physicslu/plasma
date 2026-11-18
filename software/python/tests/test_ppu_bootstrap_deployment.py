@@ -3,10 +3,13 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
+from .ppu_control_plane_fixture import verify_real_control_plane
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "ppu-bootstrap-deployment.py"
@@ -47,7 +50,14 @@ class FakeInstaller:
         if self.fail_verify:
             raise RuntimeError("bad digest")
         Path(extract_to).mkdir(parents=True)
-        return SimpleNamespace(release_id="1.2.3-aaaaaaaaaaaa", archive_sha256="d" * 64)
+        return SimpleNamespace(release_id="1.2.3-aaaaaaaaaaaa", archive_sha256="d" * 64,
+                               git_sha="a" * 40)
+
+    def verify_control_plane(self, verified):
+        return verify_real_control_plane(verified)
+
+    def _systemctl(self, *args):
+        self.calls.append(("systemctl", *args))
 
     def validate_plasma_python(self, path, *, product_root):
         self.calls.append("python")
@@ -71,6 +81,8 @@ class FakeInstaller:
     def install_release(self, verified, **kwargs):
         self.calls.append("activate")
         if self.fail_install:
+            if "restored" in self.fail_install:
+                kwargs["on_rollback"]()
             raise RuntimeError(self.fail_install)
         health = kwargs["health_check"](kwargs["gateway_host"])
         return {"result": "PASS", "release_id": verified.release_id, "gateway_readiness": health}
@@ -106,11 +118,16 @@ def _request(tmp_path: Path):
     )
 
 
-def _coordinator(tmp_path: Path, installer):
+def _coordinator(tmp_path: Path, installer, runtime_restart_quiesce=None):
     counter = iter([100.0 + i for i in range(30)])
+    if runtime_restart_quiesce is None:
+        def runtime_restart_quiesce():
+            installer.calls.append("quiesce")
+            return {"token": "quiesce-test", "ttl_s": 60}
     return deployment.DeploymentCoordinator(
         paths=_paths(tmp_path), installer=installer,
         clock=lambda: next(counter), transaction_id_factory=lambda: "tx-001",
+        runtime_restart_quiesce=runtime_restart_quiesce,
     )
 
 
@@ -134,12 +151,59 @@ def test_successful_transaction_orders_verify_stage_activate_health(tmp_path: Pa
     result = coordinator.execute(_request(tmp_path))
     assert result["result"] == "PASS"
     assert result["transaction"]["state"] == "runtime_active"
+    assert result["transaction"]["api_transaction_id"] is None  # Local CLI remains independent.
     assert result["capabilities"]["fpga_update"] is False
-    assert installer.calls == ["verify", "python", "baseline", "previous", "stage", "activate", "health"]
+    assert installer.calls == ["verify", "python", "baseline", "previous", "stage", "quiesce", "activate", "health"]
     journal = json.loads(coordinator.paths.journal.read_text(encoding="utf-8"))
     assert journal["state"] == "runtime_active"
     assert coordinator.paths.journal.stat().st_mode & 0o077 == 0
     assert coordinator.paths.lock.stat().st_mode & 0o077 == 0
+
+
+@pytest.mark.parametrize("site_count", [1, 2, 4, 8])
+def test_deployment_coordinator_forwards_site_count_to_fresh_installer(
+    tmp_path: Path, site_count: int
+):
+    class FreshInstaller(FakeInstaller):
+        def _previous_current(self, current):
+            self.calls.append("previous")
+            return None
+
+        def install_release(self, verified, **kwargs):
+            assert kwargs["site_count"] == site_count
+            return super().install_release(verified, **kwargs)
+
+    request = replace(_request(tmp_path), site_count=site_count)
+    result = _coordinator(tmp_path, FreshInstaller()).execute(request)
+    assert result["result"] == "PASS"
+
+
+@pytest.mark.parametrize("site_count", [0, 9, True, "2"])
+def test_invalid_deployment_site_count_fails_before_mutation(tmp_path: Path, site_count):
+    installer = FakeInstaller()
+    coordinator = _coordinator(tmp_path, installer)
+    with pytest.raises(deployment.DeploymentError, match="site_count"):
+        coordinator.execute(replace(_request(tmp_path), site_count=site_count))
+    assert installer.calls == []
+    assert not coordinator.paths.journal.exists()
+
+
+def test_api_transaction_id_is_recorded_by_the_locked_coordinator(tmp_path: Path):
+    coordinator = _coordinator(tmp_path, FakeInstaller())
+    api_id = "f" * 32
+    result = coordinator.execute(replace(_request(tmp_path), api_transaction_id=api_id))
+    assert result["transaction"]["api_transaction_id"] == api_id
+    journal = json.loads(coordinator.paths.journal.read_text(encoding="utf-8"))
+    assert journal["api_transaction_id"] == api_id
+    assert journal["transaction_id"] == result["transaction"]["transaction_id"]
+
+
+@pytest.mark.parametrize("api_id", ["", "f" * 31, "F" * 32, "unknown", True])
+def test_invalid_api_transaction_id_is_rejected_before_coordinator_mutation(tmp_path: Path, api_id):
+    coordinator = _coordinator(tmp_path, FakeInstaller())
+    with pytest.raises(deployment.DeploymentError, match="API transaction identity"):
+        coordinator.execute(replace(_request(tmp_path), api_transaction_id=api_id))
+    assert not coordinator.paths.journal.exists()
 
 
 def test_verification_failure_is_terminal_and_never_stages(tmp_path: Path):
@@ -203,3 +267,69 @@ def test_corrupt_or_overpermissive_journal_fails_closed(tmp_path: Path):
     _write_journal(tmp_path, state="runtime_active", mode=0o644)
     with pytest.raises(deployment.DeploymentError, match="permissions are too broad"):
         _coordinator(tmp_path, FakeInstaller()).execute(_request(tmp_path))
+
+
+def test_upgrade_quiesce_denial_is_terminal_before_activation(tmp_path: Path):
+    installer = FakeInstaller()
+
+    def busy():
+        installer.calls.append("quiesce")
+        raise RuntimeError("RUNTIME_RESTART_QUIESCE_NOT_GRANTED: PPU execution is active")
+
+    coordinator = _coordinator(tmp_path, installer, runtime_restart_quiesce=busy)
+    with pytest.raises(deployment.DeploymentError, match="runtime upgrade quiesce denied"):
+        coordinator.execute(_request(tmp_path))
+    assert installer.calls == ["verify", "python", "baseline", "previous", "stage", "quiesce"]
+    journal = json.loads(coordinator.paths.journal.read_text(encoding="utf-8"))
+    assert journal["state"] == "verify_failed"
+    assert journal["error_code"] == "runtime_quiesce_denied"
+    # A refused upgrade leaves the PPU deployable again (no recovery_required).
+    assert deployment.DeploymentCoordinator(paths=_paths(tmp_path), installer=FakeInstaller(), runtime_restart_quiesce=lambda: {}).execute(_request(tmp_path))["result"] == "PASS"
+
+
+def test_fresh_install_needs_no_runtime_quiesce(tmp_path: Path):
+    class FreshInstaller(FakeInstaller):
+        def _previous_current(self, current):
+            self.calls.append("previous")
+            return None
+
+    installer = FreshInstaller()
+
+    def must_not_run():
+        raise AssertionError("fresh install has no running Runtime to quiesce")
+
+    result = _coordinator(tmp_path, installer, runtime_restart_quiesce=must_not_run).execute(_request(tmp_path))
+    assert result["result"] == "PASS"
+    assert "quiesce" not in installer.calls
+
+
+def test_kit_standalone_upgrade_without_runtime_socket_is_terminal_not_recovery(tmp_path: Path, monkeypatch):
+    """Regression for Z2 #1282 D2: the Runtime upgrade runs this module from the
+    Z2 PS kit scripts/ directory (no sibling helpers). A missing helper or an
+    unavailable Runtime gate must end verify_failed, never recovery_required."""
+    import importlib.util
+    import shutil
+    import sys
+
+    kit_scripts = tmp_path / "kit-scripts"
+    kit_scripts.mkdir()
+    target = kit_scripts / "ppu-bootstrap-deployment.py"
+    shutil.copyfile(Path(deployment.__file__), target)
+    spec = importlib.util.spec_from_file_location("plasma_kit_standalone_deployment_tx", target)
+    standalone = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = standalone
+    spec.loader.exec_module(standalone)
+    monkeypatch.setattr(standalone, "RUNTIME_CONTROL_SOCKET", tmp_path / "absent" / "control.sock")
+
+    installer = FakeInstaller()
+    counter = iter([100.0 + i for i in range(30)])
+    coordinator = standalone.DeploymentCoordinator(
+        paths=_paths(tmp_path), installer=installer,
+        clock=lambda: next(counter), transaction_id_factory=lambda: "tx-kit",
+    )
+    with pytest.raises(standalone.DeploymentError, match="RUNTIME_CONTROL_SOCKET_UNAVAILABLE"):
+        coordinator.execute(_request(tmp_path))
+    assert "activate" not in installer.calls
+    journal = json.loads(coordinator.paths.journal.read_text(encoding="utf-8"))
+    assert journal["state"] == "verify_failed"
+    assert journal["error_code"] == "runtime_quiesce_denied"

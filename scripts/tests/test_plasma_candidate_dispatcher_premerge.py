@@ -76,7 +76,25 @@ def fake_codex_run(command, **kwargs):
     return real_run(command, **kwargs)
 def hosted_stub(task, **kwargs):
     return original(task, executor=fake_codex_run, **kwargs)
-with patch.object(dispatcher, "run_codex_task", side_effect=hosted_stub):
+# Host-only fixture: mock exactly the trusted public PR GET. Never network.
+event_file = Path(sys.argv[sys.argv.index("--event") + 1])
+fixture_pr = event_file.parent / "pr.json"
+class FakePublicResponse:
+    status = 200
+    def read(self, limit):
+        return fixture_pr.read_bytes()[:limit]
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        return False
+def fake_public_get(request, *, timeout):
+    assert request.full_url.startswith(
+        "https://api.github.com/repos/physicslu/plasma/pulls/")
+    assert timeout == 15
+    assert "Authorization" not in request.headers
+    return FakePublicResponse()
+with patch.object(dispatcher, "urlopen", side_effect=fake_public_get), \
+     patch.object(dispatcher, "run_codex_task", side_effect=hosted_stub):
     sys.argv = [str(root / "scripts/plasma_development_dispatch.py"), *sys.argv[2:]]
     raise SystemExit(dispatcher.main())
 """
@@ -135,19 +153,7 @@ def smoke() -> None:
         codex = fake_bin / "codex"
         codex.write_text(CODEX_STUB)
         codex.chmod(0o700)
-        # The worker now rechecks live PR metadata; this test must stub
-        # only that precise GitHub API request, never contact real GitHub.
-        gh = fake_bin / "gh"
-        gh.write_text(
-            "#!/usr/bin/env python3\n"
-            "from pathlib import Path\n"
-            "import sys\n"
-            "if len(sys.argv) != 3 or sys.argv[1] != 'api' or "
-            f"sys.argv[2] != 'repos/physicslu/plasma/pulls/{PR_NUMBER}':\n"
-            "    raise SystemExit(2)\n"
-            "sys.stdout.write((Path(__file__).resolve().parent.parent / 'pr.json').read_text())\n"
-        )
-        gh.chmod(0o700)
+        # Public HTTPS PR metadata is stubbed in HOSTED_STUB_CLI only.
         clean_env = {
             "PATH": str(fake_bin) + os.pathsep + os.environ.get("PATH", "/usr/bin:/bin"),
             "HOME": str(temp),

@@ -57,7 +57,8 @@ test("shared component exposes semantic operation, policy and action test hooks"
 test("PMode and EMode runtime tests consume one Programming Job test driver", () => {
   assert.match(sharedDriver, /expectedFields:[^\n]*\["target", "image", "operations", "policy"\]/);
   assert.match(sharedDriver, /expectedActions:[^\n]*\["start", "status", "abort"\]/);
-  assert.match(sharedDriver, /expectedOperations:[^\n]*\["erase", "program", "verify", "read"\]/);
+  assert.match(sharedDriver, /engineering:\s*\["erase", "program", "verify"\]/);
+  assert.match(sharedDriver, /production:\s*\["erase", "program", "verify", "read"\]/);
   assert.match(sharedDriver, /expectedPolicies:[^\n]*\["repeat", "retry", "stop"\]/);
   assert.match(sharedDriver, /export async function expectProgrammingJobContract/);
   assert.match(sharedDriver, /export function programmingJobOperation/);
@@ -122,11 +123,13 @@ test("Operator UI exposes one canonical first-level Panel Header and Toggle owne
 test("Programming Job keeps approved body structure without owning Panel Header presentation", () => {
   assert.match(sharedComponent, /import \{ OperatorPanel, OperatorPanelToggle \} from "\.\/operator-panel"/);
   assert.match(sharedComponent, /<OperatorPanelToggle/);
-  assert.match(sharedCss, /\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*128px minmax\(0, 1fr\)/);
+  assert.match(sharedCss, /\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 180px\) minmax\(0, 1fr\)[\s\S]*align-items:\s*start/);
   assert.match(sharedCss, /\.programmingJobField > strong\s*\{[\s\S]*font-size:\s*var\(--operator-field-label-font-size\)/);
   assert.match(sharedCss, /\.programmingJobImageControl\s*\{[\s\S]*min-height:\s*var\(--operator-control-min-height\)/);
   assert.match(sharedCss, /\.programmingJobOperationChecks input\s*\{[\s\S]*width:\s*var\(--operator-checkbox-size\)/);
   assert.match(sharedCss, /\.programmingJobPolicyControls input,[\s\S]*\.programmingJobPolicyControls select\s*\{[\s\S]*min-height:\s*var\(--operator-control-min-height\)/);
+  // The label column has one owner: no mode-scoped override of it is left.
+  assert.doesNotMatch(sharedCss, /data-programming-job-fields="engineering"\] \.programmingJobField\s*\{/);
   assert.match(sharedCss, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.08fr\) minmax\(0, 1fr\)/);
   assert.match(sharedCss, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*min-height:\s*var\(--operator-action-min-height\)/);
   assert.match(sharedCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*var\(--operator-action-min-height\)/);

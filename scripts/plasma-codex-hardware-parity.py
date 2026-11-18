@@ -214,7 +214,7 @@ def check_credentials_metadata(user: str) -> str:
         account = pwd.getpwnam(user)
         base = Path(account.pw_dir)
         d = base / ".config/plasma"
-        file = d / "z2-dev-credentials.json"
+        file = d / "z2-login-smoke.json"
         if file.is_symlink() or d.is_symlink():
             return "SYMLINK_REFUSED"
         meta = file.stat()

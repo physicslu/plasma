@@ -15,6 +15,10 @@ on:
       - "pl/tests/test_lt02_native_hil.py"
       - ".github/workflows/pl-lt02-hil.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

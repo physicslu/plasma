@@ -1,0 +1,15 @@
+{
+  "schema": "plasma.ppu.enrollment-button-profile.v1",
+  "board": "pynq-z2",
+  "enabled": false,
+  "disabled_reason": "LOM-P2A-2 Gate 1: J7 pin 6 (AR_RST / PS MIO12) wiring, live pinmux and GPIO ownership not yet verified on the Z2 (Gate 2 hardware step)",
+  "gpio": {
+    "chip_label": "zynq_gpio",
+    "line": 12,
+    "active_low": true
+  },
+  "debounce_ms": 50,
+  "hold_ms": 3000,
+  "poll_ms": 10,
+  "hardware_notes": "Normally-open button between J7 pin 6 (AR_RST -> PS_MIO12_500, bank 500 3.3 V, R236 10k pull-up) and J7 pin 2/3 (GND), per TUL PYNQ-Z2 schematic R12 p4/p10/p12. AR_RST is also driven low by on-board Q9 (NC7WZ07, open-drain) during PS_SRST_B (SRST1 button); a press on AR_RST cannot reach PS_SRST_B. MIO12 must remain an input."
+}

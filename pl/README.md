@@ -23,37 +23,38 @@ PPU
 
 ## 目錄
 
-目前 PL 結構：
+目前 PL 結構（`rtl/`、`verification/` 等請直接看目錄內容）：
 
 ```text
 pl/
 ├── AGENTS.md
-├── constraints/
-│   └── pynq-z2/
-│       ├── pynq-z2-base.xdc
-│       └── btled.xdc
-├── projects/
-│   └── btled/
-│       ├── README.md
-│       ├── create_project.tcl
-│       └── build_bitstream.tcl
+├── constraints/pynq-z2/      # XDC 正本
+├── projects/                 # Vivado 專案 Tcl 與說明（見下表）
 ├── rtl/
-│   ├── examples/
-│   │   └── btled.sv
-│   ├── site/                 # production per-Site RTL placeholder
-│   ├── bus/                  # shared bus/interconnect RTL
-│   └── top/                  # Plasma PL top-level integration
-├── verification/
-│   ├── cocotb/               # Python functional tests
-│   ├── sva/                  # separate SystemVerilog assertions
-│   └── models/               # Python reference/golden models
-├── sim/                      # minimal HDL simulation harnesses when needed
+│   ├── bus/                  # AXI-Lite／interconnect RTL
+│   ├── site/                 # per-Site RTL（SWD waveform／transaction 等）
+│   ├── examples/             # btled 等流程範例
+│   └── top/
+├── verification/             # cocotb、SVA、reference models
+├── sim/
+├── hil/                      # 歷史 HIL 程式與保留的共用安全 helper
 ├── tests/
-│   └── test_source_layout.py
 └── build/                    # generated Vivado output; not committed
 ```
 
-原先尚未有正式 Plasma production FPGA module；現在已新增首個 Z2 EMIO GPIO／PL Identity **PoC 候選 RTL**，但尚未通過 Vivado 與實體 Z2 驗收。`site/`、`bus/`、`top/` 與 verification placeholders 是為第一個正式 module 保留的 source layout；實際 RTL、cocotb、SVA、reference model 或 harness 應在有需求時取代 placeholder，而不是為外觀建立空架構。
+| `projects/` | 狀態 |
+| --- | --- |
+| `btled` | 開發流程範例（按鍵→LED），不是 Plasma 產品 RTL。 |
+| `z2-bluepill-rbb` | 目前 Blue Pill SWD PoC 的 Image Manifest；**main 上只有 `image-manifest.json`**，RTL／Vivado 原始碼在未合併的 PR #1142，無法從 main 重新建置。 |
+| `z2-fixed-unified-site1` | F1-B 固定 ABI Site 1 PS7 整合；**已淘汰並刪除**（2026-11-02，原始碼見 Git 歷史）。 |
+| `z2-swd-gpio` | PS EMIO GPIO software bit-bang；**已退役**，建置入口停用。 |
+| `z2-swd03-axi` | FPGA 內部合成 DPIDR responder，無外部腳位；**已退役**。 |
+| `z2-control-waveform` | PSPL-02／SWD-00 內部 PL loopback；host-only 候選，Z2 載入未驗收。 |
+| `z2-identity` | Identity-only PS／PL AXI 實驗。 |
+| `z2-lt02-axi` | LT02-04 五 aperture MMIO loopback；只有 source／build recipe。 |
+| `swd-transaction` | SWD-01／SWD-02 transaction transport 與 virtual target（host-only）。 |
+
+`site/`、`bus/`、`top/` 與 verification 目錄應隨實際 RTL、cocotb、SVA 需求成長，而不是為外觀建立空架構。
 
 ## 原則
 
@@ -70,13 +71,12 @@ pl/
 
 目前 `btled` 只是開發流程驗證範例；正式 Plasma RTL 將依功能放在 `rtl/site/`、`rtl/bus/`、`rtl/top/`，並依 SWD/SPI/I2C 等實際介面需求建立 protocol-specific modules。
 
-## 首個 FPGA SWD EMIO / Identity 建置候選
+## 現行 Blue Pill SWD PoC 與退休路徑
 
-- [PYNQ-Z2 SWD EMIO GPIO + PL Identity 工程](projects/z2-swd-gpio/README.md)：Site 1 的 SWD GPIO proof-of-path、AXI4-Lite Identity ABI v1、Bitstream + HWH + Manifest、SWPC 一鍵 Vivado Build；尚未完成 Vivado/HIL 實證。
-- `rtl/site/swd_emio_bridge.sv` 是 PS EMIO GPIO 的 PL 腳位橋接；**不是**高速 FPGA SWD Master。
-- `rtl/bus/pl_identity_axi_lite.sv` 是首個 PS 可讀的 PL Identity register block。
-- [LT02 five-aperture PS↔PL MMIO Loopback Vivado candidate](projects/z2-lt02-axi/README.md)：保留原四個內部 Fixture Apertures，新增獨立 2 KiB AXI Scratchpad；僅建立 source、HWH 驗證與 SWPC Build，未宣稱新 Bitstream 或 Z2 HIL PASS。
-- [LT02-05 實體 Z2 Native MMIO HIL](hil/lt02/README.md)：使用正式 Python Driver 與 5 Aperture FPGA candidate，具備自動化前置安全檢查及資料測試；目前僅來源與 Host CI 驗證，實體 HIL 尚未執行。\n- `btled` 仍保留獨立教學範例，不作 Production IC programming qualification。
+- **Current Path 3:** Z2 **PS-local ARMv7 OpenOCD → UNIX WordPort/RemoteBitbang → PL SWD Image → PMOD → Blue Pill**；實際載入/DPIDR 必須有本次 HIL 收據。請見根目錄 `AGENTS.md`、[`bluepill-wordport-session.py`](../scripts/bluepill-wordport-session.py) 及 [Blue Pill Image Manifest](projects/z2-bluepill-rbb/image-manifest.json)。
+- **RETIRED:** [`z2-swd-gpio`](projects/z2-swd-gpio/README.md) 是舊 PS EMIO GPIO software bit-bang；舊建置入口已停用。
+- **RETIRED:** [`z2-swd03-axi`](projects/z2-swd03-axi/README.md) 是 FPGA 內部合成 DPIDR，沒有對 Blue Pill 的 PMOD SWD 外部訊號。
+- [相依盤點／舊文件判讀與防誤用準則](../docs/development/swd-legacy-path-retirement.md)。保留的共用 Identity、Board Files、RTL、LT02 合成測試不能替代實體 SWD PASS。
 
 ## 快速測試
 

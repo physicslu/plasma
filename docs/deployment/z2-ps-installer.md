@@ -1,6 +1,10 @@
 # PYNQ-Z2 PS Release Kit and Managed Acceptance
 
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) defines the two PPU deployment routes; the `z2-ps` release-kit installer is the internal executor of Route A (product deployment), not a separate route.
+
 Status: **PS-only release-kit implementation with P3 controlled Site Desired runtime activation wiring; every deployment candidate still requires real Z2 qualification**
+
+> **Scope and authority:** This document describes the Z2 **PS release-kit and managed acceptance** path, not blanket authorization for production deployment or physical DUT/FPGA operations. The currently approved deployment mechanism and credentials must be verified against the active PPU Deployment Engine and root [AGENTS.md](../../AGENTS.md); any SSH-based diagnostic or installation examples here do not establish SSH as a required production deployment transport. Preserve the separately approved Factory Recovery boundary.
 
 ## Purpose
 
@@ -18,7 +22,8 @@ Clean PYNQ-Z2
   -> verify/install Plasma-owned Python below /opt/plasma/python
   -> verify/install immutable PPU release
   -> systemd Server + Gateway + bounded runtime-activation helper
-  -> local readiness + PS diagnostic loopback
+  -> local read-only readiness (GET only: health + G13 challenge bound to this Bootstrap)
+  -> Manager signed PS loopback (controller-authorized, G13)
   -> Control Station Add PPU / Validate & Enable
   -> Save Site Desired
   -> controlled Runtime Activation when required
@@ -36,6 +41,10 @@ Real Z2   = install / systemd-DAC / runtime / physical-host validation
 ```
 
 A CI PASS must never be reported as a Real Z2 PASS.
+
+> **Verification checkpoint:** The examples below include `scripts/plasmactl install z2-ps` / `deploy z2-ps` and describe release-kit behavior. Before treating them as current operator instructions, reconcile those exact commands against the active `scripts/plasmactl` implementation and PPU Deployment Engine transaction/rollback tests. Until verified, this document is a PS release-kit reference, not proof of the current SWPC→PPU production transport.
+
+> **Source-backed CLI clarification (Gate 1):** `scripts/plasmactl` dispatches the `z2-ps` profile to `scripts/plasmactl-z2-ps`; the backend implements `install`, `deploy`, `verify`, and `status` commands. This confirms the documented **local Z2 PS release-kit CLI exists**, but does **not** prove the newer single SWPC→PPU Deployment Engine has replaced every legacy SSH engineering path. The separate [unified deployment Gate 1 contract](../architecture/ppu-unified-deployment-gate1.md) explicitly records partial Host-only convergence and a remaining on-device installer gap. Keep these two lifecycle claims separate until independently qualified.
 
 ## Release identity and Python ownership
 
@@ -139,7 +148,6 @@ plasma-z2-ps-kit-<release-id>/
 │   ├── plasmactl
 │   ├── plasmactl-z2-ps
 │   ├── ppu-z2-installer.py
-│   ├── ppu-z2-installer-core.py
 │   ├── z2-python-runtime.py
 │   └── openocd-runtime.py
 ├── artifacts/
@@ -153,7 +161,7 @@ plasma-z2-ps-kit-<release-id>/
     └── README.md
 ```
 
-The P3 installer is intentionally a **two-file bootstrap unit**. `ppu-z2-installer.py` is the P3 wrapper; `ppu-z2-installer-core.py` retains the audited P2 release verification and installation core. The kit is invalid if either file is missing. CI compiles both under Python 3.10, includes both in `SHA256SUMS`, and executes the extracted wrapper with its extracted sibling core.
+The canonical **single-file** `ppu-z2-installer.py` contains release verification, the Z2 installer and P3 runtime-activation integration. It no longer dynamically loads a sibling installer core or modifies a module's global functions. The kit is invalid without the file; CI compiles it under Python 3.10, verifies its `SHA256SUMS` entry, and executes the verified installer.
 
 The Z2 does not need Git, npm, Node.js, Vite, a Plasma source checkout, a compiler, or a local CPython build to consume this kit.
 
@@ -166,10 +174,14 @@ The installer boundary verifies at least:
 3. regular files/directories only and safe extraction limits;
 4. exact internal `SHA256SUMS` file set and digests;
 5. full source identity and `ppu/linux/armv7l` target;
-6. PPU runtime identity and production Device Catalog presence;
+6. PPU runtime identity (no Device Catalog / IC Support is required; a legacy release that still ships them is tolerated, never required);
 7. closed hardware boundary;
 8. explicit Plasma-owned ARMv7 final Python >=3.11;
-9. Server/Gateway canonical configuration identity.
+9. Server/Gateway canonical configuration identity;
+10. the bundled same-commit control plane (`runtime/control-plane/`, PR-B Full-Copy): exact file set and SHA-256 from `control-plane-manifest.json`, the required Bootstrap / Site Worker / Adapter files, and one Site Worker protocol shared by the Runtime client (`plasma_interfaces/site_worker_c3.py`) and the bundled Worker (`ppu_site_worker.py`, currently `plasma.ppu.site-worker.v3`);
+11. the bundled Adapter driver ABI against the selected engine (`/etc/plasma/site-worker-engine.json`), when one is selected.
+
+A release without the control plane (`RELEASE_CONTROL_PLANE_MISSING`), with a Runtime/Worker protocol split (`RELEASE_SITE_WORKER_PROTOCOL_MISMATCH`) or with an unsupported Adapter ABI (`SITE_ADAPTER_ABI_INCOMPATIBLE`) ends `verify_failed` before anything is mutated.
 
 P3 packaging separately verifies the wrapper/core bootstrap pair instead of assuming the repository source tree will be present on the appliance.
 
@@ -218,18 +230,46 @@ The helper is `PartOf=plasma-web.service`; Gateway `Requires=` it. It is not ind
 
 ## First install versus upgrade
 
-A first install may create the fail-closed PS bootstrap topology:
+A first install creates each PPU's declared Site topology, disabled, in its own `/etc/plasma/ppu.yaml`. The installer accepts `--site-count N` (1..8, default 8), forwarded through the existing deployment coordinator. It derives the concurrency ceiling from that same count; `max_supported_sites: 8` remains the capacity ceiling, not the number of configured Sites:
 
 ```yaml
 server:
   max_supported_sites: 8
+  max_concurrent_jobs: 2
 
-sites: []
+sites:
+  - {id: 1, enabled: false, interface: "mock"}
+  - {id: 2, enabled: false, interface: "mock"}
 ```
 
-This means capacity ceiling 8 and configured Site count 0; it does not create `SITE0` and does not hard-code eight Sites into the Web/API topology.
+This example is a 2-Site PPU. A 1/4/8-Site fresh install generates exactly 1/4/8 Site entries and matches the concurrency limit. `enabled` remains independent. The Bootstrap API / unparameterized factory deployment currently defaults to 8 and does not infer actual physical Site count. Other topologies must be explicitly provisioned. No new configuration store or hardware-verification dependency is introduced.
 
-An **upgrade is different**. Existing `/etc/plasma/ppu.yaml` is persisted product state and may contain operator-approved Site Desired records. P3 therefore preserves the existing canonical file instead of regenerating first-install `sites: []`. The release/service wiring changes; the canonical Desired content survives.
+The Gateway Site desired-state path (`POST /api/settings/sites/{id}` with a
+strong `If-Match` ETag, then runtime activation) edits **existing** Sites
+only, so every Site the PPU supports must exist in the canonical file. A
+disabled Site executes nothing; `site_id` stays one-based and `SITE0` remains
+invalid.
+
+An **upgrade is different**. Existing `/etc/plasma/ppu.yaml` is persisted product state and may contain operator-approved Site Desired records. P3 therefore preserves the existing canonical file. The single exception is a one-time migration: a file whose only Site list is the exact former first-install line `sites: []` gets that line replaced by the disabled default Sites above (evidence: `site_desired_state.empty_sites_migrated_to_defaults`). Any other Site list is preserved byte for byte.
+
+An upgrade also **restarts** `plasma-server.service` and `plasma-web.service`
+after `enable --now` (which never restarts a running unit), so the health check
+observes the new release. Before activation the Bootstrap deployment takes the
+running Runtime's bounded TTL quiesce (`quiesce`, 60 s); it is refused while any
+Site executes, and the upgrade then ends `verify_failed`
+(`runtime_quiesce_denied`) without mutating the installation.
+
+## IC Catalog / IC Support (not shipped)
+
+Since OPF S5 / PR-C1 the Runtime kit ships **no** IC Support or Device Catalog
+data, and neither `plasma-server.service` nor `plasma-web.service` sets
+`PLASMA_IC_SUPPORT_ROOT` or `PLASMA_DEVICE_CATALOG_MANIFEST`. Execution is
+decided only by the verified Active Bundle v3, device capability,
+authorization and hardware safety; an enabled non-mock Site starts without
+Catalog data. The PPU Gateway has no Device Selector route (`GET
+/api/devices/search` is an unknown route since S5-B); the Device Selector is
+owned by Manager (Console consumers migrated in PR-C2). Root, install,
+verification and Rollback contracts are unchanged.
 
 ## Site Desired versus Runtime
 
@@ -259,7 +299,7 @@ Two separate races must be closed:
 
 The quiesce lease has a bounded TTL and expires automatically. Gateway/helper failure must not create an indefinite admission lock.
 
-Protocol v3.3 still hides dormant interface/target bindings for disabled Sites. A successful restart can therefore reconcile to `partially_observable`; the UI must not invent evidence and call that state fully proven `in_sync`.
+Protocol v3.3 still hides dormant interface bindings for disabled Sites. A successful restart can therefore reconcile to `partially_observable`; the UI must not invent evidence and call that state fully proven `in_sync`.
 
 ## Deployment activation and rollback
 
@@ -280,6 +320,40 @@ verify everything
 If activation fails, the previous release, canonical configuration, Server/Gateway units, helper unit and config-root metadata are restored within the owned boundary. On first-install failure, candidate managed files are removed rather than promoted as an installation.
 
 The installer also records explicit evidence that an upgrade preserved existing canonical configuration and that runtime activation uses the bounded helper contract.
+
+### Full-Copy: Runtime + Bootstrap + Site Worker + Adapter (PR-B)
+
+The PPU Runtime release carries the complete Bootstrap control plane of the same commit (the file set is `ppu-bootstrap-installer.py` `control_plane_files()`: Bootstrap service and deployment engine, enrollment/controller, B3 installer pair and policy, asset helpers, Package Action control plane, Site Worker v3, Site engine and the ABI-5 Adapter, Root parser and privileged source-only inputs). The Bootstrap deployment coordinator installs it inside the **same** transaction, lock and journal as the Runtime; there is no second installer:
+
+```text
+verify release + control plane + Adapter ABI           (verify_failed, nothing mutated)
+  -> stage immutable <release-id>
+  -> Runtime upgrade quiesce (refused while any Site executes)
+  -> control_plane_installing: durable snapshot of every file to be replaced
+       (/var/lib/plasma-bootstrap/control-plane-snapshots/<transaction>/, 0700)
+  -> existing Bootstrap installer _copy_scripts into /opt/plasma/bootstrap
+  -> verify every installed file SHA-256; write control-plane.json
+       (release id, release git SHA, archive SHA-256, Worker protocol, Adapter ABI)
+  -> activating: existing install_release (restarts Package control + Site Worker,
+       then Server + Gateway) -> readiness
+```
+
+Rollback and recovery:
+
+* control-plane copy or post-copy verification fails → the snapshot is restored byte-exact (files that did not exist are removed); Runtime and Worker were never restarted → `rolled_back`.
+* Runtime activation or readiness fails → the installer calls the coordinator's `on_rollback` **before** restarting the previous Runtime: snapshot restored, Package control + Site Worker restarted on it, then the previous release/config/units are restored → `rolled_back`.
+* any restore or rollback step fails, or the process ends mid-transaction → `recovery_required`. The snapshot is kept; the next deployment is refused and nothing is retried or resent automatically.
+* the kit is refused by verification before any kit command runs → the kit tool exits **3**; the Bootstrap API records `failed` / `kit_preinstall_refused` only after re-proving the Coordinator journal bytes and the `current` release are unchanged. Any other engine failure stays `recovery_required`.
+
+**#1433 one-time transition.** A Bootstrap installed before #1433 (e.g. `783102b9e`) refuses a kit without `scripts/ppu-z2-installer-core.py`. The Z2 PS kit therefore carries that file's exact bytes from `783102b9e` (SHA-256 `8613b3a1…e515`, checked at assembly) as data only: the kit's own `plasmactl` and single-file `ppu-z2-installer.py` never load it, and the Full-Copy coordinator snapshots and then removes it from `/opt/plasma/bootstrap` after a verified control-plane install (a rollback restores it).
+
+**Operator recovery of a pre-install refusal recorded as `recovery_required`** (old Bootstrap): stop only `plasma-bootstrap.service`, run `scripts/ppu-bootstrap-preinstall-recovery.py` as root with the transaction ID and the expected Coordinator journal SHA-256, `current` target and Active Asset Set SHA-256, then start the service. It holds the Coordinator flock, refuses on any mismatch, keeps the original record (and its SHA-256) under `/var/lib/plasma-bootstrap/operator-recovery/`, and atomically records `failed` / `kit_preinstall_refused` with the evidence. It never writes `succeeded` or restores an older record.
+
+Device identity (`/etc/machine-id`), Bootstrap controller/enrollment state, Site seals, the engine selection, FPGA/privileged state and the Active Asset Set are outside the copied file set and are never touched.
+
+Runtime binding: at start the Runtime (`plasma_server.package_actions.from_config`) requires `/opt/plasma/bootstrap/control-plane.json` to name the Active release's git SHA and its own Site Worker protocol, and the loaded `ppu_site_worker.PROTOCOL` to match. Otherwise the Runtime exits (`CONTROL_PLANE_RELEASE_UNBOUND`, `CONTROL_PLANE_RELEASE_MISMATCH`, `SITE_WORKER_PROTOCOL_MISMATCH`), so a new Runtime never runs against an old Worker and a deployment readiness check rolls back.
+
+The running `plasma-bootstrap.service` keeps its in-memory code until it is restarted; the deployment result reports `control_plane.bootstrap_service_restart_required` and never restarts it. Once `control-plane.json` exists, `ppu-bootstrap-installer.py` (factory install and `--refresh-only`) refuses with `BOOTSTRAP_MANAGED_BY_FULL_COPY_DEPLOYMENT`; update Bootstrap by deploying the Runtime release of the same commit.
 
 ## Installation on a clean Z2
 
@@ -307,7 +381,7 @@ bash scripts/plasmactl verify z2-ps
 bash scripts/plasmactl status z2-ps
 ```
 
-The current verifier proves a real ARMv7 host, active Server/Gateway/runtime-activation helper services, canonical Site Desired ownership, P3 installer evidence, the bounded Server/helper Unix-socket DAC contract, Gateway readiness, local PS diagnostic loopback, and the closed hardware boundary. OpenOCD packaging is qualified separately: CI builds both x86_64 and ARMv7 artifacts, executes the ARMv7 runtime under QEMU, checks the bundled script tree and shared-library closure, and runs a software-only dummy-adapter smoke. That evidence is Programming Engine packaging/runtime evidence only. It does **not** issue the controlled restart transaction merely to make verification pass.
+The current verifier proves a real ARMv7 host, active Server/Gateway/runtime-activation helper services, canonical Site Desired ownership, P3 installer evidence, the bounded Server/helper Unix-socket DAC contract, Gateway readiness, the G13 controller challenge served through the Bootstrap admission socket for the same device (GET only; since LOM-P2A-2 P0 the installer sends no write and never reads the controller credential — the signed PS loopback is the Manager's controller-authorized acceptance), and the closed hardware boundary. OpenOCD packaging is qualified separately: CI builds both x86_64 and ARMv7 artifacts, executes the ARMv7 runtime under QEMU, checks the bundled script tree and shared-library closure, and runs a software-only dummy-adapter smoke. That evidence is Programming Engine packaging/runtime evidence only. It does **not** issue the controlled restart transaction merely to make verification pass.
 
 A real P3 activation acceptance should additionally prove on the exact deployed identity:
 

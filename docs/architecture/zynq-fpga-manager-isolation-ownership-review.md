@@ -1,5 +1,7 @@
 # Zynq FPGA Manager isolation and runtime ownership review
 
+> **Term note:** in this document **B1/B2/B3 are the PR #972 FPGA/UIO safety items** — B1 live Fabric UIO ownership handoff, B2 retained-mmap guard, B3 aperture Supervisor. Not the Bundle-stage meaning; see [glossary](../glossary.md#b1b2b3).
+
 > **Status: Host-only review, 2026-10-17. M1 architecture freeze: NO-GO.**
 > This is an evidence ledger and a proposed ownership contract, not an accepted
 > hardware ABI, a board reload procedure, or authorization for HIL-B/C. It

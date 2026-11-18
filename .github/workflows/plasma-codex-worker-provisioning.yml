@@ -1,18 +1,16 @@
-name: PLASMA Codex SWPC host provisioning contracts
+name: PLASMA historical Codex worker provisioning contracts
 
 on:
   pull_request:
     paths:
       - "scripts/plasma-codex-host-provision.sh"
       - "scripts/plasma-codex-worker-readiness.py"
-      - "docs/development/plasma-codex-worker-provisioning.md"
       - ".github/workflows/plasma-codex-worker-provisioning.yml"
   push:
     branches: [main]
     paths:
       - "scripts/plasma-codex-host-provision.sh"
       - "scripts/plasma-codex-worker-readiness.py"
-      - "docs/development/plasma-codex-worker-provisioning.md"
       - ".github/workflows/plasma-codex-worker-provisioning.yml"
 
 permissions:

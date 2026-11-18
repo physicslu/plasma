@@ -3,17 +3,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ManagerRegistryEntry } from "./ppu-registry-api";
 import {
+  admitManagerPpuBundle,
+  installManagerPpuBundle,
   appendManagerPpuBootstrapChunk,
   bytesToBase64,
   commitManagerPpuBootstrapUpload,
   createManagerPpuBootstrapUpload,
   getManagerPpuBootstrap,
   isMissingBootstrapCapabilityRoute,
-  pairManagerPpuBootstrap,
+  enrollManagerPpuBootstrap,
   parseSha256Sidecar,
   runManagerPpuPlatformPsLoopback,
   sha256Hex,
   startManagerPpuBootstrapDeployment,
+  type AdmittedBundle,
   type ManagerBootstrapStatus,
   type PlatformPsLoopbackPayload,
 } from "./ppu-bootstrap-api";
@@ -46,12 +49,15 @@ export default function PpuRuntimeDeployment({
   const [status, setStatus] = useState<ManagerBootstrapStatus | null>(null);
   const [platformCapability, setPlatformCapability] = useState<"checking" | "supported" | "unsupported">("checking");
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"pair" | "deploy" | "loopback" | null>(null);
+  const [busy, setBusy] = useState<"pair" | "deploy" | "bundle" | "b3" | "loopback" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [pairingToken, setPairingToken] = useState("");
+  const [engineeringTicket, setEngineeringTicket] = useState("");
+  const [buttonEnrollment, setButtonEnrollment] = useState<"idle" | "awaiting">("idle");
   const [kit, setKit] = useState<File | null>(null);
   const [sidecar, setSidecar] = useState<File | null>(null);
+  const [bundleFile, setBundleFile] = useState<File | null>(null);
+  const [admitted, setAdmitted] = useState<AdmittedBundle | null>(null);
   const [ppuId, setPpuId] = useState(alias);
   const [facilityId, setFacilityId] = useState("lab");
   const [displayName, setDisplayName] = useState(alias || "Plasma PPU");
@@ -104,7 +110,8 @@ export default function PpuRuntimeDeployment({
   const recoveryRequired = runtime?.state === "recovery_required" || deployment?.state === "recovery_required";
   const firstInstall = runtime?.state === "runtime_absent";
   const maintenanceReady = firstInstall || (runtime?.state === "runtime_active" && hasTrustedIdleObservation);
-  const canPair = Boolean(alias && pairingToken.trim().length >= 32 && busy === null);
+  const canEnroll = Boolean(alias && busy === null);
+  const canClaimTicket = Boolean(alias && /^[0-9a-f]{64}$/.test(engineeringTicket.trim()) && busy === null);
   const canLoopback = Boolean(
     alias
     && pairing?.paired
@@ -129,6 +136,23 @@ export default function PpuRuntimeDeployment({
     && deployment?.state !== "queued"
     && deployment?.state !== "running",
   );
+  const canAdmitBundle = Boolean(
+    alias && bundleFile && bundleFile.size > 0 && bundleFile.size <= 32 * 1024 * 1024
+    && pairing?.paired && pairing.device_match && maintenanceReady
+    && !hasActiveExecution && !recoveryRequired && busy === null
+    && deployment?.state !== "queued" && deployment?.state !== "running",
+  );
+  const canInstallBundle = Boolean(
+    alias && admitted
+    && deployment?.state === "admitted" && deployment?.upload_id === admitted.uploadId
+    && deployment?.transaction_id === admitted.admissionTransactionId
+    && pairing?.paired && pairing.device_match
+    && !hasActiveExecution && !recoveryRequired && busy === null,
+  );
+  const b3Result = deployment?.result && typeof deployment.result === "object"
+    ? deployment.result as Record<string, unknown> : null;
+  const b3FpgaLoad = b3Result?.fpga_load && typeof b3Result.fpga_load === "object"
+    ? b3Result.fpga_load as Record<string, unknown> : null;
   const deploymentTone = useMemo(() => {
     if (!deployment) return "neutral";
     if (deployment.state === "succeeded") return "success";
@@ -136,18 +160,26 @@ export default function PpuRuntimeDeployment({
     return "warning";
   }, [deployment]);
 
-  async function pair() {
-    if (!canPair) return;
+  async function enroll(request: Parameters<typeof enrollManagerPpuBootstrap>[1]) {
+    if (!canEnroll) return;
     setBusy("pair");
     setError(null);
     setNotice(null);
     try {
-      await pairManagerPpuBootstrap(alias, pairingToken);
-      setPairingToken("");
-      setNotice("Platform maintenance credential stored for this PPU. Maintenance authorization is active for the bounded Platform workflow.");
+      const result = await enrollManagerPpuBootstrap(alias, request);
+      if (result.state === "AWAITING_BUTTON") {
+        setButtonEnrollment("awaiting");
+        setNotice("Press and hold the PPU enrollment button for 3 seconds, then select Complete Enrollment.");
+        return;
+      }
+      setButtonEnrollment("idle");
+      setEngineeringTicket("");
+      setNotice(result.controller_mode === "RECOVERY_ONLY"
+        ? `Enrolled (generation ${result.controller_generation}) in RECOVERY_ONLY: ${(result.recovery_blockers ?? []).join(", ")}. Complete recovery before normal writes.`
+        : `This Control Station now controls the PPU (generation ${result.controller_generation}). No token is needed for normal use.`);
       await refresh(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Platform maintenance pairing failed");
+      setError(reason instanceof Error ? reason.message : "PPU enrollment failed");
     } finally {
       setBusy(null);
     }
@@ -205,6 +237,65 @@ export default function PpuRuntimeDeployment({
       setError(reason instanceof Error ? reason.message : "PPU Platform Release update failed");
     } finally {
       setUploadProgress(null);
+      setBusy(null);
+    }
+  }
+
+  async function admitBundle() {
+    if (!canAdmitBundle || !bundleFile) return;
+    setBusy("bundle");
+    setError(null);
+    setNotice(null);
+    setUploadProgress(0);
+    try {
+      // Browser may send data to Manager/BFF, but NEVER receives PPU token.
+      // Admission is strictly non-executing and NOT an install permission.
+      const digest = await sha256Hex(await bundleFile.arrayBuffer());
+      const created = await createManagerPpuBootstrapUpload(alias, bundleFile.size, digest);
+      let offset = 0;
+      while (offset < bundleFile.size) {
+        const bytes = new Uint8Array(await bundleFile.slice(
+          offset, Math.min(offset + CHUNK_BYTES, bundleFile.size),
+        ).arrayBuffer());
+        await appendManagerPpuBootstrapChunk(
+          alias, created.upload.upload_id, offset, bytesToBase64(bytes),
+          await sha256Hex(bytes),
+        );
+        offset += bytes.byteLength;
+        setUploadProgress(Math.round((offset / bundleFile.size) * 100));
+      }
+      await commitManagerPpuBootstrapUpload(alias, created.upload.upload_id);
+      const receipt = await admitManagerPpuBundle(alias, created.upload.upload_id, digest);
+      setAdmitted({
+        uploadId: created.upload.upload_id,
+        archiveSha256: digest,
+        admissionTransactionId: receipt.deployment.transaction_id,
+      });
+      setNotice(`Bundle admitted only (not installed/activated). Transaction: ${receipt.deployment.transaction_id}`);
+      await refresh(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Bundle Admission failed");
+    } finally {
+      setUploadProgress(null);
+      setBusy(null);
+    }
+  }
+
+  async function installBundle(fpgaLoad: boolean) {
+    if (!canInstallBundle || !admitted) return;
+    setBusy("b3");
+    setError(null);
+    setNotice(null);
+    try {
+      const receipt = await installManagerPpuBundle(alias, admitted, fpgaLoad);
+      setAdmitted(null);
+      setNotice(fpgaLoad
+        ? `Install and FPGA load queued. Transaction: ${receipt.deployment.transaction_id}`
+        : `Install queued (no FPGA load). Transaction: ${receipt.deployment.transaction_id}`);
+      await refresh(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Bundle install failed");
+    } finally {
       setBusy(null);
     }
   }
@@ -304,27 +395,36 @@ export default function PpuRuntimeDeployment({
           <header className="ppuPlatformSectionHeader">
             <div>
               <small>MAINTENANCE</small>
-              <h4 id="platform-maintenance-heading">Platform Maintenance</h4>
-              <p>Authorize maintenance independently from programming Registration.</p>
+              <h4 id="platform-maintenance-heading">Local PPU Enrollment</h4>
+              <p>Connect this Control Station to the PPU by physical presence. No token is typed for normal use.</p>
             </div>
           </header>
           <div className="ppuPlatformMaintenanceControls">
+            {buttonEnrollment === "idle" ? (
+              <button className="operatorButton" data-variant="primary" type="button" disabled={!canEnroll} onClick={() => void enroll({ entry: "button", step: "start" })}>
+                {busy === "pair" ? "Requesting..." : "Enroll with PPU Button"}
+              </button>
+            ) : (
+              <button className="operatorButton" data-variant="primary" type="button" disabled={!canEnroll} onClick={() => void enroll({ entry: "button", step: "claim" })}>
+                {busy === "pair" ? "Completing..." : "Complete Enrollment"}
+              </button>
+            )}
             <label className="operatorField">
-              <span>Platform Maintenance Pairing Token</span>
+              <span>Engineering / SD rescue ticket (development)</span>
               <input
                 type="password"
                 autoComplete="off"
-                value={pairingToken}
+                value={engineeringTicket}
                 disabled={busy !== null}
-                placeholder="Factory / recovery pairing token"
-                onChange={event => setPairingToken(event.target.value)}
+                placeholder="64-hex ticket from plasma-enroll arm or plasma-enroll.json"
+                onChange={event => setEngineeringTicket(event.target.value)}
               />
             </label>
-            <button className="operatorButton" type="button" disabled={!canPair} onClick={() => void pair()}>
-              {busy === "pair" ? "Pairing..." : "Authorize Platform Maintenance"}
+            <button className="operatorButton" type="button" disabled={!canClaimTicket} onClick={() => void enroll({ entry: "ticket", ticket: engineeringTicket.trim() })}>
+              Claim Ticket
             </button>
           </div>
-          <p className="ppuPlatformSectionNote">This credential authorizes Platform maintenance. It does not register the PPU for managed programming operations.</p>
+          <p className="ppuPlatformSectionNote">Enrollment authorizes Platform maintenance and replaces any previous controller of this PPU. It does not register the PPU for managed programming operations.</p>
         </section>
 
         <section className="ppuPlatformSection ppuPlatformLoopback" aria-labelledby="platform-loopback-heading">
@@ -406,6 +506,39 @@ export default function PpuRuntimeDeployment({
         </p>
       </section>
 
+      <section className="ppuPlatformSection" aria-labelledby="platform-bundle-admission-heading">
+        <header className="ppuPlatformSectionHeader">
+          <div>
+            <small>BUNDLE ADMISSION ONLY</small>
+            <h4 id="platform-bundle-admission-heading">User Bundle v3</h4>
+            <p>Upload your own verified Bundle v3 Packages. Admission does not install, execute or load FPGA.</p>
+          </div>
+        </header>
+        <div className="ppuPlatformDeploymentForm">
+          <label className="operatorField ppuPlatformFileField">
+            <span>Bundle v3 ZIP (max 32 MiB)</span>
+            <input type="file" accept=".zip" disabled={busy !== null}
+              onChange={event => setBundleFile(event.target.files?.[0] ?? null)} />
+          </label>
+          <button className="operatorButton ppuPlatformDeployButton" type="button"
+            disabled={!canAdmitBundle} onClick={() => void admitBundle()}>
+            {busy === "bundle" ? `Admitting${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Verify & Admit Bundle (No Install)"}
+          </button>
+        </div>
+        <p className="ppuPlatformSectionNote">Each step is authorized by you as the paired owner for this exact file SHA-256; no per-Bundle pre-approval is needed. Admission produces a Receipt only. Format, integrity, Target, FPGA qualification and device locks are still enforced by the PPU.</p>
+        <div className="ppuPlatformDeploymentForm">
+          <button className="operatorButton" type="button"
+            disabled={!canInstallBundle} onClick={() => void installBundle(false)}>
+            {busy === "b3" ? "Submitting" : "Install Only"}
+          </button>
+          <button className="operatorButton ppuPlatformDeployButton" type="button"
+            disabled={!canInstallBundle} onClick={() => void installBundle(true)}>
+            {busy === "b3" ? "Submitting" : "Install and Load FPGA"}
+          </button>
+        </div>
+        <p className="ppuPlatformSectionNote">Install and Load FPGA reloads the PL through the PPU&apos;s protected Root Entry after Runtime Job quiesce, then makes this Bundle the Active Set only if Identity passes. Sites need re-admission afterwards. No DUT operation.</p>
+      </section>
+
       <section className="ppuPlatformDeploymentStatus" aria-label="Platform deployment status" data-tone={deploymentTone}>
         <div>
           <small>PLATFORM DEPLOYMENT</small>
@@ -415,6 +548,18 @@ export default function PpuRuntimeDeployment({
           <small>TRANSACTION</small>
           <span className="ppuPlatformMonoValue">{deployment?.transaction_id ?? "No deployment transaction"}</span>
         </div>
+        {b3FpgaLoad?.requested === true && (
+          <div>
+            <small>FPGA LOAD</small>
+            <span className="ppuPlatformMonoValue">
+              {String(b3FpgaLoad.result)} · {String(b3FpgaLoad.fpga_image_id)} · {String(b3FpgaLoad.identity)}
+            </span>
+          </div>
+        )}
+        {b3Result?.runtime_site_readmission === "REQUIRED" && (
+          <p className="ppuRegistryMessage">Runtime Site re-admission is required after the FPGA reload.</p>
+        )}
+        {deployment?.error_code && <p className="ppuRegistryMessage error">{deployment.error_code}</p>}
         {deployment?.error && <p className="ppuRegistryMessage error">{deployment.error}</p>}
       </section>
         </>

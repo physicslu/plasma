@@ -1,0 +1,67 @@
+{
+ "http_status": 200,
+ "ok": true,
+ "plan": {
+  "activation_required": true,
+  "active_asset_set": {
+   "asset_set_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+   "state": "ACTIVE"
+  },
+  "bundle": {
+   "archive_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+   "archive_size": 21607,
+   "asset_package_id": "img-8d3ffb02b80f7797",
+   "bundle_name": "stm32f103c8t6-site2-img-8d3ffb02b80f",
+   "bundle_schema": "plasma.ppu.bundle.v3",
+   "icpn": "STM32F103C8T6",
+   "image_filename": "plasma-blue-pill-cdc.bin",
+   "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+   "image_size": 18768,
+   "profile": "stm32f103c8t6-site2",
+   "provider": "openocd-platform-reference",
+   "target": {
+    "board": "pynq-z2",
+    "fpga_part": "xc7z020clg400-1",
+    "platform": "linux-armv7"
+   },
+   "version": "1.0.0"
+  },
+  "catalog_gate": "NOT_USED",
+  "confirm_required": "PROGRAM",
+  "fpga_load": false,
+  "plan_id": "1c9d2c6359cec95c8226142489d11083",
+  "ppu_alias": "z2",
+  "route": {
+   "driver_abi": "plasma_swd:5",
+   "flash_base": 134217728,
+   "flash_size": 65536,
+   "icpn": "STM32F103C8T6",
+   "max_image_bytes": 65536,
+   "operations": [
+    "flash_cycle"
+   ],
+   "profile": "stm32f103c8t6-site2",
+   "provider": "openocd-platform-reference",
+   "route_id": "z2-site2-stm32f103c8t6",
+   "sites": [
+    2
+   ],
+   "target": {
+    "board": "pynq-z2",
+    "fpga_part": "xc7z020clg400-1",
+    "platform": "linux-armv7"
+   },
+   "target_config": "target/stm32f1x.cfg",
+   "transport": "fpga"
+  },
+  "schema": "plasma.manager.bundle-programming-plan.v1",
+  "site_id": 2,
+  "steps": [
+   "B1_UPLOAD",
+   "B2_ADMIT",
+   "B3_ACTIVATE",
+   "FLASH_CYCLE_JOB",
+   "VERIFY_RECEIPT"
+  ]
+ }
+}

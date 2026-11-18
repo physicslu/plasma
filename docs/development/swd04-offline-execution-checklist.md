@@ -1,3 +1,5 @@
+> **HISTORICAL / INTERNAL-FIXTURE ONLY — NOT a Blue Pill Path 3 operator runbook.** The `z2-swd03-axi` synthetic responder is retired for external SWD; its DPIDR is not from Blue Pill. Follow root `AGENTS.md` and [retired path inventory](swd-legacy-path-retirement.md) for current PS-local OpenOCD → WordPort → PL SWD. This document remains only for referenced host-only/legacy testing, not hardware authorization.
+
 # SWD-04 offline staging and controlled execution checklist
 
 This document is a procedure, **not hardware authorization**. Offline tests are

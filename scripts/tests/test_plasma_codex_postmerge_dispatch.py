@@ -156,7 +156,7 @@ class PostmergeGateTests(unittest.TestCase):
         wf=(ROOT/".github/workflows/plasma-codex-software-mvp.yml").read_text()
         # The 2026-10-19 one-shot #1034 admission is historical only.
         # New software tasks require the same separate owner Issue trigger as HIL.
-        self.assertIn("issue_comment:",wf)
+        self.assertNotIn("\n  issue_comment:\n",wf)
         self.assertNotIn("workflow_dispatch:",wf)
         self.assertIn("github.event_name == 'issue_comment'",wf)
         self.assertIn("github.event.comment.body == '/plasma-codex hello-c 981'",wf)

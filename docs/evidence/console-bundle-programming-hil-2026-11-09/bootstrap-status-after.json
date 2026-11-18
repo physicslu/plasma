@@ -1,0 +1,143 @@
+{
+ "bootstrap": {
+  "bootstrap": {
+   "api_version": "1",
+   "state": "bootstrap_ready",
+   "version": "0.1.0"
+  },
+  "capabilities": {
+   "bundle_v3_b3_install": true,
+   "bundle_v3_b3_mode": "development",
+   "fpga_update": false,
+   "identity_update": false,
+   "runtime_deployment": true
+  },
+  "deployment": {
+   "admission_transaction_id": "285c0483c5b64f0d9c68a970cdcef8fe",
+   "error": null,
+   "error_code": null,
+   "fpga_load": false,
+   "mode": "activate",
+   "owner_authorization": {
+    "action": "bundle.activate",
+    "authorization_sha256": "47825f1918da09834afc223876639e572d43679cb96c914dbd06cb0353f78ab4",
+    "device_id": "ppu-device-7ed4b30913a9bf6101da5a7a",
+    "method": "paired-console-operation-hmac-sha256",
+    "package_identity_sha256": null,
+    "schema": "plasma.ppu.owner-operation-authorization.v1",
+    "status": "OWNER_AUTHORIZED",
+    "subject_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+    "transaction_id": "285c0483c5b64f0d9c68a970cdcef8fe"
+   },
+   "result": {
+    "active_asset_set": {
+     "already_active": false,
+     "asset_set_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+     "generation": 13
+    },
+    "archive_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+    "bundle_name": "stm32f103c8t6-site2-img-8d3ffb02b80f",
+    "coordinator_receipt": {
+     "api_transaction_id": "d929e9859df14acc91bff2b53043b51b",
+     "coordinator_release_id": "1.0.0-4d2837d483be46b9",
+     "coordinator_state": "asset_set_active",
+     "coordinator_transaction_id": "0d5148b2-a8b4-48f9-a7db-34243c1e3285"
+    },
+    "dut": "NOT_RUN",
+    "files_verified": 4,
+    "fpga": "NOT_RUN",
+    "fpga_load": {
+     "requested": false,
+     "result": "NOT_RUN"
+    },
+    "install_path": "/opt/plasma/assets/staged/4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+    "mode": "activate",
+    "package_order": [
+     "openocd-platform-reference",
+     "stm32f103c8t6-site2",
+     "img-8d3ffb02b80f7797"
+    ],
+    "per_package_install_executed": true,
+    "ready": false,
+    "result": "PASS",
+    "runtime_activation_executed": false,
+    "runtime_site_readmission": "NOT_REQUIRED",
+    "schema": "plasma.ppu.b3-deployment-receipt.v2",
+    "source_commit": null,
+    "stage": "bundle_install_and_activate",
+    "transaction": {
+     "api_transaction_id": "d929e9859df14acc91bff2b53043b51b",
+     "artifact_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+     "asset_activation_fpga": false,
+     "asset_activation_previous": {
+      "asset_set_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+      "fpga": "NOT_VERIFIED",
+      "generation": 12,
+      "profile": "NOT_VERIFIED",
+      "ready": false,
+      "schema": "plasma.ppu.active-assets.v1",
+      "state": "ACTIVE"
+     },
+     "error_code": null,
+     "error_message": null,
+     "kind": "bundle",
+     "module": "stm32f103c8t6-site2-img-8d3ffb02b80f",
+     "package_kind": "bundle",
+     "previous_release": null,
+     "release_artifact": "/var/lib/plasma-bootstrap/uploads/c103534f8bc1436e82caf16848510fbf.tar.gz",
+     "release_id": "1.0.0-4d2837d483be46b9",
+     "schema_version": 1,
+     "sequence": 7,
+     "source_commit": null,
+     "started_at_epoch_s": 1794198267.7196538,
+     "state": "asset_set_active",
+     "transaction_id": "0d5148b2-a8b4-48f9-a7db-34243c1e3285",
+     "updated_at_epoch_s": 1794198268.0594401
+    }
+   },
+   "schema_version": 1,
+   "started_at_epoch_s": 1794198266.3738134,
+   "state": "succeeded",
+   "transaction_id": "d929e9859df14acc91bff2b53043b51b",
+   "updated_at_epoch_s": 1794198268.2333207,
+   "upload_id": "c103534f8bc1436e82caf16848510fbf"
+  },
+  "fpga": {
+   "pl_compatibility": "not_managed",
+   "pl_qualification": "not_qualified",
+   "pl_version": null
+  },
+  "identity": {
+   "device_id": "ppu-device-7ed4b30913a9bf6101da5a7a",
+   "facility_id": null,
+   "hardware_revision": null,
+   "ppu_id": null
+  },
+  "runtime": {
+   "git_sha": "a1b1c6f3b1424ce38d1de7e597ef22d0ef4460f2",
+   "product_version": "0.2.1",
+   "reason": null,
+   "release_id": "0.2.1-a1b1c6f3b142",
+   "state": "runtime_active",
+   "target": "linux-armv7l"
+  },
+  "schema_version": 1,
+  "security": {
+   "control_token_provisioned": true,
+   "operation_authorization": "plasma.ppu.owner-operation-authorization.v1",
+   "publisher_authenticity": "not_qualified",
+   "transport_confidentiality": "not_qualified"
+  }
+ },
+ "bootstrap_endpoint_policy": "z2-ps-same-host:18081",
+ "ok": true,
+ "pairing": {
+  "credential_persistence": "file",
+  "device_id": "ppu-device-7ed4b30913a9bf6101da5a7a",
+  "device_match": true,
+  "paired": true,
+  "updated_at": "2026-11-09T01:20:34.201539+00:00"
+ },
+ "ppu_alias": "z2",
+ "upstream_status": 200
+}

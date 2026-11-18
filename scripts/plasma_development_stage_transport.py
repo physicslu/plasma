@@ -27,13 +27,14 @@ HOME = Path("/home/plasma-codex")
 PRIVATE = HOME / ".config/plasma"
 LOGIN = PRIVATE / "z2-login-smoke.json"
 KNOWN_HOSTS = PRIVATE / "z2-login-known_hosts"
-SUDO = PRIVATE / "z2-swd05-oneshot.json"
-ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-f1b-root-entry"
-MARK = "PLASMA_F1B_PATH2_DEV="
+ROOT_ENTRY = "/usr/local/libexec/plasma/z2-path2-root-entry"
+MARK = "PLASMA_PATH2_STAGE="
 PROMPT = "PLASMA_PATH2_SUDO_PROMPT:"
 TIMEOUT = 105
 MAX_OUTPUT = 8192
-STAGES = ("download", "test", "restore")
+# A stage name is syntax, not a transport-side action allowlist. The
+# installed root-owned module decides which bounded verbs it implements.
+STAGE_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}\Z")
 
 
 class Blocked(ValueError):
@@ -52,7 +53,7 @@ SAFE_FAILURE_CODES = frozenset({
     "HOST_KEY_NOT_PINNED", "STAGE_NOT_ALLOWLISTED", "SOURCE_SHA_INVALID",
     "REMOTE_EXIT_OR_PRIVILEGE_FAILED", "REMOTE_PTY_NOT_DRAINED",
     "REMOTE_OUTPUT_TOO_LARGE", "EXACTLY_ONE_REMOTE_RECEIPT_REQUIRED",
-    "REMOTE_RESULT_NOT_VERIFIED", "F1B_IMAGE_NOT_LOADED",
+    "REMOTE_RESULT_NOT_VERIFIED", "PROJECT_NOT_ALLOWLISTED",
 })
 
 
@@ -72,6 +73,8 @@ ROOT_MANIFEST_DIAGNOSTICS = frozenset({
     "PATH2_PINNED_PYTHON_NOT_INSTALLED", "PATH2_SOURCE_NOT_ROOT_OWNED",
     "PATH2_SOURCE_WRITABLE_BY_OTHERS", "PATH2_REQUIRED_SOURCE_NOT_PINNED",
     "PATH2_APPROVED_SOURCE_HASH_MISMATCH",
+    "PATH2_APPROVED_COMMIT_PIN_INVALID", "PATH2_APPROVED_SOURCE_SHA_MISMATCH",
+    "PATH2_REQUEST_NOT_PINNED", "PATH2_LEGACY_PROJECT_DENIED",
 })
 
 
@@ -107,17 +110,15 @@ def remote_failure(returncode: int, output: bytes) -> str:
     # Reject mixed/duplicate root diagnostic claims and all arbitrary stderr.
     # Do not interpret diagnostics on SSH's own failure exit (255).
     lines = text.splitlines()
-    root_codes = [line for line in lines if line in ROOT_MANIFEST_DIAGNOSTICS
-                  or line == "LiveStageDenied: F1B_IMAGE_NOT_LOADED"]
+    root_codes = [line for line in lines
+                  if line in ROOT_MANIFEST_DIAGNOSTICS]
     if returncode == 2 and len(root_codes) == 1:
-        if root_codes[0] in ROOT_MANIFEST_DIAGNOSTICS:
-            return "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED"
-    if returncode == 1 and root_codes == ["LiveStageDenied: F1B_IMAGE_NOT_LOADED"]:
-        return "F1B_IMAGE_NOT_LOADED"
+        return "Z2_ROOT_SOURCE_OR_IMAGE_BLOCKED"
     return "REMOTE_EXIT_OR_PRIVILEGE_FAILED"
 
 
-def parse_receipt(stage: str, source_sha: str, output: bytes) -> dict:
+def parse_receipt(stage: str, source_sha: str, output: bytes,
+                  project: str) -> dict:
     text = output.decode("utf-8", "replace")
     matched = re.findall(
         re.escape(MARK) + r"([^\r\n]{1,3000})\r?(?:\n|\Z)", text)
@@ -128,15 +129,21 @@ def parse_receipt(stage: str, source_sha: str, output: bytes) -> dict:
     except (ValueError, RecursionError):
         raise Blocked("REMOTE_RECEIPT_INVALID") from None
     need(type(data) is dict and data.get("stage") == stage
+         and data.get("project") == project
          and type(data.get("boot_id")) is str
          and re.fullmatch(r"[a-zA-Z0-9-]{8,64}", data["boot_id"]) is not None
-         and data.get("result") in {
-             "download": ("LOADED_AND_HELD",),
-             "test": ("IDENTITY_PASS",),
-             "restore": ("RESTORED_VERIFIED", "ALREADY_RESTORED"),
-         }[stage], "REMOTE_RESULT_NOT_VERIFIED")
+         and (
+             data.get("result") in {
+                 "download": ("LOADED_AND_HELD",),
+                 "test": ("IDENTITY_PASS", "DPIDR_PASS"),
+                 "restore": ("RESTORED_VERIFIED", "ALREADY_RESTORED"),
+             }[stage] if stage in ("download", "test", "restore")
+             else (stage == "audit" and data.get("result") ==
+                   "READ_ONLY_AUDIT_NOT_HARDWARE_ADMISSION"
+                   and data.get("hardware_write_authorized") is False)
+         ), "REMOTE_RESULT_NOT_VERIFIED")
     return {"stage": stage, "source_sha": source_sha,
-            "real_z2": True, "boot_id": data["boot_id"],
+            "project": project, "real_z2": True, "boot_id": data["boot_id"],
             "result": data["result"]}
 
 
@@ -160,17 +167,20 @@ def private_json(path: Path) -> dict:
 def enrollment() -> tuple[str, str, str]:
     need(pwd.getpwuid(os.geteuid()).pw_name == WORKER and
          os.geteuid() != 0, "SWPC_RUNNER_IDENTITY_DENIED")
+    # The ONLY Z2 login/sudo credential file shared by Path 2 and Path 3.
+    # Do not select another host through a legacy per-task or operator file.
     ssh = private_json(LOGIN)
-    sudo = private_json(SUDO)
-    need(type(ssh) is dict and set(ssh) == {
-         "ssh_host", "ssh_username", "ssh_password"} and
+    sudo_password = ssh.get("sudo_password", ssh.get("ssh_password")) \
+        if type(ssh) is dict else None
+    need(type(ssh) is dict and
+         {"ssh_host", "ssh_username", "ssh_password"} <= set(ssh) <=
+         {"ssh_host", "ssh_username", "ssh_password", "sudo_password"} and
          ssh["ssh_username"] == "xilinx" and
          type(ssh["ssh_host"]) is str and
          re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,250}", ssh["ssh_host"]) and
          type(ssh["ssh_password"]) is str and ssh["ssh_password"] and
-         type(sudo) is dict and
-         type(sudo.get("sudo_password")) is str and
-         sudo["sudo_password"], "SSH_OR_SUDO_ROUTE_NOT_ENROLLED")
+         type(sudo_password) is str and sudo_password,
+         "SSH_OR_SUDO_ROUTE_NOT_ENROLLED")
     kh = KNOWN_HOSTS.lstat()
     need(stat.S_ISREG(kh.st_mode) and
          kh.st_uid == os.geteuid() and
@@ -180,12 +190,26 @@ def enrollment() -> tuple[str, str, str]:
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         check=False, timeout=5)
     need(chk.returncode == 0, "HOST_KEY_NOT_PINNED")
-    return ssh["ssh_host"], ssh["ssh_password"], sudo["sudo_password"]
+    return ssh["ssh_host"], ssh["ssh_password"], sudo_password
 
 
-def execute(stage: str, source_sha: str) -> dict:
-    need(stage in STAGES, "STAGE_NOT_ALLOWLISTED")
+def execute(stage: str, source_sha: str, project: str | None = None) -> dict:
+    """Execute an exact reviewed operation through the existing Z2 Root Entry.
+
+    project=None is the direct CLI contract: no runtime Project/Profile/Stage
+    selection; the Root Entry chooses its reviewed implementation. An explicit
+    project is legacy-only and remains bounded until the old route is deleted.
+    """
+    need(type(stage) is str and STAGE_NAME.fullmatch(stage) is not None,
+         "STAGE_INVALID")
     need(bool(re.fullmatch(r"[a-f0-9]{40}", source_sha)), "SOURCE_SHA_INVALID")
+    direct = project is None
+    if direct:
+        project = "pl/projects/z2-fixed-unified-site1"  # existing reviewed Z2 handler
+    else:
+        need(type(project) is str and re.fullmatch(
+            r"pl/projects/[a-z0-9][a-z0-9-]{2,69}", project) is not None,
+            "PROJECT_NOT_ALLOWLISTED")
     try:
         host, password, sudo_password = enrollment()
     except Blocked:
@@ -194,7 +218,10 @@ def execute(stage: str, source_sha: str) -> dict:
         raise Blocked("LOCAL_ENROLLMENT_DENIED") from None
     # Remote command is fixed; only the three bounded stage tokens vary.
     # Root-side executable itself checks protected code/firmware manifest.
-    remote = ("sudo -S -p " + PROMPT + " " + ROOT_ENTRY + " " + stage)
+    # Git source_sha remains an operator/PR audit tag; privileged Root
+    # authenticates the installed executable closure by its own manifest.
+    # No Git Commit Pin, Project, or path is forwarded to Root.
+    remote = "sudo -S -p " + PROMPT + " " + ROOT_ENTRY + " " + stage
     argv = [
         "/usr/bin/ssh", "-F", "/dev/null", "-T",
         "-o", "StrictHostKeyChecking=yes",
@@ -263,7 +290,7 @@ def execute(stage: str, source_sha: str) -> dict:
         except subprocess.TimeoutExpired:
             raise Blocked("CHILD_OWNERSHIP_UNCERTAIN") from None
         need(returncode == 0, remote_failure(returncode, bytes(response)))
-        return parse_receipt(stage, source_sha, bytes(response))
+        return parse_receipt(stage, source_sha, bytes(response), project)
 
     finally:
         try:
@@ -289,3 +316,10 @@ def execute(stage: str, source_sha: str) -> dict:
             if slave != -1:
                 os.close(slave)
             os.close(master)
+
+
+def execute_operation(operation: str, source_sha: str) -> dict:
+    """Path 2 direct operation, with no Stage or Project Profile admission."""
+    need(type(operation) is str and operation in ("download", "test", "restore"),
+         "STAGE_NOT_ALLOWLISTED")
+    return execute(operation, source_sha)

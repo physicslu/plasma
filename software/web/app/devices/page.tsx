@@ -4,7 +4,7 @@ import { useWorkspaceSession } from "../workspace-session";
 import { ICSelector } from "./ic-selector";
 
 export default function DevicesPage() {
-  const { hydrated, apiBase } = useWorkspaceSession();
+  const { hydrated } = useWorkspaceSession();
 
   if (!hydrated) {
     return <main className="devicesPage" aria-busy="true">Resolving Control Station routing…</main>;
@@ -12,7 +12,7 @@ export default function DevicesPage() {
 
   return (
     <main className="devicesPage">
-      <ICSelector usage="lookup" apiBase={apiBase} />
+      <ICSelector usage="lookup" />
     </main>
   );
 }

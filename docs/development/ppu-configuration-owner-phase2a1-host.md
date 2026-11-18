@@ -1,5 +1,7 @@
 # Phase 2A.1 — PPU Configuration Owner（Host-only Control Model）
 
+> **Term note:** in this document **B1/B2/B3 are the PR #972 FPGA/UIO safety items** — B1 live Fabric UIO ownership handoff, B2 retained-mmap guard, B3 aperture Supervisor. Not the Bundle-stage meaning; see [glossary](../glossary.md#b1b2b3).
+
 > **Status: Host-only implementation candidate. M1 Architecture Freeze = NO-GO.**
 >
 > 本文件與 `software/python/plasma_interfaces/configuration_owner.py` 僅適用

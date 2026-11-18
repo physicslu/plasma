@@ -99,7 +99,13 @@ class Gate1CSafetyTests(unittest.TestCase):
         self.assertEqual(len(archived), 5)
         self.assertIn("device-catalog-stm32c0-stage-dispatch.yml",
                       {f.name for f in files})
-        self.assertGreaterEqual(len(files) + len(archived) - 1, 325)
+        # Three LA-only Issue #981 workflows were deliberately retired with
+        # the fixed JSON Host Supervisor; keep the full remaining scan.
+        for obsolete in ("plasma-codex-la2016.yml",
+                         "plasma-codex-la2016-direct.yml",
+                         "plasma-codex-la2016-diagnose.yml"):
+            self.assertNotIn(obsolete, {f.name for f in files})
+        self.assertGreaterEqual(len(files) + len(archived) - 1, 322)
         report=gate.workflow_audit(WORKFLOWS)
         self.assertEqual(report["total"],len(files))
         self.assertEqual(report["scanned"],len(files))

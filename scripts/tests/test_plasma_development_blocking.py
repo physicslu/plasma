@@ -17,7 +17,6 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import plasma_development_dispatch as dispatch
 import plasma_codex_native_preflight as native
-import plasma_path2_stage_orchestrator as stages
 import test_plasma_development_dispatch as fixtures
 
 
@@ -39,35 +38,15 @@ class BlockingPolicy(unittest.TestCase):
                 dispatch.run_task(CPU.task, executor=lambda *a, **k:
                                   subprocess.CompletedProcess(a[0], 7, expected, b''))
 
-    def test_inert_options_do_not_add_stages(self):
-        for initial in ('build', 'download', 'test'):
-            opts = {flag: True for flag in stages.FLAGS}
-            request = dict(stage=initial, source_sha='a'*40,
-                           profile_id='f1b-site1-v1', target_id='z2-development',
-                           options=opts)
-            receipt = dict(stage='build', status='PASS', source_sha='a'*40,
-                           profile_id='f1b-site1-v1', artifact_sha256='b'*64,
-                           evidence_sha256='c'*64)
-            if initial != 'build':
-                request['artifact_sha256'] = 'b'*64
-                if initial == 'download':
-                    request['build_receipt'] = receipt
-                else:
-                    request['load_receipt'] = receipt | dict(
-                        stage='download', target_id='z2-development',
-                        lease_id='development-held', load_evidence_sha256='d'*64)
-            clean = stages.validate_request(request)
-            expected = {'build': ('build','download','test'),
-                        'download': ('download','test'), 'test': ('test',)}[initial]
-            self.assertEqual(stages.required_stages(initial, clean['options']), expected)
-            called = []
-            def fail(ctx):
-                called.append(ctx['stage'])
-                return dict(stage=ctx['stage'], status='NO_GO', reason='EXECUTION_FAILED')
-            outcome = stages.run(request, adapters={s: fail for s in expected})
-            self.assertEqual(called, [initial])
-            self.assertEqual(outcome['status'], 'NO_GO')
-            self.assertEqual(outcome['completed'], [])
+    def test_retired_root_route_cannot_authorize_any_fixed_operation(self):
+        from test_plasma_path2_root_direct import make_event, context
+        registry = dispatch.parse_json(dispatch.MANIFEST)
+        for operation in ("download", "test", "restore", "full", "build"):
+            with self.subTest(operation=operation):
+                event = make_event(operation)
+                with self.assertRaisesRegex(
+                        dispatch.Denied, "WORK_ORDER_CAPABILITY_DENIED"):
+                    dispatch.authorize(event, context(), registry)
 
     def test_both_paths_can_reauthorize_same_host_order_but_not_tamper(self):
         fixtures.GenericWorkOrderContracts.setUpClass()
@@ -106,7 +85,7 @@ class BlockingPolicy(unittest.TestCase):
                 'contains': lambda items, item: item in items,
                 'fromJSON': json.loads,
             })
-        for capability in ('cpu-only', 'vivado-host-build', 'path2-stage-contract'):
+        for capability in ('cpu-only', 'vivado-host-build', 'operator-cli'):
             self.assertTrue(admitted('path2-cli', capability))
             self.assertTrue(admitted('path2-cli', capability, **{
                 'needs.development-claim.result': 'failure'}))
@@ -117,6 +96,7 @@ class BlockingPolicy(unittest.TestCase):
             'needs.development-codex.result': 'success'}))
         self.assertFalse(admitted('path2-cli', 'z2-cpu-only'))
         self.assertFalse(admitted('path2-cli', 'arbitrary-shell'))
+        self.assertFalse(admitted('path2-cli', 'z2-root-operation'))
 
 
 class NativePreflightWorkOrder(unittest.TestCase):

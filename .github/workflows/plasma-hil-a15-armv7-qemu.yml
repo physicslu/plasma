@@ -11,7 +11,6 @@ on:
       - 'scripts/hil-a15-contract.py'
       - 'scripts/tests/test-hil-a15-qemu.py'
       - 'docs/development/hil-a15-qemu-armv7.md'
-      - 'docs/README.md'
 
 permissions:
   contents: read

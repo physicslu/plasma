@@ -1,0 +1,105 @@
+{
+    "protocol_version": "3.3",
+    "message_type": "response",
+    "ok": true,
+    "job": {
+        "job_id": "job-20261109-044035-b8cbd4da",
+        "site_id": 2,
+        "operation": "flash_cycle",
+        "state": "success",
+        "created_at": "2026-11-09T04:40:35.026779+00:00",
+        "started_at": "2026-11-09T04:40:35.302142+00:00",
+        "cancel_requested": false,
+        "stage": "flash_cycle",
+        "stage_state": "completed",
+        "stage_progress_percent": 100.0,
+        "progress_percent": 100.0,
+        "bytes_done": 18768,
+        "bytes_total": 18768,
+        "attempt": 1,
+        "attempt_history": [
+            {
+                "attempt": 1,
+                "state": "success",
+                "started_at": "2026-11-09T04:40:35.315681+00:00",
+                "finished_at": "2026-11-09T04:40:42.062738+00:00",
+                "elapsed_ms": 6747,
+                "retry_scheduled": false,
+                "error": null
+            }
+        ],
+        "retry_exhausted": false,
+        "active_asset_set": {
+            "schema": "plasma.ppu.active-assets.v1",
+            "state": "ACTIVE",
+            "asset_set_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+            "generation": 13,
+            "ready": false,
+            "fpga": "NOT_VERIFIED",
+            "profile": "NOT_VERIFIED"
+        },
+        "updated_at": "2026-11-09T04:40:42.063569+00:00",
+        "result": {
+            "job_id": "job-20261109-044035-b8cbd4da",
+            "site_id": 2,
+            "operation": "flash_cycle",
+            "state": "success",
+            "created_at": "2026-11-09T04:40:35.026779+00:00",
+            "started_at": "2026-11-09T04:40:35.302142+00:00",
+            "finished_at": "2026-11-09T04:40:42.062908+00:00",
+            "elapsed_ms": 6747,
+            "attempts": 1,
+            "retry_exhausted": false,
+            "attempt_history": [
+                {
+                    "attempt": 1,
+                    "state": "success",
+                    "started_at": "2026-11-09T04:40:35.315681+00:00",
+                    "finished_at": "2026-11-09T04:40:42.062738+00:00",
+                    "elapsed_ms": 6747,
+                    "retry_scheduled": false,
+                    "error": null
+                }
+            ],
+            "image_name": "plasma-blue-pill-cdc.bin",
+            "image_size": 18768,
+            "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+            "output_files": [],
+            "error": null,
+            "details": {
+                "stages": [
+                    "erase",
+                    "program",
+                    "verify",
+                    "readback"
+                ],
+                "bytes_programmed": 18768,
+                "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+                "flash_cycle": {
+                    "adapter": "z2-abi5-swd-openocd5088",
+                    "adapter_khz": 2000,
+                    "bytes_verified": 18768,
+                    "icpn": "STM32F103C8T6",
+                    "openocd_rc": 0,
+                    "operation": "flash_cycle",
+                    "readback_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+                    "result": "PASS",
+                    "safe_off": true,
+                    "site": 2,
+                    "target_config": "target/stm32f1x.cfg",
+                    "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+                    "session_id": "bc95043abdfcca01433627bf9b8481da",
+                    "opf_provider_package": "openocd-platform-reference",
+                    "opf_profile_package": "stm32f103c8t6-site2",
+                    "opf_asset_set_sha256": "4d2837d483be46b960903c2ec3f2b2bb05fd309da96aa9e0ca2ae2758fad5467",
+                    "opf_profile_sha256": "644a76fd5ed433e568e26f8a57761840f4ab7fe3b66430f797ddf9df23bbbdd0",
+                    "opf_driver_abi": "plasma_swd:5",
+                    "opf_openocd_sha256": "b8a7db6706493401c48f0fa08b46a3a167633a7aa314bf0ca209fd7c7ce0f861",
+                    "opf_engine_selection_sha256": "c07ba04c7398979adc7860aea5e0ec54ab088fec2c5891b6f9248ed749b31b05",
+                    "opf_worker_engine_selection_sha256": "c07ba04c7398979adc7860aea5e0ec54ab088fec2c5891b6f9248ed749b31b05",
+                    "opf_worker_epoch": "a055ff30bab15be9874c237b10b1e83d"
+                }
+            }
+        }
+    }
+}

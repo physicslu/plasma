@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -114,6 +116,61 @@ def test_local_control_station_profile_delegates_to_dedicated_backend(tmp_path: 
         assert result.returncode == 0, result.stderr
 
     assert log.read_text(encoding="utf-8").splitlines() == [expected for _, expected in cases]
+
+
+
+def _resolve_local_python_from_fixture(root: Path, configured: str = "") -> subprocess.CompletedProcess[str]:
+    """Execute only the pinned Bash resolver using temporary fake executables."""
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    resolver = "python_is_supported() {" + source.split("python_is_supported() {", 1)[1].split("\nrequire_clean_source() {", 1)[0]
+    harness = (
+        "set -euo pipefail\n"
+        'die() { printf "%s\\n" "$*" >&2; exit 77; }\n'
+        f"plasma_python_root={shlex.quote(str(root))}\n"
+        f"base_python={shlex.quote(configured)}\n"
+        f"{resolver}\n"
+        # Replace qualification with a safe executable check. This test checks
+        # path identity; real version gating remains in python_is_supported().
+        'python_is_supported() { [[ -x "$1" ]]; }\n'
+        'resolve_base_python\nprintf "%s\\n" "$base_python"\n'
+    )
+    return subprocess.run(
+        ["bash", "-c", harness], capture_output=True, text=True, check=False, timeout=10
+    )
+
+
+def test_local_control_station_runtime_aliases_are_one_canonical_interpreter(tmp_path: Path) -> None:
+    base = tmp_path / "cpython-3.12.13-linux-x86_64-gnu"
+    interpreter = base / "bin" / "python3"
+    interpreter.parent.mkdir(parents=True)
+    interpreter.write_text("#!/bin/sh\\nexit 0\\n", encoding="utf-8")
+    interpreter.chmod(0o755)
+
+    (tmp_path / "cpython-3.12-linux-x86_64-gnu").symlink_to(base, target_is_directory=True)
+    venv_alias = tmp_path / "3.12.13" / "bin" / "python3"
+    venv_alias.parent.mkdir(parents=True)
+    venv_alias.symlink_to(interpreter)
+    (tmp_path / "broken").symlink_to(tmp_path / "missing-runtime", target_is_directory=True)
+
+    result = _resolve_local_python_from_fixture(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == str(interpreter.resolve())
+    # The saved explicit path must remain unchanged: do not silently change
+    # the installed Control Station's selected venv or config.
+    selected = _resolve_local_python_from_fixture(tmp_path, str(venv_alias))
+    assert selected.returncode == 0
+    assert selected.stdout.strip() == str(venv_alias)
+
+
+def test_local_control_station_distinct_interpreters_still_fail_closed(tmp_path: Path) -> None:
+    for name in ("cpython-3.12.13-linux-x86_64-gnu", "cpython-3.13.0-linux-x86_64-gnu"):
+        python = tmp_path / name / "bin" / "python3"
+        python.parent.mkdir(parents=True)
+        python.write_text("#!/bin/sh\\nexit 0\\n", encoding="utf-8")
+        python.chmod(0o755)
+    result = _resolve_local_python_from_fixture(tmp_path)
+    assert result.returncode == 77
+    assert "multiple Plasma Python runtimes found" in result.stderr
 
 
 def test_local_control_station_is_console_manager_only_and_loopback_bound() -> None:
@@ -273,9 +330,9 @@ def test_z2_ps_backend_keeps_pynq_python_and_hardware_boundary_closed() -> None:
     assert "/usr/bin/python3" not in source
     assert "PS-only" in source
     assert "PL/FPGA/Site/power/real-IC readiness is separate" in source
-    assert "/api/engineering/diagnostics/loopback" in source
-    assert 'loopback.get("endpoint") != "ps"' in source
-    assert 'loopback.get("source") != "ps"' in source
+    # LOM-P2A-2 P0: the kit sends no Gateway write; read-only G13 readiness only.
+    assert "/api/engineering/diagnostics/loopback" not in source
+    assert '"$readiness_tool" --gateway "$base"' in source
 
 
 def test_unknown_profile_fails_closed() -> None:
@@ -364,3 +421,92 @@ def test_swpc_first_install_is_fail_closed_and_cleans_only_a_prechecked_clean_bo
     assert "first install found unmanaged/pre-existing appliance artifact without install evidence" in source
     assert "first install failed; removing only artifacts created inside the clean SWPC Z2-like boundary" in source
     assert "require_clean_first_install_boundary" in source
+
+
+def test_local_control_station_manager_is_bootstrap_capable_with_release_catalog() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    units = source.split("write_units()", 1)[1].split("write_evidence()", 1)[0]
+    assert "-m plasma_manager.bootstrap_server --config $manager_config" in units
+    assert "-m plasma_manager.server --config" not in units
+    assert "Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$current_link/$release_catalog_dir/$catalog_manifest_relative" in units
+    assert "Environment=PLASMA_IC_SUPPORT_ROOT=$current_link/$release_catalog_dir/data/ic-support" in units
+    assert "Environment=PLASMA_RUNTIME_EVIDENCE_ROOT=$current_link/$release_catalog_dir" in units
+    assert 'catalog_manifest_relative="data/device-catalog/production/icpn-v1-manifest.json"' in source
+    # Committed bytes only, exported from the clean HEAD being activated.
+    assert "archive --format=tar HEAD -- data release" in source
+    assert "-c core.autocrlf=false -c core.eol=lf" in source
+    # L3 HIL receipts referenced by the reviewed manifests ship with the Catalog.
+    export = source.split("export_release_catalog() {", 1)[1].split("prepare_release() {", 1)[0]
+    assert '"$destination/release/physical-compatibility"' in export
+    assert 'value.startswith("docs/evidence/")' in export
+    assert 'archive --format=tar HEAD -- "${evidence_paths[@]}"' in export
+
+
+def test_local_control_station_release_catalog_ships_l3_evidence(tmp_path: Path) -> None:
+    """Execute export_release_catalog against this repository's HEAD."""
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    function = "export_release_catalog() {" + source.split("export_release_catalog() {", 1)[1].split("\nprepare_release() {", 1)[0]
+    repo_root = LOCAL_CONTROL_STATION.parents[1]
+    script = (
+        "set -euo pipefail\n"
+        'die() { echo "$*" >&2; exit 1; }\n'
+        f"repo_root={shlex.quote(str(repo_root))}\n"
+        f"base_python={shlex.quote(sys.executable)}\n"
+        f"{function}\n"
+        f"export_release_catalog {shlex.quote(str(tmp_path / 'catalog'))}\n"
+    )
+    subprocess.run(["bash", "-c", script], check=True, timeout=300)
+    catalog = tmp_path / "catalog"
+    manifest = json.loads((catalog / "release/physical-compatibility/l3-configurations-v1.json").read_text(encoding="utf-8"))
+    referenced = {manifest_path for record in manifest["configurations"]
+                  for manifest_path in [record["provenance"]["manager_journal"], record["provenance"]["bootstrap_status"],
+                                        *(receipt["path"] for receipt in record["evidence"])]}
+    assert referenced
+    for rel in referenced:
+        assert (catalog / rel).is_file(), rel
+    shipped = {str(p.relative_to(catalog)) for p in (catalog / "docs").rglob("*") if p.is_file()}
+    assert shipped == referenced
+
+
+def test_local_control_station_release_build_self_tests_manager_selector() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    prepare = source.split("prepare_release() {", 1)[1].split("write_profile_config()", 1)[0]
+    assert 'export_release_catalog "$staging/$release_catalog_dir"' in prepare
+    assert 'validate_release_selector "$staging" || die' in prepare
+    # A reused release without a working Selector Catalog is refused.
+    assert 'validate_release_selector "$release" ||' in prepare
+    selector = source.split("validate_release_selector() {", 1)[1].split("export_release_catalog()", 1)[0]
+    assert '"$release/venv/bin/python" -I -B' in selector
+    assert "import plasma_manager.bootstrap_server" in selector
+    assert "legacy_device_selector.search_response" in selector
+    assert "status != 200" in selector
+
+
+def test_local_control_station_manager_registry_is_durable_profile_state() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    assert 'registry_state="$state_dir/registry.json"' in source
+    config = source.split("write_manager_config()", 1)[1].split("write_units()", 1)[0]
+    assert 'f"  registry_state_path: {q(registry_state)}\\n"' in config
+    rollback = source.split("rollback() {", 1)[1].split("trap rollback ERR", 1)[0]
+    assert "registry.json" not in rollback
+    assert "bootstrap-credentials" not in rollback
+    assert "registry_state" not in rollback
+
+
+def test_local_control_station_verify_requires_manager_selector_and_bootstrap_unit() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    verify = source.split("verify_profile() {", 1)[1].split("status_profile()", 1)[0]
+    assert 'plasma_manager.bootstrap_server --config $manager_config" "$manager_unit"' in verify
+    assert "registry_state_path" in verify
+    assert '/api/devices/search?$selector_probe_query" "Manager Device Selector"' in verify
+    assert "Manager Device Selector is unavailable" in verify
+    assert verify.index("Manager liveness failed") < verify.index("Manager Device Selector is unavailable")
+
+
+def test_local_control_station_accepts_clean_linked_worktree_source() -> None:
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    clean = source.split("require_clean_source() {", 1)[1].split("current_sha()", 1)[0]
+    assert '[[ -e "$repo_root/.git" ]]' in clean
+    assert '[[ -d "$repo_root/.git" ]]' not in clean
+    assert "rev-parse --show-toplevel" in clean
+    assert "--untracked-files=normal" in clean

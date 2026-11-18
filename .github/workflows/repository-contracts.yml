@@ -9,12 +9,16 @@ on:
       - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
+      - "scripts/tests/test-openocd-ps-architecture.py"
       - "scripts/tests/test-adr0002-cross-vendor-discovery.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
       - "scripts/ci/ppu-network-trigger.py"
       - "scripts/plasmactl"
+      - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu_runtime_local_readiness.py"
+      - "scripts/bluepill-wordport-session.py"
       - "software/python/**"
       - "software/web/**"
       - ".github/workflows/python-tests.yml"
@@ -24,6 +28,17 @@ on:
       - ".github/workflows/z2like-demo-qemu.yml"
       - ".github/workflows/openocd-software-qualification.yml"
       - ".github/workflows/persistent-integration-host.yml"
+      - ".github/workflows/mock-cd.yml"
+      - ".github/workflows/mock-cd-browser.yml"
+      - ".github/workflows/control-station-runtime.yml"
+      - ".github/workflows/product-release.yml"
+      - ".github/workflows/kl25-installed-backend-lock-root-v1.yml"
+      - ".github/workflows/plasma-armv7-barrier-hil-a-contract.yml"
+      - ".github/workflows/plasma-codex-hardware-parity.yml"
+      - ".github/workflows/plasma-codex-swpc-preflight.yml"
+      - ".github/workflows/plasma-codex-z2-login.yml"
+      - ".github/workflows/plasma-codex-z2-readiness.yml"
+      - ".github/workflows/plasma-hil-a15-armv7-qemu.yml"
       - ".github/workflows/device-catalog-*.yml"
       - ".github/workflows/repository-contracts.yml"
   pull_request:
@@ -33,12 +48,16 @@ on:
       - ".github/device-catalog-ci-trigger-debt.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
+      - "scripts/tests/test-openocd-ps-architecture.py"
       - "scripts/tests/test-adr0002-cross-vendor-discovery.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
       - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/ci/device-catalog-trigger-governance.py"
       - "scripts/ci/ppu-network-trigger.py"
       - "scripts/plasmactl"
+      - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu_runtime_local_readiness.py"
+      - "scripts/bluepill-wordport-session.py"
       - "software/python/**"
       - "software/web/**"
       - ".github/workflows/python-tests.yml"
@@ -48,6 +67,17 @@ on:
       - ".github/workflows/z2like-demo-qemu.yml"
       - ".github/workflows/openocd-software-qualification.yml"
       - ".github/workflows/persistent-integration-host.yml"
+      - ".github/workflows/mock-cd.yml"
+      - ".github/workflows/mock-cd-browser.yml"
+      - ".github/workflows/control-station-runtime.yml"
+      - ".github/workflows/product-release.yml"
+      - ".github/workflows/kl25-installed-backend-lock-root-v1.yml"
+      - ".github/workflows/plasma-armv7-barrier-hil-a-contract.yml"
+      - ".github/workflows/plasma-codex-hardware-parity.yml"
+      - ".github/workflows/plasma-codex-swpc-preflight.yml"
+      - ".github/workflows/plasma-codex-z2-login.yml"
+      - ".github/workflows/plasma-codex-z2-readiness.yml"
+      - ".github/workflows/plasma-hil-a15-armv7-qemu.yml"
       - ".github/workflows/device-catalog-*.yml"
       - ".github/workflows/repository-contracts.yml"
 
@@ -112,6 +142,9 @@ jobs:
           documentation_exact = {
               "scripts/tests/test-public-doc-sanitization.sh",
               "scripts/tests/test-documentation-integrity.py",
+              "scripts/tests/test-openocd-ps-architecture.py",
+              "scripts/plasmactl-z2-ps",
+              "scripts/bluepill-wordport-session.py",
               "scripts/tests/test-adr0002-cross-vendor-discovery.py",
               "scripts/plasmactl",
               "software/python/plasma_web/gateway_settings.py",
@@ -179,6 +212,8 @@ jobs:
         run: bash scripts/tests/test-public-doc-sanitization.sh
       - name: Test documentation integrity
         run: python scripts/tests/test-documentation-integrity.py
+      - name: Enforce Z2 PS OpenOCD architecture against implementation
+        run: python scripts/tests/test-openocd-ps-architecture.py --self-test
       - name: Enforce ADR-0002 single cross-vendor Phase policy
         run: python scripts/tests/test-adr0002-cross-vendor-discovery.py
 

@@ -8,6 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from .ppu_control_plane_fixture import verify_real_control_plane
+
 ROOT = Path(__file__).resolve().parents[3]
 Z2_BACKEND = ROOT / "scripts" / "plasmactl-z2-ps"
 BOOTSTRAP_KIT = ROOT / "scripts" / "ppu-bootstrap-kit.py"
@@ -21,6 +23,11 @@ assert SPEC and SPEC.loader
 deployment = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = deployment
 SPEC.loader.exec_module(deployment)
+KIT_SPEC = importlib.util.spec_from_file_location("ppu_bootstrap_kit_api_correlation", BOOTSTRAP_KIT)
+assert KIT_SPEC and KIT_SPEC.loader
+kit_tool = importlib.util.module_from_spec(KIT_SPEC)
+sys.modules[KIT_SPEC.name] = kit_tool
+KIT_SPEC.loader.exec_module(kit_tool)
 
 
 class QualificationInstallPaths:
@@ -49,7 +56,14 @@ class QualificationInstaller:
 
     def verify_release(self, artifact, *, sidecar, extract_to):
         Path(extract_to).mkdir(parents=True)
-        return SimpleNamespace(release_id="1.2.3-cccccccccccc", archive_sha256="d" * 64)
+        return SimpleNamespace(release_id="1.2.3-cccccccccccc", archive_sha256="d" * 64,
+                               git_sha="c" * 40)
+
+    def verify_control_plane(self, verified):
+        return verify_real_control_plane(verified)
+
+    def _systemctl(self, *args):
+        return None
 
     def validate_plasma_python(self, path, *, product_root):
         return SimpleNamespace(path=path, version="3.12.13", architecture="armv7l", releaselevel="final")
@@ -71,6 +85,7 @@ class QualificationInstaller:
         try:
             kwargs["health_check"](kwargs["gateway_host"])
         except Exception as exc:
+            kwargs["on_rollback"]()
             raise RuntimeError(
                 f"activation failed and previous configuration/release was restored: {exc}"
             ) from exc
@@ -109,6 +124,7 @@ def _qualification_coordinator(tmp_path: Path, installer: QualificationInstaller
         ),
         installer=installer,
         transaction_id_factory=lambda: "qualification-tx",
+        runtime_restart_quiesce=lambda: {"token": "quiesce-test", "ttl_s": 60},
     )
 
 
@@ -120,12 +136,53 @@ def test_z2_backend_routes_activation_through_durable_coordinator():
     assert 'python3 "$ppu_installer" "${args[@]}"' not in source
     assert '--installer "$ppu_installer"' in source
     assert '--product-root "$product_root"' in source
+    assert '--api-transaction-id) ' in source
+    assert 'args+=(--api-transaction-id "$api_transaction_id")' in source
+
+
+def test_kit_propagates_api_id_to_existing_plasmactl_without_new_installer(tmp_path: Path):
+    product = tmp_path / "product"
+    evidence = product / "install" / "last-install.json"
+    evidence.parent.mkdir(parents=True)
+    evidence.write_text('{"result":"PASS","release_id":"v1"}', encoding="utf-8")
+    kit = kit_tool.VerifiedKit(
+        root=tmp_path, release_id="v1", kit_sha256="d" * 64,
+        ppu_artifact=tmp_path / "ppu.tar.gz", ppu_sidecar=tmp_path / "ppu.sha256",
+        python_artifact=tmp_path / "python.tar.gz", python_sidecar=tmp_path / "python.sha256",
+        openocd_artifact=tmp_path / "openocd.tar.gz", openocd_sidecar=tmp_path / "openocd.sha256",
+        plasmactl=tmp_path / "plasmactl",
+    )
+    commands = []
+
+    def runner(argv, **kwargs):
+        commands.append(list(argv))
+        return SimpleNamespace(returncode=0, stdout="")
+
+    result = kit_tool.install_verified_kit(
+        kit, gateway_host="127.0.0.1", ppu_id="ppu-01", facility_id="lab",
+        display_name="PPU", product_root=product, runner=runner,
+        api_transaction_id="f" * 32,
+    )
+    assert result["result"] == "PASS"
+    assert commands[0][-2:] == ["--api-transaction-id", "f" * 32]
+    kit_tool.install_verified_kit(
+        kit, gateway_host="127.0.0.1", ppu_id="ppu-01", facility_id="lab",
+        display_name="PPU", product_root=product, runner=runner,
+    )
+    assert "--api-transaction-id" not in commands[1]
+    with pytest.raises(kit_tool.BootstrapKitError, match="API transaction identity"):
+        kit_tool.install_verified_kit(
+            kit, gateway_host="127.0.0.1", ppu_id="ppu-01", facility_id="lab",
+            display_name="PPU", product_root=product, runner=runner,
+            api_transaction_id="unsafe",
+        )
+    assert len(commands) == 2
 
 
 def test_bootstrap_kit_requires_current_durable_coordinator_and_installer_core():
     source = BOOTSTRAP_KIT.read_text(encoding="utf-8")
     assert 'scripts / "ppu-bootstrap-deployment.py"' in source
-    assert 'scripts / "ppu-z2-installer-core.py"' in source
+    assert 'scripts / "ppu-z2-installer.py"' in source
     assert 'scripts / "openocd-runtime.py"' in source
     assert '"plasma-openocd-*-linux-armv7l.tar.gz"' in source
     assert '"--openocd-artifact"' in source

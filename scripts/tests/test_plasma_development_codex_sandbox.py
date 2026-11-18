@@ -16,6 +16,52 @@ import plasma_development_dispatch as dispatcher
 
 
 class Path3UsbTtySandboxContracts(unittest.TestCase):
+    def test_z2_sources_readonly_after_mask_and_invalid_sources_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            work, home, usb, dev = self.roots(temp)
+            for p in dev.glob('tty*'):
+                p.unlink()
+            plasma = home / '.config/plasma'
+            plasma.mkdir(parents=True, mode=0o700)
+            sources = [plasma / name for name in (
+                'z2-login-smoke.json', 'z2-login-known_hosts')]
+            for source in sources:
+                source.touch(mode=0o600)
+            unrelated = plasma / 'unrelated-secret'
+            unrelated.touch(mode=0o600)
+            with patch.object(sandbox.shutil, 'which', return_value=sys.executable):
+                args = sandbox.codex_command(work, home=home,
+                                             usb_root=usb, dev_root=dev)
+                mask = next(i for i in range(len(args)-1)
+                            if args[i:i+2] == ['--tmpfs', str(plasma)])
+                # The mounted Z2 credential directory must satisfy the same
+                # 0700 parent requirement as Path 2 enrollment().
+                self.assertEqual(args[mask-2:mask], ['--perms', '0700'])
+                self.assertEqual(args.count('--perms'), 1)
+                self.assertEqual(plasma.stat().st_mode & 0o777, 0o700)
+                # Only this private mask changes; other directories retain
+                # their existing tmpfs operations and isolation.
+                ssh = home / '.ssh'
+                self.assertIn(['--tmpfs', str(ssh)],
+                              [args[j:j+2] for j in range(len(args)-1)])
+                for source in sources:
+                    mount = next(i for i in range(len(args)-2)
+                                 if args[i:i+3] == ['--ro-bind', str(source), str(source)])
+                    self.assertGreater(mount, mask)
+                self.assertNotIn(str(unrelated), args)
+                self.assertIn('SSH_AUTH_SOCK', args)
+                sources[0].chmod(0o644)
+                with self.assertRaisesRegex(sandbox.CodexSandboxDenied, 'Z2_SOURCE_DENIED'):
+                    sandbox.codex_command(work, home=home, usb_root=usb, dev_root=dev)
+                sources[0].unlink()
+                sources[0].symlink_to(unrelated)
+                with self.assertRaisesRegex(sandbox.CodexSandboxDenied, 'Z2_SOURCE_DENIED'):
+                    sandbox.codex_command(work, home=home, usb_root=usb, dev_root=dev)
+                sources[0].unlink()
+                plasma.chmod(0o755)
+                with self.assertRaisesRegex(sandbox.CodexSandboxDenied, 'Z2_DIRECTORY_DENIED'):
+                    sandbox.codex_command(work, home=home, usb_root=usb, dev_root=dev)
+
     def roots(self, temp: str):
         root = Path(temp)
         home = root / "home"
@@ -53,9 +99,8 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
         self.assertIn("--ro-bind", args)
         self.assertEqual(args[args.index("--tmpfs") + 1], "/run")
         self.assertIn("--unsetenv", args)
-        self.assertIn("--sandbox", args)
-        self.assertEqual(args[args.index("--sandbox") + 1],
-                         "danger-full-access")
+        self.assertNotIn("--sandbox", args)
+        self.assertNotIn("--ask-for-approval", args)
         self.assertIn(str(home / ".ssh"), args)
         self.assertEqual(args.count("--dev-bind"), 3)
         self.assertEqual(args[-1], "-")
@@ -98,9 +143,7 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
                     sandbox.codex_command(work, home=home,
                                           usb_root=usb, dev_root=dev)
 
-    def test_real_runner_launch_calls_outer_namespace_not_raw_codex(self):
-        # Production path selection is selected by the actual subprocess.run
-        # identity, not by a prompt or a new Work Order/Session field.
+    def test_real_runner_launch_pins_workspace_write(self):
         class Result:
             returncode = 0
             stdout = b""
@@ -110,13 +153,13 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
             with patch.object(dispatcher.subprocess, "run",
                               return_value=Result()) as run, \
                  patch.object(sandbox, "codex_command",
-                              return_value=["bwrap", "--", "codex", "-"]) as outer:
+                              side_effect=AssertionError("unexpected sandbox")) as outer:
                 receipt = dispatcher.run_codex_task(
                     {"objective": "Owner approved development work."},
                     workspace=work, executor=run)
-            outer.assert_called_once_with(work)
+            outer.assert_not_called()
             self.assertEqual(run.call_args.args[0],
-                             ["bwrap", "--", "codex", "-"])
+                             ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"])
             self.assertEqual(receipt["codex_exit_code"], 0)
 
     def test_sandbox_error_receipt_is_constant_not_a_host_path(self):
@@ -180,9 +223,8 @@ class Path3UsbTtySandboxContracts(unittest.TestCase):
         self.assertNotIn("lab-session", source)
         self.assertNotIn("program_limit", source)
         run = inspect.getsource(dispatcher.run_codex_task)
-        self.assertIn("plasma_development_codex_sandbox", run)
-        self.assertIn("codex_sandbox.codex_command(root)", run)
-        self.assertIn("minimum sufficient experiment", run.lower())
+        self.assertNotIn("plasma_development_codex_sandbox", run)
+        self.assertIn('["codex", "exec", "--json", "--sandbox", "workspace-write", "-"]', run)
         self.assertNotIn("bluepill_flash", run)
 
 

@@ -26,7 +26,8 @@ foreach(item "${CUBE}|c7656f1fee178058be2f8ebfc8df9eaf91dc565e" "${DEVICE}|c8e9a
   endif()
 endforeach()
 
-add_executable(plasma-blue-pill-cdc.elf
+# Shared STM32 sources; original v0.1 remains the default artifact and behavior.
+set(BLUE_PILL_SOURCES
   src/main.c src/app.c src/usbd_conf.c src/usbd_desc.c
   "${DEVICE}/Source/Templates/system_stm32f1xx.c"
   "${DEVICE}/Source/Templates/gcc/startup_stm32f103xb.s"
@@ -44,15 +45,35 @@ add_executable(plasma-blue-pill-cdc.elf
   "${USB}/Core/Src/usbd_ctlreq.c"
   "${USB}/Core/Src/usbd_ioreq.c"
   "${USB}/Class/CDC/Src/usbd_cdc.c")
-target_include_directories(plasma-blue-pill-cdc.elf PRIVATE include "${HAL}/Inc" "${CMSIS}/Include" "${DEVICE}/Include" "${USB}/Core/Inc" "${USB}/Class/CDC/Inc")
-target_compile_definitions(plasma-blue-pill-cdc.elf PRIVATE STM32F103xB USE_HAL_DRIVER)
-target_compile_options(plasma-blue-pill-cdc.elf PRIVATE -mcpu=cortex-m3 -mthumb -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Wno-unused-parameter -Os)
-target_link_options(plasma-blue-pill-cdc.elf PRIVATE -mcpu=cortex-m3 -mthumb -nostartfiles -T${CMAKE_CURRENT_SOURCE_DIR}/stm32f103c8.ld -Wl,--gc-sections -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/plasma-blue-pill-cdc.map -Wl,--print-memory-usage
-  "--specs=${ARM_GCC_ROOT}/usr/lib/arm-none-eabi/newlib/nano.specs"
-  "--specs=${ARM_GCC_ROOT}/usr/lib/arm-none-eabi/newlib/nosys.specs"
-  "-L${ARM_GCC_ROOT}/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp")
-add_custom_command(TARGET plasma-blue-pill-cdc.elf POST_BUILD
-  COMMAND "${CMAKE_OBJCOPY}" -O ihex "$<TARGET_FILE:plasma-blue-pill-cdc.elf>" "${CMAKE_CURRENT_BINARY_DIR}/plasma-blue-pill-cdc.hex"
-  COMMAND "${CMAKE_OBJCOPY}" -O binary "$<TARGET_FILE:plasma-blue-pill-cdc.elf>" "${CMAKE_CURRENT_BINARY_DIR}/plasma-blue-pill-cdc.bin"
-  COMMAND "${CMAKE_SIZE}" "$<TARGET_FILE:plasma-blue-pill-cdc.elf>"
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(V02_PAYLOAD_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/plasma-blue-pill-cdc-v0.2-payload.c")
+add_custom_command(
+  OUTPUT "${V02_PAYLOAD_SOURCE}"
+  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/host/generate_flash_payload.py"
+          "${V02_PAYLOAD_SOURCE}" --size 44032 --seed 0x504c4153
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/host/generate_flash_payload.py"
+  COMMENT "Generating deterministic Blue Pill v0.2 flash diagnostic payload"
   VERBATIM)
+
+foreach(target IN ITEMS plasma-blue-pill-cdc.elf plasma-blue-pill-cdc-v0.2.elf)
+  add_executable(${target} ${BLUE_PILL_SOURCES})
+  target_include_directories(${target} PRIVATE include "${HAL}/Inc" "${CMSIS}/Include" "${DEVICE}/Include" "${USB}/Core/Inc" "${USB}/Class/CDC/Inc")
+  target_compile_definitions(${target} PRIVATE STM32F103xB USE_HAL_DRIVER)
+  target_compile_options(${target} PRIVATE -mcpu=cortex-m3 -mthumb -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Wno-unused-parameter -Os)
+  string(REGEX REPLACE "\\.elf$" "" output_name "${target}")
+  target_link_options(${target} PRIVATE -mcpu=cortex-m3 -mthumb -nostartfiles -T${CMAKE_CURRENT_SOURCE_DIR}/stm32f103c8.ld -Wl,--gc-sections "-Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/${output_name}.map" -Wl,--print-memory-usage
+    "--specs=${ARM_GCC_ROOT}/usr/lib/arm-none-eabi/newlib/nano.specs"
+    "--specs=${ARM_GCC_ROOT}/usr/lib/arm-none-eabi/newlib/nosys.specs"
+    "-L${ARM_GCC_ROOT}/usr/lib/arm-none-eabi/newlib/thumb/v7-m/nofp")
+  add_custom_command(TARGET ${target} POST_BUILD
+    COMMAND "${CMAKE_OBJCOPY}" -O ihex "$<TARGET_FILE:${target}>" "${CMAKE_CURRENT_BINARY_DIR}/${output_name}.hex"
+    COMMAND "${CMAKE_OBJCOPY}" -O binary "$<TARGET_FILE:${target}>" "${CMAKE_CURRENT_BINARY_DIR}/${output_name}.bin"
+    COMMAND "${CMAKE_SIZE}" "$<TARGET_FILE:${target}>"
+    VERBATIM)
+endforeach()
+
+# Independent v0.2 build: 1s LED toggle / 1s heartbeat, with real Flash bytes.
+target_compile_definitions(plasma-blue-pill-cdc-v0.2.elf PRIVATE
+  APP_VERSION=\"0.2\" APP_LED_PERIOD_MS=1000u APP_HEARTBEAT_PERIOD_MS=1000u)
+target_sources(plasma-blue-pill-cdc-v0.2.elf PRIVATE "${V02_PAYLOAD_SOURCE}")

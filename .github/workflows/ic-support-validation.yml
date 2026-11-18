@@ -68,15 +68,20 @@ jobs:
             data/ic-support/admission/validate.py \
             data/ic-support/tests/test_vendor_neutral_admission.py
           python data/ic-support/tests/test_vendor_neutral_admission.py
-      - name: Validate STM32F103C vendor-neutral admission migration
+      - name: Replay frozen STM32F103C vendor-neutral admission v1 (Runtime compiler retired)
         run: |
+          # The v1 generator/tests are frozen history that read the retired Runtime
+          # compiler from the working tree; replay serves it from the fixed
+          # migration_base_commit and asserts the original v1 artifact digests.
           python -m py_compile \
             data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission.py \
-            data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_v1.py
-          python data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_v1.py
+            data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission_historical_replay.py \
+            data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_historical_replay.py
+          test ! -e software/python/plasma_interfaces/openocd_plan.py
+          python data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_historical_replay.py
           out="$RUNNER_TEMP/stm32f103c-vendor-neutral-admission"
           rm -rf "$out"
-          python data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission.py --output-dir "$out"
+          python data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission_historical_replay.py --output-dir "$out"
           cat "$out/release-manifest.json"
       - name: Upload STM32F103C vendor-neutral admission sidecar
         uses: actions/upload-artifact@v4

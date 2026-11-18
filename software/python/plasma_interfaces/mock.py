@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import math
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.mock_flash import MockFlashState
 from plasma_core.mock_image_store import SharedImageStore, default_mock_image_store
@@ -14,6 +17,7 @@ from plasma_core.mock_profile_io import mock_profile_from_dict
 from plasma_core.models import ExecutionImageRef, JobRequest
 
 from .base import BaseInterface, ProgressCallback
+from .runtime_context import RuntimeJobContext
 
 
 OPERATION_ERRORS = {
@@ -51,7 +55,20 @@ class MockAttemptContext:
 
 @dataclass(slots=True)
 class MockInterface(BaseInterface):
+    CONSUMES_JOB_BINDING = True
+
     flash_size: int = 256 * 1024
+    # The simulated device's own Flash window. A Job Binding carries absolute
+    # device addresses, so ``programming`` maps them onto this window instead
+    # of assuming every write starts at offset 0.
+    flash_base: int = 0
+    # Byte-granular unless a Site declares the geometry it simulates. A Mock
+    # Site standing in for a real target must declare the same granularity as
+    # its Resource Set, or its erase evidence will not match the Manager plan.
+    erase_granularity: int = 1
+    # Makes the closing step fail, so a receipt without a proven SAFE_OFF can
+    # be exercised without hand-writing evidence.
+    safe_off_fails: bool = False
     default_delay_s: float = 0.0
     delays: dict[str, float] = field(default_factory=dict)
     throughput_bytes_per_s: dict[str, float] = field(default_factory=dict)
@@ -65,6 +82,10 @@ class MockInterface(BaseInterface):
     flash_state: MockFlashState = field(init=False, repr=False)
     calls: Counter[str] = field(default_factory=Counter, init=False)
     shutdown_count: int = field(default=0, init=False)
+    # Set by the closing step of a programming Job, cleared when a Job starts.
+    site_safe: bool = field(default=False, init=False)
+    safe_off_count: int = field(default=0, init=False)
+    _context: RuntimeJobContext | None = field(default=None, init=False, repr=False)
     _active_job_id: str | None = field(default=None, init=False, repr=False)
     _active_attempt: int = field(default=0, init=False, repr=False)
     _attempt_context: MockAttemptContext | None = field(default=None, init=False, repr=False)
@@ -87,6 +108,18 @@ class MockInterface(BaseInterface):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock progress_steps must be a positive integer")
         if not isinstance(self.failure_recoverable, bool):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock failure_recoverable must be boolean")
+        if not isinstance(self.safe_off_fails, bool):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock safe_off_fails must be boolean")
+        if isinstance(self.flash_base, bool) or not isinstance(self.flash_base, int) or self.flash_base < 0:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock flash_base must be a non-negative integer")
+        if (isinstance(self.erase_granularity, bool)
+                or not isinstance(self.erase_granularity, int)
+                or self.erase_granularity <= 0
+                or self.flash_size % self.erase_granularity != 0):
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "mock erase_granularity must be a positive divisor of flash_size",
+            )
         if not isinstance(self.delays, dict) or not isinstance(self.failures, dict):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock delays and failures must be objects")
         if not isinstance(self.throughput_bytes_per_s, dict) or not isinstance(self.operation_overheads_s, dict):
@@ -165,6 +198,9 @@ class MockInterface(BaseInterface):
     ) -> "MockInterface":
         allowed = {
             "flash_size",
+            "flash_base",
+            "erase_granularity",
+            "safe_off_fails",
             "default_delay_s",
             "delays",
             "throughput_bytes_per_s",
@@ -182,12 +218,79 @@ class MockInterface(BaseInterface):
             )
         return cls(tracker=tracker, image_store=image_store, **options)
 
+    def bind_runtime_job(self, context: RuntimeJobContext) -> None:
+        """Bind the Runtime-admitted context for one Job attempt.
+
+        A ``programming`` Job is authorized by its admitted Job Binding alone.
+        A trusted Provider Action authorizes a different execution path and is
+        never accepted in its place.
+        """
+        context = self._require_runtime_context(context)
+        if context.trusted_provider is not None:
+            raise PlasmaError(
+                ErrorCode.OPERATION_UNSUPPORTED,
+                "mock executes an admitted Job Binding, not a Provider Action",
+                context={"job_id": context.job_id, "site_id": context.site_id},
+            )
+        self._context = context
+
+    def _binding(self, operation: Operation) -> Mapping[str, Any]:
+        """The admitted Job Binding of this Job; there is no default."""
+        binding = self._context.admitted_job_binding if self._context is not None else None
+        job_range = binding.get("range") if isinstance(binding, Mapping) else None
+        if (not isinstance(binding, Mapping) or binding.get("operation") != operation.value
+                or not isinstance(job_range, Mapping)
+                or type(job_range.get("address")) is not int
+                or type(job_range.get("length")) is not int):
+            raise PlasmaError(
+                ErrorCode.OPERATION_UNSUPPORTED,
+                f"mock {operation.value} requires an admitted Job Binding",
+                context={"operation": operation.value},
+            )
+        return binding
+
+    def _offset(self, address: int, length: int) -> int:
+        """Map a Job Binding address onto this Mock target's Flash window."""
+        if (isinstance(address, bool) or isinstance(length, bool)
+                or not isinstance(address, int) or not isinstance(length, int)):
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT,
+                              "Job Binding range must be integers")
+        offset = address - self.flash_base
+        if offset < 0 or length < 0 or offset + length > self.flash_size:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "Job Binding range is outside the mock target",
+                context={"address": address, "length": length,
+                         "flash_base": self.flash_base, "flash_size": self.flash_size},
+            )
+        return offset
+
+    def _close_site(self) -> bool:
+        """Close this Site's simulated session, leaving it in a defined safe state.
+
+        The analogue of the C-3 session's fixed closing sequence. It runs
+        before the evidence is sealed, so ``safe_off`` reports a step that has
+        already happened rather than predicting the later ``safe_shutdown``.
+        """
+        if self.safe_off_fails:
+            self.site_safe = False
+            return False
+        self.site_safe = True
+        self.safe_off_count += 1
+        return True
+
     def prepare_request(self, request: JobRequest) -> None:
+        if self._context is not None and not self._context.matches(
+                request.job_id, request.site_id):
+            # A context left over from an earlier Job never authorizes this one.
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                              "RUNTIME_CONTEXT_JOB_MISMATCH")
         if request.job_id == self._active_job_id:
             self._active_attempt += 1
         else:
             self._active_job_id = request.job_id
             self._active_attempt = 1
+        self.site_safe = False
 
         raw = request.metadata.get("mock_runtime")
         if raw is None:
@@ -390,6 +493,105 @@ class MockInterface(BaseInterface):
             address=address,
         )
 
+    async def run_operations(
+        self,
+        operations: tuple[str, ...],
+        image: bytes,
+        progress: ProgressCallback | None = None,
+    ) -> dict[str, object]:
+        """One ``programming`` Job: the Binding's ordered list on this Site.
+
+        Every evidence field is read back out of the Mock Flash state this call
+        actually left behind, never copied from the request, so a write to the
+        wrong offset, a skipped erase or a mismatched Verify shows up in the
+        receipt instead of being asserted away. The Binding is the only source
+        of the list and the range: there is no default for either.
+        """
+        binding = self._binding(Operation.PROGRAMMING)
+        bound = tuple(binding.get("operations") or ())
+        job_range = binding["range"]
+        address, length = job_range["address"], job_range["length"]
+        takes_image = "program" in bound or "verify" in bound
+        if (tuple(operations) != bound or bool(image) != takes_image
+                or (takes_image and len(image) != length)):
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT,
+                              "mock programming Job does not match its Job Binding")
+        offset = self._offset(address, length)
+        steps: dict[str, Any] = {}
+
+        if "erase" in bound:
+            # Erase covers the Image's erase window, not the whole device.
+            erase_length = -(-length // self.erase_granularity) * self.erase_granularity
+            self._offset(address, erase_length)
+            await self._before("erase", None, erase_length)
+            self.flash_state.erase(offset, erase_length)
+            steps["erase"] = {"erase_address": address, "erase_length": erase_length}
+            if bound == ("erase",):
+                observed = self.flash_state.read(self.image_store, offset, length)
+                steps["erase"].update(
+                    blank_verified=observed == b"\xff" * length,
+                    bytes_verified=length,
+                    readback_sha256=hashlib.sha256(observed).hexdigest(),
+                )
+                if not steps["erase"]["blank_verified"]:
+                    raise PlasmaError(
+                        ErrorCode.ERASE_FAILED,
+                        "mock erase did not leave the bound range blank",
+                        recoverable=True,
+                        context={"operations": list(bound), "steps": steps,
+                                 "failure_source": "mismatch"},
+                    )
+
+        if "program" in bound:
+            await self._before("program", None, length)
+            assert self.image_store is not None
+            ref = self.image_store.put(image)
+            self.flash_state.program_shared(
+                image_sha256=ref.sha256,
+                image_size_bytes=ref.size_bytes,
+                address=offset,
+            )
+            written = self.flash_state.read(self.image_store, offset, length)
+            steps["program"] = {
+                "write_address": address,
+                "bytes_written": len(written),
+                "image_sha256": hashlib.sha256(written).hexdigest(),
+            }
+
+        if "verify" in bound:
+            await self._before("verify", None, length)
+            observed = self.flash_state.read(self.image_store, offset, length)
+            steps["verify"] = {
+                "verify_address": address,
+                "bytes_verified": len(observed),
+                "readback_sha256": hashlib.sha256(observed).hexdigest(),
+            }
+            if observed != image:
+                raise PlasmaError(
+                    ErrorCode.VERIFY_FAILED,
+                    "mock verify read back something other than the Job Image",
+                    recoverable=True,
+                    context={"operations": list(bound), "steps": steps,
+                             "address": address, "failure_source": "mismatch"},
+                )
+
+        if not self._close_site():
+            raise PlasmaError(
+                ErrorCode.INTERFACE_FAILURE,
+                "mock closing step did not leave the Site safe",
+                context={"operations": list(bound), "steps": steps, "safe_off": False},
+            )
+        if progress:
+            await progress(length, length)
+        return {
+            "result": "PASS",
+            "operations": list(bound),
+            "steps": steps,
+            "load_address": address,
+            "icpn": binding.get("icpn"),
+            "safe_off": True,
+        }
+
     async def verify(
         self,
         image: bytes,
@@ -445,5 +647,7 @@ class MockInterface(BaseInterface):
         return self.flash_state.read(self.image_store, address, length)
 
     async def safe_shutdown(self) -> None:
+        # The Runtime context never outlives the Job it was bound for.
+        self._context = None
         self.shutdown_count += 1
         await asyncio.sleep(0)

@@ -19,6 +19,10 @@ on:
       - "software/python/tests/test_mmio_loop_test.py"
       - ".github/workflows/pl-mmio-lt02.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

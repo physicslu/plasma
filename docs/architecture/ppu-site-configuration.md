@@ -6,13 +6,14 @@ Status: Phase 1 writable desired-state contract, P1 optimistic concurrency, and 
 
 A Plasma PPU owns the desired configuration of each physical Site. The Control Station may request a change through Plasma Manager, but the Browser and Manager do not become configuration sources of truth.
 
-Phase 1 makes these existing `SiteConfig` fields writable:
+Site Desired controls interface and administrative enablement, not IC. Issue #1424 retires `target` from the writable Site Desired contract:
 
 ```text
 enabled
 interface
-target
 ```
+
+A legacy `SiteConfig.target` may remain parseable in older YAML, but real-hardware Jobs never take ICPN from it. Saving Site Desired retires it on that Site.
 
 P1 adds per-Site optimistic concurrency so a stale Browser Draft cannot silently overwrite a newer saved Desired state.
 
@@ -84,7 +85,6 @@ The digest is computed from the normalized canonical tuple:
 site_id
 enabled
 interface
-target
 ```
 
 It is deliberately derived rather than stored as a mutable YAML counter. Therefore the same Desired state has the same revision across Gateway process restarts, and changing SITE 2 does not invalidate a Draft for unchanged SITE 1.
@@ -98,8 +98,7 @@ The write body remains exact-field and fail-closed:
 ```json
 {
   "enabled": true,
-  "interface": "mock",
-  "target": "STM32F103C8T6"
+  "interface": "mock"
 }
 ```
 
@@ -111,9 +110,7 @@ openocd
 fpga
 ```
 
-Unknown or missing fields are rejected. `target` must be a non-empty trimmed identifier of at most 256 characters. Site identity is canonical 1-based identity and the Site must already exist in the PPU configuration.
-
-The target string is configuration identity, not proof that a real IC/driver/hardware path has been qualified. Driver/device semantic qualification remains an execution and device-support responsibility.
+Unknown or missing Site Desired fields are rejected, including an obsolete `target`. Site identity is one-based and must already exist in PPU configuration. The user-selected exact ICPN is required on each real-hardware Job and independently validated against the active Bundle Profile and the PPU Site capability.
 
 ### Write precondition
 
@@ -151,13 +148,15 @@ The Control Station BFF and Plasma Manager forward `If-Match` only through their
 
 ## Persistence
 
-A successful write updates only these fields for the selected Site:
+A successful write updates only these writable fields for the selected Site:
 
 ```text
 enabled
 interface
-target
 ```
+
+Any obsolete `target` property on that Site is retired by this write.
+The Job's exact ICPN is a separate input, never a persistent Site setting.
 
 Other Site attributes, including timeout/retry/mock settings, are preserved.
 
@@ -266,7 +265,7 @@ partially_observable
 
 ### Disabled Site observability
 
-Protocol v3.3 reports `interface=null` and `target=null` for a disabled Site. Therefore the Gateway cannot prove whether the running process loaded the same dormant interface/target binding as desired.
+Protocol v3.3 reports `interface=null` for a disabled Site. Therefore the Gateway cannot prove whether the running process loaded the same dormant interface as Desired.
 
 It must not guess.
 
@@ -326,7 +325,6 @@ The Engineering PPU/Site Configuration page shows:
 ```text
 Desired Enabled
 Desired Interface
-Desired Target
 Actual runtime summary
 Reconciliation
 Save / Reset

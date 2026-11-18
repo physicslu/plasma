@@ -1,5 +1,7 @@
 # Plasma Web REST API Contract
 
+> **API-layer distinction:** This document governs PPU-facing REST v3, not the Web application's Manager BFF routes (`software/web/app/api/manager/`) or the separate `/api/fleet` frontend aggregation route. Route availability and authorization must be checked against `software/python/plasma_web/gateway.py`, `secure_gateway.py`, and endpoint tests; a documented route alone is not deployment evidence.
+
 ## Scope
 
 This document defines the browser-facing **Plasma Web REST API contract**. It is separate from:
@@ -23,47 +25,9 @@ rest_contract_version = "3"
 
 ## Remote-write security contract
 
-The backend secure REST boundary is implemented by `SecurePlasmaWebHandler`. Its deployment/browser activation is still pending; the current `plasma_web.gateway` entry point remains unchanged until identity transport and deployment configuration are completed.
+PPU Gateway writes are bound to the PPU's **current enrolled controller** (LOM-P2A-2 G13, [enrollment spec](../development/opf-local-owner-mode-p2a0-enrollment-spec.md) §6.1): every `POST` is classified into an operation class (unclassified routes fail closed with `403 CONTROLLER_OPERATION_UNCLASSIFIED`), carries the `PLASMA-PPU-HMAC-V1` request proof over a nonce from `GET /api/auth/challenge`, and is verified by the root Bootstrap controller admission socket; responses carry `X-Plasma-PPU-Response-Auth`. The proof is produced by the Manager from its enrolled credential — browsers never hold a PPU credential. Refusals: `401 CONTROLLER_UNAUTHENTICATED` (with the non-secret `controller_generation`), `403 CONTROLLER_RECOVERY_ONLY`, `503 CONTROLLER_NOT_ENROLLED`.
 
-When the secure boundary is active, protected requests authenticate a canonical Principal using:
-
-```text
-Authorization: Bearer <high-entropy-credential>
-```
-
-Authorization is permission-based and resource-scoped over Facility / PPU / Site. Role names such as `viewer`, `operator`, `engineer`, `admin`, and `service` are permission bundles rather than route-specific role checks.
-
-Viewer is information read-only. In particular:
-
-```text
-GET status / Batch information = read-only information access
-IC READ operation              = ppu.read execution permission
-```
-
-IC Read is not a Viewer permission because it drives hardware, consumes execution capacity, and can expose target contents.
-
-State-changing requests under the secure boundary also require a durable command identity:
-
-```text
-Idempotency-Key: <command-id>
-```
-
-The server persists `principal_id + command_id` before execution. An identical completed retry returns the persisted HTTP response without executing the physical command again. Reusing the same key for a different request is rejected; a command whose admission remains in progress/ambiguous is fail-closed rather than blindly reissued.
-
-Canonical security errors are:
-
-```text
-HTTP 401  E4101 AUTHENTICATION_REQUIRED
-HTTP 403  E4102 AUTHORIZATION_DENIED
-HTTP 409  E4103 COMMAND_REPLAY_CONFLICT
-HTTP 409  E4104 COMMAND_IN_PROGRESS
-```
-
-Authentication must precede protected Provider/PPU resource lookup. Missing/invalid credentials do not create durable SQLite audit writes; this prevents unauthenticated traffic from turning `synchronous=FULL` audit persistence into microSD write amplification. Authenticated authorization denials and admitted command lifecycle events are durable-audited.
-
-Browser CORS transport for `Authorization` and `Idempotency-Key`, standalone Zynq credential provisioning, optional Cloudflare/OIDC identity bridging, and deployment activation are intentionally deferred to the identity-integration slice. Until that wiring is active, the security boundary is not claimed as a deployed protection for the current Gateway entry point.
-
-See [Remote Write Security Boundary](remote-write-security-boundary.md).
+The former opt-in Bearer-principal Gateway (`SecurePlasmaWebHandler`, `Authorization: Bearer`, `Idempotency-Key` replay ledger, `E4103`/`E4104`, `GET /api/security/me`) is retired; no deployment used it. Host labs without a PPU Bootstrap run the Gateway with `--host-lab-unauthenticated-writes`.
 
 ## Gateway communication settings
 
@@ -263,6 +227,10 @@ Standalone/local inline Program/Verify may submit one materialized Asset directl
 ```
 
 The Gateway validates the Asset and normalizes it before creating the wire-level `JobRequest.image`.
+
+**Programming** uses one Job with `operations: ["erase", "program", "verify"]` (or another legal ordered subset), an exact `job_binding`, and an `image_asset` plus `asset_base64` when programming or verifying. Read is an independent `operation: "read"` Job on its bound range. `flash_cycle` is retired and rejected; cycle-only Bundle references are no longer admitted. C-3 consumes the same admitted Binding. See [OPF Programming Operations](opf-programming-operations-v1.md).
+
+**Target (exact ICPN).** A Job may carry `"target": "<ICPN>"`; otherwise the operator's explicit Site `target` is used. A real-hardware Job with neither is rejected `E1001 INVALID_ARGUMENT`; there is no product default ICPN (the Mock workflow simulator needs none).
 
 A direct REST Job may declare an execution-owner token:
 

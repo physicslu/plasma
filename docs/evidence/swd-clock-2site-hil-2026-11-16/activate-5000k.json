@@ -1,0 +1,33 @@
+{
+ "route_id": "z2-site2-stm32f103c8t6-operations",
+ "flash_profile": {
+  "schema": "plasma.ppu.openocd-flash-profile.v1",
+  "icpn": "STM32F103C8T6",
+  "target_config": "target/stm32f1x.cfg",
+  "flash_base": 134217728,
+  "flash_size": 65536,
+  "erase_granularity": 1024,
+  "transport_settings": {
+   "protocol": "swd",
+   "clock_hz": 5000000
+  }
+ },
+ "resource_set_sha256": "6f1df96a68b146878aaa4ae7db44a91b3ab4a9d9ba8bc1ed58a7706dfb080c3a",
+ "bundle_sha256": "8338ef4004941b6d6740e73a1055957ef1125a858938aced46ca5f83181556c4",
+ "bundle_size": 65829,
+ "before": {
+  "state": "ACTIVE",
+  "asset_set_sha256": "108a90ccfcbed92042a8e31f1d604e93ca3d8e06d04a3d3737398906cc5b39c3",
+  "generation": 23
+ },
+ "activation": {
+  "result": "ACTIVATED",
+  "asset_set_sha256": "8338ef4004941b6d6740e73a1055957ef1125a858938aced46ca5f83181556c4",
+  "transaction_id": "23fd1fb56bcd42109017d0228dd5e8ee"
+ },
+ "after": {
+  "state": "ACTIVE",
+  "asset_set_sha256": "8338ef4004941b6d6740e73a1055957ef1125a858938aced46ca5f83181556c4",
+  "generation": 24
+ }
+}

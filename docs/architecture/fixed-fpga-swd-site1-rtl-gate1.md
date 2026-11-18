@@ -5,6 +5,8 @@
 
 **2026-10-18 Gate 1 superseding semantic candidate:** [SWD Semantic Convergence](fixed-fpga-swd-semantics-gate1.md) changes proposed Line Reset to fixed 64, CLOCK_DIV to half-period >=2, metadata & fault ACK. Old gap table below documents prior implementation risk, not current normative candidate. M1 remains NO-GO.
 
+> **Evidence classification:** This is a Site-1 simulation feasibility record, not a current external Blue Pill SWD operator procedure. The [SWD semantic convergence candidate](fixed-fpga-swd-semantics-gate1.md) supersedes the older gap-table semantics; actual hardware readiness requires independent PS/PL pairing, physical pin and DUT evidence.
+
 ## Why this test
 
 A fixed Universal Image must satisfy **the same register, transaction, status and response semantics** through the PS/Driver and RTL layers. Existing SWD-03 uses a different register map and already demonstrates the SWD waveform; blindly declaring it ABI v1 would be incorrect. This isolated Site-1 RTL slice uses the **new candidate Site offset** and **reuses the existing verified SWD master** without changing its physical runtime or old HIL behavior.

@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
@@ -19,12 +18,7 @@ import {
   normalizeApiBase,
   type Operation,
 } from "./plasma-api";
-import {
-  getSecurityTransportServerState,
-  getSecurityTransportState,
-  markGatewayRoutingResolved,
-  subscribeSecurityTransport,
-} from "./security-transport";
+import { markGatewayRoutingResolved } from "./gateway-transport";
 
 export type SelectionMap = Record<string, Record<string, number[]>>;
 export type ProductionSet = SelectionMap;
@@ -44,8 +38,8 @@ export type WorkspaceSessionAuditEntry = {
   message: string;
 };
 
-type SessionState = { apiBase: string; sessionId: string; credentialRevision: number };
-type SessionRequest = { apiBase: string; credentialRevision: number; promise: Promise<string> };
+type SessionState = { apiBase: string; sessionId: string };
+type SessionRequest = { apiBase: string; promise: Promise<string> };
 type ApiMode = "managed" | "standalone";
 type ManagedRoutingDiscovery = { managed: boolean; alias: string | null } | null;
 
@@ -118,11 +112,6 @@ async function discoverManagedRouting(): Promise<ManagedRoutingDiscovery> {
 }
 
 export function WorkspaceSessionProvider({ children }: { children: ReactNode }) {
-  const securityTransport = useSyncExternalStore(
-    subscribeSecurityTransport,
-    getSecurityTransportState,
-    getSecurityTransportServerState,
-  );
   const [hydrated, setHydrated] = useState(false);
   const [apiBase, setApiBaseState] = useState(DEFAULT_API_BASE);
   const [apiMode, setApiMode] = useState<ApiMode>("standalone");
@@ -242,62 +231,47 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
 
   const ensureEngineeringSession = useCallback(async (requestedBase?: string): Promise<string> => {
     const normalized = normalizeApiBase(requestedBase ?? apiBase);
-    const credentialRevision = securityTransport.credentialRevision;
     const current = sessionStateRef.current;
-    if (current?.apiBase === normalized && current.credentialRevision === credentialRevision) {
+    if (current?.apiBase === normalized) {
       return current.sessionId;
     }
     const pending = sessionRequestRef.current;
-    if (pending?.apiBase === normalized && pending.credentialRevision === credentialRevision) {
+    if (pending?.apiBase === normalized) {
       return await pending.promise;
     }
 
     const promise = beginEngineeringSession(normalized).then(session => {
-      if (getSecurityTransportState().credentialRevision !== credentialRevision) {
-        throw new Error("Engineering credential changed while the session was starting");
-      }
       const sessionId = publishSession({
         apiBase: normalized,
         sessionId: session.session_id,
-        credentialRevision,
       });
       appendSessionAudit(`[SESSION] NEW · fresh connection · ${sessionId.slice(0, 8)}…`);
       return sessionId;
     });
-    sessionRequestRef.current = { apiBase: normalized, credentialRevision, promise };
+    sessionRequestRef.current = { apiBase: normalized, promise };
     try {
       return await promise;
     } finally {
       if (sessionRequestRef.current?.promise === promise) sessionRequestRef.current = null;
     }
-  }, [apiBase, appendSessionAudit, publishSession, securityTransport.credentialRevision]);
+  }, [apiBase, appendSessionAudit, publishSession]);
 
   const restartEngineeringSession = useCallback(async (requestedBase?: string): Promise<string> => {
     const normalized = normalizeApiBase(requestedBase ?? apiBase);
-    const credentialRevision = securityTransport.credentialRevision;
     const current = sessionStateRef.current;
-    const previousSessionId = current?.apiBase === normalized && current.credentialRevision === credentialRevision
-      ? current.sessionId
-      : undefined;
+    const previousSessionId = current?.apiBase === normalized ? current.sessionId : undefined;
     const session = await beginEngineeringSession(normalized, previousSessionId);
-    if (getSecurityTransportState().credentialRevision !== credentialRevision) {
-      throw new Error("Engineering credential changed while the session was restarting");
-    }
     const sessionId = publishSession({
       apiBase: normalized,
       sessionId: session.session_id,
-      credentialRevision,
     });
     appendSessionAudit(
       `[SESSION] NEW · ${session.previous_session_cleared ? "previous Programming Asset cache cleared" : "fresh connection"} · ${sessionId.slice(0, 8)}…`,
     );
     return sessionId;
-  }, [apiBase, appendSessionAudit, publishSession, securityTransport.credentialRevision]);
+  }, [apiBase, appendSessionAudit, publishSession]);
 
-  const engineeringSessionId = sessionState?.apiBase === apiBase
-    && sessionState.credentialRevision === securityTransport.credentialRevision
-    ? sessionState.sessionId
-    : null;
+  const engineeringSessionId = sessionState?.apiBase === apiBase ? sessionState.sessionId : null;
 
   const value = useMemo<WorkspaceSessionContextValue>(() => ({
     hydrated,

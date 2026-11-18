@@ -1,3 +1,5 @@
+> **HISTORICAL / SYNTHETIC-ONLY SWD-05 DRIVER, NOT AN EXTERNAL BLUE PILL ROUTE.** Real Blue Pill programming uses Z2 PS-local ARMv7 OpenOCD → UNIX WordPort/RemoteBitbang → reviewed PL SWD Image → PMOD. Follow [retirement inventory](swd-legacy-path-retirement.md); old internal loops and synthetic ACK/DPIDR cannot establish physical MCU success.
+
 # SWD-05 — Linux PS SWD-03 AXI Transaction Driver (host-only)
 
 **State:** software integration candidate. Requires SWD-05 Gate 2 before merge.

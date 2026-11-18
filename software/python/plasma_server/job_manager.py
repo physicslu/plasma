@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,6 +18,7 @@ class JobRuntime:
     state: JobState = JobState.QUEUED
     created_at: str = ""
     started_at: str | None = None
+    deadline_monotonic: float | None = None
     active_task: asyncio.Task[Any] | None = None
     cancel_requested: bool = False
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event, repr=False)
@@ -30,7 +32,14 @@ class JobRuntime:
     attempt: int = 0
     attempt_history: list[JobAttemptResult] = field(default_factory=list)
     retry_exhausted: bool = False
+    active_asset_set: dict[str, Any] | None = None
+    # OFE-1B: PPU-verified Job Binding identity, echoed for the Manager receipt.
+    job_binding: dict[str, Any] | None = None
+    trusted_provider: Any | None = field(default=None, repr=False)
     updated_at: str = ""
+    # Observation only: monotonic creation time and enqueue admission timing.
+    created_monotonic: float = field(default_factory=time.monotonic, repr=False)
+    admission_timing_ms: dict[str, float] | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if not self.created_at:
@@ -61,6 +70,8 @@ class JobRuntime:
             "attempt": self.attempt,
             "attempt_history": [item.to_dict(protocol_version) for item in self.attempt_history],
             "retry_exhausted": self.retry_exhausted,
+            "active_asset_set": self.active_asset_set,
+            "job_binding": self.job_binding,
             "updated_at": self.updated_at,
         }
         if self.result:

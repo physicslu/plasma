@@ -27,12 +27,11 @@ ppu/
 ├── ppu.pyz
 └── THIRD_PARTY_LICENSES/
     └── PyYAML.txt
-data/
-└── device-catalog/
-    └── production/
 ```
 
 `ppu.pyz` is a self-contained Python zipapp exposing Server, Gateway, and the bounded runtime-activation helper entrypoint. The runtime excludes Control Station, Manager, Node/npm, Git metadata, tests, FPGA bitstreams and physical-target power control.
+
+**Catalog-free (OPF S5 / PR-C1).** IC Catalog, IC Support and L0–L2 qualification are offline governance and never a PPU Runtime dependency. The runtime ships no `data/` tree, `ppu-runtime.json` has no `data` section, and `ppu.pyz` omits every module listed in `CATALOG_ONLY_MODULES` (`scripts/ppu-runtime.py`). The Gateway imports no Catalog / Qualification module at startup; Programming Job / Batch / Health never depend on it. The Device Selector is owned by Manager: since PR-C2 the Console calls the Manager BFF (`/api/manager/devices/search`) and Manager never relays the Selector to a PPU; since S5-B the PPU Gateway has **no** `GET /api/devices/search` route at all (unknown route ⇒ `404`, never a result; the Secure Gateway has no authorization rule for it) (see [Control Station runtime packaging](control-station-runtime-packaging.md)). Host-only proof: `software/python/tests/test_ppu_gateway_catalog_free.py`.
 
 ## Canonical release and Release Identity v2
 
@@ -84,8 +83,6 @@ plasma-ppu-<release-id>-linux-armv7l.tar.gz
 plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256
 plasma-ppu-z2-installer-<release-id>.py
 plasma-ppu-z2-installer-<release-id>.py.sha256
-ppu-z2-installer-core.py
-ppu-z2-installer-core.py.sha256
 ```
 
 CI compiles both bootstrap files under Python 3.10, verifies both detached digests, and executes the packaged wrapper with the packaged sibling core against the canonical PPU release. This is specifically intended to prevent a source-tree-only installer from being published as a valid deployment artifact.
@@ -104,16 +101,21 @@ The bootstrap remains Python-3.10-compatible. The installed Plasma runtime requi
 
 ## First-install versus upgrade configuration ownership
 
-A clean first installation may generate the fail-closed PS-only canonical topology:
+A clean first installation generates the PPU's declared Site topology (1..`site_count`), disabled, in the canonical `ppu.yaml`. The installer accepts `--site-count N` (1..8, default 8); it writes exactly N Site entries and `server.max_concurrent_jobs=N`. `max_supported_sites=8` remains the capacity ceiling and is not the configured topology count. Unparameterized Bootstrap API deployment defaults to 8; it does not autodetect hardware:
 
 ```yaml
 server:
   max_supported_sites: 8
+  max_concurrent_jobs: 2  # example: 2 configured Sites
 
-sites: []
+sites:
+  - {id: 1, enabled: false, interface: "mock"}
+  - {id: 2, enabled: false, interface: "mock"}
 ```
 
-That is a bootstrap state only. On an **upgrade**, `/etc/plasma/ppu.yaml` is operator/runtime state and must not be regenerated from first-install defaults. P3 therefore preserves the entire existing canonical file, including Site Desired records, while updating release/service wiring.
+On an **upgrade**, `/etc/plasma/ppu.yaml` is operator/runtime state and must not be regenerated from first-install defaults. The legacy Site `target` is never the source for a real-hardware Job: ICPN must be supplied per Job. New Site Desired writes manage only `enabled` and `interface` and retire any stale per-Site `target` field on that Site; unrelated Sites and settings remain untouched. P3 preserves the existing canonical file, including Site Desired records, while updating release/service wiring; the only rewrite is the one-time migration of the exact former first-install line `sites: []` to the disabled defaults. See [Z2 PS installer](z2-ps-installer.md).
+
+The runtime payload carries no IC Support or Device Catalog data and the installed services set no `PLASMA_IC_SUPPORT_ROOT` / `PLASMA_DEVICE_CATALOG_MANIFEST` (PR-C1). An enabled non-mock Site starts from the Catalog-free runtime (inverse of the historical Z2 D6 regression, `test_enabled_openocd_site_starts_from_catalog_free_runtime`).
 
 The topology semantics remain:
 
@@ -168,7 +170,7 @@ Browser Draft
 
 The Site configuration controller serializes Desired writes against this activation transaction. This closes the stale-request race where Desired could otherwise change after the aggregate revision check but before the restart. Separately, SiteManager uses the same authoritative execution lock for Job admission and runtime quiesce, closing the idle-check-to-restart TOCTOU window.
 
-The quiesce lease is bounded and expires automatically. Protocol v3.3 still does not expose dormant interface/target bindings for disabled Sites, so a post-restart state can legitimately remain `partially_observable` instead of being falsely promoted to fully proven `in_sync`.
+The quiesce lease is bounded and expires automatically. Protocol v3.3 still does not expose dormant interface bindings for disabled Sites, so a post-restart state can legitimately remain `partially_observable` instead of being falsely promoted to fully proven `in_sync`.
 
 ## Filesystem/write boundary
 

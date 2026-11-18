@@ -38,6 +38,10 @@ test("renders the Plasma Control Station product entry", async () => {
     html.includes(`>v${productManifest.product_version}<`),
     "global header must render the canonical Plasma product version",
   );
+  assert.match(html, /data-testid="global-build-id"/,
+    "global header must show a separate build identity, even when UNKNOWN");
+  assert.match(html, /(?:Build (?:[a-f0-9]{12}|UNKNOWN)|DEV (?:[a-f0-9]{12}|DIRTY|UNKNOWN))/,
+    "build identity must be distinct from the stable product version");
   assert.match(html, />選擇產品模式</);
   assert.match(html, /href="\/fleet"/);
   assert.match(html, />量產模式</);

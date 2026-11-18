@@ -1,5 +1,7 @@
 # `plasmactl` Deployment Profiles
 
+> **Start here:** [PPU deployment start page](ppu-deployment-start-here.md) defines the two PPU deployment routes; `plasmactl install z2-ps` is the internal executor / manual recovery form of Route A (product deployment).
+
 ## Status
 
 **Current deployment control-plane contract.**
@@ -42,12 +44,11 @@ plasmactl
     └── scripts/plasmactl-z2-ps
         ├── scripts/z2-python-runtime.py
         ├── scripts/ppu-z2-installer.py
-        └── scripts/ppu-z2-installer-core.py
 ```
 
 The local Control Station backend owns only Console/BFF + Manager lifecycle. It never starts a local Plasma Server or Plasma Gateway.
 
-The SWPC backend remains a surrogate-only host adapter. The Z2 backend is distinct: it accepts only a real ARMv7 target at runtime and reuses the canonical PPU release plus the existing Z2 installer instead of reimplementing those internals. The Z2 installer bootstrap is intentionally a two-file unit: the P3 wrapper `ppu-z2-installer.py` requires its sibling `ppu-z2-installer-core.py`.
+The SWPC backend remains a surrogate-only host adapter. The Z2 backend is distinct: it accepts only a real ARMv7 target at runtime and reuses the canonical PPU release plus the existing Z2 installer instead of reimplementing those internals. The Z2 installer uses one canonical `ppu-z2-installer.py` containing the verified release core and runtime-activation integration.
 
 ## Backward compatibility
 
@@ -152,7 +153,7 @@ A temporarily unreachable PPU remains non-fatal. If the configured PPU is reacha
 ./scripts/plasmactl verify local-control-station
 ```
 
-This verifies the local runtime/evidence contract, managed-mode BFF wiring, local Manager liveness and local Console health. For a reachable PPU, it also verifies that the configured endpoint exposes the managed Site settings surface instead of only a restricted diagnostics/status surface. It does not qualify PPU execution, Z2, PL, Sites, or real IC programming.
+This verifies the local runtime/evidence contract, managed-mode BFF wiring, the Bootstrap-capable Manager unit with its release Device Selector Catalog and runtime registry state path, local Manager liveness, a loopback Manager Device Selector HTTP 200 and local Console health. For a reachable PPU, it also verifies that the configured endpoint exposes the managed Site settings surface instead of only a restricted diagnostics/status surface. It does not qualify PPU execution, Z2, PL, Sites, or real IC programming.
 
 ### Cross-platform boundary
 
@@ -300,7 +301,7 @@ sudo bash scripts/plasmactl install z2-ps \
   --python-sidecar artifacts/plasma-python-3.12.13-linux-armv7l.tar.gz.sha256 \
   --release-artifact artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz \
   --release-sidecar artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256 \
-  --gateway-host 192.168.2.99 \
+  --gateway-host <Z2_HOST> \
   --ppu-id z2-dev-01 \
   --facility-id lab
 ```
@@ -326,7 +327,7 @@ The profile never replaces `/usr/bin/python3` or the PYNQ Python environment.
 sudo bash scripts/plasmactl deploy z2-ps \
   --release-artifact artifacts/plasma-ppu-<new-release-id>-linux-armv7l.tar.gz \
   --release-sidecar artifacts/plasma-ppu-<new-release-id>-linux-armv7l.tar.gz.sha256 \
-  --gateway-host 192.168.2.99 \
+  --gateway-host <Z2_HOST> \
   --ppu-id z2-dev-01 \
   --facility-id lab
 ```

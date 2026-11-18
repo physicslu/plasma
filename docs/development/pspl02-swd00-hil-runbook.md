@@ -1,3 +1,5 @@
+> **INTERNAL PS-PL LOOPBACK ONLY, NOT EXTERNAL SWD.** Real Blue Pill programming uses Z2 PS-local ARMv7 OpenOCD → UNIX WordPort/RemoteBitbang → reviewed PL SWD Image → PMOD. Follow [retirement inventory](swd-legacy-path-retirement.md); old internal loops and synthetic ACK/DPIDR cannot establish physical MCU success.
+
 # PSPL-02 / SWD-00 internal waveform HIL
 
 This procedure is limited to the **three-aperture** `control_waveform_loopback`
@@ -61,7 +63,7 @@ one SSH/TTY session does not grant another SSH session elevated rights.
 For this owner-authorized prototype experiment, Codex may independently
 authenticate with the **private, owner-provided** SSH/sudo credentials per
 `AGENTS.md` and
-`docs/development/codex-z2-hil-development-command.md`.
+[`docs/development/plasma-embedded.md`](plasma-embedded.md).
 Use a bounded authenticated session and `sudo -S` stdin when necessary;
 never pass passwords as command arguments, commit them, print them in logs,
 or change sudoers. Run the current privileged hardware audit only once

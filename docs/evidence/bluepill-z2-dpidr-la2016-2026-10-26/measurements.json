@@ -1,0 +1,25 @@
+{
+  "schema": "plasma.bluepill.z2.dpidr.la2016.measurements.v1",
+  "samplerate_hz": 5000000,
+  "channel_map": {
+    "CH0": "SWCLK",
+    "CH1": "SWDIO",
+    "CH2": "Blue Pill 3.3 V digital logic observation"
+  },
+  "captures": {
+    "capture-01.sr": {
+      "sample_count": 50002496,
+      "logic_chunks": 24,
+      "states_ch2_ch1_ch0": {"6": 50002496},
+      "ch0_transitions": 0,
+      "swd_attempt": "NOT_RUN"
+    },
+    "capture-02.sr": {
+      "sample_count": 50002496,
+      "logic_chunks": 24,
+      "states_ch2_ch1_ch0": {"6": 50002496},
+      "ch0_transitions": 0,
+      "swd_attempt": "FAIL"
+    }
+  }
+}

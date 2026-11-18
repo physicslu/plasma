@@ -17,6 +17,7 @@ import mmap
 import os
 from pathlib import Path
 import sys
+import stat
 from threading import RLock
 from typing import Iterable
 
@@ -47,6 +48,22 @@ def _u32(value: int, name: str) -> int:
     if type(value) is not int or not 0 <= value <= 0xFFFFFFFF:
         raise MMIOError(f"{name} must be an unsigned 32-bit integer")
     return value
+
+
+def _inherited_reload_lock(fd: int, lock_path: str) -> int:
+    """Duplicate only an existing root-owned, path-matched flock descriptor."""
+    if os.geteuid() != 0:
+        raise MMIOError("inherited FPGA reload fence requires Root")
+    expected = os.stat(lock_path, follow_symlinks=False)
+    inherited = os.fstat(fd)
+    if (not stat.S_ISREG(expected.st_mode) or
+            not stat.S_ISREG(inherited.st_mode) or
+            expected.st_dev != inherited.st_dev or
+            expected.st_ino != inherited.st_ino or
+            inherited.st_uid != 0 or inherited.st_nlink != 1 or
+            inherited.st_mode & 0o002):
+        raise MMIOError("inherited FPGA reload fence inode denied")
+    return os.dup(fd)
 
 
 @dataclass(frozen=True)
@@ -152,6 +169,8 @@ class LinuxMMIO:
         device: str = "/dev/mem",
         owner_lock: str = "/run/lock/plasma-mmio.lock",
         readonly: bool = False,
+        site_owner: int | None = None,
+        inherited_owner_lock_fd: int | None = None,
     ) -> None:
         items = tuple(apertures)
         if not items:
@@ -170,10 +189,33 @@ class LinuxMMIO:
             raise MMIOError("device and owner_lock must be absolute paths")
         if type(readonly) is not bool:
             raise MMIOError("readonly must be bool")
+        # Root's identity child must share the same *open file description*
+        # as its parent's exclusive reload fence. Reopening and flocking the
+        # pathname would self-conflict. This exception is read-only, Root-only,
+        # and cannot be used to bypass the per-Site runtime lease.
+        if inherited_owner_lock_fd is not None:
+            if (type(inherited_owner_lock_fd) is not int or
+                    inherited_owner_lock_fd < 3 or not readonly or
+                    site_owner is not None or device != "/dev/mem" or
+                    owner_lock != "/run/lock/plasma-mmio.lock"):
+                raise MMIOError("inherited FPGA reload fence is Root identity-only")
+        # Explicit v5 two-Site prototype opt-in. Legacy users remain
+        # PPU-exclusive (LOCK_EX) and cannot overlap a shared Site owner.
+        if site_owner is not None:
+            from .swd_site import SITE_BASES
+            if type(site_owner) is not int or site_owner not in SITE_BASES:
+                raise MMIOError("only two independent SWD Site locks exist")
+            if len(items) != 1 or items[0].base != SITE_BASES[site_owner]:
+                raise MMIOError("shared PPU lease requires exact single Site window")
+            if device == "/dev/mem" and owner_lock != "/run/lock/plasma-mmio.lock":
+                raise MMIOError("live Site must share canonical PPU Reload fence")
+        self.site_owner = site_owner
+        self.inherited_owner_lock_fd = inherited_owner_lock_fd
         self.device, self.owner_lock, self.readonly = device, owner_lock, readonly
         self._mutex = RLock()
         self._fd: int | None = None
         self._lock_fd: int | None = None
+        self._site_lock_fd: int | None = None
         self._pid: int | None = None
         self._pages: dict[int, mmap.mmap] = {}
         self._words: dict[int, memoryview] = {}
@@ -196,21 +238,47 @@ class LinuxMMIO:
                 raise MMIOClosed("backend is already opened or permanently retired")
             if sys.byteorder != "little":
                 raise MMIOError("native word mapping requires little-endian platform")
-            lock_fd = os.open(
-                self.owner_lock, os.O_CREAT | os.O_RDWR | os.O_CLOEXEC |
-                getattr(os, "O_NOFOLLOW", 0), 0o600,
-            )
+            if self.inherited_owner_lock_fd is None:
+                lock_fd = os.open(
+                    self.owner_lock, os.O_CREAT | os.O_RDWR | os.O_CLOEXEC |
+                    getattr(os, "O_NOFOLLOW", 0), 0o600,
+                )
+            else:
+                lock_fd = _inherited_reload_lock(
+                    self.inherited_owner_lock_fd, self.owner_lock)
+            site_fd: int | None = None
             try:
+                if self.site_owner is not None:
+                    st = os.fstat(lock_fd)
+                    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+                        raise MMIOError("PPU fence must be a single regular inode")
+                lock_mode = fcntl.LOCK_SH if self.site_owner is not None else fcntl.LOCK_EX
                 try:
-                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(lock_fd, lock_mode | fcntl.LOCK_NB)
                 except BlockingIOError as exc:
                     raise MMIOError("MMIO owned by another cooperating process") from exc
+                if self.site_owner is not None:
+                    site_fd = os.open(
+                        f"{self.owner_lock}.site-{self.site_owner}",
+                        os.O_CREAT | os.O_RDWR | os.O_CLOEXEC |
+                        getattr(os, "O_NOFOLLOW", 0), 0o600,
+                    )
+                    st = os.fstat(site_fd)
+                    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+                        raise MMIOError("Site lock must be a single regular inode")
+                    try:
+                        fcntl.flock(site_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    except BlockingIOError as exc:
+                        raise MMIOError("Site owned by another cooperating process") from exc
                 access = os.O_RDONLY if self.readonly else os.O_RDWR
                 fd = os.open(self.device, access | os.O_SYNC | os.O_CLOEXEC)
             except BaseException:
+                if site_fd is not None:
+                    os.close(site_fd)
                 os.close(lock_fd)
                 raise
             self._fd, self._lock_fd, self._pid = fd, lock_fd, os.getpid()
+            self._site_lock_fd = site_fd
 
     def _check_active(self) -> None:
         if self._retired or self._fd is None:
@@ -231,6 +299,8 @@ class LinuxMMIO:
             if base in self._owners or any(owner.site_id == site_id
                                            for owner in self._owners.values()):
                 raise MMIOError("Site ID/aperture already claimed")
+            if self.site_owner is not None and site_id != self.site_owner:
+                raise MMIOError("Site ID is outside the acquired per-Site lock")
             lease = SiteMMIO(self, base, site_id)
             self._owners[base] = lease
             return lease
@@ -332,6 +402,9 @@ class LinuxMMIO:
                 if self._fd is not None:
                     os.close(self._fd)
                     self._fd = None
+                if self._site_lock_fd is not None:
+                    os.close(self._site_lock_fd)
+                    self._site_lock_fd = None
                 if self._lock_fd is not None:
                     os.close(self._lock_fd)
                     self._lock_fd = None

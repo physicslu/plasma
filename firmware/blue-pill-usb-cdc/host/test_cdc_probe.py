@@ -104,7 +104,7 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(parse_args(["--port", "/dev/fake", "--host-port-pause-seconds", "0.6"])
                          .host_port_pause_seconds, 0.6)
 
-    def fake_run(self, events, pause_seconds=0.0, duration=2.6):
+    def fake_run(self, events, pause_seconds=0.0, duration=2.6, version="0.1"):
         clock = FakeClock()
         serial = FakeSerial(clock, events)
         output = io.StringIO()
@@ -112,7 +112,7 @@ class MonitorTests(unittest.TestCase):
              patch("cdc_probe.time.monotonic", clock.monotonic), \
              patch("cdc_probe.time.sleep", clock.sleep), \
              contextlib.redirect_stdout(output):
-            run_live("/dev/fake", duration, 0.2, pause_seconds)
+            run_live("/dev/fake", duration, 0.2, pause_seconds, version=version)
         return serial, output.getvalue()
 
     def test_live_loop_prints_each_heartbeat_without_default_pause(self):
@@ -218,6 +218,29 @@ class MonitorTests(unittest.TestCase):
             self.fake_run(self.stream(stop=1), pause_seconds=2, duration=60)
         with self.assertRaisesRegex(AssertionError, "insufficient observation time"):
             self.fake_run(self.stream(stop=1), pause_seconds=59, duration=60)
+
+    def test_v02_monitor_and_version_isolation(self):
+        monitor = HeartbeatMonitor(period=1.0, version="0.2")
+        self.assertFalse(monitor.observe("HB version=0.1 seq=1 uptime_ms=500", 1.0))
+        self.assertTrue(monitor.observe("HB version=0.2 seq=1 uptime_ms=1000", 1.0))
+        self.assertTrue(monitor.observe("HB version=0.2 seq=2 uptime_ms=2000", 2.0))
+        with self.assertRaisesRegex(AssertionError, "interval"):
+            monitor.observe("HB version=0.2 seq=3 uptime_ms=3000", 2.5)
+        self.assertTrue(is_firmware_id("ID PLASMA_BLUE_PILL_CDC/0.2", "0.2"))
+        self.assertFalse(is_firmware_id("ID PLASMA_BLUE_PILL_CDC/0.1", "0.2"))
+        self.assertEqual(parse_args(["--port", "unused", "--version", "0.2"]).version, "0.2")
+
+    def test_v02_live_coverage_and_wrong_id_rejection(self):
+        events = [(1.0, "HB version=0.2 seq=1 uptime_ms=1000"),
+                  (1.1, "ID PLASMA_BLUE_PILL_CDC/0.2")]
+        events.extend((float(n), f"HB version=0.2 seq={n} uptime_ms={1000*n}")
+                      for n in range(2, 6))
+        _, output = self.fake_run(events, duration=5.5, version="0.2")
+        self.assertIn("PASS: 5 heartbeats", output)
+        wrong = [(t, "ID PLASMA_BLUE_PILL_CDC/0.1" if line.startswith("ID ") else line)
+                 for t, line in events]
+        with self.assertRaisesRegex(AssertionError, "ID reply absent"):
+            self.fake_run(wrong, duration=5.5, version="0.2")
 
     def test_live_loop_rejects_uninterrupted_sequence_gap(self):
         with self.assertRaisesRegex(AssertionError, "sequence skipped"):

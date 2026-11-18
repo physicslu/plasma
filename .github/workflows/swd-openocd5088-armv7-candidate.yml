@@ -1,0 +1,142 @@
+name: PLASMA OpenOCD 5088 ARMv7 SWD candidate (CI only)
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/swd-openocd5088-armv7-candidate.yml"
+      - "scripts/ci/inject-plasma-openocd5088-native.py"
+      - "scripts/ci/build-openocd5088-armv7.sh"
+      - "scripts/ci/verify-openocd5088-armv7.sh"
+      - "scripts/ci/openocd5088-armv7-cache.py"
+      - "software/native/swd/**"
+
+permissions:
+  contents: read
+
+jobs:
+  armv7-source-locked-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout PR source (no persistent credentials)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Test build-key/cache-hit/cache-miss and fail-closed contracts (host-only)
+        run: python3 -m unittest discover -s scripts/ci/tests -p test_openocd5088_armv7_cache.py -v
+
+      - name: Calculate exact OpenOCD build input fingerprint
+        id: build-key
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="$(python3 scripts/ci/openocd5088-armv7-cache.py key)"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Restore verified ARMv7 build cache (exact key only)
+        id: build-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: _ci_openocd5088_cache
+          key: openocd5088-armv7-v1-${{ steps.build-key.outputs.key }}
+
+      - name: Enable ARMv7 user-space emulation on hosted runner
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+
+      - name: Build source-locked OpenOCD 5088 + plasma_swd on ARMv7 (cache miss)
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/build-openocd5088-armv7.sh "$GITHUB_WORKSPACE/_ci_openocd5088_cache"
+          python3 scripts/ci/openocd5088-armv7-cache.py seal \
+            --directory _ci_openocd5088_cache --key "${{ steps.build-key.outputs.key }}"
+
+      - name: Verify cache integrity and execute ARMv7 QEMU positive/negative checks (always)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/openocd5088-armv7-cache.py verify \
+            --directory _ci_openocd5088_cache --key "${{ steps.build-key.outputs.key }}"
+          bash scripts/ci/verify-openocd5088-armv7.sh \
+            "$GITHUB_WORKSPACE/_ci_openocd5088_cache" \
+            "$RUNNER_TEMP/plasma-openocd5088-armv7"
+
+      - name: Repackage current admission script and generate latest HEAD evidence (always)
+        shell: bash
+        env:
+          PLASMA_PR_HEAD_SHA: "${{ github.event.pull_request.head.sha }}"
+        run: |
+          set -euo pipefail
+          folder="$RUNNER_TEMP/plasma-openocd5088-armv7"
+          cp scripts/z2/plasma_swd_site_admission.py "$folder/"
+          (
+            cd "$folder"
+            sha256sum openocd plasma_swd_site_admission.py > openocd.sha256
+            printf '%s\n' \
+              'Upstream OpenOCD 5088db4c9154ca833c6d558381074b33672e127a' \
+              'Platform: ARMv7 ubuntu:22.04 QEMU user-space build' \
+              'PLASMA plasma_swd source-locked adapter candidate' \
+              'PS Root/Owner/Voltage-attestation binding: IMPLEMENTED, Host/QEMU denial only' \
+              'Z2 HIL / Blue Pill DPIDR: NOT_RUN' \
+              'DO NOT DEPLOY as a qualified production runtime' \
+              > PROVENANCE.txt
+          )
+          python3 - "$folder" "$PLASMA_PR_HEAD_SHA" <<'PY'
+          import hashlib, json, pathlib, sys
+          folder = pathlib.Path(sys.argv[1])
+          digest = hashlib.sha256((folder / "openocd").read_bytes()).hexdigest()
+          receipt = {
+              "schema": "plasma.openocd.armv7.candidate-evidence.v1",
+              "plasma_source_sha": sys.argv[2],
+              "openocd_source_sha": "5088db4c9154ca833c6d558381074b33672e127a",
+              "openocd_binary_sha256": digest,
+              "architecture": "ARMv7",
+              "adapter_discovery": "PASS",
+              "unowned_adapter_init": "DENIED",
+              "hardware_runtime_ready": False,
+              "ps_local_owner_binding": "IMPLEMENTED_UNADMITTED_INIT_DENIED",
+              "site_admission_script_sha256": hashlib.sha256((folder / "plasma_swd_site_admission.py").read_bytes()).hexdigest(),
+              "unadmitted_site1_init": "DENIED",
+              "z2_hil": "NOT_RUN",
+              "bluepill_dpidr": "NOT_RUN",
+          }
+          (folder / "candidate-evidence.json").write_text(
+              json.dumps(receipt, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(receipt, sort_keys=True))
+          PY
+          tar -C "$folder" -czf "$RUNNER_TEMP/plasma-openocd5088-armv7-candidate.tar.gz" \
+            openocd openocd.sha256 plasma_swd_site_admission.py tcl \
+            adapter-list.log adapter-select.log unowned-init-denied.log \
+            unadmitted-site1-init-denied.log elf-header.txt linked-libraries.txt \
+            candidate-evidence.json PROVENANCE.txt
+          cd "$RUNNER_TEMP"
+          sha256sum plasma-openocd5088-armv7-candidate.tar.gz \
+            > plasma-openocd5088-armv7-candidate.tar.gz.sha256
+          sha256sum -c plasma-openocd5088-armv7-candidate.tar.gz.sha256
+          tar -tzf plasma-openocd5088-armv7-candidate.tar.gz >/dev/null
+          mkdir -p "$GITHUB_WORKSPACE/_ci_armv7_artifacts"
+          cp plasma-openocd5088-armv7-candidate.tar.gz \
+            plasma-openocd5088-armv7-candidate.tar.gz.sha256 \
+            "$GITHUB_WORKSPACE/_ci_armv7_artifacts/"
+
+      - name: Publish unqualified ARMv7 candidate evidence (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasma-openocd5088-armv7-candidate
+          path: |
+            _ci_armv7_artifacts/plasma-openocd5088-armv7-candidate.tar.gz
+            _ci_armv7_artifacts/plasma-openocd5088-armv7-candidate.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Save verified ARMv7 build-only cache (cache miss, after artifact publication)
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: _ci_openocd5088_cache
+          key: openocd5088-armv7-v1-${{ steps.build-key.outputs.key }}

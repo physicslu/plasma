@@ -261,7 +261,6 @@ units = module.render_systemd_units(
     paths=paths,
     python_runtime=module.PythonRuntime(python_path, python_version, architecture),
     gateway_host="127.0.0.1",
-    catalog_relative="data/device-catalog/production/icpn-v1-manifest.json",
 )
 for name, content in units.items():
     module._write_text_atomic(paths.systemd_root / name, content)

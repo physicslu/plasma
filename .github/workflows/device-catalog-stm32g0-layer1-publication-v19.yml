@@ -8,7 +8,6 @@ on:
       - 'data/device-catalog/research/validate_stm32g0_layer1_publication_v19.py'
       - 'data/device-catalog/research/STM32G0_LAYER1_PRODUCTION_PUBLICATION_V19.md'
       - 'software/python/plasma_web/device_catalog.py'
-      - 'software/python/tests/test_device_catalog.py'
       - 'software/python/tests/test_device_catalog_web_gateway.py'
       - '.github/workflows/device-catalog-stm32g0-layer1-publication-v19.yml'
 

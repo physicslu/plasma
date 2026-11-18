@@ -1,27 +1,10 @@
-# PLASMA Engineering Dispatch v1 — Gate 1A Offline Architecture
+# PLASMA Engineering Dispatch v1 — historical Gate 1A architecture
 
-> **Status: Contract-only, NOT deployed; runtime dispatch disabled.**
->
-> **Scope:** engineering/developer job orchestration via GitHub and Codex. This is
-> **not** the Control Station → PPU → eight-site IC programming runtime scheduler.
-> All existing `plasma-codex-*.yml` legacy workflows remain untouched. New
-> engineering work will use this contract **only after** separate Gate 2 merge
-> and subsequent new-route implementation/acceptance. Existing workflows migrate
-> **individually at their next approved invocation**, not in a bulk rewrite.
+> **Historical only.** Original workload counts and legacy per-instrument Issue #981 dispatch descriptions are superseded. For current operation use `AGENTS.md`, the shared main Dispatcher and [Path 3 Direct Hardware Tools](../development/plasma-path3-direct-hardware-tools.md).
 
-## 1. Why this architecture exists
+## 1. Historical context
 
-The [LA2016 Direct loopback](../development/plasma-codex-la2016-direct.md)
-has already demonstrated one successful path: GitHub owner-approved Issue
-comment → dedicated SWPC non-root Runner → Codex CLI → pinned KINGST tool →
-actual PWM1/CH0 traces and hashes → GitHub evidence. This demonstrates
-one path, not a multi-capability engineering dispatcher.
-
-At review, the repository contains **11 distinct `plasma-codex-*.yml` workflows**
-and 27 scripts prefixed `plasma-codex-` (including legacy wrappers and distinct
-hardware contracts). Each legacy workflow retains its existing exact command,
-GitHub authorization and independent hardware controls. **Do not change,
-disable, rename or automatically reroute these triggers in Gate 1A.**
+The [2026-10-16 LA2016 PWM1→CH0 evidence](../evidence/la2016-pwm-loopback/2026-10-16/README.md) documents historical real captures. It does not authorize a new experiment or an old Issue dispatch. Current Path 3 directly invokes SWPC sigrok CLI and SSH to Z2 PS; OpenOCD and WordPort bridge stay local to Z2 PS, with no Host Supervisor JSON command translation.
 
 ## 2. First-principle separation
 

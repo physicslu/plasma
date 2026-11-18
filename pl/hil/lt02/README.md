@@ -80,7 +80,7 @@ a v1.1 repeated real-board performance result must be separately observed.**
 
 ## Approved development orchestration on SWPC
 
-Use `docs/development/codex-z2-hil-development-command.md` and
+Use `docs/development/plasma-embedded.md`, `docs/development/plasma-path3-codex.md` and
 `AGENTS.md`, not a new review/permission round within previously approved
 prototype development scope. Perform a bounded current-state preflight on
 the enrolled PYNQ-Z2, resolve its authorized local SSH credentials without

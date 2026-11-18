@@ -26,33 +26,71 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+/*
+ * One label column for every mode: both EMode and PMode number the fields
+ * 2-1 … 2-4, and "2-2. Programming Source" does not fit a 128px column at the
+ * shared 11px / 800 label font (it overlapped the control in PMode).
+ */
 .programmingJobField {
   min-width: 0;
   padding: 9px 10px;
   border-bottom: 1px solid var(--line, #d4dee8);
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
-  align-items: center;
-  column-gap: 8px;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+  align-items: start;
+  column-gap: 10px;
   row-gap: 4px;
 }
 
 .programmingJobField > strong {
-  justify-self: start;
+  justify-self: stretch;
+  min-width: 0;
+  /* Centre the label on the first control line of its row. */
+  min-height: var(--operator-control-min-height);
+  display: flex;
+  align-items: center;
   text-align: left;
   color: var(--text, #172033);
   font-size: var(--operator-field-label-font-size);
   font-weight: 800;
   line-height: 1.2;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.programmingJobField > small {
+/* The IC picker keeps its own height, so its label centres on that. */
+.programmingJobField[data-programming-job-field="target"] {
+  align-items: center;
+}
+
+.programmingJobField > small,
+.programmingJobImageContent > small {
   grid-column: 2;
   margin: 0;
   color: var(--text-soft, #51606f);
   font-size: var(--operator-helper-font-size);
   line-height: 1.35;
+}
+
+/* Source selector, file picker, details and hint stack in the control column. */
+.programmingJobImageContent {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.programmingJobImageField {
+  align-items: start;
+}
+
+.programmingJobImageField > strong {
+  min-height: var(--operator-control-min-height);
+  display: flex;
+  align-items: center;
+}
+
+.programmingJobImageContent > small {
+  grid-column: 1;
 }
 
 .programmingJobImageControl {
@@ -318,7 +356,8 @@
     gap: 6px;
   }
 
-  .programmingJobField > small {
+  .programmingJobField > small,
+  .programmingJobImageContent {
     grid-column: 1;
   }
 
@@ -335,5 +374,36 @@
     padding: 8px;
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+}
+
+@container engineering-programming (max-width: 700px) {
+  .engineeringProgrammingV2 .programmingJobField {
+    grid-template-columns: minmax(142px, 160px) minmax(0, 1fr);
+  }
+
+  .engineeringProgrammingV2 .programmingJobOperationChecks,
+  .engineeringProgrammingV2 .programmingJobPolicyControls {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  .engineeringProgrammingV2 .programmingJobGrid .icPickerMenu button {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container engineering-programming (max-width: 480px) {
+  .engineeringProgrammingV2 .programmingJobField {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .engineeringProgrammingV2 .programmingJobField > small,
+  .engineeringProgrammingV2 .programmingJobImageContent {
+    grid-column: 1;
+  }
+
+  .engineeringProgrammingV2 .programmingJobActionBar {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -92,7 +92,7 @@ test("public Render keeps Production Programming Job contained on iPad landscape
   await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
   await expectConstrainedProductionJob(page);
 
-  const selection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
+  const selection = page.getByRole("region", { name: "SYSTEM SETUP & TARGETING" });
   await selection.getByRole("button", { name: /收起|Hide/ }).click();
   await expect(selection.locator(".operatorPanelBody")).toBeHidden();
   await expectConstrainedProductionJob(page);

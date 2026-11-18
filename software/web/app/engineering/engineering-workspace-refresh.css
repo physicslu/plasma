@@ -267,11 +267,6 @@
   width: 100%;
 }
 
-/* Numbering is layout metadata only; title typography belongs to OperatorPanel. */
-.engineeringProgrammingV2 .targetingCard > header::before {
-  content: "1. ";
-}
-
 .engineeringProgrammingV2 .targetingCard .cardBody {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -296,10 +291,6 @@
 
 .engineeringProgrammingV2 .liveSiteStatus {
   margin-top: 10px;
-}
-
-.engineeringProgrammingV2 .liveSiteStatus > header > span::before {
-  content: "3. ";
 }
 
 .engineeringProgrammingV2 .engineeringLogCard {

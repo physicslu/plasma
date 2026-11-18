@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Protected FPGA Package Action entry (filename retained pending Z2 migration).
+# No Git Source Commit Pin, /root/plasma-path2-approved, dynamic executable
+# name, project selection, shell command or Bundle-selected script.
+# The installed privileged Python closure is independently root-owned and
+# provisioned/verified at install time before the existing Root FPGA Loader.
+set -euo pipefail
+asset_set=''
+case "${1:-}" in
+  download|test|restore)
+    [[ $# -eq 1 ]] || { echo 'PPU_FPGA_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
+    operation="$1" ;;
+  bundle-load)
+    [[ $# -eq 2 ]] || { echo 'PPU_FPGA_OPERATION_ARGUMENT_REQUIRED' >&2; exit 2; }
+    operation="$1"
+    asset_set="$2"
+    [[ "$asset_set" =~ ^[0-9a-f]{64}$ ]] ||
+      { echo 'PPU_FPGA_ASSET_SET_SHA_INVALID' >&2; exit 2; } ;;
+  *) echo 'PPU_FPGA_OPERATION_NOT_ALLOWLISTED' >&2; exit 2 ;;
+esac
+[[ "$(id -u)" == '0' ]] || { echo 'PPU_FPGA_ROOT_REQUIRED' >&2; exit 2; }
+
+root=/opt/plasma/privileged/fpga-root
+python=/opt/plasma/python/3.12.13/bin/python3
+module=pl.hil.fpga_image_root
+
+# Do not permit a non-root account to substitute the verifier/entrypoint
+# while Root is about to import the protected FPGA hardware implementation.
+for dir in /opt /opt/plasma /opt/plasma/bootstrap /opt/plasma/privileged "$root"; do
+  [[ -d "$dir" && ! -L "$dir" && "$(stat -c '%u' "$dir")" == '0' ]] ||
+    { echo 'PPU_FPGA_TRUSTED_SOURCE_NOT_INSTALLED' >&2; exit 2; }
+  mode="$(stat -c '%a' "$dir")"
+  (( (8#$mode & 0022) == 0 )) ||
+    { echo 'PPU_FPGA_TRUSTED_SOURCE_WRITABLE' >&2; exit 2; }
+done
+for file in "$python"; do
+  [[ -f "$file" && ! -L "$file" && "$(stat -c '%u' "$file")" == '0' ]] ||
+    { echo 'PPU_FPGA_TRUSTED_EXECUTOR_NOT_INSTALLED' >&2; exit 2; }
+  mode="$(stat -c '%a' "$file")"
+  (( (8#$mode & 0022) == 0 )) ||
+    { echo 'PPU_FPGA_TRUSTED_EXECUTOR_WRITABLE' >&2; exit 2; }
+done
+cd "$root"
+exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/var/empty \
+  PYTHONPATH="$root" PYTHONDONTWRITEBYTECODE=1 \
+  "$python" -B -m "$module" "$operation" ${asset_set:+"$asset_set"}

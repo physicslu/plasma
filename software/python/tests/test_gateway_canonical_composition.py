@@ -7,7 +7,6 @@ import pytest
 from plasma_web import gateway_phase2, gateway_phase3
 from plasma_web.gateway_phase2 import PPUNetworkActivationSupportMixin, SiteConfigurationSupportMixin
 from plasma_web.gateway_phase3 import Phase3PlasmaWebHandler, SiteRuntimeActivationSupportMixin
-from plasma_web.secure_gateway_app import DeployedSecurePlasmaWebHandler
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -17,9 +16,6 @@ def test_phase3_handler_has_explicit_feature_composition() -> None:
     assert issubclass(Phase3PlasmaWebHandler, SiteRuntimeActivationSupportMixin)
     assert issubclass(Phase3PlasmaWebHandler, SiteConfigurationSupportMixin)
     assert issubclass(Phase3PlasmaWebHandler, PPUNetworkActivationSupportMixin)
-    assert issubclass(DeployedSecurePlasmaWebHandler, SiteRuntimeActivationSupportMixin)
-    assert issubclass(DeployedSecurePlasmaWebHandler, SiteConfigurationSupportMixin)
-    assert issubclass(DeployedSecurePlasmaWebHandler, PPUNetworkActivationSupportMixin)
 
 
 def test_phase2_startup_uses_explicit_runner_without_handler_global_replacement() -> None:
@@ -33,14 +29,13 @@ def test_phase2_startup_uses_explicit_runner_without_handler_global_replacement(
 
 def test_phase3_startup_does_not_chain_or_replace_handler_globals() -> None:
     phase3 = (ROOT / "software/python/plasma_web/gateway_phase3.py").read_text(encoding="utf-8")
-    secure = (ROOT / "software/python/plasma_web/secure_gateway_app.py").read_text(encoding="utf-8")
 
     assert "\n        phase2.main()" not in phase3
     assert "\n    phase2.main()" not in phase3
     assert "phase2.PlasmaWebHandler =" not in phase3
     assert "canonical_gateway.PlasmaWebHandler =" not in phase3
-    assert "gateway.PlasmaWebHandler =" not in secure
-    assert "gateway.main(handler_class=DeployedSecurePlasmaWebHandler)" in secure
+    # The opt-in Bearer-principal launcher is retired (LOM-P2A-2 follow-up).
+    assert not (ROOT / "software/python/plasma_web/secure_gateway_app.py").exists()
 
 
 def test_phase2_parser_retains_canonical_runtime_options() -> None:

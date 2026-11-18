@@ -174,4 +174,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # Importable helpers remain for dependent host-only tests.
+    raise SystemExit("RETIRED_Z2_SWD_GPIO: standalone historical FPGA artifact CLI retired")
+
     raise SystemExit(main())

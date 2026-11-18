@@ -180,11 +180,10 @@ test("Emode Mock uses Synthetic Image and target-owned Main Flash READ", async (
   const fileName = programmingJobField(job, "image").locator("[data-image-source]");
   await expect(readiness).toHaveText("NO OP");
   await expect(execute).toBeDisabled();
-  const read = programmingJobOperation(job, "read");
-  await read.check();
-  await expect(readiness).toHaveText("BATCH READY");
-  await expect(execute).toBeEnabled();
-  await read.uncheck();
+  await expect(programmingJobOperation(job, "read")).toHaveCount(0);
+  await expect(page.getByLabel("SITE 1 Read Memory")).toBeVisible();
+  await expect(readiness).toHaveText("NO OP");
+  await expect(execute).toBeDisabled();
   await programmingJobOperation(job, "program").check();
   await expect(fileName).toHaveText("Mock Synthetic Image");
   await expect(fileName).toHaveAttribute("data-image-source", "mock_synthetic");

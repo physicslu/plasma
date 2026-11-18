@@ -37,7 +37,7 @@ Failure is **fail-closed**. There is no fallback from the production catalog to 
 
 ## Product API and UI
 
-The existing `GET /api/devices/search` route remains the stable product API. Keeping this route avoids unnecessary Manager and Secure Gateway routing changes.
+`GET /api/devices/search` remains the stable product API. It is served only by Plasma Manager (Console BFF `GET /api/manager/devices/search`); the PPU Gateway has no Selector route (OPF S5-B).
 
 The search surface supports:
 

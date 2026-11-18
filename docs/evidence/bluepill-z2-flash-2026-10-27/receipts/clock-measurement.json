@@ -1,0 +1,64 @@
+{
+  "active_periods_le_500000_samples": 37228,
+  "all_periods": 37228,
+  "median_period_samples": 1396,
+  "minimum_period_samples": 1359,
+  "modal_frequency_hz": 3610.1083032490974,
+  "modal_period_count": 1142,
+  "modal_period_samples": 1385,
+  "modal_period_us": 277.0,
+  "p05_period_samples": 1376,
+  "p95_period_samples": 3252,
+  "rising_edges": 37229,
+  "sample_rate_hz": 5000000,
+  "top_periods": [
+    [
+      1385,
+      1142
+    ],
+    [
+      1387,
+      1066
+    ],
+    [
+      1383,
+      1054
+    ],
+    [
+      1386,
+      1050
+    ],
+    [
+      1389,
+      1036
+    ],
+    [
+      1382,
+      1030
+    ],
+    [
+      1384,
+      1028
+    ],
+    [
+      1388,
+      998
+    ],
+    [
+      1381,
+      942
+    ],
+    [
+      1380,
+      895
+    ],
+    [
+      1390,
+      843
+    ],
+    [
+      1379,
+      816
+    ]
+  ]
+}

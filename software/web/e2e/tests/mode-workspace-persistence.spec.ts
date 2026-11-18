@@ -122,7 +122,7 @@ test("Pmod and Emode keep configuration while runtime is re-read from the backen
   await productionOperation(page, "P").check();
   await productionOperation(page, "R").check();
   await page.getByRole("button", { name: /收起|Hide/ }).click();
-  await expect(page.getByRole("region", { name: "PRODUCTION SITE SELECTION" }).locator(".operatorPanelBody")).toBeHidden();
+  await expect(page.getByRole("region", { name: "SYSTEM SETUP & TARGETING" }).locator(".operatorPanelBody")).toBeHidden();
 
   await page.getByRole("link", { name: "工程模式", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Engineering Mode" })).toBeVisible();
@@ -136,12 +136,13 @@ test("Pmod and Emode keep configuration while runtime is re-read from the backen
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(4, { timeout: 15_000 });
   await page.getByLabel("Batch select SITE 2").uncheck();
   await programmingJobOperation(engineeringJob, "erase").check();
-  await programmingJobOperation(engineeringJob, "read").check();
+  await programmingJobOperation(engineeringJob, "verify").check();
+  await expect(programmingJobOperation(engineeringJob, "read")).toHaveCount(0);
 
   await page.getByRole("link", { name: "量產模式", exact: true }).click();
   await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
   await expect(page.locator(`[data-production-ppu="${ppu1Id}"]`)).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("region", { name: "PRODUCTION SITE SELECTION" }).locator(".operatorPanelBody")).toBeHidden();
+  await expect(page.getByRole("region", { name: "SYSTEM SETUP & TARGETING" }).locator(".operatorPanelBody")).toBeHidden();
   await expect(programmingJobField(programmingJob(page), "image").locator("[data-image-source]")).toHaveText("shared-mode-state.bin");
   await expect(productionOperation(page, "P")).toBeChecked();
   await expect(productionOperation(page, "R")).toBeChecked();
@@ -156,7 +157,8 @@ test("Pmod and Emode keep configuration while runtime is re-read from the backen
   await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(4);
   await expect(programmingJobOperation(engineeringJob, "erase")).toBeChecked();
-  await expect(programmingJobOperation(engineeringJob, "read")).toBeChecked();
+  await expect(programmingJobOperation(engineeringJob, "verify")).toBeChecked();
+  await expect(page.getByLabel("SITE 1 Read Memory")).toBeVisible();
 
   expect(runtime.sessionCalls()).toBe(1);
   expect(runtime.statusCalls(ppu1Id)).toBeGreaterThanOrEqual(2);

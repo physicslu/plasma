@@ -8,7 +8,6 @@ on:
       - "scripts/plasma-codex-hardware-parity.py"
       - "scripts/tests/test-plasma-codex-hardware-parity.py"
       - "docs/development/plasma-codex-hardware-parity.md"
-      - "docs/README.md"
   push:
     branches: [main]
     paths:
@@ -16,7 +15,6 @@ on:
       - "scripts/plasma-codex-hardware-parity.py"
       - "scripts/tests/test-plasma-codex-hardware-parity.py"
       - "docs/development/plasma-codex-hardware-parity.md"
-      - "docs/README.md"
 
 permissions:
   contents: read

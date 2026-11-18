@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# RETIRED: source retained for historical tests only; no image builds.
+printf '%s\n' 'RETIRED_Z2_SWD03_AXI: legacy project retired; use Z2 PS-local WordPort/PL SWD' >&2
+exit 2
 # HOST BUILD ONLY: creates a uniquely named Vivado run, never loads FPGA or
 # executes ps7_init, and never modifies retained PSPL-02 baseline build files.
 set -Eeuo pipefail

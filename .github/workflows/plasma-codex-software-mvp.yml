@@ -1,9 +1,8 @@
 name: PLASMA Unified HIL - owner-triggered fixed SW Codex (Issue 981)
 
 # Unified SW/Z2/LA Runner: owner-only fixed SW task; no generic dispatcher or hardware operation.
+# Legacy Issue #981 /plasma-codex runtime dispatch retired; hosted CI only.
 on:
-  issue_comment:
-    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-codex-software-mvp.yml"

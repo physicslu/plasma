@@ -247,8 +247,7 @@ class RuntimeContracts(unittest.TestCase):
             return Result()
         with patch.object(runtime, "isolation_check", return_value={}):
             runtime.run_worker(b, self.policy, runtime.digest(b), executor=fake_exec)
-        self.assertEqual(observed[0][0][0], "codex")
-        self.assertIn("exec", observed[0][0])
+        self.assertEqual(observed[0][0], ["codex", "exec", "-"])
         self.assertIn(b"Only modify these reviewed repository paths", observed[0][1]["input"])
         self.assertIn(b"Never access devices", observed[0][1]["input"])
 

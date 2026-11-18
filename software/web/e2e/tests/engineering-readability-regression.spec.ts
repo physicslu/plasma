@@ -146,9 +146,9 @@ test("Engineering first-level Panel titles share one operator header baseline wh
 
   const titles = [
     page.locator(".batchSummary .operatorPanelTitle > strong"),
-    page.locator(".targetingCard > header"),
+    page.locator(".targetingCard .operatorPanelTitle > strong"),
     job.locator(".operatorPanelTitle > strong"),
-    page.locator(".liveSiteStatus > header > span"),
+    page.locator(".liveSiteStatus .operatorPanelTitle > strong"),
     page.locator(".engineeringOperatorLog .operatorPanelTitle > strong"),
   ];
   const baselineTitle = await titleSignature(titles[0]);
@@ -158,10 +158,11 @@ test("Engineering first-level Panel titles share one operator header baseline wh
     expect(await titleSignature(title)).toEqual(baselineTitle);
   }
 
-  const setupPseudo = await page.locator(".targetingCard > header").evaluate(element => getComputedStyle(element, "::before").content);
-  const livePseudo = await page.locator(".liveSiteStatus > header > span").evaluate(element => getComputedStyle(element, "::before").content);
-  expect(setupPseudo).toContain("1.");
-  expect(livePseudo).toContain("3.");
+  // Section numbers come from the shared header, not from CSS generated content.
+  await expect(page.locator(".targetingCard .operatorPanelTitle")).toHaveText(/^1\.\s*SYSTEM SETUP & TARGETING$/);
+  await expect(page.locator(".liveSiteStatus .operatorPanelTitle")).toHaveText(/^3\.\s*LIVE SITE STATUS/);
+  await expect(job.locator(".operatorPanelTitle")).toHaveText(/^2\.\s*PROGRAMMING JOB$/);
+  await expect(page.locator(".engineeringOperatorLog .operatorPanelTitle")).toHaveText(/^4\.\s*ENGINEERING JOB LOG$/);
 
   const setupLabels = page.locator(".targetingCard .workflowField > span");
   await expect(setupLabels).toHaveCount(2);

@@ -1,5 +1,7 @@
 # PLASMA UIO Runtime Backend — Phase 2A Host-only Candidate
 
+> **Term note:** in this document **B1/B2/B3 are the PR #972 FPGA/UIO safety items** — B1 live Fabric UIO ownership handoff, B2 retained-mmap guard, B3 aperture Supervisor. Not the Bundle-stage meaning; see [glossary](../glossary.md#b1b2b3).
+
 > **Status: Implemented and CI-qualified on synthetic Linux sysfs/regular files ONLY.**
 > Never use this work as authorization to open a real `/dev/uioX`, unbind a device,
 > reload FPGA, perform MMIO against Z2, or run HIL-B/C.

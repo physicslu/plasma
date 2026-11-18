@@ -15,7 +15,7 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
 
   assert.match(page, /ProgrammingWorkspaceV2/);
   assert.match(workspace, /SINGLE PPU PROGRAMMING/);
-  assert.match(workspace, /SYSTEM SETUP &amp; TARGETING/);
+  assert.match(workspace, /title="SYSTEM SETUP & TARGETING"/);
   assert.match(workspace, /PROGRAMMING JOB/);
   assert.match(workspace, /Target IC/);
   assert.match(workspace, /Programming Image/);
@@ -34,9 +34,12 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.doesNotMatch(refresh, /recentEvents/);
 
   assert.match(refresh, /grid-template-columns:\s*minmax\(0, 1fr\)/);
-  assert.match(refresh, /content:\s*"1\. "/);
-  assert.match(refresh, /content:\s*"3\. "/);
-  assert.doesNotMatch(refresh, /1\. SYSTEM SETUP|3\. LIVE SITE STATUS|font-size:\s*0/);
+  // Section numbers come from the shared OperatorPanelHeader, never from CSS
+  // generated content, and both modes use the same chapter order.
+  assert.match(workspace, /<OperatorPanelHeader\s+number=\{1\}\s+title="SYSTEM SETUP & TARGETING"/);
+  assert.match(workspace, /<OperatorPanelHeader\s+number=\{3\}\s+title="LIVE SITE STATUS"/);
+  assert.match(sharedJob, /const fieldNumber = \(index: number\) => `\$\{PROGRAMMING_JOB_SECTION\}-\$\{index\}\.`/);
+  assert.doesNotMatch(refresh, /targetingCard > header::before|liveSiteStatus > header > span::before|font-size:\s*0/);
 });
 
 test("Engineering shell uses the approved dark EMode sidebar and supports collapse", async () => {
@@ -112,6 +115,20 @@ test("Engineering keeps direct single-Site jobs separate from server-owned Batch
   assert.match(controller, /cancelServerBatch\(/);
 });
 
+test("Engineering Read Memory is an independent per-Site Job, not a Batch operation", async () => {
+  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const driver = await source("../e2e/tests/programming-job-test-helpers.ts");
+
+  assert.match(workspace, /const operationOrder: Operation\[\] = \["erase", "program", "verify"\]/);
+  assert.match(workspace, /const selectedBatchOperations = operationOrder\.filter\(operation => selectedOperations\.includes\(operation\)\)/);
+  assert.match(workspace, /readSelected: false/);
+  assert.match(workspace, /snapshot\.operations\.filter\(operation => operation !== "read"\)/);
+  assert.match(workspace, /aria-label=\{`SITE \$\{site\.id\} Read Memory`\}/);
+  assert.match(workspace, /onClick=\{\(\) => runSingleSite\(site\.id, "read"\)\}/);
+  assert.match(workspace, /OPERATIONS \(E\/P\/V\)/);
+  assert.match(driver, /engineering: \["erase", "program", "verify"\]/);
+});
+
 test("Engineering Target IC is optional and crosses both direct-Job and server-Batch boundaries", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
@@ -142,7 +159,7 @@ test("Engineering v2 advertises only the implemented binary Programming Image no
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
 
-  assert.match(sharedJob, /accept="\.bin,application\/octet-stream"/);
+  assert.match(sharedJob, /accept=\{image\.accept \?\? "\.bin,application\/octet-stream"\}/);
   assert.match(workspace, /imageLabel="Programming Image"/);
   assert.match(workspace, /Binary Programming Image \(\.bin\)\./);
   assert.doesNotMatch(sharedJob, /\.hex/);

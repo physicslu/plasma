@@ -1,3 +1,5 @@
+# RETIRED: historical Tcl retained for offline code/tests only.
+error "RETIRED_Z2_SWD_GPIO: retired FPGA image build entrypoint"
 # Build source-controlled Z2 EMIO SWD PoC (NO hardware loading).
 set script_dir [file dirname [file normalize [info script]]]
 

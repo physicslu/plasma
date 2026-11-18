@@ -1,0 +1,8 @@
+{
+  "schema": "plasma.vivado-host-project.v1",
+  "vivado_project": "z2_control_waveform",
+  "build_env": "PLASMA_LOOPBACK_BUILD",
+  "success_marker": "BITSTREAM_BUILD_PASS",
+  "reports": ["timing_summary.rpt", "drc.rpt", "methodology.rpt", "utilization.rpt"],
+  "prepare_artifact": true
+}

@@ -1,0 +1,7 @@
+# .codegraphignore
+node_modules/
+build/
+dist/
+*.bit
+*.bin
+.git/

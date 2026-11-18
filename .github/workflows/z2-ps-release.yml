@@ -9,7 +9,12 @@ on:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/plasmactl"
       - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu_runtime_local_readiness.py"
       - "scripts/ppu-bootstrap-deployment.py"
+      - "scripts/ppu-bootstrap-installer.py"
+      - "scripts/ppu_site_worker.py"
+      - "scripts/ppu_site_engine.py"
+      - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/build-z2-python-runtime.sh"
       - "scripts/openocd-runtime.py"
@@ -24,7 +29,6 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
-      - "scripts/ppu-z2-installer-core.py"
       - "scripts/product-release.py"
       - "docs/deployment/z2-ps-installer.md"
       - "docs/deployment/plasmactl-deployment-profiles.md"
@@ -33,13 +37,17 @@ on:
       - "software/python/plasma_core/**"
       - "software/python/plasma_interfaces/**"
       - "software/python/plasma_handlers/**"
+      - "software/python/plasma_opf/**"
       - "software/python/plasma_server/**"
       - "software/python/plasma_client/**"
       - "software/python/plasma_web/**"
+      - "!software/python/plasma_web/nxp_mcxn236_blhost_compat_poc.py"
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
+      - "software/python/tests/ppu_control_plane_fixture.py"
+      - "software/python/tests/test_ppu_full_copy_deployment.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_openocd_runtime_artifact.py"
       - "software/python/tests/test_openocd_release_cache_contract.py"
@@ -50,7 +58,12 @@ on:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/plasmactl"
       - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu_runtime_local_readiness.py"
       - "scripts/ppu-bootstrap-deployment.py"
+      - "scripts/ppu-bootstrap-installer.py"
+      - "scripts/ppu_site_worker.py"
+      - "scripts/ppu_site_engine.py"
+      - "scripts/ppu_site_adapter_abi5.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/build-z2-python-runtime.sh"
       - "scripts/openocd-runtime.py"
@@ -65,7 +78,6 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
-      - "scripts/ppu-z2-installer-core.py"
       - "scripts/product-release.py"
       - "docs/deployment/z2-ps-installer.md"
       - "docs/deployment/plasmactl-deployment-profiles.md"
@@ -74,13 +86,17 @@ on:
       - "software/python/plasma_core/**"
       - "software/python/plasma_interfaces/**"
       - "software/python/plasma_handlers/**"
+      - "software/python/plasma_opf/**"
       - "software/python/plasma_server/**"
       - "software/python/plasma_client/**"
       - "software/python/plasma_web/**"
+      - "!software/python/plasma_web/nxp_mcxn236_blhost_compat_poc.py"
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
       - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
+      - "software/python/tests/ppu_control_plane_fixture.py"
+      - "software/python/tests/test_ppu_full_copy_deployment.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_openocd_runtime_artifact.py"
       - "software/python/tests/test_openocd_release_cache_contract.py"
@@ -116,7 +132,7 @@ jobs:
       - name: Prove clean-PYNQ bootstrap compatibility
         run: |
           python -m py_compile scripts/z2-python-runtime.py
-          python -m py_compile scripts/ppu-z2-installer.py scripts/ppu-z2-installer-core.py
+          python -m py_compile scripts/ppu-z2-installer.py
           python -m py_compile scripts/ppu-bootstrap-deployment.py
           bash -n scripts/build-z2-python-runtime.sh
           python scripts/z2-python-runtime.py --help
@@ -425,6 +441,7 @@ jobs:
           software/python/tests/test_ppu_release.py
           software/python/tests/test_ppu_z2_installer.py
           software/python/tests/test_z2_bootstrap_deployment_call_graph.py
+          software/python/tests/test_ppu_full_copy_deployment.py
           software/python/tests/test_z2_python_runtime_artifact.py
           software/python/tests/test_openocd_runtime_artifact.py
           software/python/tests/test_z2_ps_release_cache_contract.py
@@ -474,6 +491,8 @@ jobs:
         env:
           IDENTITY: ${{ steps.release.outputs.identity }}
           PPU_ARCHIVE: ${{ steps.release.outputs.archive }}
+          LEGACY_INSTALLER_CORE_COMMIT: 783102b9e5521bbced4be4fb1f3f494bdcab299c
+          LEGACY_INSTALLER_CORE_SHA256: 8613b3a14c0854f08c9dc69f4cd68b098deb75f2eda36f159356bddf8a18e515
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/plasma-z2-ps-kit-$IDENTITY"
@@ -482,9 +501,17 @@ jobs:
           cp scripts/plasmactl-z2-ps "$root/scripts/plasmactl-z2-ps"
           cp scripts/ppu-bootstrap-deployment.py "$root/scripts/ppu-bootstrap-deployment.py"
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
-          cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"
+          cp scripts/ppu_package_units.py "$root/scripts/ppu_package_units.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
           cp scripts/openocd-runtime.py "$root/scripts/openocd-runtime.py"
+          cp scripts/ppu_runtime_local_readiness.py "$root/scripts/ppu_runtime_local_readiness.py"
+          # One-time #1433 transition: a pre-#1433 installed Bootstrap (783102b9e)
+          # refuses a kit without this file. Exact pinned bytes from that commit;
+          # this kit's single-file installer never loads it, and the Full-Copy
+          # coordinator removes it from /opt/plasma/bootstrap after install.
+          git show "$LEGACY_INSTALLER_CORE_COMMIT:scripts/ppu-z2-installer-core.py" \
+            > "$root/scripts/ppu-z2-installer-core.py"
+          echo "$LEGACY_INSTALLER_CORE_SHA256  $root/scripts/ppu-z2-installer-core.py" | sha256sum -c -
           cp "$PPU_ARCHIVE" "$PPU_ARCHIVE.sha256" "$root/artifacts/"
           cp "$RUNNER_TEMP/z2-python-artifact/"* "$root/artifacts/"
           cp "$RUNNER_TEMP/openocd-artifact/"* "$root/artifacts/"
@@ -492,7 +519,9 @@ jobs:
           chmod +x "$root/scripts/plasmactl" "$root/scripts/plasmactl-z2-ps" \
             "$root/scripts/ppu-bootstrap-deployment.py" "$root/scripts/ppu-z2-installer.py" \
             "$root/scripts/z2-python-runtime.py" "$root/scripts/openocd-runtime.py"
-          test -f "$root/scripts/ppu-z2-installer-core.py"
+          test -f "$root/scripts/ppu-z2-installer.py"
+          test -f "$root/scripts/ppu_package_units.py"
+          test -f "$root/scripts/ppu_runtime_local_readiness.py"
           python scripts/z2-python-runtime.py verify \
             "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz" \
             --sidecar "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz.sha256"

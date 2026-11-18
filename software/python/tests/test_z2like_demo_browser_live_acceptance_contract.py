@@ -74,13 +74,14 @@ def test_live_gate_reuses_verified_qemu_openocd_cache_without_recompile() -> Non
 
 def test_live_gate_keeps_pairing_secret_and_capability_out_of_evidence() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
-    assert "/var/lib/plasma-bootstrap/control-token" in source
+    assert "/sim/ppu-enroll.py" in source                 # LOM-P2A-2 engineering ticket
+    assert "cat\", \"/var/lib/plasma-bootstrap/control-token" not in source
     assert 'token = ""' in source
     assert 'CAPABILITY_COOKIE = "plasma-manager-maintenance"' in source
     assert '"wrong_pairing_token": "BLOCKED_NO_CREDENTIAL_CHANGE"' in source
     assert '"maintenance_capability_cookie_contract": "PASS"' in source
     assert '"kit_sha256": kit_sha' in source
-    assert '"token": token' in source
+    assert '"ticket": token' in source
     assert '"capability": capability' not in source
     assert '"pairing_token"' not in source
 

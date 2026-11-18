@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Device-visible rootless Codex sandbox for the existing Development Path 3.
 
-No new execution mode, session type, Work Order field or Runner. Every
-existing Path 3 Codex run uses this outer OS namespace. The owner authorizes
-physical effects through the existing Gate 1 Work Order, not through a new
-hardware-capability field. The lab worker's normal DAC/ACL still applies.
+Legacy opt-in namespace probe; normal Path 3 execution no longer uses this
+outer mount/device filter. The owner authorizes physical effects through the
+existing Gate 1 Work Order; Linux DAC/ACL and hardware guards still apply.
 """
 from __future__ import annotations
 
@@ -13,6 +12,7 @@ from pathlib import Path
 import pwd
 import re
 import shutil
+import stat
 
 
 class CodexSandboxDenied(ValueError):
@@ -94,23 +94,48 @@ def codex_command(
         argv += ["--dev-bind", str(node), "/dev/" + node.name]
 
     argv += ["--bind", str(workspace), str(workspace)]
-    # Preserve only Codex's API login; hide unrelated private credential dirs.
+    # Keep only the enrolled Z2 login sources visible, read-only. Do not expose
+    # the whole SSH directory, agent socket or unrelated Plasma credentials.
+    plasma = home / ".config/plasma"
+    z2_sources = []
+    if plasma.exists() or plasma.is_symlink():
+        meta = plasma.lstat()
+        require(stat.S_ISDIR(meta.st_mode) and meta.st_uid == os.geteuid()
+                and stat.S_IMODE(meta.st_mode) == 0o700,
+                "CODEX_SANDBOX_Z2_DIRECTORY_DENIED")
+        for name in ("z2-login-smoke.json", "z2-login-known_hosts"):
+            source = plasma / name
+            if not source.exists() and not source.is_symlink():
+                continue
+            meta = source.lstat()
+            require(stat.S_ISREG(meta.st_mode) and meta.st_uid == os.geteuid()
+                    and stat.S_IMODE(meta.st_mode) == 0o600,
+                    "CODEX_SANDBOX_Z2_SOURCE_DENIED")
+            z2_sources.append(source)
+    # Hide private directories before restoring the selected file mounts.
     for name in (".ssh", ".aws", ".gnupg", ".kube", ".config/plasma",
                  ".config/gh"):
         private = home / name
         if private.exists() or private.is_symlink():
             require(private.is_dir() and not private.is_symlink(),
                     "CODEX_SANDBOX_PRIVATE_PATH_DENIED")
+            # Bubblewrap defaults tmpfs to 0755; Stage Transport enrollment
+            # requires this credential parent to remain private (0700).
+            # --perms applies only to the immediately following tmpfs.
+            if name == ".config/plasma":
+                argv += ["--perms", "0700"]
             argv += ["--tmpfs", str(private)]
+    for source in z2_sources:
+        argv += ["--ro-bind", str(source), str(source)]
     argv += ["--bind", str(auth), str(auth)]
     for key in ("GH_TOKEN", "GITHUB_TOKEN", "GITHUB_PAT", "SSH_AUTH_SOCK",
                 "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
                 "AWS_SESSION_TOKEN", "PLASMA_Z2_AUTH"):
         argv += ["--unsetenv", key]
+    # This optional probe also inherits Codex CLI policy.
     argv += [
         "--chdir", str(workspace), "--",
-        "codex", "--ask-for-approval", "never", "exec", "--json",
-        "--sandbox", "danger-full-access", "-",
+        "codex", "exec", "--json", "-",
     ]
     return argv
 

@@ -17,6 +17,7 @@ from plasma_core.assets import ProgrammingAsset
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest, validate_job_id
+from plasma_opf import bundle_v3
 
 from .diagnostics import execute_ps_loopback
 from .openocd_control_plane import execute_openocd_control_plane
@@ -95,23 +96,37 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
     max_body_bytes = 24 * 1024 * 1024
     allowed_origins = frozenset({"*"})
     output_root = Path("output")
+    # Where the Plasma Server writes Job output (its ``server.output_root``).
+    # The Gateway's own ``output_root`` holds Gateway state and may be a
+    # different directory; ``None`` means both share ``output_root``.
+    job_output_root: Path | None = None
     static_root: Path | None = None
 
     def log_message(self, format: str, *args: Any) -> None:
         return
 
+    def _extra_response_headers(self, status: int, data: bytes) -> dict[str, str]:
+        """Hook for response proofs (G13 controller admission); none by default."""
+        return {}
+
     def _json(self, status: int, payload: dict[str, Any]) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode()
+        extra = self._extra_response_headers(int(status), data)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        for key, value in extra.items():
+            self.send_header(key, value)
         self._cors_headers()
         self.end_headers()
         self.wfile.write(data)
 
     def _binary_data(self, data: bytes, filename: str) -> None:
+        extra = self._extra_response_headers(int(HTTPStatus.OK), data)
         self.send_response(HTTPStatus.OK)
+        for key, value in extra.items():
+            self.send_header(key, value)
         self.send_header("Content-Type", "application/octet-stream")
         self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Content-Length", str(len(data)))
@@ -391,7 +406,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         validate_job_id(job_id)
         if not filename or Path(filename).name != filename or filename in {".", ".."}:
             raise ValueError("invalid output filename")
-        job_directory = (self.output_root / job_id).resolve()
+        job_directory = ((self.job_output_root or self.output_root) / job_id).resolve()
         result_path = job_directory / "result.json"
         if not result_path.is_file():
             raise ValueError("job output is not available")
@@ -427,6 +442,102 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             raise ValueError("asset_size does not match decoded Asset length")
         return asset
 
+    @staticmethod
+    def _job_image_request(body: dict[str, Any], operation: Operation, *,
+                           client_id: str, default_timeout_s: float) -> JobRequest:
+        """OFE-1B Job Image source: independent of the Resource Bundle.
+
+        Exclusive with the Bundle reference and the legacy inline Asset. The
+        Gateway checks Image SHA256/size/format/payload and the Binding's
+        self-consistency; the PPU SiteManager re-derives the Resource Set and
+        verifies the complete Binding under the Job lease. ``operation`` is the
+        user's; it is never rewritten. No retry, no staging cache.
+        """
+        programming = operation is Operation.PROGRAMMING
+        if programming:
+            try:
+                operations = bundle_v3.normalize_operations(body.get("operations"))
+            except bundle_v3.BundleBuildError as exc:
+                raise ValueError(f"operations list is invalid: {exc}") from exc
+            image_operation = bundle_v3.operations_take_image(operations)
+        else:
+            image_operation = operation.value in bundle_v3.IMAGE_OPERATIONS
+        selector = "operations" if programming else "operation"
+        common = {"site_id", selector, "timeout_s", "target", "provider", "profile", "job_binding"}
+        required = {"site_id", selector, "target", "provider", "profile", "job_binding"}
+        if image_operation:
+            common |= {"image_asset", "asset_base64"}
+            required |= {"image_asset", "asset_base64"}
+        _require_declared_keys(body, allowed=common, required=required, label="Job Image request")
+        site_id = _parse_site_id(body["site_id"])
+        binding = body["job_binding"]
+        for key in ("target", "provider", "profile"):
+            if not isinstance(body[key], str) or not body[key]:
+                raise ValueError(f"{key} must be a non-empty string")
+        job_range = binding.get("range") if isinstance(binding, dict) else None
+        if (not isinstance(binding, dict) or binding.get("schema") != bundle_v3.JOB_BINDING_SCHEMA
+                or binding.get("operation") != operation.value
+                or (programming and binding.get("operations") != operations)
+                or (not programming and "operations" in binding)
+                or binding.get("site_id") != site_id
+                or binding.get("icpn") != body["target"]
+                or binding.get("profile") != body["profile"]
+                or not isinstance(job_range, dict)
+                or type(job_range.get("address")) is not int
+                or type(job_range.get("length")) is not int):
+            raise ValueError("job_binding does not match this Job request")
+        image = b""
+        metadata: dict[str, Any] = {
+            "provider": body["provider"], "profile": body["profile"], "job_binding": binding,
+        }
+        map_data: dict[str, Any] = {}
+        if image_operation:
+            try:
+                declared = bundle_v3.parse_image_asset(body["image_asset"])
+            except bundle_v3.BundleBuildError as exc:
+                raise ValueError(f"image_asset is invalid: {exc}") from exc
+            if binding.get("image_asset_sha256") != bundle_v3.image_asset_sha256(declared):
+                raise ValueError("job_binding does not bind this image_asset")
+            if binding.get("icpn") != declared["icpn"]:
+                raise ValueError("image_asset target does not match job_binding")
+            encoded = body["asset_base64"]
+            if not isinstance(encoded, str) or not encoded:
+                raise ValueError("asset_base64 is required")
+            try:
+                data = base64.b64decode(encoded, validate=True)
+            except ValueError as exc:
+                raise ValueError("asset_base64 is invalid") from exc
+            # Reuse the existing Programming Asset -> Normalized Image path.
+            asset = ProgrammingAsset.from_upload(
+                name=f"job-image-{declared['sha256'][:16]}.bin", asset_type="image",
+                asset_format=declared["format"], data=data, sha256=declared["sha256"])
+            if asset.size != declared["size"]:
+                raise ValueError("image_asset size does not match decoded Image length")
+            normalized = asset.normalize_image()
+            if normalized.data != data:
+                raise ValueError("Job Image normalization changed the payload")
+            image = normalized.data
+            metadata.update({
+                "job_image_asset": declared,
+                "image_name": normalized.name,
+                "source_asset_name": asset.name,
+                "source_asset_sha256": asset.sha256,
+                "source_asset_type": asset.asset_type.value,
+                "source_asset_format": asset.asset_format.value,
+            })
+        else:
+            if binding.get("image_asset_sha256") is not None:
+                raise ValueError(f"{operation.value} carries no Image")
+            if operation is Operation.READ:
+                map_data = {"sections": [{"name": "flash", "address": job_range["address"],
+                                          "length": job_range["length"]}]}
+        return JobRequest(
+            site_id=site_id, operation=operation, image=image, map_data=map_data,
+            timeout_s=float(body.get("timeout_s", default_timeout_s)),
+            client_id=client_id, target=body["target"], metadata=metadata,
+            max_retries=0,
+        )
+
     def _job_request(
         self,
         body: dict[str, Any],
@@ -450,19 +561,45 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 "asset_size",
                 "asset_sha256",
                 "asset_base64",
+                "job_binding",
+                "image_asset",
+                "operations",
                 "session_id",
+                "target",
+                "provider",
+                "profile",
             },
-            required={"site_id", "operation"},
+            required={"site_id", "operation"} if "operations" not in body else {"site_id", "operations"},
             label="job request",
         )
+        if "operations" in body:
+            # Formal model: one programming Job with an ordered operations list.
+            if "operation" in body or "job_binding" not in body or not allow_inline_asset:
+                raise ValueError(
+                    "an operations list is one programming Job with a Job Binding and no "
+                    "separate operation")
+            return self._job_image_request(body, Operation.PROGRAMMING, client_id=client_id,
+                                           default_timeout_s=default_timeout_s)
         operation = Operation(str(body["operation"]))
-        if operation not in {Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ}:
-            raise ValueError("web gateway supports erase, program, verify, and read")
+        if operation not in {
+            Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ,
+        }:
+            raise ValueError("web gateway supports programming operations[] and independent read")
+        target = body.get("target")
+        if target is not None and (not isinstance(target, str) or not target):
+            raise ValueError("target must be a non-empty exact ICPN string")
 
-        common_fields = {"site_id", "operation", "timeout_s", "map_data"}
+        if "job_binding" in body or "image_asset" in body:
+            if not allow_inline_asset:
+                raise ValueError("Job Binding requests require the PPU Gateway inline-asset API")
+            return self._job_image_request(body, operation, client_id=client_id,
+                                           default_timeout_s=default_timeout_s)
+
+        common_fields = {"site_id", "operation", "timeout_s", "map_data", "target", "provider", "profile"}
+        image_operations = {Operation.PROGRAM, Operation.VERIFY}
         if operation is Operation.READ:
             allowed_fields = common_fields | {"offset", "length"}
-        elif operation in {Operation.PROGRAM, Operation.VERIFY}:
+        elif operation in image_operations:
             if allow_inline_asset:
                 allowed_fields = common_fields | {
                     "asset_name",
@@ -494,7 +631,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         else:
             allowed_fields = common_fields
 
-        if operation not in {Operation.PROGRAM, Operation.VERIFY}:
+        if operation not in image_operations:
             _require_declared_keys(
                 body,
                 allowed=allowed_fields,
@@ -508,17 +645,21 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         site_id = _parse_site_id(body["site_id"])
         image = b""
         metadata: dict[str, Any] = {}
-        if operation in {Operation.PROGRAM, Operation.VERIFY} and allow_inline_asset:
+        if "provider" in body or "profile" in body:
+            if not all(isinstance(body.get(key), str) and body[key] for key in ("provider", "profile")):
+                raise ValueError("provider and profile must both be non-empty strings")
+            metadata.update(provider=body["provider"], profile=body["profile"])
+        if operation in image_operations and allow_inline_asset:
             asset = self._inline_asset(body)
             normalized = asset.normalize_image()
             image = normalized.data
-            metadata = {
+            metadata.update({
                 "image_name": normalized.name,
                 "source_asset_name": asset.name,
                 "source_asset_sha256": asset.sha256,
                 "source_asset_type": asset.asset_type.value,
                 "source_asset_format": asset.asset_format.value,
-            }
+            })
         return JobRequest(
             site_id=site_id,
             operation=operation,
@@ -526,6 +667,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             map_data=map_data,
             timeout_s=float(body.get("timeout_s", default_timeout_s)),
             client_id=client_id,
+            target=target,
             metadata=metadata,
         )
 

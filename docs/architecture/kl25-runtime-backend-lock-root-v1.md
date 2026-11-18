@@ -1,5 +1,7 @@
 # KL25 Programming Backend Lock — Installed-runtime Data Root v1
 
+> **S5 退役（2026-11-08）：** `plasma_interfaces/kl25_openocd_plan.py`（含 `load_backend_lock()`）與其測試已自 PPU Runtime 刪除。KL25 backend implementation lock 屬離線 IC Catalog 治理資料，由 `plasma_web/nxp_kl25_qualification.py` 以 digest 釘選；`test_kl25_runtime_root_contract_v1.py` 改為驗證已安裝 Runtime 不含任何已退役 exact-ICPN compiler／registry／projection。以下為歷史紀錄。
+
 **批次 B，根據 Runtime Data Root 架構稽核 #875；前置批次 A：#876 已合併。**
 
 ## 目標與既有問題
@@ -20,10 +22,10 @@
 
 - 正常載入原有 lock，證實 `__file__` 被模擬搬入虛擬環境仍使用明確 IC Support root。
 - 缺檔、無效 JSON、型別異常、修改後自動重算 lock digest、未設定 root 等負測試均必須 fail-closed。
-- 四類 KL25 Operation（PROGRAM／ERASE／READ／VERIFY）預設仍由 Compiler Registry 拒絕。
+- 四類 KL25 Operation（PROGRAM／ERASE／READ／VERIFY）不被任何 Runtime 路由接受（`test_execution_router.py`）；已安裝套件不含 exact-ICPN admission projection 或 `compiler_registry`（S5 已刪除）。
 - 原有 `test_kl25_openocd_plan.py`、`test_kl25_openocd_executor.py` 的模擬程序僅證明 software-only；不做實機寫入、Erase 或電子驗證。
 - 新增專用 Regression Guard，保護剛修復的 KL25、NXP、H5/C5 OpenOCD loader 不回退為 `Path(__file__).resolve().parents[3]`。
-- 持續驗證 `test_compiler_registry.py` 與 `test_ic_support_resolver.py`，避免破壞 ST 正式 admission 及 Render 路徑契約。
+- 持續驗證 `test_ic_support_resolver.py`，避免破壞 Render 路徑契約。
 
 ## 可重現指令
 
@@ -34,7 +36,6 @@ export PLASMA_DEVICE_CATALOG_MANIFEST="$PWD/data/device-catalog/production/icpn-
 python -m unittest discover -s software/python/tests -p 'test_kl25_runtime_root_contract_v1.py' -v
 python -m unittest discover -s software/python/tests -p 'test_kl25_openocd_plan.py' -v
 python -m unittest discover -s software/python/tests -p 'test_kl25_openocd_executor.py' -v
-python -m unittest discover -s software/python/tests -p 'test_compiler_registry.py' -v
 python -m unittest discover -s software/python/tests -p 'test_ic_support_resolver.py' -v
 ```
 

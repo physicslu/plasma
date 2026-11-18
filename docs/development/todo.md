@@ -6,6 +6,33 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ## High Priority
 
+
+### Legacy `flash_cycle` Retirement — Path 3 implementation Gate 1
+
+**Status:** PR #1469 merged at `b3cd58d3dc86667a1b9c708ecd943ec84b8d94d7`; post-merge Python/Web regression follow-up is pending in Draft PR #1470 under the same approved Path 3 Gate 1. Legacy admission/executors are removed; clients use ordered operations and independent read. Corrective PR acceptance and separate Gate 2 remain pending. HIL/deployment NOT_RUN.
+
+**Scope:** Replace legacy single `flash_cycle` operation throughout current Manager/PPU Gateway/Runtime/OpenOCD/Provider/Bundle/Route/CLI/Web contracts and active tests with ONE `programming` Job using ordered `operations[]` (Erase/Program/Verify); keep independent `read`. Existing EMode/PMode execution and multi-Site scheduling are the baseline.
+
+**Required:** Inventory actual live callers and deploy tools, remove legacy alternate dispatch/admission/receipt/schema/enum/provider/adapter code and migrate still-used CLI or frontend callers to the canonical API/Job Binding. Update normative documentation and focused positive/negative tests; keep immutable historical evidence and old HIL receipts unchanged. No permanent compatibility shim or parallel execution paths. Preserve safety/authorization, stable identities, Resource Set/Job Binding/SAFE_OFF, Site isolation, `OUTCOME_UNKNOWN` no-blind-resend, cancellation/recovery and exact E/P/V/R semantics. Verify with relevant Host-only tests and GitHub CI; report exact SHA and added/removed LOC and any remaining legacy references.
+
+**Exclusions:** Repeat implementation, default Target Finalization/`reset run` behavior changes, FPGA RTL, deployment and any SWPC/Z2/DUT operation. Do not merge without explicit owner Gate 2 approval. This backlog entry is not evidence that the removal is complete.
+
+
+### PLASMA M0–M4 — 安裝／執行／OpenOCD 架構精簡與八通道燒錄路線圖
+
+**Status:** PLANNED — 2026-11-03 Owner roadmap recorded; **no Gate 1 implementation scope or Gate 2 merge approval granted by this documentation item**.
+
+**Single source of plan:** [PLASMA M0–M4 B/C, SWD Driver and OpenOCD Roadmap](plasma-m0-m4-architecture-simplification-roadmap-2026-11-03.md).
+
+- **M0 / P0:** PR #1280 systemd 249 kill fix is merged, but real Z2 D5 timeout/cgroup re-acceptance still requires evidence. Resume D6 Site 2 Probe and D7 seal recovery **only after D5 PASS**. Separately fix Runtime upgrade stale-process [Issue #1263](https://github.com/physicslu/plasma/issues/1263).
+- **M1 / P0:** Read-only Gap Audit and target contract: **two PS always-running product processes** (`plasma-web`, `plasma-server` including C1/C2/C3), **on-demand Bootstrap** with independent recovery and on-demand per-active-Site OpenOCD. Operator selects exact MCU/Firmware first, resolves Bundle, **Prepare Once → Program Many → Release**, with pinned per-Batch/Per-Site Programming Context, cache validity, per-DUT re-Probe, global FPGA reload fence and minimal separately scoped implementation PRs. Linux user/group choice deferred; retain safety invariants.
+- **M2 / P1:** Implement M1's lifecycle and Context design (Bootstrap start-on-demand, C1/C2/C3 in one `plasma-server` process, per-active-Site OpenOCD with qualified Batch reuse) plus OpenOCD/Driver responsibility simplification. B3 success selects Active; FPGA Image load requires explicit authorization; no independent B4. Keep essential recovery/safety controls and special-Package isolation. No implementation is approved by this backlog entry.
+- **M3 / P1:** One real STM32F103 Site 2 `Probe → Erase → Program → Verify → Readback → Result` with exact target/electrical qualification and SWPC-observable evidence.
+- **M4 / P2:** C1 Per-Site Job management and C3 independent hardware operation, first two Sites concurrently, then eight-Site measured hardware HIL. FPGA image switch still PPU-wide fenced. **Owner-frozen 2026-11-15 design:** [Unified 8-Site Scheduler, Manual Repeat and Work Order Quantity v1](../architecture/unified-8site-scheduler-repeat-work-order-v1.md) / [ADR-0010](../adr/0010-unified-site-scheduler-repeat-work-order.md): one Scheduler/Repeat engine for EMode/PMode; Manual 1..10000 cycles and replacement acknowledgement; Automation whole-Work-Order PASS quota, bounded make-up, independent Site lanes, durable accounting and fixture handshake. **Implementation/Host-only/HIL remain TODO.**
+- **Higher-priority dependencies from the existing TODO:** electrical programming and Site voltage/power compatibility (especially before multi-IC automation), recovery/uncertain outcomes, and authenticated physical programming. **Defer** DMA/data-plane/UI polish unless measured blocking evidence arises.
+
+**Scope boundary:** documentation only; no source/runtime modification, PR merge, Z2/SWPC/DUT operation or implied HIL result. Do **not** change WBS counts until individually reconciled. Follow the exact Gate 1/Gate 2 boundaries in [AGENTS.md](../../AGENTS.md).
+
 ### IC Electrical Programming Profile / Voltage Capability Database
 
 **Status:** TODO / required before physical multi-IC programming qualification
@@ -158,6 +185,50 @@ Required work:
 Closure evidence must include a rebuilt/installed macOS package and real browser Network evidence showing required static/font assets load successfully without the previously observed 404 class.
 
 ## Deferred architecture evolution
+
+### Path 2 Operation Transport Naming / Receipt Compatibility Cleanup
+
+**Status:** TODO / deferred; no runtime code or receipt schema changes in this documentation PR.
+
+**Current finding:** `scripts/plasma_development_stage_transport.py` still exposes `execute(stage, source_sha, project=None)`, `STAGE_NAME` and historical `PLASMA_PATH2_STAGE=` / `stage` receipt vocabulary. The active direct path already calls `execute_operation(operation, source_sha)`; these old names are **not** authorization to reintroduce Stage/Profile admission.
+
+**Follow-up:** Inventory callers and tests, then consider a minimal operation-oriented naming/receipt migration with a compatibility strategy. Preserve SSH/sudo identity, the governance B1/B2/B3 blocking checks ([glossary](../glossary.md#b1b2b3)), current hardware receipts and Issue #1168 acceptance. Do not rename protocol fields or transport functions without verifying all consumers and installed-Z2 compatibility.
+
+### Path 2 Legacy Project Argument Retirement
+
+**Status:** TODO / deferred; caller inventory and regression tests required before code deletion.
+
+**Current finding:** `execute(stage, source_sha, project=None)` still has a legacy explicit `project` branch that formats a three-argument remote command. The installed two-argument Root Entry accepts only `operation + source_sha`, so this legacy branch is not a supported live Path 2 Root contract.
+
+**Follow-up:** Locate all reachable callers and test dependencies, delete the unused three-argument branch only after proving no active path depends on it, and retain negative tests for project/profile injection and source-SHA binding. No new Root entrypoint or hardware grant.
+
+### Root Entry / Root Implementation Documentation and Historical-Path Audit
+
+**Status:** TODO / follow-up across remaining documentation and archived interfaces; the current contract/index corrections are included in this draft PR but are not a whole-repository audit.
+
+**Current finding:** `scripts/z2/plasma-path2-root-entry` executes `pl.hil.fpga_image_root`, while older documents still describe the retired (deleted) `pl.hil.path2_f1b_minimal_stage` or legacy Stage Transport as the active Root handler. Root Entry (Bash validation) and Root Implementation (Python operation execution) are distinct components of **one** protected execution chain, not two interchangeable Root executors.
+
+**Follow-up:** Audit remaining operator instructions, archived deployment handoffs, inbound links, code comments and tests. Correct current claims; explicitly mark historical snapshots rather than rewriting forensic evidence. Never infer that new FPGA Images, programmer IPs or DUT flashing are qualified from F1-B Root operation receipts.
+
+
+### F1-B Legacy Retirement — P1, after Path 2 Main Cutover
+
+**Status:** DONE except one deferred item (2026-11-02). Layer 1 (PR #1257) runtime retired: `pl/hil/f1b.py`, `f1b_owner_once.py`, `path2_f1b_minimal_stage.py`, `path2_f1b_dev_risk.py`, `path2_z2_target_guard.py`, `approved-fpga-image.json`, `scripts/plasma-z2-smoke.sh`, `scripts/z2/plasma-z2-ssh-smoke-target.sh`, their tests, and the stale `plasma-path2-f1b-root-entry` CI path filter. Layer 2 (Vivado build cleanup PR) retired: `pl/projects/z2-fixed-unified-site1/`, `ppu-fixed-site1-f1-host.yml`, the `f1b-path3-codex-vivado-build` task and `run_licensed_f1b_task`, the path3 F1-B pipeline in `plasma_vivado_host_build.py` (`preflight`, `_run_pipeline`, `diagnostics_type`, `license_snapshot`), `plasma_path2_runtime_integration.py`, `plasma_path2_build_qualification.py`, `plasma_path2_held_provider.py`, `plasma_path2_bin_provenance.py` and their tests. **Deferred (needs a Gate 1 that includes Z2 protected-Root reinstall):** the receipt-compatibility string `"project": "pl/projects/z2-fixed-unified-site1"` emitted by `pl/hil/fpga_image_root.py` and defaulted by `scripts/plasma_development_stage_transport.py`; it names no file and selects nothing. **DONE (owner decision 2026-11-02):** `scripts/plasma_fpga_build_diagnostics.py`, which had no production caller after layer 2, was deleted. No hardware changes authorized by this entry.
+
+**Layer:** Z2 Path 2/3 FPGA Provider / generic runtime boundaries / engineering dispatch / CI and documentation.
+
+**Prerequisite (P0):** The main-based Path 2 two-argument cutover was merged in PR #1167 and its bounded real-Z2 Download/Test/Restore acceptance was recorded in Issue #1168. Before retiring historical F1-B components, independently verify active callers, protected source closure, FPGA lock/ownership and Golden recovery compatibility. That F1-B acceptance does **not** qualify another Programmer IP or Blue Pill Flash. Do not change installed Z2 source or trigger FPGA/DUT operations as part of this TODO update.
+
+**P1 retirement and decoupling scope:**
+
+- Inventory live imports/callers, fixed Work Orders, workflow path filters, tests, and protected-source dependencies before deleting or moving any F1-B file.
+- ~~Retain the F1-B project Provider and safety guards~~ — **DONE/RETIRED** 2026-11-02 by owner Gate 1; the ABI v5 Root chain is the qualified reference. Immutable historical execution/recovery evidence is retained.
+- **DONE (layer 2):** F1-B coupling removed from generic build/dispatch/runtime interfaces; `run_generic` with per-project `host-build.json` is the only host build engine.
+- **DONE (layer 2):** archival F1-B Build/Provenance/Provider helpers deleted after proving no production caller (only their own tests imported them). `scripts/plasma_path2_persistent_lease.py` is generic and retained.
+- **DONE:** stale `scripts/z2/plasma-path2-f1b-root-entry` CI path filters removed; CI keeps covering `scripts/z2/plasma-path2-root-entry`. Correct documentation still describing the merged Generic Root Entry as Draft or its completed pre-merge Z2 installation/HIL as NOT_RUN; preserve historical snapshots explicitly marked historical.
+
+**Closure evidence:** dependency/call-site inventory; minimal reviewable refactor; relevant positive and negative Host/CI tests; no regression of project/source-SHA admission, Root Entry allowlists, FPGA lock/AXI safety, or protected Restore; current post-cutover Path 2 and existing Path 3 acceptance unaffected. Real Z2 requalification is required only if the change affects the installed protected runtime or hardware behavior and must be separately in-scope under Gate 1. Keep historical F1-B evidence and existing safeguards; no cleanup-by-filename.
+
 
 ### Mock Runtime Core Convergence
 

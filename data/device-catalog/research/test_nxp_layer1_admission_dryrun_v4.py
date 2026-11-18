@@ -110,7 +110,7 @@ class NxpLayer1DryRunTests(unittest.TestCase):
     def test_control_station_api_is_bounded_to_224_nxp_exact_records(self):
         import sys
         sys.path.insert(0, str(m.ROOT / "software/python"))
-        from plasma_web.gateway import _device_search_payload
+        from plasma_web.legacy_device_selector import _device_search_payload
         from plasma_web.device_catalog import get_default_device_catalog
 
         get_default_device_catalog.cache_clear()

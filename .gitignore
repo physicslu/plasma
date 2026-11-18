@@ -24,6 +24,7 @@ pl/build/
 *.xpr
 *.xsa
 *.hwh
+!pl/tests/fixtures/**/system.hwh
 
 # Python generated files
 __pycache__/

@@ -24,11 +24,11 @@ The three ambiguous T-pin / VFQFPN36 vs canonical UFQFPN entries remain **L1 / U
 
 ## Implementation and safety
 
-- The existing `OpenOCDSoftwareQualificationRegistry` composes the original 77 v9 records and exactly 12 reviewed low-density v10 records (89 unique Exact ICPNs). The shared `ProgrammingQualificationRegistry` projects L2; no duplicate manufacturer-specific Product API or separate provider was created.
+- The existing `OpenOCDSoftwareQualificationRegistry` composes the original 77 v9 records and exactly 12 reviewed low-density v10 records (89 unique Exact ICPNs). The shared `ProgrammingQualificationRegistry` projects 12 new L2 exact ICPNs and retains the previous 77 at L3; no duplicate manufacturer-specific Product API or separate provider was created.
 - The new `plasma_web/stm32f103_low_density_candidate.py` is a **read-only evidence validator**. It checks source locks, exact package/temperature/TR mapping, flash geometry, provider Device ID, operation scopes and original v9 authority, failing closed on mismatch.
 - The OpenOCD driver may fall back to a **32 KiB** maximum if the Flash size register read fails. This is **not** proof of actual 16/32 KiB capacity; any ambiguous or inconsistent size must be rejected at runtime. Manual geometry override must not bypass evidence.
 - Full-bank erase can enter OpenOCD mass-erase behavior; full-bank/mass erase, option-byte mutation and protection unlock remain blocked pending distinct execution safety controls. L2 does not authorize such side effects.
-- `SUPPORTED` / `job_selectable` is **not execution_authorized**. Installed Runtime, per-Site route, voltage/protection and hardware safety remain independent gates. Physical HIL/L3 stays `NOT_TESTED`.
+- `SUPPORTED` / `job_selectable` is **not execution_authorized**. Installed Runtime, per-Site route, voltage/protection and hardware safety remain independent gates. The newly qualified 12 low-density ICPNs remain `NOT_TESTED` for HIL/L3; the original 77 F103 L3 records remain unchanged.
 
 ## Validation and Gate 2 boundary
 

@@ -88,7 +88,7 @@ async function installDashboardMock(page: Page) {
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
   });
 
-  await page.route("**/api/devices/search**", async route => {
+  await page.route("**/api/manager/devices/search**", async route => {
     const query = new URL(route.request().url()).searchParams.get("q") ?? "";
     await route.fulfill({
       status: 200,
@@ -197,7 +197,7 @@ test("Production Factory Console v2 keeps tree selection, LED status and separat
   await expect(kpis.getByText("TOTAL IC", { exact: true })).toBeVisible();
   await expect(kpis.getByText("BATCH TIME", { exact: true })).toBeVisible();
 
-  const productionSelection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
+  const productionSelection = page.getByRole("region", { name: "SYSTEM SETUP & TARGETING" });
   await expect(productionSelection).toBeVisible();
   await expandProductionTree(page);
   const ppu1site1 = page.getByRole("checkbox", { name: "Production Set mock-facility-01 mock-facility-01-ppu-01 SITE-01" });

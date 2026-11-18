@@ -125,30 +125,19 @@ def _ensure_machine_id(path: Path) -> None:
     os.replace(temporary, path)
 
 
-def _ensure_token(service_script: Path, state_root: Path, machine_id: Path) -> None:
-    token_file = state_root / "control-token"
-    if token_file.exists():
-        if token_file.stat().st_mode & 0o077:
-            raise TargetError("persistent Bootstrap token permissions are too broad")
-        return
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(service_script),
-            "--state-root",
-            str(state_root),
-            "--machine-id",
-            str(machine_id),
-            "provision-token",
-        ],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=10,
-    )
-    if completed.returncode != 0:
-        raise TargetError(f"cannot provision Bootstrap token: {completed.stderr.strip()}")
+def _ensure_engineering_policy(config_root: Path) -> None:
+    """Host-lab emulator only: enable the LOM-P2A-2 Engineering CLI entry for
+    seven days (root-owned policy inside the container). Never on a real PPU."""
+    path = config_root / "ppu-engineering-mode.json"
+    temporary = path.with_name(path.name + ".new")
+    temporary.write_text(json.dumps({
+        "schema": "plasma.ppu.engineering-mode.v1",
+        "enrollment_cli": True,
+        "expires_at_epoch_s": int(time.time()) + 7 * 24 * 3600,
+        "note": "z2like QEMU host-lab emulator",
+    }, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.chmod(0o644)
+    os.replace(temporary, path)
 
 
 def _release_identity(current: Path) -> str | None:
@@ -183,17 +172,17 @@ def _runtime_environment(current: Path) -> dict[str, str]:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise TargetError(f"runtime manifest is unreadable: {exc}") from exc
-    data = manifest.get("data") if isinstance(manifest, dict) else None
-    catalog_rel = data.get("device_catalog_manifest") if isinstance(data, dict) else None
-    if not isinstance(catalog_rel, str) or not catalog_rel or catalog_rel.startswith("/") or ".." in Path(catalog_rel).parts:
-        raise TargetError("runtime Device Catalog path is invalid")
-    catalog = current / "runtime" / catalog_rel
-    if not catalog.is_file():
-        raise TargetError(f"runtime Device Catalog is missing: {catalog}")
+    if not isinstance(manifest, dict):
+        raise TargetError("runtime manifest is invalid")
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
-    env["PLASMA_DEVICE_CATALOG_MANIFEST"] = str(catalog)
+    # PPU Runtime is Catalog-free (OPF S5 / PR-C1): no Catalog environment.
+    env.pop("PLASMA_DEVICE_CATALOG_MANIFEST", None)
+    env.pop("PLASMA_IC_SUPPORT_ROOT", None)
     return env
+
+
+SERVER_CONTROL_SOCKET = Path("/run/plasma-server/control.sock")
 
 
 def _start_runtime(
@@ -216,8 +205,12 @@ def _start_runtime(
     for directory in (state_root / "output", state_root / "gateway-output", log_root):
         directory.mkdir(parents=True, exist_ok=True)
     env = _runtime_environment(current)
+    # Same Runtime control socket as the Z2 unit (execution lease observed by
+    # the Bootstrap safety probe and the P0 Runtime reconciliation).
+    SERVER_CONTROL_SOCKET.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     server = subprocess.Popen(
-        [sys.executable, str(app), "server", "--config", str(config)],
+        [sys.executable, str(app), "server", "--config", str(config),
+         "--runtime-control-socket", str(SERVER_CONTROL_SOCKET)],
         cwd=state_root,
         env=env,
     )
@@ -235,6 +228,8 @@ def _start_runtime(
                 "gateway",
                 "--ppu-config",
                 str(config),
+                "--controller-admission-socket",
+                "/run/plasma-bootstrap/controller-admission.sock",
                 "--host",
                 gateway_host,
                 "--port",
@@ -285,7 +280,7 @@ def _run(args: argparse.Namespace) -> int:
     for directory in (product_root, config_root, bootstrap_state, runtime_state, log_root):
         directory.mkdir(parents=True, exist_ok=True)
     _ensure_machine_id(machine_id)
-    _ensure_token(service_script, bootstrap_state, machine_id)
+    _ensure_engineering_policy(config_root)
 
     bootstrap = subprocess.Popen(
         [

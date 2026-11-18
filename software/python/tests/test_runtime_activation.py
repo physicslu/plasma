@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
+import sys
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -11,7 +14,8 @@ from plasma_core.config import PlasmaConfig, PPUConfig, ServerConfig, SiteConfig
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
-from plasma_server.site_manager import SiteManager
+from plasma_server.site_manager import PPUExecutionLease, SiteManager
+from plasma_server.runtime_control import RuntimeControlServer
 from plasma_web.runtime_activation import RuntimeActivationError, SiteRuntimeActivationController, desired_runtime_revision
 from plasma_web.runtime_activation_helper import RuntimeActivationExecutor, RuntimeActivationHelperError
 
@@ -55,6 +59,102 @@ def test_quiesce_is_bounded_and_expires(tmp_path: Path) -> None:
     manager.acquire_runtime_quiesce(2)
     manager._runtime_quiesce._deadline_monotonic = time.monotonic() - 1
     assert manager.runtime_quiesce_snapshot()["active"] is False
+
+
+def test_p4_asset_pin_uses_configured_runtime_root_not_host_path(tmp_path):
+    from plasma_server.package_actions import PackageActionRuntime
+
+    manager = SiteManager(config(tmp_path))
+    assert manager._active_asset_set_reader is None
+    product_root = tmp_path / "different-ppu-root"
+    PackageActionRuntime(
+        manager,
+        control_plane=Path(__file__).resolve().parents[3] / "scripts",
+        product_root=product_root,
+        state_root=tmp_path / "state",
+        owner_credential=None,
+        spawner=object(),
+        python_executable=Path(sys.executable),
+    )
+    assert manager._active_asset_set_reader is not None
+    assert manager._active_asset_set_reader()["state"] == "EMPTY"
+
+
+def test_p4_job_pins_active_identity_inside_ppu_lease(tmp_path):
+    async def scenario():
+        active = {"state": "ACTIVE", "asset_set_sha256": "a" * 64,
+                  "generation": 3, "ready": False}
+        manager = SiteManager(config(tmp_path), active_asset_set_reader=lambda: active)
+        await manager.start()
+        try:
+            original = manager._active_asset_set_reader
+            def read():
+                assert manager.execution_lease_snapshot()["busy"] is True
+                with pytest.raises(PlasmaError) as error:
+                    manager.acquire_asset_set_quiesce()
+                assert error.value.code is ErrorCode.PPU_BUSY
+                return original()
+            manager._active_asset_set_reader = read
+            request = JobRequest(site_id=1, operation=Operation.READ, job_id="p4-pinned")
+            future = manager.enqueue(request)
+            runtime = manager.registry.get(request.job_id)
+            active["asset_set_sha256"] = "b" * 64
+            assert runtime.snapshot()["active_asset_set"]["asset_set_sha256"] == "a" * 64
+            # Duplicate admission cannot release the original Job's lease.
+            with pytest.raises(PlasmaError) as error:
+                manager.enqueue(request)
+            assert error.value.code is ErrorCode.DUPLICATE_JOB
+            assert manager.execution_lease_snapshot()["busy"] is True
+            await future
+            await asyncio.sleep(0)
+            assert manager.execution_lease_snapshot()["busy"] is False
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_p4_asset_read_failure_releases_job_reservation(tmp_path):
+    async def scenario():
+        def corrupt():
+            raise RuntimeError("ASSET_SET_CORRUPT")
+        manager = SiteManager(config(tmp_path), active_asset_set_reader=corrupt)
+        await manager.start()
+        try:
+            with pytest.raises(RuntimeError, match="ASSET_SET_CORRUPT"):
+                manager.enqueue(JobRequest(site_id=1, operation=Operation.READ, job_id="p4-denied"))
+            assert manager.execution_lease_snapshot()["busy"] is False
+            assert manager.registry.all() == []
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_p4_ppu_fence_covers_other_site_queue_and_cancellation(tmp_path):
+    async def scenario():
+        cfg = config(tmp_path)
+        cfg.sites.append(SiteConfig(id=2, enabled=True, interface="mock", target="STM32F103C8T6"))
+        manager = SiteManager(cfg)
+        await manager.start()
+        # Occupy the concurrency slot: both admitted Jobs stay queued.
+        await manager._semaphore.acquire()
+        try:
+            requests = [JobRequest(site_id=site, operation=Operation.READ, job_id=f"p4-site-{site}",
+                                   metadata={"execution_owner_kind": "batch", "execution_owner_id": "p4"})
+                        for site in (1, 2)]
+            futures = [manager.enqueue(request) for request in requests]
+            manager.cancel(requests[0].job_id)
+            with pytest.raises(PlasmaError) as error:
+                manager.acquire_asset_set_quiesce()
+            assert error.value.code is ErrorCode.PPU_BUSY
+            assert manager.execution_lease_snapshot()["active_job_count"] == 2
+            manager._semaphore.release()
+            await asyncio.gather(*futures)
+            await asyncio.sleep(0)
+            lease = manager.acquire_asset_set_quiesce()
+            manager.release_runtime_quiesce(lease["token"])
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
 
 
 def test_runtime_revision_is_order_independent() -> None:
@@ -171,3 +271,204 @@ def test_narrow_helper_does_not_accept_arbitrary_service(tmp_path: Path) -> None
             "expected_ppu_id": "ppu-a",
             "quiesce_ttl_s": 20,
         })
+
+
+def _asset_helper():
+    source = Path(__file__).resolve().parents[3] / "scripts" / "ppu_asset_set.py"
+    spec = importlib.util.spec_from_file_location("plasma_asset_quiesce_runtime_gate1", source)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_asset_set_cross_process_held_lease_blocks_new_jobs_until_socket_eof(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        manager = SiteManager(config(tmp_path))
+        await manager.start()
+        directory = tmp_path / "runtime-control"
+        directory.mkdir(mode=0o700)
+        socket_path = directory / "control.sock"
+        control = RuntimeControlServer(manager, socket_path)
+        await control.start()
+        acquired = threading.Event()
+        released = threading.Event()
+        helper = _asset_helper()
+        def installer_operation():
+            with helper.held_runtime_asset_lease(socket_path) as lease:
+                assert lease["ppu_id"] == "ppu-a"
+                assert lease["active_job_count"] == 0
+                acquired.set()
+                assert released.wait(timeout=4)
+        worker = None
+        try:
+            worker = asyncio.create_task(asyncio.to_thread(installer_operation))
+            for _ in range(120):
+                if acquired.is_set():
+                    break
+                await asyncio.sleep(0.01)
+            assert acquired.is_set(), "Runtime must grant a held lease"
+            request = JobRequest(site_id=1, operation=Operation.READ, job_id="asset-lock-1")
+            with pytest.raises(PlasmaError) as error:
+                manager.enqueue(request)
+            assert error.value.code is ErrorCode.PPU_BUSY
+            assert manager.runtime_quiesce_snapshot()["active"] is True
+            # No TTL should expire while the owner holds its socket.
+            assert manager.runtime_quiesce_snapshot()["ttl_remaining_s"] is None
+            released.set()
+            await asyncio.wait_for(worker, timeout=4)
+            for _ in range(120):
+                if not manager.runtime_quiesce_snapshot()["active"]:
+                    break
+                await asyncio.sleep(0.01)
+            assert manager.runtime_quiesce_snapshot()["active"] is False
+            assert manager.execution_lease_snapshot()["busy"] is False
+        finally:
+            released.set()
+            if worker is not None:
+                await worker
+            await control.close()
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_asset_set_runtime_socket_rejects_busy_ppu_then_does_not_leak_lease(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        manager = SiteManager(config(tmp_path))
+        await manager.start()
+        directory = tmp_path / "runtime-control"
+        directory.mkdir(mode=0o700)
+        socket_path = directory / "control.sock"
+        control = RuntimeControlServer(manager, socket_path)
+        await control.start()
+        helper = _asset_helper()
+        try:
+            with manager._execution_lock:
+                manager._execution_lease = PPUExecutionLease(
+                    owner_kind="batch", owner_id="active-batch",
+                    job_ids={"job-queued", "job-cancelling"},
+                )
+            def try_client():
+                with helper.held_runtime_asset_lease(socket_path):
+                    pytest.fail("busy runtime must reject Asset Set switch")
+            with pytest.raises(helper.AssetSetError, match="ASSET_SET_QUIESCE_NOT_GRANTED"):
+                await asyncio.to_thread(try_client)
+            assert manager.runtime_quiesce_snapshot()["active"] is False
+            with manager._execution_lock:
+                manager._execution_lease = None
+            # Explicit restart quiesce and Asset Set hold are mutually exclusive.
+            ttl = manager.acquire_runtime_quiesce(2)
+            with pytest.raises(helper.AssetSetError, match="ASSET_SET_QUIESCE_NOT_GRANTED"):
+                await asyncio.to_thread(try_client)
+            manager.release_runtime_quiesce(ttl["token"])
+            assert manager.runtime_quiesce_snapshot()["active"] is False
+        finally:
+            with manager._execution_lock:
+                manager._execution_lease = None
+            await control.close()
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_p1_coordinator_integrates_real_runtime_socket_with_atomic_asset_set(tmp_path: Path) -> None:
+    """Host-only end-to-end B3 staged Set -> real UDS lease -> Active identity."""
+    from .test_ppu_b3_z2_install_gate1 import (
+        b3_request, build_generic_assets, make_coordinator,
+    )
+
+    async def scenario() -> None:
+        archive, sha = build_generic_assets(tmp_path / "asset-archive")
+        coordinator = make_coordinator(tmp_path)
+        b3 = coordinator.execute_bundle_v3_install(b3_request(archive, sha))
+        assert b3["stage"] == "bundle_staged_only"
+        assert not (coordinator.paths.product_root / "assets/active.json").exists()
+        manager = SiteManager(config(tmp_path / "runtime"))
+        await manager.start()
+        directory = tmp_path / "runtime-control"
+        directory.mkdir(mode=0o700)
+        socket_path = directory / "control.sock"
+        control = RuntimeControlServer(manager, socket_path)
+        await control.start()
+        helper = _asset_helper()
+        try:
+            def activate():
+                return coordinator.activate_staged_asset_set(
+                    sha, quiescence_lease=lambda: helper.held_runtime_asset_lease(socket_path),
+                )
+            receipt = await asyncio.wait_for(asyncio.to_thread(activate), timeout=10)
+            assert receipt["result"] == "PASS" and receipt["stage"] == "asset_set_active"
+            assert receipt["asset_set_sha256"] == sha
+            assert receipt["fpga"] == "NOT_RUN" and receipt["ready"] is False
+            verified = helper.read_active(coordinator.paths.product_root)
+            assert verified["state"] == "ACTIVE" and verified["asset_set_sha256"] == sha
+            for _ in range(100):
+                if not manager.runtime_quiesce_snapshot()["active"]:
+                    break
+                await asyncio.sleep(0.01)
+            assert manager.runtime_quiesce_snapshot()["active"] is False
+        finally:
+            await control.close()
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def _standalone_deployment_module(tmp_path: Path):
+    """Load ppu-bootstrap-deployment.py ALONE, as the Z2 PS kit ships it
+    (its scripts/ directory has no sibling helper modules)."""
+    import shutil
+
+    kit_scripts = tmp_path / "kit-scripts"
+    kit_scripts.mkdir()
+    target = kit_scripts / "ppu-bootstrap-deployment.py"
+    shutil.copyfile(Path(__file__).resolve().parents[3] / "scripts" / "ppu-bootstrap-deployment.py", target)
+    spec = importlib.util.spec_from_file_location("plasma_kit_standalone_deployment", target)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_runtime_restart_quiesce_blocks_jobs_without_holding_a_connection(tmp_path: Path) -> None:
+    """Runtime upgrade gate, run from a kit-shaped standalone deployment module
+    against the real Runtime control socket.
+
+    It must be refused while execution is active, must block new Jobs once
+    granted, and must leave no open connection (Python >= 3.12.1
+    Server.wait_closed() waits for open connections, which would stall the
+    Runtime's graceful shutdown during the upgrade restart).
+    """
+    deployment = _standalone_deployment_module(tmp_path)
+
+    async def scenario() -> None:
+        manager = SiteManager(config(tmp_path))
+        await manager.start()
+        directory = tmp_path / "runtime-control"
+        directory.mkdir(mode=0o700)
+        socket_path = directory / "control.sock"
+        control = RuntimeControlServer(manager, socket_path)
+        await control.start()
+        try:
+            with manager._execution_lock:
+                manager._execution_lease = PPUExecutionLease(
+                    owner_kind="batch", owner_id="active-batch", job_ids={"job-running"},
+                )
+            with pytest.raises(deployment.DeploymentError, match="RUNTIME_RESTART_QUIESCE_NOT_GRANTED"):
+                await asyncio.to_thread(deployment.quiesce_runtime_for_restart, socket_path)
+            assert manager.runtime_quiesce_snapshot()["active"] is False
+            with manager._execution_lock:
+                manager._execution_lease = None
+
+            granted = await asyncio.to_thread(deployment.quiesce_runtime_for_restart, socket_path)
+            assert granted["ttl_s"] == deployment.RUNTIME_RESTART_QUIESCE_TTL_S
+            assert manager.runtime_quiesce_snapshot()["active"] is True
+            with pytest.raises(PlasmaError) as error:
+                manager.enqueue(JobRequest(site_id=1, operation=Operation.READ, job_id="upgrade-1"))
+            assert error.value.code is ErrorCode.PPU_BUSY
+            # No connection is left open: graceful close completes promptly.
+            await asyncio.wait_for(control.close(), timeout=2)
+        finally:
+            await control.close()
+            await manager.shutdown()
+    asyncio.run(scenario())

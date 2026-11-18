@@ -4,19 +4,22 @@
 The PPU runtime contains only the Python control plane required for Plasma Server,
 the REST Gateway, and the bounded local runtime-activation helper. It deliberately
 excludes the Control Console, Manager, Node.js/npm, Git metadata, FPGA bitstreams,
-PL access, and real-target tooling.
+PL access, real-target tooling, and every IC Catalog / IC Support / qualification
+module and data file (offline governance; never a PPU Runtime dependency).
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
+import hashlib
 import importlib.metadata
 import importlib.util
 import json
+import os
 import shutil
 import sys
 import tempfile
-import tomllib
 import zipapp
 import zipfile
 from pathlib import Path
@@ -30,14 +33,133 @@ PPU_PACKAGES = (
     "plasma_core",
     "plasma_interfaces",
     "plasma_handlers",
+    "plasma_opf",
     "plasma_server",
     "plasma_client",
     "plasma_web",
 )
+# OPF S5 / PR-C1: IC Catalog, IC Support and L0-L2 qualification are offline
+# governance owned outside the PPU (Device Selector belongs to Manager). The PPU
+# runtime ships no Catalog data and none of these Catalog-only modules; the
+# Server, Gateway and activation helper never import them.
+CATALOG_ONLY_MODULES = (
+    "plasma_core/ic_support.py",
+    "plasma_core/manufacturer_device_basic.py",
+    "plasma_web/legacy_device_selector.py",
+    "plasma_web/device_catalog.py",
+    "plasma_web/programming_qualification.py",
+    "plasma_web/openocd_software_qualification.py",
+    "plasma_web/openocd_provider_registry.py",
+    "plasma_web/backend_candidate_registry.py",
+    "plasma_web/backend_provenance.py",
+    "plasma_web/backend_source_reference.py",
+    "plasma_web/runtime_evidence_root.py",
+    "plasma_web/route_evidence_admission.py",
+    "plasma_web/catalog_promotion_framework.py",
+    "plasma_web/nxp_kl25_qualification.py",
+    "plasma_web/nxp_manufacturer_device_evidence.py",
+    "plasma_web/nxp_mcxa_route_evidence.py",
+    "plasma_web/microchip_phase1_admission_guard.py",
+    "plasma_web/microchip_pic32mx_route_evidence.py",
+    "plasma_web/microchip_saml1x_route_evidence.py",
+    "plasma_web/microchip_upstream_openocd_evidence.py",
+    "plasma_web/c5_host_loader_guard.py",
+    "plasma_web/h5_host_readback_guard.py",
+)
+
+
+# PR-B Full-Copy: the Runtime payload carries the complete same-commit
+# Bootstrap control plane (Bootstrap, Site Worker v3, Adapter, asset helpers).
+# The file set comes from the Bootstrap installer itself (single source).
+CONTROL_PLANE_DIR = "control-plane"
+CONTROL_PLANE_MANIFEST = "control-plane-manifest.json"
+CONTROL_PLANE_SCHEMA = "plasma.ppu.control-plane.v1"
+SITE_ADAPTER_MODULE = "ppu_site_adapter_abi5.py"
+RUNTIME_SITE_WORKER_CLIENT = "plasma_interfaces/site_worker_c3.py"
 
 
 class PPURuntimePackagingError(ValueError):
     pass
+
+
+def _load_script(path: Path, module_name: str):
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise PPURuntimePackagingError(f"cannot load build tool: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _module_assignment(source: str, name: str) -> ast.expr:
+    for node in ast.parse(source).body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name) and node.targets[0].id == name):
+            return node.value
+    raise PPURuntimePackagingError(f"module constant is missing: {name}")
+
+
+def _string_constant(source: str, name: str) -> str:
+    value = _module_assignment(source, name)
+    if not isinstance(value, ast.Constant) or not isinstance(value.value, str):
+        raise PPURuntimePackagingError(f"module constant is not a string literal: {name}")
+    return value.value
+
+
+def _driver_abi(source: str) -> dict[str, list[int]]:
+    """``SUPPORTED_DRIVER_ABI = {"driver": frozenset({5})}`` without importing."""
+    value = _module_assignment(source, "SUPPORTED_DRIVER_ABI")
+    result: dict[str, list[int]] = {}
+    if not isinstance(value, ast.Dict):
+        raise PPURuntimePackagingError("SUPPORTED_DRIVER_ABI must be a dict literal")
+    for key, item in zip(value.keys, value.values):
+        if not (isinstance(key, ast.Constant) and isinstance(key.value, str)
+                and isinstance(item, ast.Call) and isinstance(item.func, ast.Name)
+                and item.func.id == "frozenset" and len(item.args) == 1
+                and isinstance(item.args[0], ast.Set)
+                and all(isinstance(e, ast.Constant) and type(e.value) is int
+                        for e in item.args[0].elts)):
+            raise PPURuntimePackagingError("SUPPORTED_DRIVER_ABI has an unsupported shape")
+        result[key.value] = sorted(e.value for e in item.args[0].elts)
+    return result
+
+
+def _control_plane_source(repo_root: Path, relative: str) -> Path:
+    # Same layout as the factory Bootstrap bundle: flat scripts plus pl/hil,
+    # software/python/plasma_interfaces and z2/ source-only inputs.
+    if relative.startswith(("pl/", "software/")):
+        return repo_root / relative
+    return repo_root / "scripts" / relative
+
+
+def _build_control_plane(repo_root: Path, destination: Path) -> str:
+    installer = _load_script(repo_root / "scripts" / "ppu-bootstrap-installer.py",
+                             "plasma_ppu_runtime_bootstrap_installer")
+    files: dict[str, str] = {}
+    for relative in installer.control_plane_files():
+        source = _control_plane_source(repo_root, relative)
+        if source.is_symlink() or not source.is_file():
+            raise PPURuntimePackagingError(f"control-plane source is missing: {relative}")
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+        target.chmod(0o755 if os.access(source, os.X_OK) else 0o644)
+        files[relative] = hashlib.sha256(target.read_bytes()).hexdigest()
+    protocol = _string_constant((destination / "ppu_site_worker.py").read_text(encoding="utf-8"),
+                                "PROTOCOL")
+    manifest = {
+        "schema": CONTROL_PLANE_SCHEMA,
+        "site_worker_protocol": protocol,
+        "site_adapter": {
+            "module": SITE_ADAPTER_MODULE,
+            "driver_abi": _driver_abi((destination / "ppu_site_engine.py").read_text(encoding="utf-8")),
+        },
+        "files": dict(sorted(files.items())),
+    }
+    (destination / CONTROL_PLANE_MANIFEST).write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return protocol
 
 
 def _read_json(path: Path) -> dict[str, object]:
@@ -51,6 +173,8 @@ def _read_json(path: Path) -> dict[str, object]:
 
 
 def _python_requirement(repo_root: Path) -> str:
+    import tomllib  # build host only (Python >= 3.11); kept local for 3.10 test import
+
     path = repo_root / "software" / "python" / "pyproject.toml"
     try:
         payload = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -134,6 +258,8 @@ def _build_zipapp(repo_root: Path, destination: Path) -> tuple[str, str]:
         app_root = Path(temporary)
         for package in PPU_PACKAGES:
             _copy_python_package(python_root, package, app_root)
+        for relative in CATALOG_ONLY_MODULES:
+            (app_root / relative).unlink(missing_ok=True)
         shutil.copytree(
             yaml_source,
             app_root / "yaml",
@@ -144,17 +270,16 @@ def _build_zipapp(repo_root: Path, destination: Path) -> tuple[str, str]:
     return pyyaml_version, license_text
 
 
-def _copy_device_catalog(repo_root: Path, runtime_dir: Path) -> None:
-    source = repo_root / "data" / "device-catalog" / "production"
-    if not source.is_dir():
-        raise PPURuntimePackagingError(f"production Device Catalog is missing: {source}")
-    shutil.copytree(source, runtime_dir / "data" / "device-catalog" / "production")
-
-
-def _manifest(*, python_requirement: str, pyyaml_version: str) -> dict[str, object]:
+def _manifest(*, python_requirement: str, pyyaml_version: str,
+              site_worker_protocol: str) -> dict[str, object]:
     return {
         "schema_version": RUNTIME_SCHEMA_VERSION,
         "role": ROLE,
+        "control_plane": {
+            "path": CONTROL_PLANE_DIR,
+            "manifest": CONTROL_PLANE_MANIFEST,
+            "site_worker_protocol": site_worker_protocol,
+        },
         "processes": {
             "server": {
                 "runtime": "python",
@@ -175,6 +300,7 @@ def _manifest(*, python_requirement: str, pyyaml_version: str) -> dict[str, obje
                     "gateway",
                     "--ppu-config", "<ppu-config>",
                     "--runtime-activation-socket", "<runtime-activation-socket>",
+                    "--controller-admission-socket", "<controller-admission-socket>",
                     "--host", "<gateway-bind>",
                     "--port", "18080",
                     "--plasma-host", "127.0.0.1",
@@ -194,9 +320,6 @@ def _manifest(*, python_requirement: str, pyyaml_version: str) -> dict[str, obje
             },
         },
         "packaging": {"python": "python-zipapp"},
-        "data": {
-            "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json"
-        },
         "third_party": {
             "PyYAML": {
                 "version": pyyaml_version,
@@ -221,15 +344,22 @@ def build_runtime(*, repo_root: Path, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True)
     try:
         pyyaml_version, license_text = _build_zipapp(repo_root, output_dir / "ppu" / "ppu.pyz")
+        client_protocol = _string_constant(
+            (repo_root / "software" / "python" / RUNTIME_SITE_WORKER_CLIENT).read_text(encoding="utf-8"),
+            "PROTOCOL")
+        worker_protocol = _build_control_plane(repo_root, output_dir / CONTROL_PLANE_DIR)
+        if client_protocol != worker_protocol:
+            raise PPURuntimePackagingError(
+                f"Site Worker protocol mismatch: Runtime {client_protocol!r} vs Worker {worker_protocol!r}")
         license_dir = output_dir / "ppu" / "THIRD_PARTY_LICENSES"
         license_dir.mkdir(parents=True, exist_ok=True)
         (license_dir / "PyYAML.txt").write_text(license_text, encoding="utf-8")
-        _copy_device_catalog(repo_root, output_dir)
         (output_dir / "ppu-runtime.json").write_text(
             json.dumps(
                 _manifest(
                     python_requirement=python_requirement,
                     pyyaml_version=pyyaml_version,
+                    site_worker_protocol=client_protocol,
                 ),
                 indent=2,
                 sort_keys=True,
@@ -272,6 +402,7 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     for name, value in (
         ("--ppu-config", "<ppu-config>"),
         ("--runtime-activation-socket", "<runtime-activation-socket>"),
+        ("--controller-admission-socket", "<controller-admission-socket>"),
     ):
         try:
             index = gateway_arguments.index(name)
@@ -296,6 +427,8 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     required = {
         "__main__.py",
         "plasma_core/config.py",
+        "plasma_opf/__init__.py",
+        "plasma_opf/contract.py",
         "plasma_server/server.py",
         "plasma_server/runtime_server.py",
         "plasma_server/runtime_control.py",
@@ -314,16 +447,31 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     missing = sorted(required - names)
     if missing:
         raise PPURuntimePackagingError(f"PPU zipapp is incomplete: missing {missing}")
-    catalog = runtime_dir / "data" / "device-catalog" / "production" / "icpn-v1-manifest.json"
-    if not catalog.is_file():
-        raise PPURuntimePackagingError("PPU runtime is missing the production Device Catalog manifest")
     license_path = runtime_dir / "ppu" / "THIRD_PARTY_LICENSES" / "PyYAML.txt"
     if not license_path.is_file() or not license_path.read_text(encoding="utf-8").strip():
         raise PPURuntimePackagingError("PPU runtime is missing the PyYAML license")
     boundary = _require_mapping(manifest.get("hardware_boundary"), "hardware_boundary")
     if any(boundary.get(key) is not False for key in ("loads_fpga", "accesses_pl", "changes_target_power", "programs_real_ic")):
         raise PPURuntimePackagingError("PPU runtime must keep the PL/target hardware boundary closed")
+    _validate_control_plane(runtime_dir, manifest, app)
     return manifest
+
+
+def _validate_control_plane(runtime_dir: Path, manifest: Mapping[str, object], app: Path) -> None:
+    """Same verifier the Z2 installer runs, plus the zipapp client protocol."""
+    core = _load_script(REPO_ROOT / "scripts" / "ppu-z2-installer.py",
+                        "plasma_ppu_runtime_installer_core")
+    try:
+        plane = core.verify_control_plane_tree(runtime_dir, manifest)
+    except core.Z2InstallerError as exc:
+        raise PPURuntimePackagingError(str(exc)) from exc
+    with zipfile.ZipFile(app, "r") as archive:
+        try:
+            client = archive.read(RUNTIME_SITE_WORKER_CLIENT).decode("utf-8")
+        except KeyError as exc:
+            raise PPURuntimePackagingError("PPU zipapp is missing the Site Worker client") from exc
+    if _string_constant(client, "PROTOCOL") != plane.site_worker_protocol:
+        raise PPURuntimePackagingError("Runtime Site Worker client protocol does not match the control plane")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -1,0 +1,220 @@
+{
+ "schema": "plasma.evidence.manager-fail-safe-off-recheck.v1",
+ "date": "2026-11-16",
+ "change": {
+  "pr": 1457,
+  "main": "ac1cac4a7e6a462e7415d7d220f4b590bd98fdb8",
+  "swpc_control_station_release": "ac1cac4a7e6a",
+  "rollback_release": "109a97602a0c"
+ },
+ "ppu": {
+  "alias": "z2",
+  "ppu_id": "z2-hil",
+  "runtime": "0.2.1-f1994ba5ca19",
+  "active_asset_set": "957ac4e62d23507fd577300c3dc827777fa1ccddb0fffdb13911dc9e8b8d8d83",
+  "generation": 22,
+  "max_concurrent_jobs": 2,
+  "changed": false
+ },
+ "steps": [
+  {
+   "label": "recheck-20261116-a-site2-v01",
+   "batch_id": "6904e6e4d5f363f544097ad96fe14292",
+   "start_id": "da53f4ac90fde73c703f10b21042d4ef",
+   "post_count": 1,
+   "sites": [
+    2
+   ],
+   "operations": [
+    "erase",
+    "program",
+    "verify"
+   ],
+   "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+   "retry_limit": 0,
+   "outcome": "PASS",
+   "post_execution": {
+    "busy": false,
+    "owner_kind": null,
+    "owner_id": null,
+    "active_job_count": 0
+   },
+   "units": {
+    "2": {
+     "outcome": "PASS",
+     "reason": null,
+     "attempts": [
+      {
+       "n": 1,
+       "run_id": "fa4c6402d7c73738996e5e0bdf3b845f",
+       "job_id": "job-20261116-045721-4e2cb401",
+       "outcome": "PASS",
+       "reason": null,
+       "safe_off": true,
+       "receipt_safe_off": true,
+       "safe_off_source": "job_details",
+       "flash_result": "PASS",
+       "retry": null,
+       "ppu_job_state": "success",
+       "ppu_attempts": 1,
+       "site_worker_failure": null
+      }
+     ]
+    }
+   },
+   "la_sr_sha256": "33dbb4f261f86d90ffb5e362937cfc4bcee86692f029fd18b5aafb3ee23ed3c7"
+  },
+  {
+   "label": "recheck-20261116-b-verify-site1fail-retry1",
+   "batch_id": "214e264c25bc39cda643083e367546a4",
+   "start_id": "4d8c1913390ed8494ca9841a1b99024a",
+   "post_count": 1,
+   "sites": [
+    1,
+    2
+   ],
+   "operations": [
+    "verify"
+   ],
+   "image_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+   "retry_limit": 1,
+   "outcome": "FAIL",
+   "post_execution": {
+    "busy": false,
+    "owner_kind": null,
+    "owner_id": null,
+    "active_job_count": 0
+   },
+   "units": {
+    "1": {
+     "outcome": "FAIL",
+     "reason": "RETRY_LIMIT_EXHAUSTED",
+     "attempts": [
+      {
+       "n": 1,
+       "run_id": "bddb9543a3f87301b5f961122e1e9234",
+       "job_id": "job-20261116-045826-5810bd86",
+       "outcome": "FAIL",
+       "reason": "JOB_NOT_SUCCESS",
+       "safe_off": true,
+       "receipt_safe_off": true,
+       "safe_off_source": "site_worker_failure",
+       "flash_result": "FAIL",
+       "retry": {
+        "eligible": true,
+        "reason": "DEFINITE_FAIL_SAFE_OFF_VERIFIED",
+        "decision": "RETRY"
+       },
+       "ppu_job_state": "error",
+       "ppu_attempts": 1,
+       "site_worker_failure": {
+        "code": "VERIFY_MISMATCH",
+        "failed_step": "verify",
+        "readback_sha256": "0ecc03b32ff94c78f15f61452be153488725e3f1781edb33350fbedd7b37d6bd",
+        "expected_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+        "safe_off": true,
+        "safe_off_evidence": {
+         "admission_revoked": true,
+         "marker_present": true,
+         "termination_reason": null
+        }
+       }
+      },
+      {
+       "n": 2,
+       "run_id": "5a594526b1462d4c6c9e4c0fa9aea798",
+       "job_id": "job-20261116-045838-60fd4c51",
+       "outcome": "FAIL",
+       "reason": "JOB_NOT_SUCCESS",
+       "safe_off": true,
+       "receipt_safe_off": true,
+       "safe_off_source": "site_worker_failure",
+       "flash_result": "FAIL",
+       "retry": {
+        "eligible": true,
+        "reason": "DEFINITE_FAIL_SAFE_OFF_VERIFIED",
+        "decision": "NO_RETRY"
+       },
+       "ppu_job_state": "error",
+       "ppu_attempts": 1,
+       "site_worker_failure": {
+        "code": "VERIFY_MISMATCH",
+        "failed_step": "verify",
+        "readback_sha256": "0ecc03b32ff94c78f15f61452be153488725e3f1781edb33350fbedd7b37d6bd",
+        "expected_sha256": "8d3ffb02b80f779758829ff5c3727f5ade466652806d9124fa17c39fc48d841d",
+        "safe_off": true,
+        "safe_off_evidence": {
+         "admission_revoked": true,
+         "marker_present": true,
+         "termination_reason": null
+        }
+       }
+      }
+     ]
+    },
+    "2": {
+     "outcome": "PASS",
+     "reason": null,
+     "attempts": [
+      {
+       "n": 1,
+       "run_id": "dd9a62b22d50c697aad5da61dc544574",
+       "job_id": "job-20261116-045827-e4873126",
+       "outcome": "PASS",
+       "reason": null,
+       "safe_off": true,
+       "receipt_safe_off": true,
+       "safe_off_source": "job_details",
+       "flash_result": "PASS",
+       "retry": null,
+       "ppu_job_state": "success",
+       "ppu_attempts": 1,
+       "site_worker_failure": null
+      }
+     ]
+    }
+   },
+   "la_sr_sha256": "c6444ad9682d3b1f855bc473f4631d92ae7aaf2e529e989e82b5db7d8f131b90",
+   "la": {
+    "samplerate_hz": 20000000.0,
+    "seconds": 60.0000838,
+    "window_ms": 1,
+    "site1_swclk_CH3": {
+     "edges": 1087604,
+     "bursts_s": [
+      [
+       13.468,
+       13.989
+      ],
+      [
+       22.751,
+       23.146
+      ]
+     ]
+    },
+    "site1_swdio_CH4": {
+     "edges": 175370
+    },
+    "site2_swclk_CH0": {
+     "edges": 543802,
+     "bursts_s": [
+      [
+       14.646,
+       15.079
+      ]
+     ]
+    },
+    "site2_swdio_CH1": {
+     "edges": 86302
+    }
+   }
+  }
+ ],
+ "before_fix_reference": {
+  "wp07_step": "6b",
+  "batch_id_prefix": "332df1a4",
+  "site1_receipt_safe_off": null,
+  "site1_reason": "SAFE_OFF_NOT_VERIFIED",
+  "evidence": "../wp07-two-site-concurrent-hil-2026-11-15/README.md"
+ }
+}

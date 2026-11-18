@@ -183,6 +183,75 @@ while time.monotonic() < deadline:
         time.sleep(0.1)
 else:
     raise SystemExit("[render-start] Mock PPU Plasma Gateway did not become ready")
+PY
+
+python - "${manager_config}" "${manager_port}" "${observation_db}" "${ppu_alias}" "${gateway_port}" <<'PY'
+import sys
+from pathlib import Path
+import yaml
+
+path, manager_port, observation_db, alias, gateway_port = sys.argv[1:]
+payload = {
+    "manager": {
+        "host": "127.0.0.1",
+        "port": int(manager_port),
+        "request_timeout_s": 10.0,
+        "poll_interval_s": 2.0,
+        "observation_db_path": observation_db,
+    },
+    "ppus": [{"alias": alias, "endpoint": f"http://127.0.0.1:{int(gateway_port)}"}],
+}
+Path(path).write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+PY
+
+printf '[render-start] Starting immutable-registry Plasma Manager on 127.0.0.1:%s for %s\n' \
+  "${manager_port}" "${ppu_alias}"
+python -m plasma_manager.server --config "${manager_config}" &
+manager_pid=$!
+
+python - "${manager_pid}" "${manager_port}" <<'PY'
+import os
+import socket
+import sys
+import time
+
+pid = int(sys.argv[1])
+port = int(sys.argv[2])
+deadline = time.monotonic() + 15
+while time.monotonic() < deadline:
+    try:
+        os.kill(pid, 0)
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            break
+    except OSError:
+        time.sleep(0.1)
+else:
+    raise SystemExit("[render-start] Plasma Manager did not become ready")
+PY
+
+# PR-C2: the Device Selector is owned by Plasma Manager (Console BFF ->
+# Manager), never a PPU Gateway relay. Prove the customer selector contract on
+# the Manager before the public Console starts.
+python - "${manager_pid}" "${manager_port}" <<'PY'
+import json
+import os
+import sys
+import time
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
+
+manager_pid = int(sys.argv[1])
+port = int(sys.argv[2])
+deadline = time.monotonic() + 120
+while True:
+    try:
+        os.kill(manager_pid, 0)
+        with urlopen(f"http://127.0.0.1:{port}/api/devices/search?q=STM32F103C8T6&limit=1", timeout=60):
+            break
+    except (HTTPError, URLError, TimeoutError, OSError):
+        if time.monotonic() >= deadline:
+            raise SystemExit("[render-start] Manager Device Selector did not become ready")
+        time.sleep(0.5)
 
 with urlopen(
     f"http://127.0.0.1:{port}/api/devices/search?q=STM32F103C8T6&limit=1",
@@ -249,50 +318,6 @@ for exact, provider_id in (
             or providers[0].get("executable") is not False
             or providers[0].get("installed_binary_sha256") is not None):
         raise SystemExit(f"[render-start] H5/C5 pinned display metadata unavailable: {exact}")
-PY
-
-python - "${manager_config}" "${manager_port}" "${observation_db}" "${ppu_alias}" "${gateway_port}" <<'PY'
-import sys
-from pathlib import Path
-import yaml
-
-path, manager_port, observation_db, alias, gateway_port = sys.argv[1:]
-payload = {
-    "manager": {
-        "host": "127.0.0.1",
-        "port": int(manager_port),
-        "request_timeout_s": 10.0,
-        "poll_interval_s": 2.0,
-        "observation_db_path": observation_db,
-    },
-    "ppus": [{"alias": alias, "endpoint": f"http://127.0.0.1:{int(gateway_port)}"}],
-}
-Path(path).write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-PY
-
-printf '[render-start] Starting immutable-registry Plasma Manager on 127.0.0.1:%s for %s\n' \
-  "${manager_port}" "${ppu_alias}"
-python -m plasma_manager.server --config "${manager_config}" &
-manager_pid=$!
-
-python - "${manager_pid}" "${manager_port}" <<'PY'
-import os
-import socket
-import sys
-import time
-
-pid = int(sys.argv[1])
-port = int(sys.argv[2])
-deadline = time.monotonic() + 15
-while time.monotonic() < deadline:
-    try:
-        os.kill(pid, 0)
-        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
-            break
-    except OSError:
-        time.sleep(0.1)
-else:
-    raise SystemExit("[render-start] Plasma Manager did not become ready")
 PY
 
 export HOST="0.0.0.0"

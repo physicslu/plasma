@@ -16,8 +16,15 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import select
+import signal
+import time
 import sys
 import uuid
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+import plasma_engineering_activity as engineering_activity
 
 REPO = "physicslu/plasma"
 OWNER = "physicslu"
@@ -29,6 +36,28 @@ COMMAND_PREFIX = "/plasma-dispatch run "
 DYNAMIC_TASKS = {"path2-cli": "path2-work-order", "path3-codex": "path3-work-order"}
 WORK_ORDER_PREFIX = "/plasma-dispatch work-order 981\n"
 WORK_ORDER_SCHEMA = "plasma.development.work_order.v1"
+# Explicit opt-in for a host-only observation. Engineering work stays unbounded.
+QUICK_PROFILE = "quick-observe"
+QUICK_MAX_SECONDS = 75
+QUICK_MAX_TOOL_ITEMS = 12
+QUICK_INPUT_TOKEN_BUDGET = 30000  # Post-turn alert; not a live hard cap.
+# Owner-declared display phase, not a live stage, hardware permission or PASS.
+MONITOR_PHASES = frozenset({
+    "HOST_ONLY", "INSTALL", "RUNTIME", "PROGRAMMING_PROFILE", "FLASH_TEST",
+})
+# Explicit operator-public metadata; never derived from objective/acceptance.
+# Single-line restricted vocabulary prevents control sequences, URLs, quotes,
+# shell syntax and raw JSON from crossing the GitHub output/monitor boundary.
+MONITOR_SUMMARY = re.compile(
+    r"[A-Za-z0-9\u4e00-\u9fff]"
+    r"[A-Za-z0-9\u4e00-\u9fff ,._()/+-]{6,78}"
+    r"[A-Za-z0-9\u4e00-\u9fff)]\Z"
+)
+MONITOR_SENSITIVE = re.compile(
+    r"\b(?:password|passwd|secret|credential|token|bearer|"
+    r"private.key|api.key|authorization)\b|[a-fA-F0-9]{32,}",
+    re.IGNORECASE,
+)
 # Fixed trusted-main Path 2 observation; NOT an arbitrary-script capability.
 NATIVE_PREFLIGHT = "codex-native-install-v1"
 EXPECTED_RUNNER = "SWPC-plasma-codex"
@@ -94,35 +123,9 @@ def task_by_id(registry: object, task_id: str) -> dict:
                 "specs/engineering-dispatch/work-orders/hil-a2-cpu-only-r1.json",
                 "A2_TASK_BINDING_DENIED")
         return task
-    if task_id in ("z2-path2-download", "z2-path2-testing",
-                    "z2-path2-restore", "z2-path2-full-hil"):
-        expected = {"z2-path2-download": "download",
-                    "z2-path2-testing": "test",
-                    "z2-path2-restore": "restore",
-                    "z2-path2-full-hil": "full"}
-        require(execution_path == "path2-cli" and set(task) == {
-            "execution_path", "capability", "project", "stage",
-        } and task["capability"] == "path2-stage-contract"
-                and task["project"] == "pl/projects/z2-fixed-unified-site1"
-                and task["stage"] == expected[task_id],
-                "PATH2_STAGE_TASK_FIELDS_DENIED")
-        return task
     if execution_path == "path2-cli" and task.get("capability") == "vivado-host-build":
-        require(task_id in ("fixed-site1-vivado-host-build", "z2-path2-build"),
-                "PATH2_BUILD_TASK_ID_DENIED")
-        # Path 2 is an execution method, NOT synonymous with CPU-only Python.
-        # Host builds use a fixed, reviewed Vivado capability and project.
-        require(set(task) == {"execution_path", "capability", "project",
-                              "toolchain", "board_repo_sha"},
-                "HOST_BUILD_TASK_FIELDS_DENIED")
-        require(type(task["project"]) is str and re.fullmatch(
-            r"pl/projects/[a-z0-9-]{3,70}", task["project"]
-        ) is not None, "HOST_BUILD_PROJECT_DENIED")
-        require(task["toolchain"] == "2026.1" and
-                type(task["board_repo_sha"]) is str and
-                SHA40.fullmatch(task["board_repo_sha"]) is not None,
-                "HOST_BUILD_TOOLCHAIN_DENIED")
-        return task
+        # A candidate registry may not revive a fixed Site 1 build route.
+        raise Denied("RETIRED_PATH2_FIXED_BUILD_TASK")
     if execution_path == "path2-cli":
         # Legacy CPU-only CLI fixtures keep their independent sandbox.
         require(set(task) >= {
@@ -204,8 +207,12 @@ def parse_dynamic_work_order(event: object) -> dict:
                            "execution_path", "capability"}
             and set(order) <= {"schema", "objective", "acceptance", "scope",
                                "execution_path", "capability",
-                               "pr_number", "source_sha", "session_resume", "native_preflight", "script", "argv",
-                               "expected_stdout_sha256", "project", "stage"},
+                               "pr_number", "source_sha", "native_preflight", "script", "argv",
+                               "expected_stdout_sha256", "verification",
+                               "timeout_seconds", "project", "operation",
+                               "toolchain", "board_repo_sha",
+                                "monitor_summary", "codex_execution",
+                               "codex_profile", "artifact_source", "monitor_phase"},
             "WORK_ORDER_FIELDS_DENIED")
     require(order["schema"] == WORK_ORDER_SCHEMA,
             "WORK_ORDER_SCHEMA_DENIED")
@@ -216,6 +223,16 @@ def parse_dynamic_work_order(event: object) -> dict:
                             for ch in val), "WORK_ORDER_TEXT_DENIED")
     require(len(order["objective"]) + len(order["acceptance"]) <= 10000,
             "WORK_ORDER_TOO_LARGE")
+    if "monitor_summary" in order:
+        summary = order["monitor_summary"]
+        require(type(summary) is str and
+                MONITOR_SUMMARY.fullmatch(summary) is not None and
+                MONITOR_SENSITIVE.search(summary) is None,
+                "WORK_ORDER_MONITOR_SUMMARY_DENIED")
+    if "monitor_phase" in order:
+        require(type(order["monitor_phase"]) is str and
+                order["monitor_phase"] in MONITOR_PHASES,
+                "WORK_ORDER_MONITOR_PHASE_DENIED")
     path, capability, scope = (order["execution_path"],
                                order["capability"], order.get("scope"))
     require(type(path) is str and path in DYNAMIC_TASKS and
@@ -225,52 +242,139 @@ def parse_dynamic_work_order(event: object) -> dict:
             "execution_path", "capability"}
     optional_ref = {"pr_number", "source_sha"}
     if path == "path3-codex":
-        if "session_resume" in order:
-            require(order["session_resume"] == "page-boundary-off-by-one"
-                    and scope == "host-only"
-                    and set(order) <= base | optional_ref | {"session_resume"}
-                    and type(order.get("pr_number")) is int
-                    and order["pr_number"] >= 0
-                    and "source_sha" in order,
-                    "WORK_ORDER_RESUME_SCOPE_DENIED")
-        else:
-            require(capability == "codex-workspace" and
-                    set(order) <= (base - {"scope"}) | optional_ref,
-                    "WORK_ORDER_PATH3_FIELDS_DENIED")
-        require(capability == "codex-workspace",
+        quick = order.get("codex_profile") == QUICK_PROFILE
+        allowed = (base - {"scope"}) | optional_ref | {
+            "monitor_summary", "codex_execution", "codex_profile",
+            "artifact_source", "monitor_phase"}
+        if quick:
+            allowed |= {"scope"}
+        require(capability == "codex-workspace" and
+                set(order) <= allowed and
+                ("codex_execution" not in order or
+                 order["codex_execution"] == "guarded-hardware-no-sandbox") and
+                ("codex_profile" not in order or quick) and
+                (not quick or (order.get("scope") == "host-only"
+                 and "codex_execution" not in order
+                 and order.get("pr_number", 0) == 0)),
                 "WORK_ORDER_PATH3_FIELDS_DENIED")
+        if "artifact_source" in order:
+            source = order["artifact_source"]
+            require(type(source) is dict and
+                    set(source) == {"run_id", "source_sha"} and
+                    type(source["run_id"]) is int and
+                    1 <= source["run_id"] <= 999_999_999_999_999 and
+                    type(source["source_sha"]) is str and
+                    SHA40.fullmatch(source["source_sha"]) is not None and
+                    not quick and order.get("pr_number", 0) == 0 and
+                    order.get("codex_execution") == "guarded-hardware-no-sandbox",
+                    "WORK_ORDER_ARTIFACT_SOURCE_DENIED")
     elif capability == "cpu-only" and "native_preflight" in order:
         # Existing Path 2 task_id and Runner. No candidate scripts, shell,
         # path parameters, model or hardware under this one main-only route.
         require(path == "path2-cli" and scope == "host-only" and
                 order["native_preflight"] == NATIVE_PREFLIGHT and
-                set(order) == base | optional_ref | {"native_preflight"} and
+                set(order) == base | optional_ref | {"native_preflight"} |
+                 ({"monitor_summary"} if "monitor_summary" in order else set()) and
                 order.get("pr_number") == 0 and
                 type(order.get("pr_number")) is int and
                 type(order.get("source_sha")) is str,
                 "WORK_ORDER_NATIVE_PREFLIGHT_SCOPE_DENIED")
     elif capability == "cpu-only":
-        require(scope == "host-only" and
-                {"script", "argv", "expected_stdout_sha256"} <= set(order)
+        # The generic CPU-only route is not a fixed experiment registry.
+        # Scope defaults to host-only; the existing Bubblewrap sandbox is
+        # mandatory at execution regardless of this optional metadata.
+        require(path == "path2-cli" and scope in (None, "host-only") and
+                {"script", "argv"} <= set(order)
                 and set(order) <= base | optional_ref |
-                {"script", "argv", "expected_stdout_sha256"},
+                {"script", "argv", "expected_stdout_sha256", "verification",
+                 "timeout_seconds", "monitor_summary"},
                 "WORK_ORDER_PATH2_FIELDS_DENIED")
-        task_by_id({"schema_version": VERSION, "mode": "development",
-                    "tasks": {"work-order-fixture": {
-                        "execution_path": "path2-cli",
-                        "capability": "cpu-only",
-                        "script": order["script"], "argv": order["argv"],
-                        "expected_stdout_sha256":
-                            order["expected_stdout_sha256"]}}},
-                   "work-order-fixture")
-    elif capability == "path2-stage-contract":
-        require(scope == "guarded-hardware" and
-                {"project", "stage"} <= set(order) and
-                set(order) <= base | optional_ref | {"project", "stage"} and
-                order["project"] == "pl/projects/z2-fixed-unified-site1" and
-                type(order["stage"]) is str and
-                order["stage"] in ("download", "test", "restore"),
-                "WORK_ORDER_STAGE_CAPABILITY_DENIED")
+        mode = order.get("verification", "stdout-sha256")
+        require(type(mode) is str and
+                mode in ("stdout-sha256", "exit-code"),
+                "WORK_ORDER_VERIFICATION_DENIED")
+        if mode == "stdout-sha256":
+            require("expected_stdout_sha256" in order and
+                    type(order["expected_stdout_sha256"]) is str and
+                    SHA256.fullmatch(order["expected_stdout_sha256"]) is not None,
+                    "WORK_ORDER_OUTPUT_DIGEST_DENIED")
+        else:
+            require("expected_stdout_sha256" not in order,
+                    "WORK_ORDER_EXIT_CODE_DIGEST_CONFLICT")
+        script = order["script"]
+        # Host-only Bubblewrap still prevents network/device access, so
+        # source-pinned CLI scripts can live anywhere under scripts/.
+        # No path traversal, dot component, absolute path or shell entry.
+        require(type(script) is str and re.fullmatch(
+            r"scripts/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py", script
+        ) is not None, "SCRIPT_PATH_DENIED")
+        argv = order["argv"]
+        require(type(argv) is list and len(argv) <= 16 and all(
+            type(x) is str and re.fullmatch(
+                r"[A-Za-z0-9._=/,:@+%~-]{1,256}", x
+            ) is not None and ".." not in x for x in argv
+        ), "TASK_ARGS_DENIED")
+        timeout_seconds = order.get("timeout_seconds", 120)
+        require(type(timeout_seconds) is int and
+                1 <= timeout_seconds <= 180, "WORK_ORDER_TIMEOUT_DENIED")
+    elif capability == "operator-cli":
+        # Owner-reviewed deterministic CLI. No operation/Project/F1-B allowlist.
+        # The exact pinned repo script runs as the existing NON-root SWPC worker;
+        # any Z2/DUT authority remains subject to actual OS and hardware guards.
+        require(path == "path2-cli" and scope == "guarded-hardware" and
+                {"script", "argv"} <= set(order) and
+                set(order) <= base | optional_ref |
+                {"script", "argv", "timeout_seconds", "monitor_summary",
+                 "artifact_source"},
+                "WORK_ORDER_OPERATOR_CLI_FIELDS_DENIED")
+        script = order["script"]
+        # Reuse the canonical Bash operator entrypoint; do not admit arbitrary
+        # shell scripts, command strings, or privilege-changing profiles.
+        require(type(script) is str and
+                (script == "scripts/plasmactl" or re.fullmatch(
+                    r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
+                    script) is not None),
+                "WORK_ORDER_OPERATOR_CLI_SCRIPT_DENIED")
+        argv = order["argv"]
+        require(type(argv) is list and len(argv) <= 32 and all(
+            type(arg) is str and len(arg) <= 2048 and
+            not any(ord(ch) < 32 or ord(ch) == 127 for ch in arg)
+            for arg in argv), "WORK_ORDER_OPERATOR_CLI_ARGS_DENIED")
+        if script == "scripts/plasmactl":
+            require(tuple(argv) in CONTROL_STATION_OPERATOR_COMMANDS,
+                    "WORK_ORDER_OPERATOR_CLI_COMMAND_DENIED")
+        timeout_seconds = order.get("timeout_seconds", 600)
+        require(type(timeout_seconds) is int and
+                1 <= timeout_seconds <= 1800,
+                "WORK_ORDER_OPERATOR_CLI_TIMEOUT_DENIED")
+        # Path 2 may request only the already-qualified CI Kit handoff used
+        # by Path 3. No candidate GitHub token, arbitrary URL, or PR artifact.
+        if "artifact_source" in order:
+            source = order["artifact_source"]
+            require(order.get("pr_number", 0) == 0
+                    and type(source) is dict
+                    and set(source) == {"run_id", "source_sha"}
+                    and type(source["run_id"]) is int
+                    and 1 <= source["run_id"] <= 999_999_999_999_999
+                    and type(source["source_sha"]) is str
+                    and SHA40.fullmatch(source["source_sha"]) is not None
+                    and order["script"] == "scripts/plasma_program.py"
+                    and order["argv"][0:1] == ["runtime-deploy"],
+                    "PATH2_RUNTIME_ARTIFACT_SOURCE_DENIED")
+    elif capability == "vivado-host-build":
+        # Admission accepts a pinned project path from trusted main or an
+        # exact PR HEAD. The selected driver still proves its project contract.
+        require(path == "path2-cli" and scope in (None, "host-only")
+                and {"project", "toolchain", "board_repo_sha"} <= set(order)
+                and set(order) <= base | optional_ref |
+                {"project", "toolchain", "board_repo_sha", "monitor_summary"}
+                and type(order["project"]) is str
+                and re.fullmatch(r"pl/projects/[a-z0-9-]{3,70}",
+                                 order["project"]) is not None
+                and order["toolchain"] == "2026.1"
+                and type(order["board_repo_sha"]) is str
+                and SHA40.fullmatch(order["board_repo_sha"]) is not None,
+                "WORK_ORDER_VIVADO_HOST_BUILD_DENIED")
     else:
         raise Denied("WORK_ORDER_CAPABILITY_DENIED")
     number = order.get("pr_number", 0)
@@ -285,16 +389,114 @@ def parse_dynamic_work_order(event: object) -> dict:
         require(type(order.get("source_sha")) is str and
                 SHA40.fullmatch(order["source_sha"]) is not None,
                 "WORK_ORDER_NATIVE_MAIN_SHA_REQUIRED")
-    elif order.get("session_resume") == "page-boundary-off-by-one":
-        # Exception for this exact CPU-only post-merge diagnostic only.
-        # Main pinning is checked against trusted GITHUB_SHA by request().
-        require(type(order.get("source_sha")) is str and
-                SHA40.fullmatch(order["source_sha"]) is not None,
-                "WORK_ORDER_RESUME_MAIN_SHA_REQUIRED")
     else:
         require("source_sha" not in order,
                 "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED")
     return order
+
+
+# One native Bash entrypoint without a generic shell-command execution route.
+# Only the existing Control Station upgrade/read-only commands are admitted;
+# --dev-fresh-state, install and Z2/PPU profiles require separate explicit work.
+CONTROL_STATION_OPERATOR_COMMANDS = frozenset({
+    ("deploy", "local-control-station"),
+    ("verify", "local-control-station"),
+    ("status", "local-control-station"),
+})
+
+# --- Path 2 one-shot hardware: cross-Run exactly-once claim -----------------
+# Reuses the A2 MECHANISM (protected, never-updatable claim namespace; hosted
+# atomic ref creation; readback) without touching the A2 contract. The key is
+# the FULL Work Order digest, not the comment ID, so a re-run, a re-posted
+# identical Work Order or a concurrent independent Run all collide. Creating
+# the ref consumes the authorization whatever the later outcome.
+P2HW_SCRIPT = "scripts/plasma_programming_load.py"
+P2HW_FLAG = "--run-batch"
+P2HW_CLAIM_PREFIX = f"refs/heads/plasma-engineering-claims/{ISSUE}/p2hw-"
+P2HW_GITHUB_API = "https://api.github.com/repos/physicslu/plasma/git/"
+
+
+def one_shot_hardware(task: object) -> bool:
+    """True for every argv argparse would read as --run-batch (incl. abbrev)."""
+    if (type(task) is not dict or task.get("capability") != "operator-cli" or
+            task.get("script") != P2HW_SCRIPT or type(task.get("argv")) is not list):
+        return False
+    return any(type(a) is str and len(a) > 2 and
+               P2HW_FLAG.startswith(a.split("=", 1)[0]) for a in task["argv"])
+
+
+def p2hw_claim_ref(work_order_sha256: object) -> str:
+    require(type(work_order_sha256) is str and
+            SHA256.fullmatch(work_order_sha256) is not None,
+            "P2HW_WORK_ORDER_DIGEST_INVALID")
+    return P2HW_CLAIM_PREFIX + work_order_sha256
+
+
+def claim_hardware_once(create, read, *, claim_ref: str, sha: str,
+                        run_attempt: object) -> dict:
+    """Create the protected claim ref exactly once; never retry or update.
+
+    ``create(ref, sha)`` / ``read(ref)`` return ``(status, json_body)``.
+    Duplicate -> P2HW_CLAIM_DUPLICATE. Any ambiguous transport result is
+    P2HW_CLAIM_UNKNOWN: the authorization may be consumed, so nothing runs
+    and only a NEW owner Work Order can authorize another attempt.
+    """
+    require(run_attempt == "1", "P2HW_REPLAY_RUN_ATTEMPT_DENIED")
+    require(type(claim_ref) is str and claim_ref.startswith(P2HW_CLAIM_PREFIX) and
+            SHA256.fullmatch(claim_ref[len(P2HW_CLAIM_PREFIX):]) is not None,
+            "P2HW_CLAIM_REF_INVALID")
+    require(type(sha) is str and SHA40.fullmatch(sha) is not None,
+            "P2HW_CLAIM_SHA_INVALID")
+
+    def matches(status, body, expected):
+        obj = body.get("object") if type(body) is dict else None
+        return (status == expected and type(body) is dict and
+                body.get("ref") == claim_ref and type(obj) is dict and
+                obj.get("sha") == sha)
+    try:
+        status, body = create(claim_ref, sha)
+    except Exception:
+        raise Denied("P2HW_CLAIM_UNKNOWN") from None
+    if status == 422:
+        try:
+            exists = read(claim_ref)[0] == 200
+        except Exception:
+            exists = False
+        raise Denied("P2HW_CLAIM_DUPLICATE" if exists else "P2HW_CLAIM_REJECTED")
+    require(matches(status, body, 201), "P2HW_CLAIM_UNKNOWN")
+    try:
+        status, body = read(claim_ref)
+    except Exception:
+        raise Denied("P2HW_CLAIM_READBACK_DENIED") from None
+    require(matches(status, body, 200), "P2HW_CLAIM_READBACK_DENIED")
+    return {"status": "CLAIM_CREATED_AND_READBACK", "schema": "plasma.p2hw.claim.v1",
+            "claim_ref": claim_ref, "sha": sha, "run_attempt": 1}
+
+
+def github_claim_transport(token: object):
+    """Fixed-endpoint GitHub ref transport for the hosted claim Job only."""
+    require(type(token) is str and len(token) >= 16, "P2HW_CLAIM_TOKEN_MISSING")
+
+    def call(method: str, url: str, payload: dict | None = None):
+        req = Request(url, method=method,
+                      data=(json.dumps(payload, sort_keys=True).encode()
+                            if payload is not None else None),
+                      headers={"Authorization": "Bearer " + token,
+                               "Accept": "application/vnd.github+json",
+                               "X-GitHub-Api-Version": "2022-11-28",
+                               "Content-Type": "application/json"})
+        try:
+            with urlopen(req, timeout=10) as response:
+                return response.status, json.loads(response.read(8192))
+        except HTTPError as err:
+            return err.code, {}
+
+    def create(ref: str, sha: str):
+        return call("POST", P2HW_GITHUB_API + "refs", {"ref": ref, "sha": sha})
+
+    def read(ref: str):
+        return call("GET", P2HW_GITHUB_API + "ref/" + ref[len("refs/"):])
+    return create, read
 
 
 def work_order_digest(order: dict) -> str:
@@ -325,14 +527,29 @@ def task_for_request(registry: object, req: dict, event: object) -> dict:
         "acceptance": order["acceptance"],
         "work_order_sha256": req["work_order_sha256"],
     }
+    if "monitor_summary" in order:
+        task["monitor_summary"] = order["monitor_summary"]
+    if "monitor_phase" in order:
+        task["monitor_phase"] = order["monitor_phase"]
+    if "codex_execution" in order:
+        task["codex_execution"] = order["codex_execution"]
+    if "artifact_source" in order:
+        task["artifact_source"] = order["artifact_source"]
+    if "codex_profile" in order:
+        task["codex_profile"] = order["codex_profile"]
+        task["work_order_scope"] = "host-only"
     if order["execution_path"] == "path2-cli":
-        task["work_order_scope"] = order["scope"]
-    if "session_resume" in order:
-        task["session_resume"] = order["session_resume"]
+        task["work_order_scope"] = order.get("scope", "host-only")
+        if order["capability"] == "cpu-only":
+            task["verification"] = order.get("verification", "stdout-sha256")
+            task["timeout_seconds"] = order.get("timeout_seconds", 120)
+        elif order["capability"] == "operator-cli":
+            task["verification"] = "exit-code"
+            task["timeout_seconds"] = order.get("timeout_seconds", 600)
     if "native_preflight" in order:
         task["native_preflight"] = order["native_preflight"]
     for key in ("script", "argv", "expected_stdout_sha256",
-                "project", "stage"):
+                "project", "operation", "toolchain", "board_repo_sha"):
         if key in order:
             task[key] = order[key]
     return task
@@ -375,11 +592,6 @@ def request(event: object, context: dict) -> dict:
                 order["pr_number"] == 0):
             require(order["source_sha"] == sha,
                     "WORK_ORDER_NATIVE_MAIN_SHA_MISMATCH")
-        if (order.get("session_resume") == "page-boundary-off-by-one" and
-                order["pr_number"] == 0):
-            # Never admit a different main commit, branch or omitted pin.
-            require(order["source_sha"] == sha,
-                    "WORK_ORDER_RESUME_MAIN_SHA_MISMATCH")
         return {
             "task_id": DYNAMIC_TASKS[order["execution_path"]],
             "auto_download_after_build_success": False,
@@ -390,8 +602,6 @@ def request(event: object, context: dict) -> dict:
             "comment_id": comment["id"],
             "issue_number": ISSUE,
             "work_order_sha256": work_order_digest(order),
-            **({"session_resume": order["session_resume"]}
-               if "session_resume" in order else {}),
         }
     require(len(body) <= 200, "COMMAND_DENIED")
     branch_match = BRANCH_COMMAND.fullmatch(body)
@@ -403,11 +613,8 @@ def request(event: object, context: dict) -> dict:
     flags = match.group("flags") or ""
     auto_download = " --auto-download" in flags
     auto_testing = " --auto-testing" in flags
-    require(not auto_download or task_id == "z2-path2-build",
-            "PATH2_AUTO_DOWNLOAD_TASK_DENIED")
-    require(not auto_testing or task_id in (
-        "z2-path2-build", "z2-path2-download"),
-        "PATH2_AUTO_TEST_TASK_DENIED")
+    require(not auto_download and not auto_testing,
+            "RETIRED_PATH2_AUTO_STAGE_FLAGS")
     return {
         "task_id": task_id,
         "auto_download_after_build_success": auto_download,
@@ -480,7 +687,12 @@ def authorize(event: object, context: dict, registry: object,
             "claim_ref": (f"refs/heads/plasma-engineering-claims/{ISSUE}/"
                           f"a2-{req['comment_id']}-{work_sha[:16]}-r1"),
         }
-    if task.get("capability") in ("vivado-host-build", "path2-stage-contract"):
+    p2hw_claim = {}
+    if one_shot_hardware(task):
+        require(context.get("GITHUB_RUN_ATTEMPT") == "1",
+                "P2HW_REPLAY_RUN_ATTEMPT_DENIED")
+        p2hw_claim = {"hardware_claim_ref": p2hw_claim_ref(req["work_order_sha256"])}
+    if task.get("capability") in ("vivado-host-build", "operator-cli"):
         # Owner-approved immutable PR SHA is admissible before merge.
         # verify_pr() above has already checked the live same-repo owner PR,
         # exact current HEAD and main base; do not equate merge with trust.
@@ -490,12 +702,22 @@ def authorize(event: object, context: dict, registry: object,
             (req["pr_number"] > 0 and
              req["source_sha"] != req["trusted_sha"]),
             "HOST_BUILD_SOURCE_BINDING_DENIED")
+    # Display-only category derived from the validated task capability/stage.
+    # No freeform Work Order command, stdout or candidate data enters the pane.
+    monitor_stage = ""
+    if task["execution_path"] == "path2-cli":
+        if task.get("native_preflight") == NATIVE_PREFLIGHT:
+            monitor_stage = "Native preflight"
+        elif task.get("capability") == "operator-cli":
+            monitor_stage = "Guarded CLI"
+        elif task.get("capability") == "vivado-host-build":
+            monitor_stage = "Vivado host build"
+        else:
+            monitor_stage = "CPU-only CLI"
     return {
         "status": "AUTHORIZED_DEV_TASK",
-        "authorized_stage": (task["stage"] if
-                             req["task_id"] == DYNAMIC_TASKS["path2-cli"] and
-                             task.get("capability") == "path2-stage-contract"
-                             else None),
+        "monitor_stage": monitor_stage,
+        "authorized_operation": None,
         **req,
         "pinned_sha": req["source_sha"],
         "execution_path": task["execution_path"],
@@ -505,7 +727,16 @@ def authorize(event: object, context: dict, registry: object,
                  if task["execution_path"] == "path2-cli"
             else "codex-workspace"
         ),
+        # Only explicit, checksum-bound, operator-public Path 2/3 metadata.
+        # No objective, acceptance, prompt, or Work Order JSON in this field.
+        "monitor_summary": task.get("monitor_summary", ""),
+        # Only owner-authenticated, hash-bound Path 3 display metadata.
+        "monitor_phase": task.get("monitor_phase", ""),
+        **({"artifact_run_id": str(task["artifact_source"]["run_id"]),
+            "artifact_source_sha": task["artifact_source"]["source_sha"]}
+          if "artifact_source" in task else {}),
         **a2_claim,
+        **p2hw_claim,
     }
 
 
@@ -513,8 +744,8 @@ def authorize(event: object, context: dict, registry: object,
 def reviewed_host_build_driver(*, workspace: Path, approval: dict):
     """Use trusted main for main builds, an exact owner-pinned PR driver otherwise.
 
-    The trusted dispatcher owns all authorization; this capability is limited
-    to the fixed Vivado host build, never generic candidate Python execution.
+    The trusted dispatcher owns all authorization; the exact PR candidate
+    driver must independently qualify its project contract and host artifacts.
     """
     if approval["pr_number"] == 0:
         import plasma_vivado_host_build as build
@@ -540,8 +771,7 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         require(type(approval) is dict and
                 approval.get("execution_capability") == "vivado-host-build" and
                 approval.get("execution_path") == "path2-cli" and
-                approval.get("task_id") in (
-                    "fixed-site1-vivado-host-build", "z2-path2-build") and
+                approval.get("task_id") == DYNAMIC_TASKS["path2-cli"] and
                 type(approval.get("pinned_sha")) is str and
                 SHA40.fullmatch(approval["pinned_sha"]) is not None and
                 type(approval.get("trusted_sha")) is str and
@@ -552,28 +782,86 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                   approval["pr_number"] > 0 and
                   approval["pinned_sha"] != approval["trusted_sha"])),
                 "HOST_BUILD_APPROVAL_REQUIRED")
-        # A request requiring an unregistered live Download provider must
-        # fail before importing candidate Build code or starting Vivado.
-        if (approval["task_id"] == "z2-path2-build" and
-                approval.get("auto_download_after_build_success") is True):
-            raise Denied("PATH2_LIVE_DOWNLOAD_PROVIDER_NOT_REGISTERED")
+        if approval["task_id"] == DYNAMIC_TASKS["path2-cli"]:
+            # Project the authenticated Work Order to the host build engine.
+            require(type(task) is dict and
+                    set(task) >= {"execution_path", "capability", "objective",
+                                  "acceptance", "work_order_sha256",
+                                  "work_order_scope", "project", "toolchain",
+                                  "board_repo_sha"} and
+                    set(task) <= {"execution_path", "capability", "objective",
+                                  "acceptance", "work_order_sha256",
+                                  "work_order_scope", "project", "toolchain",
+                                  "board_repo_sha", "monitor_summary"} and
+                    task["execution_path"] == "path2-cli" and
+                    task["capability"] == "vivado-host-build" and
+                    task["work_order_scope"] == "host-only" and
+                    type(task["project"]) is str and
+                    re.fullmatch(r"pl/projects/[a-z0-9-]{3,70}",
+                                 task["project"]) is not None and
+                    task["toolchain"] == "2026.1" and
+                    type(task["board_repo_sha"]) is str and
+                    SHA40.fullmatch(task["board_repo_sha"]) is not None and
+                    type(task["work_order_sha256"]) is str and
+                    SHA256.fullmatch(task["work_order_sha256"]) is not None and
+                    approval.get("work_order_sha256") ==
+                    task["work_order_sha256"] and
+                    approval.get("authorized_stage") is None and
+                    approval.get("auto_download_after_build_success") is False and
+                    approval.get("auto_test_after_download_success") is False,
+                    "HOST_BUILD_DYNAMIC_WORK_ORDER_DENIED")
+            task = {key: task[key] for key in (
+                "execution_path", "capability", "project", "toolchain",
+                "board_repo_sha")}
         build = reviewed_host_build_driver(workspace=workspace,
                                            approval=approval)
-        if approval["task_id"] == "z2-path2-build":
-            import plasma_path2_runtime_integration as integration
-            return integration.host_build(
-                task, workspace=workspace, approval=approval,
-                evidence_dir=evidence_dir,
-                build_driver=lambda _ctx: build.run(
-                    task, workspace=workspace, approval=approval,
-                    evidence_dir=evidence_dir, executor=executor))
         return build.run(task, workspace=workspace, approval=approval,
                          evidence_dir=evidence_dir, executor=executor)
-    if task.get("capability") == "path2-stage-contract":
-        import plasma_path2_runtime_integration as integration
-        if approval is not None and approval.get("task_id") == "z2-path2-full-hil":
-            return integration.full_hil_sequence(task, approval)
-        return integration.registered_hardware_stage(task, approval)
+    if task.get("capability") == "z2-root-operation":
+        # Legacy fixed operations are no longer a Dispatcher capability.
+        # Preserve separately installed root recovery code; no implicit route.
+        raise Denied("RETIRED_PATH2_ROOT_OPERATION")
+    if task.get("capability") == "operator-cli":
+        # This is an approved, source-pinned SWPC user-space process, NOT a
+        # privileged Root Entry or an assertion of actual DUT/LA/FPGA success.
+        require(type(approval) is dict and type(task) is dict and
+                task.get("execution_path") == "path2-cli" and
+                task.get("work_order_scope") == "guarded-hardware" and
+                task.get("verification") == "exit-code" and
+                type(task.get("argv")) is list and
+                len(task["argv"]) <= 32 and all(
+                    type(a) is str and len(a) <= 2048 and
+                    not any(ord(c) < 32 or ord(c) == 127 for c in a)
+                    for a in task["argv"]) and
+                type(task.get("script")) is str and
+                (task["script"] == "scripts/plasmactl" or re.fullmatch(
+                    r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
+                    task["script"]) is not None) and
+                type(task.get("work_order_sha256")) is str and
+                SHA256.fullmatch(task["work_order_sha256"]) is not None and
+                approval.get("task_id") == DYNAMIC_TASKS["path2-cli"] and
+                approval.get("execution_path") == "path2-cli" and
+                approval.get("execution_capability") == "operator-cli" and
+                approval.get("work_order_sha256") == task["work_order_sha256"] and
+                approval.get("pinned_sha") is not None and
+                approval.get("source_sha") == approval.get("pinned_sha") and
+                type(approval.get("trusted_sha")) is str and
+                SHA40.fullmatch(approval["trusted_sha"]) is not None and
+                type(approval.get("pinned_sha")) is str and
+                SHA40.fullmatch(approval["pinned_sha"]) is not None and
+                type(approval.get("pr_number")) is int and
+                ((approval["pr_number"] == 0 and
+                  approval["pinned_sha"] == approval["trusted_sha"]) or
+                 (approval["pr_number"] > 0 and
+                  approval["pinned_sha"] != approval["trusted_sha"])) and
+                approval.get("auto_download_after_build_success") is False and
+                approval.get("auto_test_after_download_success") is False,
+                "OPERATOR_CLI_APPROVAL_DENIED")
+        if one_shot_hardware(task):
+            expected = p2hw_claim_ref(task["work_order_sha256"])
+            require(approval.get("hardware_claim_ref") == expected and
+                    os.environ.get("PLASMA_P2HW_CLAIM_REF") == expected,
+                    "OPERATOR_CLI_HARDWARE_CLAIM_REQUIRED")
     if task.get("capability") == "z2-cpu-only":
         require(type(approval) is dict and
                 approval.get("task_id") == "hil-a2-cpu-only" and
@@ -596,7 +884,12 @@ def run_task(task: dict, *, workspace: Path = ROOT,
     require(script.is_relative_to(workspace_root) and
             requested_script.is_file() and not requested_script.is_symlink(),
             "SCRIPT_NOT_FOUND")
-    command = [sys.executable, str(script), *task["argv"]]
+    if task.get("capability") == "operator-cli" and task["script"] == "scripts/plasmactl":
+        require(tuple(task["argv"]) in CONTROL_STATION_OPERATOR_COMMANDS and not sandbox,
+                "OPERATOR_CLI_COMMAND_DENIED")
+        command = ["/bin/bash", str(script), *task["argv"]]
+    else:
+        command = [sys.executable, str(script), *task["argv"]]
     if sandbox:
         # Fail closed on SWPC if the OS-level CPU-only namespace sandbox
         # is missing/unavailable. Never execute untrusted candidate Python
@@ -624,9 +917,16 @@ def run_task(task: dict, *, workspace: Path = ROOT,
             sys.executable, "-I", "-S",
             str(Path("/work") / task["script"]), *task["argv"],
         ]
+    timeout_seconds = task.get("timeout_seconds", 40)
+    require(type(timeout_seconds) is int and
+            1 <= timeout_seconds <= (1800 if task.get("capability") == "operator-cli"
+                                     else 180), "PATH2_TIMEOUT_DENIED")
+    mode = task.get("verification", "sha256-only")
+    require(mode in ("sha256-only", "stdout-sha256", "exit-code"),
+            "TASK_VERIFICATION_DENIED")
     proc = executor(
         command, cwd=workspace_root, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, timeout=40, check=False,
+        stderr=subprocess.PIPE, timeout=timeout_seconds, check=False,
     )
     require(len(proc.stdout) <= 65536 and len(proc.stderr) <= 65536,
             "OUTPUT_EXCEEDS_LIMIT")
@@ -634,15 +934,49 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         require(evidence_dir.is_dir(), "EVIDENCE_DIR_DENIED")
         (evidence_dir / "plasma-path2-stdout.txt").write_bytes(proc.stdout)
         (evidence_dir / "plasma-path2-stderr.txt").write_bytes(proc.stderr)
+        # Keep the actual process status even when CLI validation fails.
+        # This is a small supplement to existing stdout/stderr evidence.
+        (evidence_dir / "plasma-path2-process.json").write_text(
+            json.dumps({
+                "exit_code": proc.returncode,
+                "stdout_sha256": hashlib.sha256(proc.stdout).hexdigest(),
+                "stderr_sha256": hashlib.sha256(proc.stderr).hexdigest(),
+                "verification": mode,
+                "execution_classification": (
+                    "NOT_RUN_RESOURCE_UNAVAILABLE"
+                    if task.get("capability") == "operator-cli" and proc.returncode == 69
+                    else "NOT_RUN_PERMISSION_DENIED"
+                    if task.get("capability") == "operator-cli" and proc.returncode == 77
+                    else "EXIT_ZERO" if proc.returncode == 0
+                    else "COMMAND_FAILED"),
+            }, sort_keys=True) + "\n", encoding="utf-8")
     digest = hashlib.sha256(proc.stdout).hexdigest()
-    lines = proc.stdout.decode("ascii").splitlines()
+    try:
+        lines = proc.stdout.decode("utf-8").splitlines()
+    except UnicodeDecodeError:
+        raise Denied("OUTPUT_NOT_UTF8") from None
+    # Reviewed operator scripts may explicitly use standard sysexits codes:
+    # EX_UNAVAILABLE=69 (missing authorized resource or enrollment),
+    # EX_NOPERM=77 (real OS/credential permission denial).
+    # A classified NOT_RUN remains a FAILED job, never an implicit PASS.
+    if task.get("capability") == "operator-cli":
+        if proc.returncode == 69:
+            raise Denied("OPERATOR_CLI_NOT_RUN_RESOURCE_UNAVAILABLE")
+        if proc.returncode == 77:
+            raise Denied("OPERATOR_CLI_NOT_RUN_PERMISSION_DENIED")
     require(proc.returncode == 0, "COMMAND_FAILED")
-    require(digest == task["expected_stdout_sha256"], "OUTPUT_SHA256_MISMATCH")
+    if mode != "exit-code":
+        require(digest == task["expected_stdout_sha256"],
+                "OUTPUT_SHA256_MISMATCH")
     return {
-        "status": "PASS",
+        "status": ("OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED"
+                   if task.get("capability") == "operator-cli" else "PASS"),
+        "physical_hil": ("NOT_VERIFIED" if task.get("capability") == "operator-cli"
+                         else "NOT_APPLICABLE"),
         "execution_path": "path2-cli",
         "runner": os.environ.get("RUNNER_NAME", "offline-stub"),
         "exit_code": proc.returncode,
+        "verification": mode,
         "rows": max(0, len(lines) - 1),
         "stdout_bytes": len(proc.stdout),
         "stdout_sha256": digest,
@@ -774,8 +1108,18 @@ class CodexUsageCollector:
         "item.started", "item.updated", "item.completed", "error",
     })
     MAX_TOKENS = 2**63 - 1
+    # Only fixed Codex item categories may reach the operator pane.
+    # Never log freeform command, text, path, prompt or other item properties.
+    MONITOR_ITEM_TYPES = frozenset({
+        "command_execution", "agent_message", "reasoning", "file_change",
+        "mcp_tool_call", "web_search", "collab_tool_call",
+    })
 
-    def __init__(self):
+    def __init__(self, *, monitor_only: bool = False,
+                 workspace: Path | None = None):
+        self.monitor_only = monitor_only
+        self.activity = (engineering_activity.Path3Activity(workspace)
+                         if monitor_only and workspace is not None else None)
         self.pending = bytearray()
         self.dropping = False
         self.session_id = None
@@ -783,6 +1127,13 @@ class CodexUsageCollector:
                        "output_tokens": 0}
         self.turns = 0
         self.invalid = False
+        # Metadata-only observations; commands, stdout and model text excluded.
+        self.items_started = 0
+        self.items_completed = 0
+        self.commands_started = 0
+        self.commands_failed = 0
+        self.tool_items_started = 0
+        self.budget_reason = None
 
     def _line(self, raw: bytes) -> bytes:
         try:
@@ -792,6 +1143,21 @@ class CodexUsageCollector:
         if type(event) is not dict:
             return b"[codex unrecognized event]\n"
         kind = event.get("type")
+        item = event.get("item")
+        category = item.get("type") if type(item) is dict else None
+        if kind == "item.started":
+            self.items_started += 1
+            if category == "command_execution":
+                self.commands_started += 1
+            if category in ("command_execution", "mcp_tool_call",
+                            "web_search", "collab_tool_call"):
+                self.tool_items_started += 1
+        elif kind == "item.completed":
+            self.items_completed += 1
+            if category == "command_execution":
+                code = item.get("exit_code")
+                if type(code) is int and code != 0:
+                    self.commands_failed += 1
         if kind == "thread.started":
             thread_id = event.get("thread_id")
             try:
@@ -820,6 +1186,13 @@ class CodexUsageCollector:
                         self.invalid = True
                 self.turns += 1
         label = kind if type(kind) is str and kind in self.EVENTS else "unrecognized event"
+        if self.monitor_only and kind in ("item.started", "item.updated", "item.completed"):
+            if self.activity is not None:
+                return self.activity.project(event)
+            item = event.get("item")
+            category = item.get("type") if type(item) is dict else None
+            if type(category) is str and category in self.MONITOR_ITEM_TYPES:
+                label = category + "." + kind.split(".", 1)[1]
         return f"[codex {label}]\n".encode("ascii")
 
     def feed(self, data: bytes) -> bytes:
@@ -852,6 +1225,21 @@ class CodexUsageCollector:
         self.pending.clear()
         return result
 
+    def activity_counts(self) -> dict:
+        """Counters only: no stdout, commands, prompts or private paths."""
+        return {
+            "schema_version": 1,
+            "source": "codex_exec_jsonl",
+            "turns_completed": self.turns,
+            "items_started": self.items_started,
+            "items_completed": self.items_completed,
+            "tool_items_started": self.tool_items_started,
+            "commands_started": self.commands_started,
+            "commands_failed": self.commands_failed,
+            "model_request_count": None,
+            "model_request_count_status": "NOT_AVAILABLE",
+        }
+
     def snapshot(self) -> dict:
         complete = self.turns > 0 and not self.invalid
         return {
@@ -869,8 +1257,10 @@ class CodexUsageCollector:
 
 def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                              evidence: Path, live_log: str,
-                             usage: CodexUsageCollector | None = None) -> int:
-    """Stream sanitized Codex event names into evidence and the monitor.
+                             usage: CodexUsageCollector | None = None,
+                             max_seconds: int | None = None,
+                             max_tool_items: int | None = None) -> int:
+    """Stream existing type-only evidence and projected safe Monitor events.
 
     Only a trusted main worker supplies the fixed monitor path. Loss of the
     secondary monitor sink must never discard local engineering evidence.
@@ -885,11 +1275,13 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                 (info.st_mode & 0o170000) != 0o100000):
             raise LiveMonitorUnavailable("MONITOR_LOG_OWNERSHIP_DENIED")
         usage = usage if usage is not None else CodexUsageCollector()
+        monitor_events = CodexUsageCollector(monitor_only=True, workspace=cwd)
         with evidence.open("wb") as trace:
             trace.write(b"=== Codex JSONL event types (sensitive fields omitted) ===\n")
             with subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE,
-                                  stderr=subprocess.DEVNULL) as worker:
+                                  stderr=subprocess.DEVNULL,
+                                  start_new_session=max_seconds is not None) as worker:
                 assert worker.stdin is not None and worker.stdout is not None
                 try:
                     worker.stdin.write(prompt)
@@ -897,26 +1289,51 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
                     pass
                 finally:
                     worker.stdin.close()
+                deadline = (time.monotonic() + max_seconds
+                            if max_seconds is not None else None)
                 while True:
+                    if deadline is not None:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            usage.budget_reason = "WALL_TIMEOUT"
+                            try:
+                                os.killpg(worker.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                            break
+                        readable, _, _ = select.select(
+                            [worker.stdout], [], [], min(remaining, 0.5))
+                        if not readable:
+                            continue
                     chunk = worker.stdout.read1(16384)
                     if not chunk:
                         break
                     safe = usage.feed(chunk)
+                    monitor_safe = monitor_events.feed(chunk)
                     trace.write(safe)
                     trace.flush()
-                    if live_fd >= 0 and safe:
+                    if (max_tool_items is not None and
+                            usage.tool_items_started > max_tool_items):
+                        usage.budget_reason = "TOOL_ITEMS_LIMIT"
                         try:
-                            pending = memoryview(safe)
+                            os.killpg(worker.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        break
+                    if live_fd >= 0 and monitor_safe:
+                        try:
+                            pending = memoryview(monitor_safe)
                             while pending:
                                 pending = pending[os.write(live_fd, pending):]
                         except OSError:
                             os.close(live_fd)
                             live_fd = -1
                 tail = usage.finish()
+                monitor_tail = monitor_events.finish()
                 trace.write(tail)
-                if live_fd >= 0 and tail:
+                if live_fd >= 0 and monitor_tail:
                     try:
-                        pending = memoryview(tail)
+                        pending = memoryview(monitor_tail)
                         while pending:
                             pending = pending[os.write(live_fd, pending):]
                     except OSError:
@@ -930,8 +1347,7 @@ def _run_codex_with_live_log(command: list[str], prompt: bytes, cwd: Path,
 
 def run_codex_task(task: dict, *, workspace: Path = ROOT,
                    executor=subprocess.run,
-                   task_id: str | None = None,
-                   runner_license: dict | None = None) -> dict:
+                   task_id: str | None = None) -> dict:
     """Run the owner-authorized Development Mode engineer with real evidence.
 
     Path 3 may edit candidate engineering sources, Tcl, RTL and documents,
@@ -939,14 +1355,34 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     grant physical device access. The fixed PR SHA remains the INPUT identity;
     the candidate Git diff and evidence are captured before review/commit.
     """
+    # Only the authenticated dynamic Path 3 Owner Work Order can request
+    # a single non-sandboxed Codex invocation. Worker admission revalidates
+    # the owner event, SHA-pinned candidate and full Work Order digest.
+    non_sandbox = task.get("codex_execution") is not None
+    quick = task.get("codex_profile") is not None
+    if quick:
+        require(task.get("codex_profile") == QUICK_PROFILE and
+                task_id == DYNAMIC_TASKS["path3-codex"] and
+                task.get("execution_path") == "path3-codex" and
+                task.get("capability") == "codex-workspace" and
+                task.get("work_order_scope") == "host-only" and
+                type(task.get("work_order_sha256")) is str and
+                SHA256.fullmatch(task["work_order_sha256"]) is not None and
+                not non_sandbox,
+                "CODEX_QUICK_ADMISSION_DENIED")
+    if non_sandbox:
+        require(task_id == DYNAMIC_TASKS["path3-codex"] and
+                task.get("execution_path") == "path3-codex" and
+                task.get("capability") == "codex-workspace" and
+                task["codex_execution"] == "guarded-hardware-no-sandbox" and
+                type(task.get("work_order_sha256")) is str and
+                SHA256.fullmatch(task["work_order_sha256"]) is not None,
+                "CODEX_NON_SANDBOX_ADMISSION_DENIED")
     root = workspace.resolve(strict=True)
     evidence = root / ".plasma-path3-evidence"
     require(not evidence.exists() and not evidence.is_symlink(),
             "CODEX_EVIDENCE_PATH_ALREADY_EXISTS")
     evidence.mkdir(mode=0o700)
-    if runner_license is not None:
-        (evidence / "runner-license-diagnostic.json").write_text(
-            json.dumps(runner_license, indent=2, sort_keys=True) + "\n")
     report = evidence / "engineering-report.md"
     codex_log = evidence / "codex.log"
     output_path = task.get("output_path")
@@ -955,76 +1391,47 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         ".txt" if task.get("output_format") == "text" else ".csv"
     ) if source is not None else None)
     test_log = source.with_suffix(".test.log") if source is not None else None
-    # Codex loads the concise root AGENTS.md as the normative entrypoint.
-    # Keep task details in reviewed repository Work Orders and read large
-    # detailed clauses only when relevant to the approved engineering goal.
+    # Path 3 is a handoff, not a plan for the model's individual steps.
     prompt = (
-        "PLASMA Path 3 Development Mode. Follow root AGENTS.md and the "
-        "owner-approved Work Order at its pinned source SHA. Read only "
-        "task-relevant detailed clauses linked from AGENTS.md, including "
-        "nested AGENTS.md when affected. Do not preload unrelated runbooks. "
-        "Within the existing Gate 1, diagnose, edit RTL/Tcl/Python, run "
-        "required builds/tests and fix/retest without another user approval. "
-        "Vivado 2026.1 is available only for work within approved scope. "
-        "Do not retry unsafe hardware writes; respect live ownership, "
-        "root-executor, electrical and rollback guards. Report inaccessible "
-        "SWPC/Z2 operations as NOT_RUN, never PASS. "
-        "Record actual commands, exits, results and hashes in "
-        ".plasma-path3-evidence/engineering-report.md. Do not commit, push "
-        "or change Git refs.\n"
-        "Goal:\n" + task["objective"] + "\n"
+        ("PLASMA owner-authorized Path 3 quick host-only observation. "
+         "Follow the mandatory constraints in AGENTS.md; do not expand "
+         "the task or explore unrelated repository contents. Run only the "
+         "requested observation and report the exit code and result.\n"
+         if quick else
+         "PLASMA Path 3 engineering assignment. Follow the repository AGENTS.md "
+         "and the owner-approved Gate 1 Work Order at its pinned source SHA. "
+         "Choose the implementation, tools, tests, and in-scope engineering "
+         "sequence autonomously. Report observed results and remaining blockers "
+         "accurately, including NOT_RUN when appropriate.\n")
+        + "Goal:\n" + task["objective"] + "\n"
     )
     if task_id == DYNAMIC_TASKS["path3-codex"]:
         prompt += (
             "Owner Work Order SHA256: " + task["work_order_sha256"] + "\n"
             "Acceptance criteria:\n" + task["acceptance"] + "\n"
         )
-    if task_id == "f1b-path3-codex-vivado-build":
+    if quick:
+        # Instructions guide the agent; the wrapper independently enforces
+        # wall-clock/tool-item limits (not a live token budget).
         prompt += (
-            "For this F1-B task the trusted dispatcher will execute the SAME "
-            "fixed Python Build Engine as Path 2 on the licensed runner AFTER "
-            "you exit, twice in fresh output directories. Inspect "
-            ".plasma-path3-evidence/runner-license-diagnostic.json and record "
-            "a category-only sandbox comparison. Do not escape the sandbox. "
-            "Host execution accepts only byte-authenticated PL inputs at the "
-            "owner-reviewed pinned SHA. Diagnose/edit/test candidate source "
-            "here, but changed PL inputs require a reviewed new source pin "
-            "before host execution; report that blocker honestly. No candidate "
-            "driver or arbitrary command is executed outside the sandbox. "
-            "Host results will be appended to your report; do not claim them "
-            "in advance. On host failure inspect each run's "
-            "plasma-fpga-build-diagnostics.json and preserve the first failure.\n"
+            "QUICK OBSERVATION: Host-only, no hardware, network, broad "
+            "repository search, source edits, builds or repeated testing. "
+            "Run the exact bounded observation once; report exit code and "
+            "sanitized result. Do not expand scope.\n"
         )
-    prompt += (
-        "In Development Mode, the existing Path 3 engineer may use accessible "
-        "SWPC USB and TTY tools for hardware operations explicitly covered "
-        "by the Owner's Gate 1 objective. Linux DAC/ACL still applies. "
-        "Use the minimum sufficient experiment: stop after one genuine PASS; "
-        "after FAIL diagnose and make a targeted retest. No Program, Readback "
-        "or Verify quota applies. Privileged Z2 FPGA Manager/MMIO and protected "
-        "stages still require the existing trusted root executor; no sudo, "
-        "root, /dev/mem or UIO access is granted to Codex. "
-        "Never claim a physical PASS without actual evidence.\n"
-    )
-    if output_path:
-        prompt += (
-            "For this legacy task, also update " + output_path +
-            " when useful and record its ACTUAL complete output as text "
-            "plus a short .test.log, but do not restrict other engineering "
-            "edits merely to satisfy the old generated-file convention.\n"
-        )
-    command = [
-        "codex", "--ask-for-approval", "never",
-        "-c", "sandbox_workspace_write.network_access=false",
-        "exec", "--json", "--sandbox", "workspace-write", "-",
-    ]
-    if executor is subprocess.run:
-        # Production Path 3: one rootless OS-level device-visible namespace.
-        # The inner Codex sandbox cannot access the real host's other /dev.
-        # Offline tests inject an inert executor and retain the legacy argv.
-        import plasma_development_codex_sandbox as codex_sandbox
-        command = codex_sandbox.codex_command(root)
+    # Pin ordinary Path 3 inside a sandbox even if operator defaults change.
+    # Only the Owner-bound hardware Work Order can request unsandboxed Codex
+    # for this single child invocation; Root Guard and OS locks still apply.
+    command = ["codex", "exec", "--json", "--sandbox", "workspace-write", "-"]
+    if quick:
+        # A bounded observation should not inherit potentially high effort.
+        command = ["codex", "-c", "model_reasoning_effort=low",
+                   "exec", "--json", "--sandbox", "workspace-write", "-"]
+    if non_sandbox:
+        command = ["codex", "exec", "--json",
+                   "--sandbox", "danger-full-access", "-"]
     usage = CodexUsageCollector()
+    started_at = time.monotonic()
     # GitHub Actions job timeout is the operational limit; a fixed 480-second
     # Python timer would terminate normal Vivado implementation.
     # One autonomous Codex invocation owns scoped FIX -> RETEST iterations.
@@ -1040,9 +1447,14 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         try:
             returncode = _run_codex_with_live_log(
                 command, prompt.encode("utf-8"), root, codex_log, live_log,
-                usage=usage)
+                usage=usage,
+                max_seconds=QUICK_MAX_SECONDS if quick else None,
+                max_tool_items=QUICK_MAX_TOOL_ITEMS if quick else None)
             proc = subprocess.CompletedProcess(command, returncode, b"", b"")
         except LiveMonitorUnavailable:
+            if quick:
+                # No streaming observation => cannot enforce tool-item budget.
+                raise Denied("QUICK_MONITOR_REQUIRED") from None
             # Only pre-execution setup can fall back. Never re-run a Codex
             # command after any part of its real execution has begun.
             # Monitor unavailable: preserve the original real execution path,
@@ -1050,17 +1462,21 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
             proc = executor(
                 command, input=prompt.encode("utf-8"), cwd=root,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                timeout=None, check=False,
+                timeout=QUICK_MAX_SECONDS if quick else None,
+                check=False,
             )
             codex_log.write_bytes(
                 b"=== Codex JSONL event types (sensitive fields omitted) ===\n" +
                 usage.feed(proc.stdout) + usage.finish() +
                 (b"[codex stderr omitted]\n" if proc.stderr else b""))
     else:
+        if quick and executor is subprocess.run:
+            raise Denied("QUICK_MONITOR_REQUIRED")
         proc = executor(
             command, input=prompt.encode("utf-8"), cwd=root,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            timeout=None, check=False,
+            timeout=QUICK_MAX_SECONDS if quick else None,
+                check=False,
         )
         codex_log.write_bytes(
             b"=== Codex JSONL event types (sensitive fields omitted) ===\n" +
@@ -1070,6 +1486,39 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         return hashlib.sha256(p.read_bytes()).hexdigest()
     usage_path = evidence / "codex-token-usage.json"
     usage_snapshot = usage.snapshot()
+    metrics = usage.activity_counts()
+    metrics.update({
+        "elapsed_ms": max(0, int((time.monotonic() - started_at) * 1000)),
+        "execution_profile": QUICK_PROFILE if quick else "engineering",
+        "wall_seconds_limit": QUICK_MAX_SECONDS if quick else None,
+        "tool_items_limit": QUICK_MAX_TOOL_ITEMS if quick else None,
+        "input_tokens_soft_limit": QUICK_INPUT_TOKEN_BUDGET if quick else None,
+    })
+    # The input-token threshold is reported only after turn.completed.
+    # It is a cost observation, never a runtime failure or functional verdict.
+    if not quick:
+        cost_budget_status = "NOT_APPLICABLE"
+    elif usage_snapshot["status"] != "reported":
+        cost_budget_status = "NOT_AVAILABLE"
+    elif usage_snapshot["input_tokens"] > QUICK_INPUT_TOKEN_BUDGET:
+        cost_budget_status = "EXCEEDED"
+    else:
+        cost_budget_status = "WITHIN_LIMIT"
+    metrics["cost_budget_status"] = cost_budget_status
+    metrics["cost_budget_alert"] = (
+        "INPUT_BUDGET_POST_TURN" if cost_budget_status == "EXCEEDED" else None)
+    # Only hard wall-clock or tool-item limits may stop a running Quick job.
+    metrics["budget_reason"] = usage.budget_reason
+    if usage_snapshot["status"] == "reported":
+        metrics["non_cached_input_tokens"] = (
+            usage_snapshot["input_tokens"] - usage_snapshot["cached_input_tokens"])
+        metrics["cache_share_basis_points"] = (
+            (10000 * usage_snapshot["cached_input_tokens"] //
+             usage_snapshot["input_tokens"])
+            if usage_snapshot["input_tokens"] else 0)
+    else:
+        metrics["non_cached_input_tokens"] = None
+        metrics["cache_share_basis_points"] = None
     # Bounded numeric-only context diagnostics. The size of a repo file is
     # NOT proof of actual Codex instruction loading or a model request count.
     root_agents = root / "AGENTS.md"
@@ -1084,6 +1533,9 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "dispatched_prompt_bytes": len(prompt.encode("utf-8")),
         "model_request_count": None,
         "model_request_count_status": "NOT_AVAILABLE",
+        "model_request_count_source": "CODEX_EXEC_JSONL_NO_REQUEST_EVENTS",
+        "observed_turns_completed": usage.turns,
+        "observed_tool_items_started": usage.tool_items_started,
         "actual_instruction_load_status": "NOT_VERIFIED",
     }
     usage_path.write_text(json.dumps(usage_snapshot, indent=2, sort_keys=True) + "\n")
@@ -1095,8 +1547,15 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
         "codex_log_path": str(codex_log.relative_to(root)),
         "codex_log_sha256": digest(codex_log),
         "codex_usage": usage_snapshot,
+        "codex_activity_metrics": metrics,
         "codex_context_audit": context_audit,
+        "cost_budget_status": cost_budget_status,
+        "functional_acceptance": "UNVERIFIED",
+        "codex_execution_status": (
+            "EXIT_ZERO" if proc.returncode == 0 else "EXIT_NONZERO"),
         "codex_model_selection": codex_requested_model_settings(command),
+        "codex_sandbox_request": ("danger-full-access" if non_sandbox
+                                  else "workspace-write"),
         "codex_usage_path": str(usage_path.relative_to(root)),
         "codex_usage_sha256": digest(usage_path),
         "acceptance": "CHATGPT_REVIEW_OF_REAL_OUTPUT_AND_TEST_LOG",
@@ -1123,10 +1582,14 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     evidence_complete = ("engineering_report_sha256" in receipt or
                          all(k in receipt for k in (
                              "source_sha256", "output_sha256", "test_log_sha256")))
+    # Cost-budget alerts do not change execution success or acceptance.
     # Preserve the real Codex exit code and evidence even when execution
     # fails. A JSON receipt is NOT acceptance; main() returns nonzero for
-    # failure and Actions collects source changes in an always() step.
-    if proc.returncode != 0:
+    # hard execution failure and Actions always collects source changes.
+    if usage.budget_reason is not None:
+        receipt["status"] = "CODEX_BUDGET_EXCEEDED_REVIEW_REQUIRED"
+        receipt["failure_reason"] = usage.budget_reason
+    elif proc.returncode != 0:
         receipt["status"] = "CODEX_EXECUTION_FAILED_REVIEW_REQUIRED"
         receipt["failure_reason"] = "CODEX_CLI_NONZERO"
     # Report completeness is review metadata for both Paths/scopes. Physical
@@ -1134,66 +1597,6 @@ def run_codex_task(task: dict, *, workspace: Path = ROOT,
     receipt["evidence_complete"] = evidence_complete
     return receipt
 
-
-def run_licensed_f1b_task(task: dict, *, workspace: Path, req: dict) -> dict:
-    """Trusted-main, fixed-task integration. Never a sandbox escape endpoint.
-
-    main() calls this only after worker_admission and live_pr_metadata. No
-    request file, socket, candidate command, candidate driver or workflow.
-    """
-    require(req["task_id"] == "f1b-path3-codex-vivado-build" and
-            req["pr_number"] > 0 and req["source_sha"] != req["trusted_sha"],
-            "HOST_BUILD_SOURCE_BINDING_DENIED")
-    import plasma_vivado_host_build as build  # trusted dispatcher sibling
-    baseline = build.license_snapshot()
-    receipt = run_codex_task(task, workspace=workspace, task_id=req["task_id"],
-                             runner_license=baseline)
-    evidence = workspace / ".plasma-path3-evidence"
-    report = evidence / "engineering-report.md"
-    require(evidence.is_dir() and not evidence.is_symlink() and
-            evidence.resolve() == workspace.resolve() / ".plasma-path3-evidence" and
-            report.is_file() and not report.is_symlink(), "HOST_REPORT_DENIED")
-    result = {"status": "NOT_RUN", "builds": [], "source_sha": req["source_sha"]}
-    try:
-        require(receipt["codex_exit_code"] == 0, "HOST_BUILD_CODEX_FAILED")
-        require(baseline["vivado_startup"]["pass"], "HOST_BUILD_LICENSE_REJECTED")
-        source = build.authenticate_host_inputs(workspace, req["source_sha"])
-        with (evidence / "host-input-authentication.json").open("x") as stream:
-            stream.write(json.dumps(source, indent=2, sort_keys=True) + "\n")
-        fixed = parse_json(ROOT / "specs/engineering-dispatch/development-tasks-v1.json"
-                           )["tasks"]["fixed-site1-vivado-host-build"]
-        fixed = dict(fixed, execution_path="path3-codex")
-        approval = {"execution_path": "path3-codex",
-                    "execution_capability": "vivado-host-build",
-                    "task_id": req["task_id"], "pr_number": req["pr_number"],
-                    "trusted_sha": req["trusted_sha"], "pinned_sha": req["source_sha"]}
-        for index in (1, 2):
-            # Each engine invocation creates a new mkdtemp build directory.
-            target = evidence / f"host-build-{index}"
-            target.mkdir(mode=0o700)
-            build.authenticate_host_inputs(workspace, req["source_sha"])
-            actual = build.run(fixed, workspace=workspace, approval=approval,
-                               evidence_dir=target, execution_path="path3-codex")
-            result["builds"].append(actual)
-        require(result["builds"][0]["build_dir"] != result["builds"][1]["build_dir"],
-                "HOST_BUILD_OUTPUT_REUSED")
-        result["status"] = "PASS"
-    except (Denied, build.BuildDenied, OSError, ValueError,
-            subprocess.SubprocessError) as exc:
-        result["reason"] = safe_error_reason(exc)
-        result["status"] = "FAIL" if result["builds"] else "NOT_RUN_OR_FAIL"
-        receipt["status"] = "HOST_BUILD_FAILED_REVIEW_REQUIRED"
-    with (evidence / "licensed-host-builds.json").open("x") as stream:
-        stream.write(json.dumps(result, indent=2, sort_keys=True) + "\n")
-    # Host output is appended after the sandbox engineer finishes; never infer
-    # Build PASS from Codex's exit or from a successful GitHub job.
-    require(report.is_file() and not report.is_symlink(), "HOST_REPORT_DENIED")
-    with report.open("a") as stream:
-        stream.write("\nTrusted runner F1-B execution: " + result["status"] +
-                     ". See licensed-host-builds.json and host-build-{1,2}/.\n")
-    receipt["engineering_report_sha256"] = hashlib.sha256(report.read_bytes()).hexdigest()
-    receipt["licensed_host_build_status"] = result["status"]
-    return receipt
 
 def safe_error_reason(exc: Exception) -> str:
     """Keep one trusted, constant build error code; never leak host paths."""
@@ -1214,26 +1617,68 @@ def safe_error_reason(exc: Exception) -> str:
 
 
 def live_pr_metadata(req: dict) -> dict | None:
-    """Worker independently queries GitHub; never trust a cached admission snapshot."""
+    """Worker independently rechecks public GitHub PR over authenticated TLS.
+
+    Do NOT add GH_TOKEN/GITHUB_TOKEN to the SWPC candidate execution job:
+    candidate PR Python runs as the same non-root user and must not inherit or
+    recover GitHub credentials through parent-process environment or /proc.
+    This repository's PR metadata is public. A 403/404/network/rate-limit
+    denial fails closed; the earlier hosted authorization is NOT a fallback.
+    """
     if not req["pr_number"]:
         return None
     try:
-        result = subprocess.run(
-            ["gh", "api", f"repos/{REPO}/pulls/{req['pr_number']}"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            check=True, timeout=15)
-        require(len(result.stdout) <= 262144, "LIVE_PR_RESPONSE_TOO_LARGE")
-        pr = json.loads(result.stdout)
+        url = f"https://api.github.com/repos/{REPO}/pulls/{req['pr_number']}"
+        request = Request(url, headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "PLASMA-SWPC-PR-Admission",
+            "X-GitHub-Api-Version": "2022-11-28",
+        })
+        with urlopen(request, timeout=15) as response:
+            require(response.status == 200, "LIVE_PR_HTTP_STATUS_DENIED")
+            body = response.read(262145)
+        require(len(body) <= 262144, "LIVE_PR_RESPONSE_TOO_LARGE")
+        pr = json.loads(body)
         verify_pr(pr, req)
         return pr
-    except (OSError, ValueError, subprocess.SubprocessError):
+    except (OSError, HTTPError, URLError, TimeoutError, ValueError):
         raise Denied("LIVE_PR_VERIFICATION_FAILED") from None
+
+
+def p2hw_claim_main(req: dict, args, transport=github_claim_transport) -> dict:
+    """Hosted claim Job: re-derive the key from the owner event, then claim."""
+    token = os.environ.pop("GITHUB_TOKEN", None)
+    require(args.work_order_sha256 == req.get("work_order_sha256") and
+            args.claim_ref == p2hw_claim_ref(req.get("work_order_sha256")) and
+            args.pinned_sha == req.get("source_sha"),
+            "P2HW_CLAIM_BINDING_DENIED")
+    require(args.evidence_dir is not None, "P2HW_CLAIM_EVIDENCE_DIR_REQUIRED")
+    # Like A2, the claim ref points at the trusted main commit running this
+    # Job, never the candidate PR commit: a GITHUB_TOKEN without `workflows`
+    # permission may not create a branch ref at a commit that changes
+    # .github/workflows. The candidate SHA stays bound via the digest/receipt.
+    trusted_sha = os.environ.get("GITHUB_SHA")
+    require(type(trusted_sha) is str and SHA40.fullmatch(trusted_sha) is not None,
+            "P2HW_CLAIM_TRUSTED_SHA_REQUIRED")
+    create, read = transport(token)
+    receipt = claim_hardware_once(create, read, claim_ref=args.claim_ref,
+                                  sha=trusted_sha,
+                                  run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"))
+    receipt.update(work_order_sha256=req["work_order_sha256"],
+                   pinned_sha=args.pinned_sha,
+                   comment_id=req.get("comment_id"), issue_number=ISSUE,
+                   run_id=os.environ.get("GITHUB_RUN_ID", ""))
+    with (args.evidence_dir / "plasma-p2hw-claim.json").open("x", encoding="utf-8") as f:
+        os.chmod(f.name, 0o600)
+        json.dump(receipt, f, indent=2, sort_keys=True)
+        f.write("\n")
+    return receipt
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=(
-        "request", "authorize", "execute", "execute-codex",
+        "request", "authorize", "execute", "execute-codex", "p2hw-claim",
     ))
     parser.add_argument("--event", type=Path, required=True)
     parser.add_argument("--registry", type=Path, default=MANIFEST)
@@ -1244,15 +1689,17 @@ def main() -> int:
     parser.add_argument("--registry-sha256")
     parser.add_argument("--work-order-sha256")
     parser.add_argument("--execution-capability")
-    parser.add_argument("--resume-phase", choices=("new", "resume"))
     parser.add_argument("--workspace", type=Path, default=ROOT)
     parser.add_argument("--evidence-dir", type=Path)
+    parser.add_argument("--claim-ref")
     args = parser.parse_args()
     try:
         event = parse_json(args.event)
         req = request(event, os.environ)
         if args.action == "request":
             plan = {"status": "VALID_OWNER_REQUEST", **req}
+        elif args.action == "p2hw-claim":
+            plan = p2hw_claim_main(req, args)
         else:
             registry = parse_json(args.registry)
             pr = parse_json(args.pr_info) if args.pr_info else None
@@ -1268,7 +1715,8 @@ def main() -> int:
                 task = task_for_request(registry, req, event)
                 task_approval = (authorize(event, os.environ, registry, pr_info=pr)
                                  if task.get("capability") in
-                                    ("z2-cpu-only", "vivado-host-build", "path2-stage-contract")
+                                    ("z2-cpu-only", "vivado-host-build",
+                                     "operator-cli")
                                  else None)
                 # One fixed main-only Path 2 observation. Executed by
                 # trusted main, not candidate code and NEVER by Codex.
@@ -1283,8 +1731,7 @@ def main() -> int:
                             os.environ.get("RUNNER_NAME") == EXPECTED_RUNNER and
                             os.environ.get("RUNNER_ENVIRONMENT") == "self-hosted" and
                             task["capability"] == "cpu-only" and
-                            task["work_order_scope"] == "host-only" and
-                            args.resume_phase is None,
+                            task["work_order_scope"] == "host-only",
                             "NATIVE_PREFLIGHT_WORKER_DENIED")
                     import plasma_codex_native_preflight as native
                     try:
@@ -1311,27 +1758,10 @@ def main() -> int:
                             "provenance": "NOT_INDEPENDENTLY_VERIFIED",
                             "sha256_pin_authorized": False,
                         }
-                # This exact CPU-only fixture is the ONLY cross-Job route.
-                # Unflagged Path 3 retains its existing single-exec behavior.
-                elif task.get("session_resume") or args.resume_phase:
-                    require(args.action == "execute-codex" and
-                            task.get("session_resume") == "page-boundary-off-by-one"
-                            and args.resume_phase in ("new", "resume"),
-                            "RESUME_EXPLICIT_PHASE_DENIED")
-                    import plasma_path3_cross_job_resume as crossjob
-                    try:
-                        receipt = crossjob.execute(
-                            args.resume_phase,
-                            {**req, "execution_path": task["execution_path"]},
-                            args.workspace)
-                    except crossjob.ResumeDenied as exc:
-                        raise Denied(str(exc)) from None
                 else:
                     receipt = (
-                        (run_licensed_f1b_task(task, workspace=args.workspace, req=req)
-                         if req["task_id"] == "f1b-path3-codex-vivado-build"
-                         else run_codex_task(task, workspace=args.workspace,
-                                             task_id=req["task_id"]))
+                        run_codex_task(task, workspace=args.workspace,
+                                       task_id=req["task_id"])
                         if args.action == "execute-codex"
                         else run_task(task, workspace=args.workspace,
                                       evidence_dir=args.evidence_dir,
@@ -1348,10 +1778,7 @@ def main() -> int:
                 }
                 task_failed = (
                     (args.action == "execute-codex"
-                     and receipt.get("status") != (
-                         "NEW_EXPECTED_TEST_FAIL" if args.resume_phase == "new"
-                         else "RESUME_FIX_PASS" if args.resume_phase == "resume"
-                         else "EVIDENCE_READY_REVIEW_REQUIRED"))
+                     and receipt.get("status") != "EVIDENCE_READY_REVIEW_REQUIRED")
                     or (task.get("native_preflight") == NATIVE_PREFLIGHT
                         and receipt.get("status") != "OBSERVED")
                 )

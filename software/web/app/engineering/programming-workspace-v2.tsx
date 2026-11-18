@@ -12,6 +12,7 @@ import {
 } from "../gateway-settings-api";
 import { useI18n } from "../i18n";
 import { BatchSummary } from "../operator-ui/batch-summary";
+import { OperatorPanelHeader } from "../operator-ui/operator-panel";
 import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
 import {
   cancelJob,
@@ -43,6 +44,7 @@ import {
   startEngineeringServerBatch,
   useEngineeringServerBatchState,
 } from "./engineering-server-batch";
+import ManagedProgrammingWorkspace from "./managed-programming-workspace";
 import "./programming-workspace-base.css";
 import EngineeringLogPanel, {
   classifyEngineeringLog,
@@ -95,8 +97,8 @@ const MAX_LOG_ENTRIES = 1000;
 const POLL_INTERVAL_MS = 500;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
 const terminalStates = new Set<JobState>(["success", "failed", "error", "cancelled", "timeout", "aborted"]);
-const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
-const operationCodes: Record<Operation, string> = { erase: "E", program: "P", verify: "V", read: "R" };
+const operationOrder: Operation[] = ["erase", "program", "verify"];
+const operationCodes: Record<Exclude<Operation, "read">, string> = { erase: "E", program: "P", verify: "V" };
 
 class GatewayUnavailableError extends Error {
   constructor(message: string) {
@@ -225,7 +227,16 @@ function serverSiteStage(site: BatchSiteSnapshot, stopping: boolean): Stage {
   return site.state;
 }
 
+// The formal Control Station (Managed routing) programs through the Manager
+// only: Registry / Fleet / Programming Routes -> plan -> run. The workspace
+// below is the Standalone Mock development runtime and is never reached there.
 export default function ProgrammingWorkspaceV2() {
+  const { hydrated, apiMode } = useWorkspaceSession();
+  if (!hydrated) return null;
+  return apiMode === "managed" ? <ManagedProgrammingWorkspace /> : <StandaloneProgrammingWorkspace />;
+}
+
+function StandaloneProgrammingWorkspace() {
   const { locale, t } = useI18n();
   const {
     hydrated: workspaceHydrated,
@@ -297,6 +308,7 @@ export default function ProgrammingWorkspaceV2() {
     ? engineeringTargetApiBase(apiBase, selection.facilityId, selection.ppuId)
     : null;
   const selectedSiteIds = selectedSiteIdsState ?? [];
+  const selectedBatchOperations = operationOrder.filter(operation => selectedOperations.includes(operation));
   const selectedSites = sites.filter(site => selectedSiteIds.includes(site.id));
   const selectableSiteIds = sites
     .filter(site => site.enabled && !isRunning(site))
@@ -312,19 +324,19 @@ export default function ProgrammingWorkspaceV2() {
     providerOnline: connection === "online" && Boolean(catalog),
     targetValid: Boolean(targetApiBase && selectedPPU),
     selectedSiteCount: selectedSiteIds.length,
-    selectedOperationCount: selectedOperations.length,
+    selectedOperationCount: selectedBatchOperations.length,
     requiresImage,
     imagePresent: Boolean(imageAsset) || syntheticProgrammingImageAvailable || Boolean(batchSnapshot?.asset),
     imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_ASSET_BYTES,
-    readSelected: selectedOperations.includes("read"),
+    readSelected: false,
     readParamsValid: true,
     allSitesExecutable,
     batchRunning: batchRunning && !batchCancelling,
     batchCancelling,
   });
   const noOperationWarning = locale === "zh-TW"
-    ? "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。"
-    : "No operation selected. Select at least one of Erase, Program, Verify, or Read.";
+    ? "未選擇任何操作。請至少選擇 Erase、Program 或 Verify 其中一項。"
+    : "No operation selected. Select at least one of Erase, Program, or Verify.";
   const programmingUnavailableLabel = locale === "zh-TW" ? "燒錄功能目前不可用" : "Programming unavailable";
   const dismissWarning = locale === "zh-TW" ? "關閉警告" : "Dismiss warning";
   const syntheticImageLabel = "Mock Synthetic Image";
@@ -499,7 +511,7 @@ export default function ProgrammingWorkspaceV2() {
         siteSelectionTarget.current = `${first.facility_id}/${first.ppu_id}`;
         setSelectedSiteIdsState(ids);
       }
-      setSelectedOperations([...snapshot.operations]);
+      setSelectedOperations(snapshot.operations.filter(operation => operation !== "read"));
       setRepeatCount(String(snapshot.execution_policy.repeat_count));
       setSiteRetryLimit(String(snapshot.execution_policy.site_retry_limit));
       setStopPolicy(snapshot.execution_policy.failed_site_stop_threshold === null
@@ -897,7 +909,7 @@ export default function ProgrammingWorkspaceV2() {
     }
 
     const siteIds = [...selectedSiteIds];
-    const operations = operationOrder.filter(operation => selectedOperations.includes(operation));
+    const operations = selectedBatchOperations;
     const readDetail = operations.includes("read") ? " · read MAIN FLASH" : "";
     setOperatorWarning(null);
     trackedJobs.current = {};
@@ -984,16 +996,19 @@ export default function ProgrammingWorkspaceV2() {
 
         <div className="productionProgrammingWorkflow">
           <section className={`productionProgrammingCard targetingCard ${setupCollapsed ? "is-collapsed" : ""}`}>
-            <header>
-              SYSTEM SETUP &amp; TARGETING
-              <button
-                type="button"
-                className="engineeringPanelToggle"
-                aria-label={`${setupCollapsed ? "Expand" : "Collapse"} System Setup`}
-                aria-expanded={!setupCollapsed}
-                onClick={() => setSetupCollapsed(current => !current)}
-              >{setupCollapsed ? "展開⌄" : "收合⌃"}</button>
-            </header>
+            <OperatorPanelHeader
+              number={1}
+              title="SYSTEM SETUP & TARGETING"
+              actions={(
+                <button
+                  type="button"
+                  className="engineeringPanelToggle"
+                  aria-label={`${setupCollapsed ? "Expand" : "Collapse"} System Setup`}
+                  aria-expanded={!setupCollapsed}
+                  onClick={() => setSetupCollapsed(current => !current)}
+                >{setupCollapsed ? "展開⌄" : "收合⌃"}</button>
+              )}
+            />
             <div className="cardBody" hidden={setupCollapsed}>
               <h2>SERVER TOPOLOGY</h2>
               <label className="workflowField">
@@ -1036,7 +1051,6 @@ export default function ProgrammingWorkspaceV2() {
               onToggleCollapsed={() => setProgrammingJobCollapsed(current => !current)}
               expandLabel={locale === "zh-TW" ? "展開" : "Show"}
               collapseLabel={locale === "zh-TW" ? "收合" : "Hide"}
-              apiBase={apiBase}
               targetDevice={targetDevice}
               onTargetChange={selectTargetDevice}
               targetDisabled={targetLocked}
@@ -1106,10 +1120,11 @@ export default function ProgrammingWorkspaceV2() {
         {catalogError && <div className="engineeringBoundaryNote warning"><b>{programmingUnavailableLabel}</b><span>{catalogError}</span></div>}
 
         <section className="productionProgrammingCard liveSiteStatus overviewCard" aria-label="Engineering Site status">
-          <header>
-            <span>LIVE SITE STATUS</span>
-            <small>{ppu?.display_name ?? selectedPPU?.display_name ?? "Selected PPU"} · {sites.length} Sites · Batch selected {selectedSiteIds.length} · REST polling 500 ms</small>
-          </header>
+          <OperatorPanelHeader
+            number={3}
+            title="LIVE SITE STATUS"
+            meta={`${ppu?.display_name ?? selectedPPU?.display_name ?? "Selected PPU"} · ${sites.length} Sites · Batch selected ${selectedSiteIds.length} · REST polling 500 ms`}
+          />
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">
             <table className="channelTable">
               <thead>
@@ -1126,7 +1141,7 @@ export default function ProgrammingWorkspaceV2() {
                       <span>BATCH</span>
                     </label>
                   </th>
-                  <th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>OPERATIONS (E/P/V/R)</th>
+                  <th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>OPERATIONS (E/P/V)</th>
                 </tr>
               </thead>
               <tbody className="targetSitesSection">
@@ -1157,6 +1172,16 @@ export default function ProgrammingWorkspaceV2() {
                       <td><b className="engineeringResult" data-result={resultLabel(displayStage)}>{resultLabel(displayStage)}</b></td>
                       <td><div className="rowActions engineeringV2Actions">
                         {operationOrder.map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.id} ${t(`operation.${operation}`)}`} title={t(`operation.${operation}`)} disabled={operationDisabled(site, operation)} onClick={() => runSingleSite(site.id, operation)}>{operationCodes[operation]}</button>)}
+                        <button
+                          type="button"
+                          className="readMemoryJob"
+                          aria-label={`SITE ${site.id} Read Memory`}
+                          title="Read Memory"
+                          disabled={operationDisabled(site, "read")}
+                          onClick={() => runSingleSite(site.id, "read")}
+                        >
+                          R
+                        </button>
                         <button className="stop" aria-label={`Cancel SITE ${site.id}`} disabled={batchRunning || !isRunning(site)} onClick={() => void cancelSite(site.id)}>■</button>
                         {site.stage === "success" && site.jobId && site.outputFile && targetApiBase && <a className="rowDownload" aria-label={`Download SITE ${site.id} read file`} href={readDownloadUrl(targetApiBase, site.jobId, site.outputFile)}>↓</a>}
                       </div></td>

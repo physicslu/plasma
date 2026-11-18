@@ -75,6 +75,17 @@ class FleetPoller:
             self._last_refresh_error = None
         return snapshot
 
+    def shared_control_check(self) -> None:
+        from .shared_control import SharedControlError
+        with self._state_lock:
+            if (self._thread is None or not self._thread.is_alive()
+                    or self._stop_event.is_set()):
+                raise SharedControlError("FLEET_POLLER_NOT_RUNNING")
+            if not isinstance(self._snapshot, dict) or not isinstance(self._snapshot.get("ppus"), list):
+                raise SharedControlError("FLEET_CACHE_UNINITIALIZED_OR_INVALID")
+            if self._last_refresh_error is not None:
+                raise SharedControlError("FLEET_SHARED_REFRESH_FAILED")
+
     def snapshot(self) -> dict[str, Any]:
         """Return the cached snapshot without contacting any PPU."""
         with self._state_lock:

@@ -199,7 +199,7 @@ test("IC Selector first enriched result renders without page error and paginatio
     } : null,
   });
 
-  await page.route("**/api/devices/search**", async route => {
+  await page.route("**/api/manager/devices/search**", async route => {
     const url = new URL(route.request().url());
     const query = url.searchParams.get("q") ?? "";
     const limit = Number(url.searchParams.get("limit") ?? "30");

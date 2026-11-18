@@ -360,6 +360,7 @@ def _start_gateway(app: Path, work: Path, env: Mapping[str, str]) -> subprocess.
             "127.0.0.1",
             "--plasma-port",
             "9900",
+            "--host-lab-unauthenticated-writes",
             "--output-root",
             str(work / "gateway-output"),
         ],
@@ -417,10 +418,7 @@ def _inside_mode(args: argparse.Namespace) -> int:
     app = runtime / "ppu/ppu.pyz"
     if not app.is_file():
         raise AcceptanceError(f"PPU zipapp is missing: {app}")
-    manifest = json.loads((runtime / "ppu-runtime.json").read_text(encoding="utf-8"))
-    catalog = runtime / str((manifest.get("data") or {}).get("device_catalog_manifest"))
-    if not catalog.is_file():
-        raise AcceptanceError(f"Device Catalog manifest is missing: {catalog}")
+    json.loads((runtime / "ppu-runtime.json").read_text(encoding="utf-8"))
 
     work = Path("/work")
     for directory in (work / "server-output", work / "logs", work / "gateway-output"):
@@ -432,7 +430,9 @@ def _inside_mode(args: argparse.Namespace) -> int:
 
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
-    env["PLASMA_DEVICE_CATALOG_MANIFEST"] = str(catalog)
+    # PPU Runtime is Catalog-free (OPF S5 / PR-C1): no Catalog environment.
+    env.pop("PLASMA_DEVICE_CATALOG_MANIFEST", None)
+    env.pop("PLASMA_IC_SUPPORT_ROOT", None)
     server: subprocess.Popen[Any] | None = None
     gateway: subprocess.Popen[Any] | None = None
     tests: dict[str, str] = {}

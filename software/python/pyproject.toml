@@ -25,15 +25,13 @@ plasma-manager = "plasma_manager.bootstrap_server:main"
 packages = [
   "plasma_core",
   "plasma_interfaces",
+  "plasma_opf",
   "plasma_handlers",
   "plasma_server",
   "plasma_client",
   "plasma_web",
   "plasma_manager",
 ]
-
-[tool.setuptools.package-data]
-plasma_interfaces = ["stm32f103c-compiler-admission-projection-v1.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

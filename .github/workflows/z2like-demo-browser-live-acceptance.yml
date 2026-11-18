@@ -44,6 +44,7 @@ on:
       - "software/python/plasma_manager/bootstrap.py"
       - "software/python/plasma_manager/bootstrap_server.py"
       - "software/python/plasma_manager/verified_bootstrap.py"
+      - "software/python/plasma_manager/bootstrap_request_auth.py"
       - "software/python/tests/test_z2like_demo_active_job_disable_live_contract.py"
       - "software/python/tests/test_z2like_demo_qemu_control_plane_contract.py"
       - "software/web/app/api/manager/bootstrap-bff.ts"

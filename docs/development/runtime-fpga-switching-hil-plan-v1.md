@@ -1,5 +1,7 @@
 # Runtime FPGA Phase 1 — Switching HIL Acceptance & Supervisor Contract
 
+> **Term note:** in this document **B1/B2/B3 are the PR #972 FPGA/UIO safety items** — B1 live Fabric UIO ownership handoff, B2 retained-mmap guard, B3 aperture Supervisor. Not the Bundle-stage meaning; see [glossary](../glossary.md#b1b2b3).
+
 > **Status: Plan / Host-only design.** Not a HIL runbook granting execution.
 > 
 > Related: [Runtime FPGA Roadmap](../architecture/runtime-fpga-architecture-v1.md), [ADR-0003 Proposed](../adr/0003-runtime-fpga-driver-reconfiguration-boundary.md), [Proposed ABI v1](../architecture/runtime-fpga-hardware-abi-v1.md), independent unmerged PR #972.

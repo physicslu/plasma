@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import importlib.util
 import json
+import shutil
+import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
+
+from .ppu_owner_authorization_fixture import admit_body
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -61,17 +67,28 @@ def test_runtime_inspection_accepts_only_canonical_managed_release(tmp_path: Pat
     assert runtime.release_id == release_id
 
 
-def test_bootstrap_token_is_private_and_rotation_is_explicit(tmp_path: Path):
-    token_file = tmp_path / "control-token"
-    token = service.provision_token(token_file, token="x" * 40)
-    assert token == "x" * 40
-    assert token_file.stat().st_mode & 0o777 == 0o600
-    assert service.load_token(token_file) == token
-    with pytest.raises(service.BootstrapServiceError, match="already exists"):
-        service.provision_token(token_file, token="y" * 40)
-    token_file.chmod(0o644)
-    with pytest.raises(service.BootstrapServiceError, match="permissions"):
-        service.load_token(token_file)
+def test_p2a1_control_token_migrates_once_to_controller_generation_1(tmp_path: Path):
+    controller = service._controller_module()
+    state = tmp_path / "state"
+    state.mkdir()
+    legacy = state / "control-token"
+    legacy.write_text("x" * 40 + "\n", encoding="utf-8")
+    legacy.chmod(0o644)
+    store = controller.ControllerStore(state)
+    with pytest.raises(controller.ControllerError) as broad:
+        store.migrate_legacy_token()
+    assert broad.value.code == "CONTROLLER_STATE_INVALID" and legacy.exists()
+    legacy.chmod(0o600)
+    assert store.migrate_legacy_token() is True
+    record = store.controller()
+    assert (record["generation"], record["mode"], record["credential"]) == (1, "NORMAL", "x" * 40)
+    assert not legacy.exists() and store.ledger()["high_water"] == 1
+    assert store.path("controller").stat().st_mode & 0o777 == 0o600
+    # A leftover legacy file after a crash never overrides the committed record.
+    legacy.write_text("y" * 40 + "\n", encoding="utf-8")
+    legacy.chmod(0o600)
+    assert store.migrate_legacy_token() is False
+    assert store.controller()["credential"] == "x" * 40 and not legacy.exists()
 
 
 def test_chunked_upload_commits_only_after_full_sha256_match(tmp_path: Path):
@@ -134,3 +151,178 @@ def test_factory_installer_requires_complete_bootstrap_bundle(tmp_path: Path):
             python_executable="/usr/bin/python3",
             paths=installer.InstallPaths(tmp_path / "install", tmp_path / "state", tmp_path / "unit"),
         )
+
+
+
+def _installed_factory_service(tmp_path: Path):
+    """Exercise the installed factory copy, not the repository source service."""
+    install_root = tmp_path / "factory" / "opt" / "plasma" / "bootstrap"
+    state_root = tmp_path / "factory" / "var" / "lib" / "plasma-bootstrap"
+    unit = tmp_path / "factory" / "etc" / "systemd" / "system" / "plasma-bootstrap.service"
+    result = installer.install_bootstrap(
+        source_root=ROOT / "scripts", host="127.0.0.1", port=18081,
+        python_executable=sys.executable,
+        paths=installer.InstallPaths(install_root, state_root, unit),
+        enable_now=False,
+    )
+    assert result["result"] == "PASS" and result["enabled_now"] is False
+    assert result["runtime_installed"] is False and result["fpga_update"] is False
+    assert unit.is_file()
+    assert state_root.stat().st_mode & 0o777 == 0o700
+    for filename in installer.REQUIRED_SCRIPTS:
+        destination = install_root / filename
+        assert destination.is_file(), filename
+        assert destination.read_bytes() == (ROOT / "scripts" / filename).read_bytes()
+    assert "ppu_unified_deployment.py" in installer.REQUIRED_SCRIPTS
+    assert not (tmp_path / "factory" / "opt" / "plasma" / "current").exists()
+    assert not (tmp_path / "factory" / "etc" / "plasma" / "ppu-package-target.json").exists()
+
+    spec = importlib.util.spec_from_file_location(
+        "ppu_factory_install_service", install_root / "ppu-bootstrap-service.py"
+    )
+    assert spec is not None and spec.loader is not None
+    installed_service = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = installed_service
+    spec.loader.exec_module(installed_service)
+    return installed_service, state_root, install_root
+
+
+def test_factory_installs_exact_opf_runtime_sources(tmp_path: Path):
+    _service, _state, install_root = _installed_factory_service(tmp_path)
+    # Bootstrap's smoke test runs under Python 3.10/3.12 without Runtime
+    # dependencies. The Plasma Runtime itself requires Python >=3.11 and
+    # PyYAML; import/behavior coverage belongs to Python PS source tests.
+    # Check exact installed source bytes here, independent of host Python.
+    for filename in (
+        "ppu_opf_reference_openocd.py",
+        "ppu_opf_site_session.py",
+        "ppu_provider_contract.py",
+        "ppu_provider_options.py",
+    ):
+        source = ROOT / "scripts" / filename
+        installed = install_root / filename
+        assert installed.is_file()
+        assert not installed.is_symlink()
+        assert hashlib.sha256(installed.read_bytes()).digest() == (
+            hashlib.sha256(source.read_bytes()).digest()
+        )
+
+
+def _factory_python_upload(installed_service, paths, tmp_path: Path):
+    from .test_ppu_generic_package_host_only_gate1 import TARGET
+
+    file_data = b"# inert factory admission fixture\n"
+    file_name = "payload/packages/wordport/python/wordport.py"
+    manifest = {
+        "schema": "plasma.ppu.bundle.v3",
+        "name": "factory-smoke", "version": "1.0",
+        "source_commit": "a" * 40, "target": TARGET,
+        "purpose": "factory-smoke",
+        "packages": [{
+            "id": "wordport", "kind": "python", "version": "1.0",
+            "requires": [],
+            "files": [{
+                "path": file_name, "size": len(file_data),
+                "sha256": hashlib.sha256(file_data).hexdigest(),
+                "executable": False,
+            }],
+        }],
+    }
+    archive = tmp_path / "factory-smoke.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("manifest.json", json.dumps(manifest))
+        zf.writestr(file_name, file_data)
+    payload = archive.read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()
+    created = installed_service.create_upload(paths, size=len(payload), sha256=digest)
+    uid = created["upload_id"]
+    installed_service.append_chunk(
+        paths, uid, offset=0,
+        data_base64=base64.b64encode(payload).decode("ascii"),
+        sha256=digest,
+    )
+    assert installed_service.commit_upload(paths, uid)["state"] == "committed"
+    return uid, digest
+
+
+def test_factory_installed_service_can_admit_package_without_installing(tmp_path: Path):
+    from .test_ppu_generic_package_host_only_gate1 import TARGET
+
+    installed_service, state_root, install_root = _installed_factory_service(tmp_path)
+    profile = tmp_path / "device-owned-profile.json"
+    profile.write_text(json.dumps(TARGET), encoding="utf-8")
+    profile.chmod(0o600)
+    paths = installed_service.ServicePaths(
+        state_root=state_root, product_root=tmp_path / "runtime-untouched",
+        package_target_file=profile,
+        machine_id_path=_machine_id(tmp_path),
+        bootstrap_script=install_root / "ppu-bootstrap.py",
+        kit_tool=install_root / "ppu-bootstrap-kit.py",
+    )
+    uid, digest = _factory_python_upload(installed_service, paths, tmp_path)
+    server = installed_service.BootstrapHTTPServer(
+        ("127.0.0.1", 0), paths=paths, base_module=object(),
+        deployment_runner=lambda *_: pytest.fail("runtime deployment must not execute"),
+    )
+    try:
+        # Paired owner admits their own Bundle: no per-Bundle pre-approval.
+        result = server.admit_package(admit_body(paths, "bundle", uid))
+        assert result["state"] == "admitted"
+        receipt = result["result"]
+        assert receipt["result"] == "PASS"
+        assert receipt["stage"] == "package_admission_only"
+        assert receipt["install_qualified"] is False
+        assert receipt["plan"]["archive_sha256"] == digest
+        assert receipt["plan"]["execution_permitted"] is False
+        assert receipt["plan"]["target"] == TARGET
+        assert server.deployment_thread is None
+        assert not paths.coordinator_journal.exists()
+        assert not paths.product_root.exists()
+    finally:
+        server.server_close()
+
+
+def test_factory_missing_verifier_rejected_before_any_install_changes(tmp_path: Path):
+    source = tmp_path / "incomplete-bundle"
+    source.mkdir()
+    for filename in installer.REQUIRED_SCRIPTS:
+        if filename != "ppu_unified_deployment.py":
+            shutil.copyfile(ROOT / "scripts" / filename, source / filename)
+    root = tmp_path / "existing-bootstrap"
+    root.mkdir()
+    old_service = root / "ppu-bootstrap-service.py"
+    old_service.write_bytes(b"prior-installed-service\n")
+    unit = tmp_path / "unit-not-written"
+    state = tmp_path / "state-not-written"
+    with pytest.raises(installer.BootstrapInstallError,
+                       match="missing required script: ppu_unified_deployment.py"):
+        installer.install_bootstrap(
+            source_root=source, host="127.0.0.1", port=18081,
+            python_executable=sys.executable,
+            paths=installer.InstallPaths(root, state, unit),
+        )
+    assert old_service.read_bytes() == b"prior-installed-service\n"
+    assert not unit.exists() and not state.exists()
+
+
+def test_factory_admission_without_device_owned_target_is_denied(tmp_path: Path):
+    installed_service, state_root, _ = _installed_factory_service(tmp_path)
+    paths = installed_service.ServicePaths(
+        state_root=state_root, product_root=tmp_path / "runtime-untouched",
+        package_target_file=tmp_path / "never-provisioned-target.json",
+        machine_id_path=_machine_id(tmp_path),
+    )
+    uid, _ = _factory_python_upload(installed_service, paths, tmp_path)
+    server = installed_service.BootstrapHTTPServer(
+        ("127.0.0.1", 0), paths=paths, base_module=object(),
+        deployment_runner=lambda *_: pytest.fail("runtime deployment must not execute"),
+    )
+    try:
+        with pytest.raises(installed_service.BootstrapServiceError,
+                           match="PACKAGE_TARGET_PROFILE_UNAVAILABLE"):
+            server.admit_package(admit_body(paths, "bundle", uid))
+        assert not paths.deployment_record.exists()
+        assert not paths.coordinator_journal.exists()
+        assert not paths.product_root.exists()
+    finally:
+        server.server_close()

@@ -10,6 +10,10 @@ command -v tmux >/dev/null
 command -v python3 >/dev/null
 command -v sg >/dev/null
 test -f "$viewer"
+if [[ ${1:-} != "" && ${1:-} != "--reload" ]] || [[ $# -gt 1 ]]; then
+  echo "Usage: bash scripts/plasma-engineering-monitor.sh [--reload]" >&2
+  exit 2
+fi
 
 # A long-running tmux server retains the supplementary groups it had when
 # started. Query the operator's CURRENT NSS membership, not the old server's
@@ -78,7 +82,9 @@ if [ "$path2_panes" -ne 1 ]; then
   exit 1
 fi
 
-if ! tmux display-message -p -t "$session:path3" '#{window_index}' >/dev/null 2>&1; then
+# display-message can resolve a missing named window to the current
+# window and return success. Check the exact published window NAME instead.
+if ! tmux list-windows -t "=$session" -F '#{window_name}' | grep -Fxq path3; then
   right="$(viewer_command path3)"
   tmux new-window -d -t "$session:2" -n path3 -c "$repo" "$right"
 fi
@@ -88,6 +94,66 @@ path3_panes="$(tmux list-panes -t "$session:2" -F '#{pane_id}' | wc -l)"
 if [ "$path3_index" != 2 ] || [ "$path3_panes" -ne 1 ]; then
   echo "MONITOR_UNEXPECTED_PATH3_LAYOUT: index=$path3_index panes=$path3_panes" >&2
   exit 1
+fi
+
+# --reload replaces observers only; never terminate a Worker.
+if [[ ${1:-} == "--reload" ]]; then
+  for path in path2 path3; do
+    if [[ "$path" == path2 ]]; then idx=1; else idx=2; fi
+    pane_pid="$(tmux display-message -p -t "$session:$idx" '#{pane_pid}')"
+    if ! python3 - "$pane_pid" "$viewer" "$path" <<'PY'
+import pathlib, sys
+try:
+    root = int(sys.argv[1])
+    viewer = sys.argv[2]
+    path = sys.argv[3]
+    proc = {}
+    for entry in pathlib.Path("/proc").iterdir():
+        if not entry.name.isdecimal():
+            continue
+        try:
+            parts = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+            parent = int(parts[1])
+            args = (entry / "cmdline").read_bytes().split(b"\0")
+            proc[int(entry.name)] = (parent, [x.decode("utf-8", "replace") for x in args if x])
+        except (OSError, ValueError, IndexError):
+            continue
+    pane_command = proc.get(root)
+    if not pane_command or not pane_command[1] or (
+            pathlib.Path(pane_command[1][0]).name not in {"bash", "sh"}):
+        raise ValueError("pane is not a monitor shell")
+    children = set()
+    pending = [root]
+    while pending:
+        p = pending.pop()
+        for pid, (parent, _) in proc.items():
+            if parent == p and pid not in children:
+                children.add(pid)
+                pending.append(pid)
+    active = [proc[pid][1] for pid in children if pid in proc]
+    viewer_found = any(viewer in argv and "view" in argv and path in argv
+                       for argv in active)
+    if active and not viewer_found:
+        raise ValueError("non-viewer process present")
+    if viewer_found and any(
+        argv and pathlib.Path(argv[0]).name not in
+            {"bash", "sh", "sg", "python3", "python3.10"} for argv in active
+    ):
+        raise ValueError("unexpected viewer descendant")
+except (ValueError, IndexError) as error:
+    print("MONITOR_RELOAD_REFUSED:", error, file=sys.stderr)
+    sys.exit(2)
+PY
+    then
+      echo "MONITOR_RELOAD_REFUSED: $path has an active non-viewer process" >&2
+      exit 2
+    fi
+  done
+  # Check both first; only then replace the two observer panes.
+  for path in path2 path3; do
+    if [[ "$path" == path2 ]]; then idx=1; else idx=2; fi
+    tmux respawn-pane -k -t "$session:$idx" -c "$repo" "$(viewer_command "$path")"
+  done
 fi
 
 tmux select-window -t "$session:1"

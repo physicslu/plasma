@@ -1,0 +1,48 @@
+== collected 2026-11-11T00:33:57Z on SWPC (read-only)
+== install.json
+{
+  "architecture": "x86_64",
+  "console_bind": "127.0.0.1:18190",
+  "git_sha": "728e55e529b58ea22d736553c50bee237a9962f4",
+  "hardware_claim": "none",
+  "manager_bind": "127.0.0.1:18280",
+  "platform": "linux",
+  "ppu_alias": "swpc-ppu",
+  "ppu_endpoint": "http://127.0.0.1:18080",
+  "python": "/opt/plasma/python/3.12.13/bin/python3",
+  "release_id": "728e55e529b5",
+  "role": "local-control-station",
+  "schema_version": 1
+}
+== current -> ~/.local/share/plasma/local-control-station/releases/728e55e529b5
+== releases on disk
+082f018941b5
+0f1123a23a5b
+142f56a5d12c
+22a88c989b23
+2efb4543f460
+3c2145f3d155
+728e55e529b5
+79f13715319b
+7e2c23bbd6f5
+7e90f95bceb6
+c689549e7c67
+daf31bd94ed9
+== services
+MainPID=1924197
+NRestarts=0
+Id=plasma-local-manager.service
+ActiveState=active
+ActiveEnterTimestamp=Tue 2026-11-10 22:11:35 CST
+
+MainPID=1924220
+NRestarts=0
+Id=plasma-control-station.service
+ActiveState=active
+ActiveEnterTimestamp=Tue 2026-11-10 22:11:36 CST
+== registry.json sha256 (same value as swpc-state-before.sha256 in the 2026-11-10 evidence)
+ef6493e975bde781e4390510086e3df2e83b878e444c8c350ce30b997f683354  registry.json
+== source comparison (git, repository)
+git diff --name-only 728e55e52 c106fd791 (current main), excluding docs/:
+software/web/e2e/tests/bundle-programming.spec.ts
+git diff --name-only 6cf7057ce 728e55e52, excluding docs/: 0 files

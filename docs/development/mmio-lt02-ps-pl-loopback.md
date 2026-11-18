@@ -1,3 +1,5 @@
+> **INTERNAL LT02 AXI LOOPBACK ONLY, NOT EXTERNAL SWD.** Real Blue Pill programming uses Z2 PS-local ARMv7 OpenOCD → UNIX WordPort/RemoteBitbang → reviewed PL SWD Image → PMOD. Follow [retirement inventory](swd-legacy-path-retirement.md); old internal loops and synthetic ACK/DPIDR cannot establish physical MCU success.
+
 # MMIO-LT-02 — PS ↔ PL AXI4-Lite Loopback v1
 
 Status: implementation candidate. **Not** a qualified FPGA bitstream, Z2 HIL result, PL diagnostic API, or deployed UI feature.

@@ -1,0 +1,105 @@
+{
+  "source_sha": "5eca066907d449520dec13c649378726513e48b2",
+  "work_order_sha256": "3103a5e1c0505e1d85640a015917ad50c0227cbc7736f5c5babb0957b15728b5",
+  "path": "Path 3",
+  "runner": "SWPC-plasma-codex",
+  "github_run_id": 43712609056,
+  "github_job_id": 132807307691,
+  "result": "PASS",
+  "start_id": "63cb924e60d0c5be5480656ab1a4ad91",
+  "batch_id": "72582e64dbe6006b9d212b2880428176",
+  "run_id": "8c878a02c799110453e5b541a2b39715",
+  "receipt": {
+    "schema": "plasma.manager.programming-receipt.v3",
+    "job_id": "job-20261115-121827-5b1f77b2",
+    "job_state": "success",
+    "site_id": 2,
+    "operation": "programming",
+    "operations": [
+      "erase",
+      "program",
+      "verify"
+    ],
+    "observed_operations": [
+      "erase",
+      "program",
+      "verify"
+    ],
+    "target": "STM32F103C8T6",
+    "ppu_id": "z2-hil",
+    "expected_image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+    "expected_image_size": 62800,
+    "observed_image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+    "observed_image_size": 62800,
+    "readback_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+    "bytes_verified": 62800,
+    "expected_flash_range": null,
+    "observed_flash_range": null,
+    "expected_steps": {
+      "erase": {
+        "erase_address": 134217728,
+        "erase_length": 63488
+      },
+      "program": {
+        "write_address": 134217728,
+        "bytes_written": 62800,
+        "image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c"
+      },
+      "verify": {
+        "verify_address": 134217728,
+        "bytes_verified": 62800,
+        "readback_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c"
+      }
+    },
+    "observed_steps": {
+      "erase": {
+        "erase_address": 134217728,
+        "erase_length": 63488
+      },
+      "program": {
+        "write_address": 134217728,
+        "bytes_written": 62800,
+        "image_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c"
+      },
+      "verify": {
+        "verify_address": 134217728,
+        "bytes_verified": 62800,
+        "readback_sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c"
+      }
+    },
+    "range": {
+      "address": 134217728,
+      "length": 62800
+    },
+    "read_output": null,
+    "expected_resource_set_sha256": "b4495a1c5d97fad15108d27e4886bce3d56108f1d3f7dbddee1aa2d5c6250f95",
+    "observed_resource_set_sha256": "b4495a1c5d97fad15108d27e4886bce3d56108f1d3f7dbddee1aa2d5c6250f95",
+    "expected_job_binding_sha256": "06505fe424b83f9f424d49e92a8c7349cf70cfe7153d6f2ac84de15db6a848e6",
+    "observed_job_binding_sha256": "06505fe424b83f9f424d49e92a8c7349cf70cfe7153d6f2ac84de15db6a848e6",
+    "expected_image_asset_sha256": "200eb75daeff3dc79b148bb2bfd05956477c7e3d63a1bfa1ebfe4ad6772b6453",
+    "observed_image_asset_sha256": "200eb75daeff3dc79b148bb2bfd05956477c7e3d63a1bfa1ebfe4ad6772b6453",
+    "active_asset_set_sha256": "957ac4e62d23507fd577300c3dc827777fa1ccddb0fffdb13911dc9e8b8d8d83",
+    "active_generation": 22,
+    "resource_reuse": true,
+    "safe_off": true,
+    "flash_result": "PASS",
+    "attempts": 1,
+    "error": null,
+    "elapsed_ms": 9402
+  },
+  "batch_post_attempts": 1,
+  "total_control_plane_posts": 4,
+  "flash_attempts": 1,
+  "batch_units": 1,
+  "preview_plan_id": "6607ab73b1ea98acf34f1b91c62973f5",
+  "preview_reconciliation": "NOT_ACCEPTED",
+  "final_site_state": "idle",
+  "final_queued_jobs": 0,
+  "final_active_jobs": 0,
+  "native_safe_off_verified": true,
+  "native_admission_revoked": true,
+  "native_stdout_sha256": "fb2c64da42af1341fa03bf0338560410bad633bdc2133710e303a28f9334f613",
+  "analog_voltage": "NOT_MEASURED",
+  "cdc_firmware_id": "NOT_VERIFIED",
+  "cdc_heartbeat": "NOT_RUN"
+}

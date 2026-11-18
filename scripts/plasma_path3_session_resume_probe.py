@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Manual CPU-only Path 3 NEW -> FAIL -> RESUME -> PASS probe.
 
+RETIRED FROM PATH 3 RUNTIME — offline research only (#1181).
 No GitHub dispatch, SWPC use, hardware operations or private rollout reads.
 Not a production dispatcher: invoking this script requires an explicit manual
 flag and a clean, isolated checkout of an exact source commit.
@@ -84,18 +85,13 @@ def only_probe_changes(status: list[str]) -> bool:
 
 
 def cmd(resume_id: str | None) -> list[str]:
-    # Reassert BOTH sandbox and network policy on resume. The resume subcommand
-    # did not accept --sandbox in some Codex CLI releases.
-    args = [
-        "codex", "--ask-for-approval", "never",
-        "-c", 'sandbox_mode="workspace-write"',
-        "-c", "sandbox_workspace_write.network_access=false",
-        "exec", "--json",
-    ]
+    # Do not override Codex approval, sandbox, or network policy here.
+    # The invoking operator's Codex configuration remains authoritative.
+    args = ["codex", "exec", "--json"]
     if resume_id is not None:
         args.extend(["resume", resume_id, "-"])
     else:
-        args.extend(["--sandbox", "workspace-write", "-"])
+        args.append("-")
     return args
 
 

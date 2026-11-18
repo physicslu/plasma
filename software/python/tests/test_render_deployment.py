@@ -138,6 +138,8 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertIn('export PLASMA_IC_SUPPORT_ROOT="${ic_support_root}"', script)
         self.assertIn('python -m plasma_core.ic_support --summary >/dev/null', script)
         self.assertIn('/api/devices/search?q=STM32F103C8T6&limit=1', script)
+        # PR-C2: the Selector contract is proven on the Manager, not the PPU Gateway.
+        self.assertIn("[render-start] Manager Device Selector did not become ready", script)
         self.assertIn('selected_profile = result.get("selected_profile")', script)
         self.assertNotIn("--host 0.0.0.0\n  --port \"${public_port}\"", script)
         self.assertNotIn("--static-root", script)

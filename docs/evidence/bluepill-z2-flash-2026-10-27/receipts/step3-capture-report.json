@@ -1,0 +1,13 @@
+{
+  "capture_finish_unix_ns": 1793110552669814376,
+  "capture_start_unix_ns": 1793110522156896845,
+  "la_exit": 0,
+  "la_log_tail": "sr: kingst-la2016: USB PID 01a2, MCU firmware 'kingst-la-01a2.fw'.\nsr: kingst-la2016: Manufacture date: 2026-03.\nsr: kingst-la2016: Model 'LA2016', 16 channels, max 200MHz.\nsr: kingst-la2016: FPGA bitstream file 'kingst-la2016a2-fpga.bitstream'.\nsr: kingst-la2016: Could re-use current FPGA bitstream. No upload required.\nsr: session: Starting.\ncli: Received SR_DF_HEADER.\ncli: Received SR_DF_FRAME_BEGIN.\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\nsr: output/srzip: output unit size 2, feed unit size 2.\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (8388608 bytes, unitsize = 2).\ncli: Received SR_DF_LOGIC (1284506 bytes, unitsize = 2).\ncli: Received SR_DF_FRAME_END.\ncli: Received SR_DF_END.\nsr: session: Stopped.\nsr: kingst-la2016: Closing device on 1.34 (logical) / usb/1-1.4 (physical) interface 0.\n",
+  "la_session_start_observed": true,
+  "remote_exit": 0,
+  "remote_stderr": "",
+  "remote_stdout": "{\"baseline_sample\": 9, \"boot_id\": \"4cefdc0c-f586-4d19-b126-1d8e1108c8f1\", \"final_sample\": 9, \"identity_words\": [1346523991, 65536], \"image_sha256\": \"bfbd3d872caeff05a8f9daa0829b6292e5b5036c6c6b927d6c779e13fe9ec1a1\", \"mmio_read32\": 7, \"mmio_write32\": 3, \"records\": [{\"barrier_after_unix_ns\": 1793110526440196103, \"drive\": 2, \"sample\": 9, \"swclk_bit1\": 0, \"swdio_oe_bit2\": 0, \"write_before_unix_ns\": 1793110526439986003}, {\"barrier_after_unix_ns\": 1793110527440696770, \"drive\": 3, \"sample\": 11, \"swclk_bit1\": 1, \"swdio_oe_bit2\": 0, \"write_before_unix_ns\": 1793110527440432861}, {\"barrier_after_unix_ns\": 1793110528441157296, \"drive\": 2, \"sample\": 9, \"swclk_bit1\": 0, \"swdio_oe_bit2\": 0, \"write_before_unix_ns\": 1793110528440935688}], \"result\": \"STEP2_INTERNAL_SWCLK_PASS\"}\n",
+  "remote_trigger_unix_ns": 1793110522274442351,
+  "wave_bytes": 60181,
+  "wave_sha256": "e9412e4bfdaa4de5d622c1090518327b943bd53b1c5d1cb438f07a8384f34713"
+}

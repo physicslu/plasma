@@ -1,20 +1,17 @@
-name: PLASMA dedicated Codex passive HIL tool inventory (Issue 981)
+name: PLASMA historical Codex passive HIL inventory (host-only)
 
 # No device opens or hardware commands. Owner-only exact Issue comment on main.
+# Legacy Issue #981 /plasma-codex runtime dispatch retired; hosted CI only.
 on:
-  issue_comment:
-    types: [created]
   pull_request:
     paths:
       - ".github/workflows/plasma-codex-hil-tool-inventory.yml"
       - "scripts/plasma-codex-hil-tool-inventory*.py"
-      - "docs/development/plasma-codex-hil-tool-inventory.md"
   push:
     branches: [main]
     paths:
       - ".github/workflows/plasma-codex-hil-tool-inventory.yml"
       - "scripts/plasma-codex-hil-tool-inventory*.py"
-      - "docs/development/plasma-codex-hil-tool-inventory.md"
 
 permissions:
   contents: read

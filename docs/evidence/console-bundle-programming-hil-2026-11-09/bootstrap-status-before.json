@@ -1,0 +1,143 @@
+{
+ "bootstrap": {
+  "bootstrap": {
+   "api_version": "1",
+   "state": "bootstrap_ready",
+   "version": "0.1.0"
+  },
+  "capabilities": {
+   "bundle_v3_b3_install": true,
+   "bundle_v3_b3_mode": "development",
+   "fpga_update": false,
+   "identity_update": false,
+   "runtime_deployment": true
+  },
+  "deployment": {
+   "admission_transaction_id": "ceb44bb714ef4ee88e7196fbcf95a3ec",
+   "error": null,
+   "error_code": null,
+   "fpga_load": false,
+   "mode": "activate",
+   "owner_authorization": {
+    "action": "bundle.activate",
+    "authorization_sha256": "81d561600ae9ee59eded8994f4cf9e12e0de2639a53d0ffa11303e2b68ded3bf",
+    "device_id": "ppu-device-7ed4b30913a9bf6101da5a7a",
+    "method": "paired-console-operation-hmac-sha256",
+    "package_identity_sha256": null,
+    "schema": "plasma.ppu.owner-operation-authorization.v1",
+    "status": "OWNER_AUTHORIZED",
+    "subject_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+    "transaction_id": "ceb44bb714ef4ee88e7196fbcf95a3ec"
+   },
+   "result": {
+    "active_asset_set": {
+     "already_active": false,
+     "asset_set_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+     "generation": 12
+    },
+    "archive_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+    "bundle_name": "bluepill-site2-fw-v02",
+    "coordinator_receipt": {
+     "api_transaction_id": "1944c45f55e641f8b155b8fcfc56be76",
+     "coordinator_release_id": "1.0.0-387b9c8c08822a6d",
+     "coordinator_state": "asset_set_active",
+     "coordinator_transaction_id": "e3d66257-4ed9-4007-a5a3-315ec04c5475"
+    },
+    "dut": "NOT_RUN",
+    "files_verified": 4,
+    "fpga": "NOT_RUN",
+    "fpga_load": {
+     "requested": false,
+     "result": "NOT_RUN"
+    },
+    "install_path": "/opt/plasma/assets/staged/387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+    "mode": "activate",
+    "package_order": [
+     "openocd-platform-reference",
+     "stm32f103c8t6-site2",
+     "bluepill-cdc-fw-v02"
+    ],
+    "per_package_install_executed": true,
+    "ready": false,
+    "result": "PASS",
+    "runtime_activation_executed": false,
+    "runtime_site_readmission": "NOT_REQUIRED",
+    "schema": "plasma.ppu.b3-deployment-receipt.v2",
+    "source_commit": null,
+    "stage": "bundle_install_and_activate",
+    "transaction": {
+     "api_transaction_id": "1944c45f55e641f8b155b8fcfc56be76",
+     "artifact_sha256": "387b9c8c08822a6d4edb8ac7904a71a6e3143b1714453a35778c372a7517764c",
+     "asset_activation_fpga": false,
+     "asset_activation_previous": {
+      "asset_set_sha256": "71e9a044c7f45d0f6e608c2727961f6ada220b483225bd20b928bf06f289946a",
+      "fpga": "NOT_VERIFIED",
+      "generation": 11,
+      "profile": "NOT_VERIFIED",
+      "ready": false,
+      "schema": "plasma.ppu.active-assets.v1",
+      "state": "ACTIVE"
+     },
+     "error_code": null,
+     "error_message": null,
+     "kind": "bundle",
+     "module": "bluepill-site2-fw-v02",
+     "package_kind": "bundle",
+     "previous_release": null,
+     "release_artifact": "/var/lib/plasma-bootstrap/uploads/a46c8d7311744127a4366c29390d4c87.tar.gz",
+     "release_id": "1.0.0-387b9c8c08822a6d",
+     "schema_version": 1,
+     "sequence": 7,
+     "source_commit": null,
+     "started_at_epoch_s": 1794184030.188964,
+     "state": "asset_set_active",
+     "transaction_id": "e3d66257-4ed9-4007-a5a3-315ec04c5475",
+     "updated_at_epoch_s": 1794184030.5040133
+    }
+   },
+   "schema_version": 1,
+   "started_at_epoch_s": 1794184028.8872736,
+   "state": "succeeded",
+   "transaction_id": "1944c45f55e641f8b155b8fcfc56be76",
+   "updated_at_epoch_s": 1794184030.6790156,
+   "upload_id": "a46c8d7311744127a4366c29390d4c87"
+  },
+  "fpga": {
+   "pl_compatibility": "not_managed",
+   "pl_qualification": "not_qualified",
+   "pl_version": null
+  },
+  "identity": {
+   "device_id": "ppu-device-7ed4b30913a9bf6101da5a7a",
+   "facility_id": null,
+   "hardware_revision": null,
+   "ppu_id": null
+  },
+  "runtime": {
+   "git_sha": "a1b1c6f3b1424ce38d1de7e597ef22d0ef4460f2",
+   "product_version": "0.2.1",
+   "reason": null,
+   "release_id": "0.2.1-a1b1c6f3b142",
+   "state": "runtime_active",
+   "target": "linux-armv7l"
+  },
+  "schema_version": 1,
+  "security": {
+   "control_token_provisioned": true,
+   "operation_authorization": "plasma.ppu.owner-operation-authorization.v1",
+   "publisher_authenticity": "not_qualified",
+   "transport_confidentiality": "not_qualified"
+  }
+ },
+ "bootstrap_endpoint_policy": "z2-ps-same-host:18081",
+ "ok": true,
+ "pairing": {
+  "credential_persistence": "file",
+  "device_id": "ppu-device-7ed4b30913a9bf6101da5a7a",
+  "device_match": true,
+  "paired": true,
+  "updated_at": "2026-11-09T01:20:34.201539+00:00"
+ },
+ "ppu_alias": "z2",
+ "upstream_status": 200
+}

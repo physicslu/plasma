@@ -1,0 +1,34 @@
+2026-11-15T13:58Z  #1450 merged (1224cb000618), owner Gate 2; CI 15 pass / 8 skip
+2026-11-15T13:59Z  z2-ps-release run 43721849184 on 1224cb000 -> kit plasma-z2-ps-kit-0.2.1-1224cb000618 sha f7937efa (sidecar match)
+2026-11-15T14:0xZ  #1451 pin PR merged (a58e021808ba), owner approved; no CI workflow matched its path; local 8 passed
+2026-11-15T14:03:08Z Runtime Full-Copy deploy (deploy_runtime_kit, Active 957ac4e6 gen22) -> tx 4899bb12c726489c9d702933677acfc5
+2026-11-15T14:04:31Z FAIL: deployment-api state recovery_required / coordinator_result_unreconciled
+                    error: "ppu-bootstrap-kit: Z2 PS kit is missing required deployment tooling"
+Root cause: installed Bootstrap (783102b9e) kit check requires scripts/ppu-z2-installer-core.py; #1433 (59d60e2fa) retired that file,
+so every kit built from current main is refused before install.
+Observed after: coordinator journal unchanged (bundle tx b576ef74 asset_set_active); /opt/plasma/current = 0.2.1-783102b9e552;
+services active; Gateway ready; Active Set gen 22 unchanged. No install, no FPGA, no DUT. Upload 01a1acf3 left in uploads.
+Existing deployment/reconcile is NOT applicable (needs a runtime_active coordinator receipt for this tx). No retry, no manual edit.
+Effect: Manager managed writes (incl. programming Batches) are blocked by ppu_platform_recovery_required until explicit recovery.
+NOT_RUN: Root tree upgrade, engine admission switch, max_concurrent_jobs=2, WP-07 steps 5/6 with CPU/RAM sampling.
+2026-11-15T14:3xZ  #1453 merged (fd6d44afcc95), owner Gate 2; CI 22/22
+2026-11-15T14:37:56Z recovery of tx 4899bb12 (owner approved): stop plasma-bootstrap -> ppu-bootstrap-preinstall-recovery.py (sha 6cef7c41) -> RECOVERED
+                    record now failed/kit_preinstall_refused (sha 18883569); original backup operator-recovery/4899bb12...orig sha 4646b0ce; bootstrap restarted (pid 6489)
+2026-11-15T14:40:40Z Runtime Full-Copy deploy kit 0.2.1-fd6d44afcc95 (run 43725333212, sha afb20e89; old verify_kit PASS) -> tx 629defe2 PASS
+                    current=0.2.1-fd6d44afcc95; legacy installer-core removed from /opt/plasma/bootstrap; control-plane.json bound; Active 957ac4e6 gen22 unchanged
+2026-11-15T14:4xZ  plasma-bootstrap restarted (6489->8209): runtime_active, deployment succeeded, B3+runtime_deployment caps true, controller gen2 NORMAL; Sites 1/2 idle openocd
+2026-11-15T14:5xZ  Root upgrade BLOCKED before any action: /opt/plasma/privileged/fpga-root.previous (2026-11-04, manifest c30404a3) exists;
+                    ppu-privileged-source-install.py upgrade refuses (PRIVILEGED_UPGRADE_PENDING_RECOVERY) and has no command to retire an old backup.
+                    Root guard still e2adb620 (current manifest d7f808f9); factory guard 188a3d03 (= main). Engine admission still 3f5d5fec (kept: new admission needs new guard).
+NOT_RUN: Root upgrade, engine switch, max_concurrent_jobs=2, steps 5/6.
+2026-11-15T14:45:56Z Root maintenance (owner approved A): preflight PASS; stopped bootstrap/web/server/site-worker/package-control (runtime-activation followed);
+                    archived fpga-root.previous (c30404a3) -> /var/lib/plasma-privileged/root-archive/fpga-root.previous-20261104 (same fs rename);
+                    upgrade d7f808f9 -> c36f3880 UPGRADED_NOT_EXECUTED; Root guard now 188a3d03 (= main); new .previous = d7f808f9; journal 986446e7 unchanged; no FPGA reload
+2026-11-15T14:46:11Z all six services started; Gateway ready
+2026-11-15T14:4xZ  engine prepare BLOCKED by its own preflight (no change): REST_SITE2_NOT_IDLE_OR_ENABLED because it still requires Site 2 target==STM32F103C8T6
+                    (since #1424 an idle Site reports target null). Fix PR #1454 (b52baef22). Engine still 3f5d5fec; max=1.
+2026-11-15T14:5xZ  #1454 merged (c99243089); engine prepare PREPARED_NOT_SELECTED; switch SELECTED: admission 3f5d5fec -> c6dd05e6 (runtime_id ...-c6dd05e63a4f); openocd b8a7db67; FPGA journal unchanged
+2026-11-15T14:58:20Z ppu.yaml max 1->2 (backup ppu.yaml.bk-wp07b-20261115T145820Z), plasma-server restarted (web followed)
+2026-11-15T14:59Z  step 6 (verify-only v0.1, Sites 1+2, batch 4aabca9a): Site 2 PASS (job ...80bf04ec, safe_off); Site 1 refused PROC_RESOURCE_OWNER_CONFLICT before OpenOCD (no SWD edges)
+                    cause: census owner snapshot taken before Site 2 OpenOCD attached. Fix PR #1455 (85cd5529d).
+2026-11-15T15:0xZ  ppu.yaml restored to max 1 (sha ac0cfa21), plasma-server restarted; no seals/admission records. Step 5 NOT_RUN.

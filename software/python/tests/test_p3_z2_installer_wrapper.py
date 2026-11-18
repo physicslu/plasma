@@ -38,11 +38,7 @@ def runtime(install_paths):
 
 def verified():
     return SimpleNamespace(
-        runtime_manifest={
-            "data": {
-                "device_catalog_manifest": "data/device-catalog/production/icpn-v1-manifest.json"
-            }
-        }
+        runtime_manifest={"schema_version": 1, "role": "ppu"}
     )
 
 
@@ -52,7 +48,6 @@ def test_p3_units_make_helper_a_gateway_owned_dependency(tmp_path: Path) -> None
         paths=install_paths,
         python_runtime=runtime(install_paths),
         gateway_host="192.168.2.99",
-        catalog_relative="data/device-catalog/production/icpn-v1-manifest.json",
     )
 
     server = units["plasma-server.service"]
@@ -80,10 +75,10 @@ def test_successful_upgrade_preserves_existing_canonical_site_desired_state(
     config_path.chmod(0o640)
 
     def fake_core_install(*args, **kwargs):
-        installer._core._write_text_atomic(config_path, "sites: []\n", 0o640)
+        kwargs["config_writer"](config_path, "sites: []\n", 0o640)
         return {"site_desired_state": {"runtime_apply_supported": False}}
 
-    monkeypatch.setattr(installer, "_original_install_release", fake_core_install)
+    monkeypatch.setattr(installer, "_install_base_release", fake_core_install)
     calls: list[tuple[str, ...]] = []
     evidence = installer.install_release(
         verified(),
@@ -105,6 +100,7 @@ def test_successful_upgrade_preserves_existing_canonical_site_desired_state(
     assert ("enable", "--now", installer.RUNTIME_ACTIVATION_SERVICE) not in calls
     persisted_evidence = json.loads((install_paths.install_root / "last-install.json").read_text())
     assert persisted_evidence["site_desired_state"]["upgrade_preserves_existing_config"] is True
+    assert evidence["site_desired_state"]["empty_sites_migrated_to_defaults"] is False
 
 
 def test_failed_activation_restores_previous_helper_unit(
@@ -120,7 +116,7 @@ def test_failed_activation_restores_previous_helper_unit(
     def fail_core_install(*args, **kwargs):
         raise installer.Z2InstallerError("synthetic activation failure")
 
-    monkeypatch.setattr(installer, "_original_install_release", fail_core_install)
+    monkeypatch.setattr(installer, "_install_base_release", fail_core_install)
     calls: list[tuple[str, ...]] = []
     with pytest.raises(installer.Z2InstallerError, match="synthetic activation failure"):
         installer.install_release(
@@ -151,7 +147,7 @@ def test_failed_first_install_removes_candidate_helper_unit(
     def fail_core_install(*args, **kwargs):
         raise installer.Z2InstallerError("synthetic first-install failure")
 
-    monkeypatch.setattr(installer, "_original_install_release", fail_core_install)
+    monkeypatch.setattr(installer, "_install_base_release", fail_core_install)
     calls: list[tuple[str, ...]] = []
     with pytest.raises(installer.Z2InstallerError, match="synthetic first-install failure"):
         installer.install_release(
