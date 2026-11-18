@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+from plasma_core import job_timing
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
@@ -114,12 +115,13 @@ class OpenOCDInterface(BaseInterface):
                               "RUNTIME_CONTEXT_JOB_MISMATCH")
         self._binding(request.operation)
         try:
-            self.opf_flash_preflight(
-                active_asset_set=thaw(self._context.active_asset_set), target=request.target,
-                site_id=request.site_id, image_size=request.image_size,
-                job_binding=thaw(self._context.admitted_job_binding),
-                provider=request.metadata.get("provider"), profile=request.metadata.get("profile"),
-                operation=request.operation.value)
+            with job_timing.span("prepare_preflight"):
+                self.opf_flash_preflight(
+                    active_asset_set=thaw(self._context.active_asset_set), target=request.target,
+                    site_id=request.site_id, image_size=request.image_size,
+                    job_binding=thaw(self._context.admitted_job_binding),
+                    provider=request.metadata.get("provider"), profile=request.metadata.get("profile"),
+                    operation=request.operation.value)
         except (ValueError, OSError, KeyError, TypeError) as exc:
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                               "OPF_FLASH_DENIED:" + str(exc)) from exc

@@ -7,7 +7,6 @@ of Site admission, image binding, cancellation, SAFE_OFF and sealing.
 """
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import math
@@ -20,6 +19,7 @@ from plasma_interfaces.site_worker_c3 import (
     SiteWorkerControlClient, SiteWorkerRefused, run_job_operations,
 )
 from plasma_opf import TimeoutPolicy, parse_programming_selection
+from plasma_core import job_timing
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
 
@@ -340,7 +340,10 @@ async def execute_reference_flash(
           and type(job_deadline_monotonic) in (int, float)
           and math.isfinite(job_deadline_monotonic),
           "REFERENCE_JOB_DEADLINE_MISMATCH")
-    binding = qualify_reference(
+    # Blocking file reads and SHA256 checks run off the Runtime event loop so
+    # one Job's verification never stalls another Site's Job.
+    binding = await job_timing.in_thread(
+        "qualify_reference", qualify_reference,
         product_root=product_root, asset_set_sha256=asset_set_sha256,
         selection=selection, policy=policy, target=target, site_id=site_id,
         image_size=len(image), hardware=hardware,
@@ -398,6 +401,18 @@ async def execute_reference_flash(
                                    else job_binding.get("job_binding_sha256"))}
 
 
+def _staged_profile_and_handoff(product_root: Path, digest: str,
+                                profile_package: str) -> tuple[dict[str, Any], Any]:
+    staged = product_root / "assets" / "staged" / digest
+    manifest = json.loads((staged / "manifest.json").read_bytes())
+    # No StopIteration may cross the thread boundary into the event loop.
+    profile = next((p for p in manifest["packages"] if p["id"] == profile_package), None)
+    _need(profile is not None, "PROFILE_MISSING_OR_AMBIGUOUS")
+    handoff = (ppu_asset_set.resolve_staged_fpga_handoff(product_root, digest)
+               if any(p["kind"] == "fpga-image" for p in manifest["packages"]) else None)
+    return profile, handoff
+
+
 async def execute_runtime_flash(
     client: SiteWorkerControlClient, *, product_root: Path, request: JobRequest,
     active_asset_set: Mapping[str, Any] | None, job_deadline_monotonic: float,
@@ -413,29 +428,31 @@ async def execute_runtime_flash(
     """
     operation = request.operation.value
     try:
-        pinned_profile = preflight_runtime_flash(
+        # Blocking file reads and SHA256 checks run off the Runtime event loop
+        # (asyncio.to_thread) so concurrent Sites do not queue behind them.
+        pinned_profile = await job_timing.in_thread(
+            "preflight", preflight_runtime_flash,
             product_root=product_root, active_asset_set=active_asset_set,
             target=request.target, site_id=request.site_id, image_size=len(request.image),
             job_binding=job_binding,
             provider=request.metadata.get("provider"), profile=request.metadata.get("profile"),
             operation=operation)
         digest = pinned_profile["asset_set_sha256"]
-        staged = product_root / "assets" / "staged" / digest
-        manifest = json.loads((staged / "manifest.json").read_bytes())
-        profile = next(p for p in manifest["packages"]
-                       if p["id"] == pinned_profile["profile_package"])
-        handoff = (ppu_asset_set.resolve_staged_fpga_handoff(product_root, digest)
-                   if any(p["kind"] == "fpga-image" for p in manifest["packages"]) else None)
+        profile, handoff = await job_timing.in_thread(
+            "staged_manifest", _staged_profile_and_handoff,
+            product_root, digest, pinned_profile["profile_package"])
         timeout_ms = round(request.timeout_s * 1000)
         _need(timeout_ms / 1000.0 == request.timeout_s, "OPF_TIMEOUT_PRECISION_UNSUPPORTED")
         policy = TimeoutPolicy(timeout_ms, 3600000)  # existing C-3 session ceiling
         selection = {"schema": "plasma.opf.programming.v1",
                      "provider": pinned_profile["provider_package"],
                      "profile": profile["id"], "options": {}}
-        engine = ppu_site_engine.load_engine(require_root=True)
+        engine = await job_timing.in_thread(
+            "load_engine", ppu_site_engine.load_engine, require_root=True)
         remaining = job_deadline_monotonic - time.monotonic()
         _need(math.isfinite(remaining) and remaining > 0, "JOB_DEADLINE_EXPIRED")
-        status = await asyncio.to_thread(client.call, "status", timeout_s=remaining)
+        status = await job_timing.in_thread(
+            "worker_status", client.call, "status", timeout_s=remaining)
         _need(not status.get("not_ready"), "REFERENCE_ENGINE_NOT_READY")
         identity = status.get("identity", {})
         fpga = handoff["fpga_image"] if handoff else None
