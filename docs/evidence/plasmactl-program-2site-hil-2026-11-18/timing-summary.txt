@@ -1,0 +1,4 @@
+outcome PASS  batch 842900c4ceced9700d6affcc78077ebb  start 35f059639b378f0d91719fc7eb712541  state finished
+  Manager Batch elapsed 13.87 s (MANAGER_BATCH_CREATED_TO_FINISHED)
+  z2:1 PASS job job-20261118-154328-a21dcb5e attempts 1 safe_off True
+  z2:2 PASS job job-20261118-154328-d86649a2 attempts 1 safe_off True
