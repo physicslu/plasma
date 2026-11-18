@@ -1,0 +1,20 @@
+Deploy main ebde888471c8cd21fa3cf59143e76741bb841339 (#1485 Unified CLI) — 2026-11-18
+
+SWPC Control Station
+  before 7565ff0b11b8 (rollback) -> ebde888471c8 via `scripts/plasmactl deploy local-control-station`
+  (new Python launcher path). Preflight PASS (journal batches 1 / runs 2 / starts 5, PPU IDLE).
+  verify PASS; z2 managed-control probe READY; new `logs local-control-station` exit 0.
+
+Z2 Runtime
+  kits: z2-ps-release run 44337052640 (kit 0.2.1-ebde888471c8 sha 74ae0c04..., sidecar + SHA256SUMS OK,
+        release.json git_sha ebde88847, ships utilities/plasmactl/src, no __pycache__);
+        ppu-bootstrap run 44337052679 (downloaded to dl-boot, not separately installed)
+  plasma_program.py runtime-deploy (neutral ppu_bootstrap_transport), tx b8eb700e18b242acb3ca3266b74ae6e4 PASS
+  a34f0ef03 (rollback) -> ebde88847; /opt/plasma/current -> releases/0.2.1-ebde888471c8
+  Bootstrap Coordinator executed the kit's new `scripts/plasmactl` launcher on Z2 System Python 3.10.4.
+  site-worker 23:40:01 CST, server/web 23:40:06 CST restarted by Coordinator; plasma-bootstrap not restarted.
+  /opt/plasma/bootstrap ppu-bootstrap-kit.py / deployment / installer == repo bytes.
+  Active Set 957ac4e6 gen 25 unchanged; max_concurrent_jobs 2; Root 51e87bfe, FPGA journal 986446e7,
+  FPGA Manager operating, no OpenOCD; Root/Engine untouched (no Z2-side Root/Engine changes since a34f0ef03).
+  Manager: deployment succeeded, runtime_active, paired/authenticated; Sites 1,2 idle.
+  No Job, flash or HIL run.
