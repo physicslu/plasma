@@ -284,8 +284,9 @@ def _program(args: argparse.Namespace) -> int:
                "batch": programming.summarize_batch(batch)})
         return programming.batch_exit(batch)
     if action == "receipt":
+        targets = parse_targets(args.target or [])  # validate before any I/O
         batch = manager_batch(url, args.batch_id, timeout=timeout)
-        response, complete = programming.verify_batch_receipt(batch, parse_targets(args.target or []))
+        response, complete = programming.verify_batch_receipt(batch, targets)
         _emit(response)
         return EXIT_PASS if complete else programming.batch_exit(batch) or EXIT_NOT_PASS
     if action == "reconcile":
@@ -342,9 +343,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "diagnose":
+            targets = parse_targets(args.target or [])  # validate before any I/O
             fleet = manager_fleet(args.manager_url, timeout=args.timeout)
-            response, complete = select_fleet(fleet, parse_targets(args.target or []),
-                                              all_ppus=args.all)
+            response, complete = select_fleet(fleet, targets, all_ppus=args.all)
             _emit(response)
             return EXIT_PASS if complete else EXIT_NOT_PASS
         if args.command == "program":

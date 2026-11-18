@@ -311,3 +311,13 @@ def test_deploy_status_cli_uses_read_only_endpoint(capsys):
     assert status == 0
     assert json.loads(capsys.readouterr().out)["ppus"][0]["ppu_alias"] == "z2"
     read.assert_called_once()
+
+
+@pytest.mark.parametrize("argv", [
+    ["diagnose", "--target", "z2:0"],
+    ["program", "receipt", "--batch-id", "a" * 32, "--target", "z2:1,1"],
+])
+def test_invalid_target_fails_before_any_manager_io(argv, capsys):
+    with patch("plasma_cli.api.build_opener", side_effect=AssertionError("no I/O")):
+        assert main(argv) == 2
+    assert "Site IDs must be unique positive integers" in capsys.readouterr().err
