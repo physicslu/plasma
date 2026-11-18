@@ -479,3 +479,98 @@ def test_batch_restart_during_an_attempt_is_unknown(tmp_path):
         "OUTCOME_UNKNOWN", "MANAGER_RESTARTED_DURING_ATTEMPT")
     assert view["acknowledged"] is False and view["unknown_run_id"] is not None
     assert gateway.posts == []
+
+
+# ------------------------------- retention: a start is pruned with its record
+
+def _preflight():
+    import importlib.util
+    from pathlib import Path
+    script = Path(__file__).resolve().parents[3] / "scripts/plasma_cs_deploy_preflight.py"
+    spec = importlib.util.spec_from_file_location("plasma_cs_deploy_preflight_retention", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _rig_with_manager_file_names(tmp_path):
+    """The deployed Manager's journal names, so the real preflight reads them."""
+    coord = FakeCoordinator(active_sha="e" * 64)
+    gateway = FakeGateway(image=image(), coordinator=coord,
+                          resource_for=lambda _a: OPS_RESOURCE_SHA)
+    workflow, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway, journal=False)
+    workflow.journal_path = tmp_path / "bundle-programming-runs.json"
+    batches = ProgrammingBatchCoordinator(
+        workflow, journal_path=tmp_path / "programming-batches.json", sleep=lambda _s: None,
+        spawn=lambda target: target(), poll_interval_s=0.0)
+    return batches, workflow, coord, gateway
+
+
+def _consumed_starts_have_their_records(tmp_path):
+    runs = json.loads((tmp_path / "bundle-programming-runs.json").read_text())
+    batches = json.loads((tmp_path / "programming-batches.json").read_text())["batches"]
+    batch_ids = {b["batch_id"] for b in batches}
+    run_ids = {r["run_id"] for r in runs["runs"]}
+    consumed = [s for s in runs["starts"] if s["state"] == "CONSUMED"]
+    for start in consumed:
+        assert (start["batch_id"] in batch_ids if start["kind"] == "batch"
+                else start["run_id"] in run_ids), start
+    return consumed, batch_ids, run_ids
+
+
+@pytest.mark.parametrize("batch_limit, run_limit", [(2, 64), (32, 3)])
+def test_pruned_batches_and_runs_take_their_starts_and_never_block_preflight(
+        tmp_path, monkeypatch, batch_limit, run_limit):
+    """More Batches/Runs than retained: the journalled Start ledger stays
+    consistent, so the deployment preflight passes (the 32-vs-256 defect)."""
+    import plasma_manager.programming_batch as programming_batch
+    monkeypatch.setattr(programming_batch, "MAX_BATCHES_RETAINED", batch_limit)
+    monkeypatch.setattr(programming, "MAX_RUNS_RETAINED", run_limit)
+    batches, workflow, coord, gateway = _rig_with_manager_file_names(tmp_path)
+    started = []
+    for _ in range(5):
+        start_id = issue(workflow)
+        start_batch(batches, {**ops_body(FULL), "start_id": start_id})
+        started.append(start_id)
+    consumed, batch_ids, run_ids = _consumed_starts_have_their_records(tmp_path)
+    assert len(batch_ids) == min(5, batch_limit) and len(run_ids) == min(5, run_limit)
+    # In this process every Batch is still in memory and reconciles exactly.
+    assert all(rec(batches, s)["state"] == "TERMINAL_CONFIRMED" for s in started)
+
+    # After a Manager restart: the real preflight, against the live view.
+    workflow2, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway, journal=False)
+    workflow2.journal_path = tmp_path / "bundle-programming-runs.json"
+    workflow2._starts.clear()
+    workflow2._runs.clear()
+    workflow2._load_journal()
+    batches2 = ProgrammingBatchCoordinator(
+        workflow2, journal_path=tmp_path / "programming-batches.json")
+    preflight = _preflight()
+    monkeypatch.setattr(preflight, "http_json", lambda url: batches2.reconcile_start(
+        url.rsplit("/", 1)[1]))
+    journal = preflight.check_transactions(tmp_path)
+    assert preflight.check_start_reconciliation(journal, "http://manager") == len(consumed)
+    # Retained Batches still reconcile exactly; a pruned one is unprovable,
+    # which is OUTCOME_UNKNOWN and never NOT_ACCEPTED.
+    for start_id in started:
+        view = rec(batches2, start_id)
+        kept = any(s["start_id"] == start_id for s in consumed)
+        assert view["state"] == ("TERMINAL_CONFIRMED" if kept else "OUTCOME_UNKNOWN")
+        assert view["state"] != "NOT_ACCEPTED"
+    assert len(gateway.posts) == 5  # one Job per Batch; nothing resubmitted
+
+
+def test_a_consumed_start_whose_record_vanished_unexpectedly_still_blocks_preflight(
+        tmp_path, monkeypatch):
+    """Only records this Manager pruned take their start with them. A Batch
+    record that is merely missing keeps its start and stays fail-closed."""
+    batches, workflow, _coord, _gateway = _rig_with_manager_file_names(tmp_path)
+    start_batch(batches, {**ops_body(FULL), "start_id": issue(workflow)})
+    (tmp_path / "programming-batches.json").write_text(
+        json.dumps({"schema": "plasma.manager.programming-batch-journal.v2", "batches": []}))
+    preflight = _preflight()
+    monkeypatch.setattr(preflight, "http_json", lambda url: batches.reconcile_start(
+        url.rsplit("/", 1)[1]))
+    journal = preflight.check_transactions(tmp_path)
+    with pytest.raises(preflight.Blocked, match="admitted Batch record missing"):
+        preflight.check_start_reconciliation(journal, "http://manager")
