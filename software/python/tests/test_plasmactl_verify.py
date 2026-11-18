@@ -9,7 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PLASMACTL = REPO_ROOT / "scripts" / "plasmactl"
-VERIFY = REPO_ROOT / "scripts" / "plasmactl-verify"
+VERIFY = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-verify"
 
 
 def run_bash(script: str, *, stdin: str = "") -> subprocess.CompletedProcess[str]:

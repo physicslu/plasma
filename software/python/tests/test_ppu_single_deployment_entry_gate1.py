@@ -534,7 +534,8 @@ def test_kit_ships_pinned_legacy_core_that_new_tooling_never_loads():
     # The kit's own tooling (what the old Bootstrap executes) never references it.
     for name in ("plasmactl", "plasmactl-z2-ps", "ppu-z2-installer.py", "ppu_package_units.py",
                  "z2-python-runtime.py", "openocd-runtime.py", "ppu_runtime_local_readiness.py"):
-        assert "installer-core" not in (ROOT / "scripts" / name).read_text(encoding="utf-8"), name
+        source_path = (ROOT / "utilities/plasmactl/backends" / name) if name == "plasmactl-z2-ps" else (ROOT / "scripts" / name)
+        assert "installer-core" not in source_path.read_text(encoding="utf-8"), name
     # The coordinator only names it to snapshot-then-retire it.
     deployment_source = (ROOT / "scripts/ppu-bootstrap-deployment.py").read_text(encoding="utf-8")
     assert deployment_source.count("ppu-z2-installer-core.py") == 1
@@ -564,7 +565,8 @@ def test_old_bootstrap_kit_verifier_accepts_a_kit_with_the_legacy_core(tmp_path:
         for script in ("plasmactl", "plasmactl-z2-ps", "ppu-bootstrap-deployment.py",
                        "ppu-z2-installer.py", "ppu_package_units.py", "z2-python-runtime.py",
                        "openocd-runtime.py", "ppu_runtime_local_readiness.py"):
-            (root / "scripts" / script).write_bytes((ROOT / "scripts" / script).read_bytes())
+            source_path = (ROOT / "utilities/plasmactl/backends" / script) if script == "plasmactl-z2-ps" else (ROOT / "scripts" / script)
+            (root / "scripts" / script).write_bytes(source_path.read_bytes())
         cli = root / "utilities/plasmactl/src/plasma_cli"
         cli.mkdir(parents=True)
         for source in (ROOT / "utilities/plasmactl/src/plasma_cli").glob("*.py"):

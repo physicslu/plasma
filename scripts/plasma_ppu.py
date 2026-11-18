@@ -27,7 +27,7 @@ _USER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]*\Z")
 _REPO_FILES = (
     "AGENTS.md", "scripts/ppu-deploy", "scripts/ppu_deploy.py",
     "scripts/ppu_deploy_target.py", "scripts/ppu_deploy_api.py",
-    "scripts/plasmactl", "scripts/plasmactl-z2-ps", "scripts/ppu_runtime_local_readiness.py",
+    "scripts/plasmactl", "utilities/plasmactl/backends/plasmactl-z2-ps", "scripts/ppu_runtime_local_readiness.py",
     "scripts/ppu-bootstrap-service.py", "scripts/ppu-bootstrap-deployment.py",
     "scripts/opf_platform_bundle_v3_build.py",
 )

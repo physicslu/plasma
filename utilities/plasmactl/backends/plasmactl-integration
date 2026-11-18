@@ -835,7 +835,7 @@ case "$command" in
   restart) restart_services ;;
   web-restart|restart-web) restart_web_console ;;
   deploy|update-and-restart) deploy ;;
-  verify) bash "$repo/scripts/plasmactl-verify" "${1:-}" ;;
+  verify) bash "$repo/utilities/plasmactl/backends/plasmactl-verify" "${1:-}" ;;
   start) start_services ;;
   stop) stop_services ;;
   status) show_status ;;

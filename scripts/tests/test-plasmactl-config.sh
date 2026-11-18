@@ -4,7 +4,7 @@ set -Eeuo pipefail
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 repo="$(cd "$(dirname "$script_path")/../.." && pwd)"
 integration_test="$repo/scripts/tests/test-plasmactl-integration-config.sh"
-integration_backend="${PLASMACTL_INTEGRATION_PATH:-$repo/scripts/plasmactl-integration}"
+integration_backend="${PLASMACTL_INTEGRATION_PATH:-$repo/utilities/plasmactl/backends/plasmactl-integration}"
 
 [[ -f "$integration_test" ]] || {
   printf '[plasmactl-test] FAIL: integration config test is missing: %s\n' "$integration_test" >&2

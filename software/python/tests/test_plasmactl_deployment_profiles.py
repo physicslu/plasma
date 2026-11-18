@@ -10,10 +10,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PLASMACTL = REPO_ROOT / "scripts" / "plasmactl"
-INTEGRATION = REPO_ROOT / "scripts" / "plasmactl-integration"
-LOCAL_CONTROL_STATION = REPO_ROOT / "scripts" / "plasmactl-local-control-station"
-SWPC_Z2LIKE = REPO_ROOT / "scripts" / "plasmactl-swpc-z2like"
-Z2_PS = REPO_ROOT / "scripts" / "plasmactl-z2-ps"
+INTEGRATION = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-integration"
+LOCAL_CONTROL_STATION = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-local-control-station"
+SWPC_Z2LIKE = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-swpc-z2like"
+Z2_PS = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-z2-ps"
 CLI_MAIN = REPO_ROOT / "utilities" / "plasmactl" / "src" / "plasma_cli" / "main.py"
 CLI_OPERATIONS = REPO_ROOT / "utilities" / "plasmactl" / "src" / "plasma_cli" / "operations.py"
 

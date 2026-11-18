@@ -177,7 +177,7 @@ def test_programming_commissioning_tool_no_longer_imports_path2_module():
     assert "path2" not in neutral.lower() and "GITHUB_" not in neutral
 
 
-# Source ownership: all legacy entry paths link to one implementation.
+# Source ownership: nine canonical backends and zero legacy entry paths.
 @pytest.mark.parametrize("name", [
     "plasmactl-integration",
     "plasmactl-local-control-station",
@@ -189,12 +189,12 @@ def test_programming_commissioning_tool_no_longer_imports_path2_module():
     "plasmactl-verify",
     "plasmactl-z2-ps",
 ])
-def test_legacy_backend_path_is_thin_link_to_canonical_source(name):
+def test_no_legacy_backend_path_after_migration(name):
     canonical = REPO / "utilities" / "plasmactl" / "backends" / name
     legacy = REPO / "scripts" / name
     assert canonical.is_file()
-    assert legacy.is_symlink()
-    assert legacy.resolve() == canonical
+    assert not legacy.exists()
+    assert not legacy.is_symlink()
 
 
 def test_launcher_points_at_canonical_backend_directory():

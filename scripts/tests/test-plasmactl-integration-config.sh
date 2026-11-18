@@ -4,7 +4,7 @@ set -Eeuo pipefail
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 repo="$(cd "$(dirname "$script_path")/../.." && pwd)"
 plasmactl_path="${PLASMACTL_PATH:-$repo/scripts/plasmactl}"
-integration_path="$repo/scripts/plasmactl-integration"
+integration_path="$repo/utilities/plasmactl/backends/plasmactl-integration"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 

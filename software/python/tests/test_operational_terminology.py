@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-PLASMACTL_INTEGRATION = REPO_ROOT / "scripts" / "plasmactl-integration"
+PLASMACTL_INTEGRATION = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-integration"
 
 
 def test_plasmactl_generates_canonical_systemd_descriptions(tmp_path: Path) -> None:
