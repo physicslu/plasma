@@ -53,6 +53,7 @@ test("upstream evidence projection cannot mutate qualification, mapping or runti
   assert.match(code, /"production_binding_authorized": False/);
   assert.match(code, /"executable": False/);
   assert.match(code, /"physical_programming_qualified": False/);
-  assert.match(gateway, /item\["upstream_openocd_evidence"\] = microchip_upstream_openocd_evidence\(record\)/);
+  assert.match(gateway, /item\["upstream_openocd_evidence"\] = None if published_only else microchip_upstream_openocd_evidence\(record\)/);
+  assert.match(gateway, /published_only = bool\(qualification\.get\("data_only_publication"\)\)/);
   assert.doesNotMatch(code, /subprocess|os\.system|flash_write|job_selectable\s*=(?!=)|row\.mapping_status\s*=(?!=)/);
 });
