@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -67,3 +68,37 @@ def manager_batch(url: str, batch_id: str, *, timeout: float = 5.0) -> dict:
     if not isinstance(batch, dict) or batch.get("batch_id") != batch_id:
         raise FleetError("Manager Batch identity or response contract mismatch")
     return batch
+
+def manager_deployment_status(url: str, ppu_alias: str, *, timeout: float = 5.0) -> dict:
+    """Read installed PPU Bootstrap state via Manager; never deploy anything."""
+    if (
+        not isinstance(ppu_alias, str) or not 1 <= len(ppu_alias) <= 128
+        or ppu_alias != ppu_alias.strip() or ppu_alias in (".", "..")
+        or "/" in ppu_alias or "\\" in ppu_alias
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in ppu_alias)
+    ):
+        raise FleetError("invalid PPU alias for Deployment status")
+    body = _manager_get(
+        url, "/api/registry/" + quote(ppu_alias, safe="") + "/bootstrap",
+        timeout=timeout,
+    )
+    if body.get("ppu_alias") != ppu_alias or not isinstance(body.get("bootstrap"), dict):
+        raise FleetError("Manager Deployment status identity or contract mismatch")
+    pairing = body.get("pairing")
+    bootstrap = body["bootstrap"]
+    if not isinstance(pairing, dict):
+        raise FleetError("Manager Deployment status is missing pairing state")
+    deployment = bootstrap.get("deployment")
+    runtime = bootstrap.get("runtime")
+    return {
+        "ppu_alias": ppu_alias,
+        "status": "OBSERVED",
+        "pairing": {
+            "paired": pairing.get("paired"),
+            "device_match": pairing.get("device_match"),
+            "device_authenticated": pairing.get("device_authenticated"),
+        },
+        "deployment_state": deployment.get("state") if isinstance(deployment, dict) else None,
+        "runtime_state": runtime.get("state") if isinstance(runtime, dict) else None,
+        "evidence_kind": "MANAGER_BOOTSTRAP_STATUS_ONLY",
+    }

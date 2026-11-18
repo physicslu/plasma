@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from plasma_cli.api import FleetError, manager_batch, manager_fleet
-from plasma_cli.main import main, select_fleet, verify_batch_receipt
+from plasma_cli.api import FleetError, manager_batch, manager_deployment_status, manager_fleet
+from plasma_cli.main import main, observe_deployments, select_fleet, verify_batch_receipt
 from plasma_cli.targets import parse_targets
 
 
@@ -202,3 +202,52 @@ def test_receipt_cli_readonly(capsys):
     assert output["manager_reported_pass"] is True
     assert output["batch_id"] == BATCH_ID
     get.assert_called_once()
+
+def test_deployment_status_reads_bootstrap_without_mutation():
+    opener = _Opener({
+        "ok": True, "ppu_alias": "z2",
+        "pairing": {"paired": True, "device_match": True,
+                    "device_authenticated": True, "secret": "NEVER_OUTPUT"},
+        "bootstrap": {"deployment": {"state": "idle"},
+                      "runtime": {"state": "ready"}, "token": "NEVER_OUTPUT"},
+    })
+    with patch("plasma_cli.api.build_opener", return_value=opener):
+        result = manager_deployment_status("http://127.0.0.1:18280", "z2")
+    assert result["deployment_state"] == "idle"
+    assert result["runtime_state"] == "ready"
+    assert "NEVER_OUTPUT" not in json.dumps(result)
+    assert opener.request.get_method() == "GET"
+    assert opener.request.full_url.endswith("/api/registry/z2/bootstrap")
+
+
+def test_deployment_multi_ppu_failure_is_isolated():
+    def read(_url, alias, *, timeout):
+        if alias == "blocked":
+            raise FleetError("unreachable")
+        return {"ppu_alias": alias, "status": "OBSERVED"}
+    with patch("plasma_cli.main.manager_deployment_status", side_effect=read):
+        result, complete = observe_deployments("http://localhost:18280", ["z2", "blocked"])
+    assert not complete
+    assert result["ppus"][0]["status"] == "OBSERVED"
+    assert result["ppus"][1]["status"] == "NOT_VERIFIED"
+
+
+def test_deployment_duplicate_alias_denied():
+    with pytest.raises(FleetError, match="duplicate"):
+        observe_deployments("http://localhost:18280", ["z2", "z2"])
+
+
+@pytest.mark.parametrize("alias", ["", "..", ".", "../bad", "bad/name", "bad\\name", "  z2", "z2\n"])
+def test_deployment_invalid_alias_denied_before_any_io(alias):
+    with patch("plasma_cli.api.build_opener", side_effect=AssertionError("no I/O")):
+        with pytest.raises(FleetError, match="invalid PPU alias"):
+            manager_deployment_status("http://localhost:18280", alias)
+
+
+def test_deploy_status_cli_uses_read_only_endpoint(capsys):
+    with patch("plasma_cli.main.manager_deployment_status",
+               return_value={"ppu_alias": "z2", "status": "OBSERVED"}) as read:
+        status = main(["deploy", "status", "--ppu", "z2"])
+    assert status == 0
+    assert json.loads(capsys.readouterr().out)["ppus"][0]["ppu_alias"] == "z2"
+    read.assert_called_once()

@@ -6,7 +6,7 @@ import json
 import sys
 from collections.abc import Sequence
 
-from .api import FleetError, manager_batch, manager_fleet
+from .api import FleetError, manager_batch, manager_deployment_status, manager_fleet
 from .targets import Target, parse_targets
 
 
@@ -138,6 +138,25 @@ def verify_batch_receipt(batch: dict, targets: tuple[Target, ...]) -> tuple[dict
     }, complete
 
 
+def observe_deployments(manager_url: str, ppus: list[str], *, timeout: float = 5.0) -> tuple[dict, bool]:
+    """Collect independent read-only Bootstrap observations for multiple PPUs."""
+    if len(set(ppus)) != len(ppus):
+        raise FleetError("duplicate PPU alias")
+    items = []
+    complete = True
+    for alias in ppus:
+        try:
+            items.append(manager_deployment_status(manager_url, alias, timeout=timeout))
+        except FleetError as exc:
+            complete = False
+            items.append({"ppu_alias": alias, "status": "NOT_VERIFIED", "reason": str(exc)})
+    return {
+        "schema": "plasma.utility.deployment-status.v1",
+        "evidence_kind": "MANAGER_BOOTSTRAP_STATUS_ONLY",
+        "ppus": items,
+    }, complete
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="plasmactl")
     subs = parser.add_subparsers(dest="command", required=True)
@@ -154,15 +173,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     receipt.add_argument("--batch-id", required=True)
     receipt.add_argument("--target", action="append", help="optional exact PPU:Site projection")
     receipt.add_argument("--timeout", type=float, default=5.0)
+    deploy = subs.add_parser("deploy", help="read-only status; mutation is not yet implemented")
+    deploy_sub = deploy.add_subparsers(dest="deploy_command", required=True)
+    status = deploy_sub.add_parser("status", help="observe multiple PPU Bootstrap states, no writes")
+    status.add_argument("--manager-url", default="http://127.0.0.1:18280")
+    status.add_argument("--ppu", action="append", required=True, help="repeat to select multiple PPUs")
+    status.add_argument("--timeout", type=float, default=5.0)
     args = parser.parse_args(argv)
     try:
-        targets = parse_targets(args.target or [])
-        if args.command == "diagnose":
-            fleet = manager_fleet(args.manager_url, timeout=args.timeout)
-            response, complete = select_fleet(fleet, targets, all_ppus=args.all)
+        if args.command == "deploy":
+            response, complete = observe_deployments(args.manager_url, args.ppu, timeout=args.timeout)
         else:
-            batch = manager_batch(args.manager_url, args.batch_id, timeout=args.timeout)
-            response, complete = verify_batch_receipt(batch, targets)
+            targets = parse_targets(args.target or [])
+            if args.command == "diagnose":
+                fleet = manager_fleet(args.manager_url, timeout=args.timeout)
+                response, complete = select_fleet(fleet, targets, all_ppus=args.all)
+            else:
+                batch = manager_batch(args.manager_url, args.batch_id, timeout=args.timeout)
+                response, complete = verify_batch_receipt(batch, targets)
     except (FleetError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
