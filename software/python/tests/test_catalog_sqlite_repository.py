@@ -228,6 +228,7 @@ def test_l1_to_l2_requires_evidence_and_known_provider_profile(tmp_path: Path, m
     catalog, qualifications, _ = read_selector_view(str(repo.path))
     assert catalog.resolve(record.vendor, record.identifier)
     assert qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 2
+    assert "source_path" not in qualifications[(record.vendor.casefold(), record.identifier.casefold())]["publication_evidence"]
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
     status, body = selector.search_response("q=STM32F103C8T6-TEST-EXACT&levels=2,3")
     assert status == 200 and body["total_count"] == 1

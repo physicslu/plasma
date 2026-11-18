@@ -315,6 +315,7 @@ class CatalogSqliteShadowRepository:
                 or not evidence.get("source_reference")
                 or not isinstance(evidence.get("source_sha256"), str)
                 or len(evidence["source_sha256"]) != 64
+                or any(ch not in "0123456789abcdef" for ch in evidence["source_sha256"])
                 or provider.get("provider_id") != evidence.get("provider_id")
                 or provider.get("version") != evidence.get("provider_version")
                 or not provider.get("source_commit")
@@ -434,6 +435,11 @@ class CatalogSqliteShadowRepository:
                     raise DeviceCatalogIntegrityError("L3 revision requires separately authorized revocation")
                 # This marker prevents legacy display enrichers from claiming authority
                 # over data they have never reviewed.
+                if q["catalog_level"] >= 2:
+                    q["publication_evidence"] = {
+                        field: value for field, value in q["publication_evidence"].items()
+                        if field != "source_path"
+                    }
                 q["data_only_publication"] = True
                 records[key], qualifications[key] = replace(
                     record, catalog_revision_sha256=source_revision
