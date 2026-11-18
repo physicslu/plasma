@@ -301,6 +301,7 @@ class BundleProgrammingWorkflow:
         deployment_deadline_s: float = 300.0,
         job_deadline_s: float = 300.0,
         poll_interval_s: float = 1.0,
+        job_poll_interval_s: float | None = 0.25,
     ) -> None:
         self.coordinator = coordinator
         self.registry = registry
@@ -316,6 +317,11 @@ class BundleProgrammingWorkflow:
         self.deployment_deadline_s = deployment_deadline_s
         self.job_deadline_s = job_deadline_s
         self.poll_interval_s = poll_interval_s
+        # A running Job's status is read more often than slow B3 deployments:
+        # the Job end is observed within 0.25 s instead of up to 1 s.
+        # None keeps the general interval (tests that drive one fake clock).
+        self.job_poll_interval_s = (poll_interval_s if job_poll_interval_s is None
+                                    else job_poll_interval_s)
         self._lock = threading.RLock()
         self._journal_failure: str | None = None
         self._control_failure: str | None = None
@@ -1391,7 +1397,7 @@ class BundleProgrammingWorkflow:
                 return job
             if job.get("state") not in ("queued", "running") or self.monotonic() >= deadline:
                 raise _OutcomeUnknown("JOB_RESULT_UNKNOWN_DO_NOT_RESUBMIT")
-            self.sleep(self.poll_interval_s)
+            self.sleep(self.job_poll_interval_s)
 
     # --------------------------------------------------------------- read output
     def _read_output_path(self, run_id: str) -> Path | None:

@@ -408,6 +408,20 @@ def test_already_active_skips_b1_b2_b3(tmp_path):
 
 
 
+def test_running_job_is_polled_at_the_job_interval(tmp_path):
+    """The Job end is observed within the short Job interval; the general
+    (B3 deployment) interval is unchanged."""
+    route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
+    sha = bundle_v3.build_user_image_bundle(route, image(), filename="app.bin").archive_sha256
+    workflow, _coord, gateway = make(tmp_path, coordinator=FakeCoordinator(active_sha=sha))
+    slept = []
+    workflow.sleep = slept.append
+    workflow.poll_interval_s, workflow.job_poll_interval_s = 1.0, 0.25
+    _planned, run = run_once(workflow)
+    assert run["outcome"] == "PASS"
+    assert gateway.polls >= 2 and slept and set(slept) == {0.25}
+
+
 def test_binding_echo_with_a_different_range_is_not_confirmed(tmp_path):
     route = bundle_v3.load_route(ROUTES / "z2-site2-stm32f103c8t6-operations.json")
     sha = bundle_v3.build_user_image_bundle(route, image(), filename="app.bin").archive_sha256

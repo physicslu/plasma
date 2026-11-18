@@ -318,7 +318,7 @@ class ProgrammingBatchCoordinator:
                  shared_control_gate: Callable[[], tuple[str, str] | None] | None = None,
                  sleep: Callable[[float], None] = time.sleep,
                  spawn: Callable[[Callable[[], None]], None] | None = None,
-                 poll_interval_s: float = 0.5) -> None:
+                 poll_interval_s: float = 0.1) -> None:
         self.workflow = workflow
         self.journal_path = journal_path
         # The Manager's Platform maintenance gate, evaluated per Target PPU at
@@ -1049,6 +1049,11 @@ class ProgrammingBatchCoordinator:
             with self._lock:
                 unit["failure_domain"] = domain
             return "BLOCKED", f"ADMISSION_{reason}"
+        # The Site verdict above was read by this lane with no yield since.
+        # Re-reading it immediately would ask the PPU the same question twice
+        # (Asset Set + Site readiness); the Platform gate is still re-read, and
+        # every later pass (after any yield, retry or planning gap) re-reads both.
+        site_verdict_fresh = True
         for number in range(1, policy["retry_limit"] + 2):
             # Recheck after every yield, including the planning/Start gap.
             while True:
@@ -1056,7 +1061,11 @@ class ProgrammingBatchCoordinator:
                     block = self._dispatch_block(batch, alias)
                 if block is not None:
                     return ("FAIL" if number > 1 else None), block
-                verdict = self._admission_block(alias, site)
+                if site_verdict_fresh:
+                    site_verdict_fresh = False
+                    verdict = self._platform_block(alias)
+                else:
+                    verdict = self._admission_block(alias, site)
                 if verdict is None:
                     break
                 domain, reason = verdict
