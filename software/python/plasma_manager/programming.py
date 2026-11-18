@@ -337,6 +337,9 @@ class BundleProgrammingWorkflow:
         # Start admission records (journalled) and the Batch start IDs that
         # may still be admitted (memory only, like plans: a restart ends them).
         self._starts: dict[str, dict[str, Any]] = {}
+        #: Batches the Batch coordinator no longer journals. A CONSUMED Batch
+        #: start is pruned together with its Batch, never kept without it.
+        self.pruned_batch_ids: set[str] = set()
         #: Batch start IDs that may still be admitted, by issue time. A Batch
         #: start is Manager-owned and carries no PPU (PR-C, ADR 5.8): the
         #: token is an idempotency guard, never an authority.
@@ -396,6 +399,18 @@ class BundleProgrammingWorkflow:
         terminal = sorted((r for r in self._runs.values() if r not in protected),
                           key=lambda r: r.created_at)[-MAX_RUNS_RETAINED:]
         runs = terminal + protected
+        # A journalled CONSUMED start always has its admitted record
+        # journalled too: it is pruned with that Run or Batch, never after it.
+        # (A start kept without its record could never reconcile again and
+        # would block every later deployment preflight.) Only a record this
+        # Manager itself pruned qualifies; an admitted record that is merely
+        # absent keeps its start and stays OUTCOME_UNKNOWN.
+        retained_runs = {r.run_id for r in runs}
+        for stale in [s for s in self._starts.values() if s.get("state") == "CONSUMED" and (
+                (s.get("kind") == "run" and s.get("run_id") in self._runs
+                 and s.get("run_id") not in retained_runs)
+                or (s.get("kind") == "batch" and s.get("batch_id") in self.pruned_batch_ids))]:
+            del self._starts[stale["start_id"]]
         starts = sorted(self._starts.values(), key=lambda s: s["issued_at"])
         for stale in starts[:-MAX_STARTS_RETAINED]:
             # A dropped record is never read as "not accepted": an unrecorded

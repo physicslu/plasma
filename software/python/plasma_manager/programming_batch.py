@@ -529,6 +529,15 @@ class ProgrammingBatchCoordinator:
         kept = sorted((b for b in owned if b["outcome"] not in (None, "OUTCOME_UNKNOWN")),
                       key=lambda b: b["created_at"])[-MAX_BATCHES_RETAINED:]
         kept += [b for b in owned if b["outcome"] in (None, "OUTCOME_UNKNOWN")]
+        kept_ids = {b["batch_id"] for b in kept}
+        pruned = {b["batch_id"] for b in owned if b["batch_id"] not in kept_ids}
+        if pruned - self.workflow.pruned_batch_ids:
+            # Drop the admitting starts FIRST: a crash between the two writes
+            # leaves a Batch without its start (harmless), never a CONSUMED
+            # start without its Batch.
+            with self.workflow._lock:
+                self.workflow.pruned_batch_ids |= pruned
+                self.workflow._persist_locked()
         payload = {"schema": JOURNAL_SCHEMA, "batches": kept}
         parent = self._v2_path.parent
         parent.mkdir(parents=True, exist_ok=True)
