@@ -362,4 +362,5 @@ python scripts/tests/test-documentation-integrity.py
 
 The guard checks Markdown headings and local links, verifies that every `docs/**/*.md` file is listed here, rejects known retired document names and protocol/config drift, and protects the canonical Gateway base-module name.
 
+- **Plan** · `Gate 1 / Draft` · `Data-only Catalog` — [Catalog Database v1 + Data-only Publication Contract](architecture/catalog-database-v1-data-only-publication.md)：SQLite-first 的 Manager Canonical Catalog、獨立 L0–L3/Provider Qualification、Controller-scoped overlay、可稽核且具交易性的資料修訂發布；一般料號更新不觸發 PPU/FPGA/整套 CI，執行仍由 Bundle v3 與 PPU 安全 Gate 獨立控管。
 - **Current** — [z2like-demo QEMU Retirement Gate 1 Audit](development/z2like-demo-qemu-retirement-gate1.md)：紀錄程式退役範圍、保留的產品路徑、外部下線待辦與 PR #1476 整合。
