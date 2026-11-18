@@ -379,3 +379,162 @@ def test_privileged_source_provision_denies_untrusted_input(tmp_path, monkeypatc
     with pytest.raises(installer.ProvisionDenied, match="SYMLINK_DENIED"):
         installer.provision(factory, destination, _test_uid=os.getuid())
     assert not destination.exists()
+
+
+# --- Rotating backup: consecutive upgrades, failure and interruption ---------
+
+def _bump(factory, tag):
+    candidate = factory / "pl/hil/fpga_image_admission.py"
+    candidate.write_text(candidate.read_text() + "\n# host-only candidate %s\n" % tag)
+
+
+def _sha(root):
+    return source.verify_source(root, expected_uid=os.getuid())["code_manifest_sha256"]
+
+
+def _siblings(destination, *suffixes):
+    return [destination.with_name(destination.name + s) for s in suffixes]
+
+
+def test_root_upgrade_rotates_backup_over_consecutive_versions(tmp_path, monkeypatch):
+    installer, factory, destination, journal, v1 = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    previous, = _siblings(destination, ".previous")
+    history = [v1]
+    for tag in ("v3", "v4", "v5"):
+        result = installer.upgrade(
+            factory, destination, expected_current_manifest_sha256=history[-1],
+            _test_uid=os.getuid())
+        assert result["result"] == "UPGRADED_NOT_EXECUTED"
+        assert result["previous_manifest_sha256"] == history[-1]
+        assert _sha(previous) == history[-1]  # backup = tree running before
+        assert _sha(destination) == result["current_manifest_sha256"]
+        assert result["retired_backup_manifest_sha256"] == (
+            history[-2] if len(history) > 1 else None)
+        history.append(result["current_manifest_sha256"])
+        _bump(factory, tag)
+    assert len(set(history)) == 4
+    leftovers = _siblings(destination, ".next", ".retired", ".transaction.json")
+    assert not any(x.exists() for x in leftovers)
+
+
+def test_root_upgrade_failure_restores_active_and_previous_backup(tmp_path, monkeypatch):
+    installer, factory, destination, journal, v1 = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    v2 = installer.upgrade(factory, destination,
+                           expected_current_manifest_sha256=v1,
+                           _test_uid=os.getuid())["current_manifest_sha256"]
+    _bump(factory, "v3")
+    original = installer._held_image_fingerprint
+    calls = {"n": 0}
+    def fault(uid):
+        calls["n"] += 1
+        return original(uid) if calls["n"] == 1 else "0" * 64
+    monkeypatch.setattr(installer, "_held_image_fingerprint", fault)
+    with pytest.raises(installer.ProvisionDenied, match="POSTVERIFY_FAILED"):
+        installer.upgrade(factory, destination,
+                          expected_current_manifest_sha256=v2,
+                          _test_uid=os.getuid())
+    previous, staged, retired, txn = _siblings(
+        destination, ".previous", ".next", ".retired", ".transaction.json")
+    assert _sha(destination) == v2 and _sha(previous) == v1
+    assert staged.is_dir() and not retired.exists() and not txn.exists()
+    # A quarantined `.next` is not a pending recovery: retry succeeds.
+    monkeypatch.setattr(installer, "_held_image_fingerprint", original)
+    v3 = installer.upgrade(factory, destination,
+                           expected_current_manifest_sha256=v2,
+                           _test_uid=os.getuid())
+    assert _sha(previous) == v2 and _sha(destination) == v3["current_manifest_sha256"]
+
+
+@pytest.mark.parametrize("step", [
+    "prepared", "backup_retired", "current_backed_up", "candidate_active",
+    "committed"])
+def test_root_upgrade_interruption_recovers_on_next_run(tmp_path, monkeypatch, step):
+    installer, factory, destination, journal, v1 = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    v2 = installer.upgrade(factory, destination,
+                           expected_current_manifest_sha256=v1,
+                           _test_uid=os.getuid())["current_manifest_sha256"]
+    _bump(factory, "v3")
+    def power_loss(at):
+        if at == step:
+            raise installer._Interrupted(at)
+    with pytest.raises(installer._Interrupted):
+        installer.upgrade(factory, destination,
+                          expected_current_manifest_sha256=v2,
+                          _test_uid=os.getuid(), _fault=power_loss)
+    previous, staged, retired, txn = _siblings(
+        destination, ".previous", ".next", ".retired", ".transaction.json")
+    assert txn.exists()  # durable record of the in-flight transaction
+    before = journal.read_bytes()
+    if step == "committed":
+        # New tree was verified and committed: roll forward.
+        v3 = _sha(destination)
+        assert v3 not in (v1, v2)
+        _bump(factory, "v4")
+        result = installer.upgrade(factory, destination,
+                                   expected_current_manifest_sha256=v3,
+                                   _test_uid=os.getuid())
+        assert result["recovered"]["recovered"] == "ROLLED_FORWARD"
+        assert _sha(previous) == v3
+    else:
+        # Not confirmed: roll back to V2 active with V1 backup, then retry.
+        result = installer.upgrade(factory, destination,
+                                   expected_current_manifest_sha256=v2,
+                                   _test_uid=os.getuid())
+        assert result["recovered"] == {"recovered": "ROLLED_BACK",
+                                       "current_manifest_sha256": v2}
+        assert result["retired_backup_manifest_sha256"] == v1
+        assert _sha(previous) == v2
+    assert _sha(destination) == result["current_manifest_sha256"]
+    assert not any(x.exists() for x in (staged, retired, txn))
+    assert journal.read_bytes() == before
+
+
+def test_root_rollback_after_interruption_and_repeated(tmp_path, monkeypatch):
+    installer, factory, destination, journal, v1 = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    v2 = installer.upgrade(factory, destination,
+                           expected_current_manifest_sha256=v1,
+                           _test_uid=os.getuid())["current_manifest_sha256"]
+    _bump(factory, "v3")
+    def power_loss(at):
+        if at == "candidate_active":
+            raise installer._Interrupted(at)
+    with pytest.raises(installer._Interrupted):
+        installer.upgrade(factory, destination,
+                          expected_current_manifest_sha256=v2,
+                          _test_uid=os.getuid(), _fault=power_loss)
+    # Rollback to the tree that was running before the interrupted upgrade.
+    result = installer.rollback(factory, destination,
+                                expected_backup_manifest_sha256=v2,
+                                _test_uid=os.getuid())
+    assert result["result"] == "ROLLED_BACK_NOT_EXECUTED"
+    assert _sha(destination) == v2
+    assert _sha(destination.with_name(destination.name + ".previous")) == v1
+    # Ordinary rollback twice in a row: an older `.rejected` does not block.
+    installer.rollback(factory, destination,
+                       expected_backup_manifest_sha256=v1, _test_uid=os.getuid())
+    assert _sha(destination) == v1
+    v3 = installer.upgrade(factory, destination,
+                           expected_current_manifest_sha256=v1,
+                           _test_uid=os.getuid())["current_manifest_sha256"]
+    installer.rollback(factory, destination,
+                       expected_backup_manifest_sha256=v1, _test_uid=os.getuid())
+    assert _sha(destination) == v1
+    assert _sha(destination.with_name(destination.name + ".rejected")) == v3
+
+
+def test_root_upgrade_interrupted_rollback_missing_active_recovers(tmp_path, monkeypatch):
+    installer, factory, destination, journal, v1 = _offline_upgrade_fixture(
+        tmp_path, monkeypatch)
+    v2 = installer.upgrade(factory, destination,
+                           expected_current_manifest_sha256=v1,
+                           _test_uid=os.getuid())["current_manifest_sha256"]
+    rejected = destination.with_name(destination.name + ".rejected")
+    rejected.mkdir(mode=0o700)  # stale tree from an earlier rollback
+    destination.rename(destination.with_name(destination.name + ".next"))
+    installer.rollback(factory, destination,
+                       expected_backup_manifest_sha256=v1, _test_uid=os.getuid())
+    assert _sha(destination) == v1
