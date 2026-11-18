@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from plasma_cli.api import FleetError, manager_fleet
-from plasma_cli.main import main, select_fleet
+from plasma_cli.api import FleetError, manager_batch, manager_fleet
+from plasma_cli.main import main, select_fleet, verify_batch_receipt
 from plasma_cli.targets import parse_targets
 
 
@@ -124,3 +124,81 @@ def test_cli_error_does_not_claim_pass(capsys):
         status = main(["diagnose", "--all"])
     assert status == 2
     assert json.loads(capsys.readouterr().err)["ok"] is False
+
+BATCH_ID = "a" * 32
+
+
+def recorded_batch():
+    return {
+        "batch_id": BATCH_ID, "state": "completed", "outcome": "PASS",
+        "targets": [{"ppu_alias": "z2", "site_ids": [1, 2]},
+                    {"ppu_alias": "second", "site_ids": [14]}],
+        "units": [
+            {"ppu_alias": "z2", "site_id": 1, "status": "TERMINAL",
+             "outcome": "PASS", "attempts": [{"job_id": "job1"}]},
+            {"ppu_alias": "z2", "site_id": 2, "status": "TERMINAL",
+             "outcome": "PASS", "attempts": [{"job_id": "job2"}]},
+            {"ppu_alias": "second", "site_id": 14, "status": "TERMINAL",
+             "outcome": "PASS", "attempts": [{"job_id": "job3"}]},
+        ],
+    }
+
+
+def test_receipt_uses_manager_report_only_and_supports_multiple_ppus():
+    result, success = verify_batch_receipt(
+        recorded_batch(), parse_targets(["second:14", "z2:2"]))
+    assert success and result["manager_reported_pass"]
+    assert result["evidence_kind"] == "MANAGER_REPORTED_BATCH_ONLY"
+    assert [(x["ppu_alias"], x["site_id"]) for x in result["sites"]] == [
+        ("second", 14), ("z2", 2)]
+
+
+@pytest.mark.parametrize("outcome", ["PARTIAL", "FAIL", "OUTCOME_UNKNOWN", "BLOCKED", None])
+def test_receipt_never_passes_when_batch_does_not_pass(outcome):
+    record = recorded_batch()
+    record["outcome"] = outcome
+    _, success = verify_batch_receipt(record, parse_targets(["z2:1"]))
+    assert not success
+
+
+def test_receipt_cannot_hide_peer_failure_by_filtering_target():
+    record = recorded_batch()
+    record["units"][0]["outcome"] = "FAIL"
+    _, success = verify_batch_receipt(record, parse_targets(["second:14"]))
+    assert not success
+
+
+def test_receipt_denies_missing_target_and_duplicate_units():
+    record = recorded_batch()
+    with pytest.raises(FleetError, match="absent"):
+        verify_batch_receipt(record, parse_targets(["z2:4"]))
+    record["units"].append(dict(record["units"][0]))
+    with pytest.raises(FleetError, match="duplicate"):
+        verify_batch_receipt(record, ())
+
+
+def test_receipt_get_uses_exact_id_and_never_post():
+    opener = _Opener({"ok": True, "batch": recorded_batch()})
+    with patch("plasma_cli.api.build_opener", return_value=opener):
+        result = manager_batch("http://127.0.0.1:18280", BATCH_ID)
+    assert result["batch_id"] == BATCH_ID
+    assert opener.request.get_method() == "GET"
+    assert opener.request.full_url.endswith("/api/programming/batches/" + BATCH_ID)
+
+
+@pytest.mark.parametrize("bad", ["", "../z2", "A" * 32, "f" * 33, "x" * 32])
+def test_receipt_bad_id_denied_before_io(bad):
+    with patch("plasma_cli.api.build_opener", side_effect=AssertionError("no I/O")):
+        with pytest.raises(FleetError, match="Batch ID"):
+            manager_batch("http://127.0.0.1:18280", bad)
+
+
+def test_receipt_cli_readonly(capsys):
+    with patch("plasma_cli.main.manager_batch", return_value=recorded_batch()) as get:
+        status = main(["test", "receipt", "--batch-id", BATCH_ID,
+                       "--target", "z2:1,2"])
+    assert status == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["manager_reported_pass"] is True
+    assert output["batch_id"] == BATCH_ID
+    get.assert_called_once()

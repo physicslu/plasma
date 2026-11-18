@@ -12,6 +12,7 @@ python3 -m pip install ./utilities/plasmactl
 plasmactl diagnose --manager-url http://127.0.0.1:18280 --target z2:1,2
 plasmactl diagnose --manager-url https://manager.example.org --target ppu-a:1,3 --target ppu-b:2
 plasmactl diagnose --all
+plasmactl test receipt --batch-id 0123456789abcdef0123456789abcdef --target z2:1,2
 ```
 
 The Manager URL is configurable; localhost is only the SWPC Control Station
@@ -32,5 +33,10 @@ into this one utility and migrate **all** callers/tests/CI before retiring
 Manager/PPU APIs, Owner authorization, durable receipts and local safety
 guards. Never implement a second Batch scheduler or programming engine.
 
-Current scope: `diagnose` only. `deploy` and `test` are **NOT IMPLEMENTED**.
+Current scope: read-only `diagnose` and `test receipt` only. `test receipt` reads
+Manager's canonical `GET /api/programming/batches/{batch_id}` and checks the
+Target-Set/Unit identity. It reports the **Manager-reported whole-Batch PASS**,
+not an independent hardware or electrical qualification. It never issues Start,
+POST or retries. `deploy` and execution-oriented `test programming` are
+**NOT IMPLEMENTED**.
 Do not install this candidate on the live SWPC or Controller yet.
