@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Bundle-driven PLASMA programming CLI, independent of the execution path.
+"""Single-PPU Bundle commissioning tool, independent of the execution path.
 
-Uses existing Bootstrap B1/B2/B3 and Gateway programming APIs. The Runtime and
+Direct PPU engineering/commissioning entry (Bootstrap B1/B2/B3 activation,
+Runtime Kit deployment, one-Site diagnostic flash). It is NOT the formal
+programming entry: production and load programming use the Manager Batch
+through `plasmactl program`. Uses existing Bootstrap and Gateway APIs. The Runtime and
 Site Worker own all physical admission, FPGA/SWD and SAFE_OFF operations.
 One invocation selects exactly one Bundle and one Site. Never retry a write.
 """
@@ -23,6 +26,7 @@ import time
 from urllib.parse import quote
 import zipfile
 
+import ppu_bootstrap_transport
 import ppu_deploy_api
 import ppu_unified_deployment
 
@@ -164,10 +168,9 @@ def validate_source_pin(sha: str | None) -> None:
 
 def owner_token(host: str, path: Path | None) -> str:
     if path is None:
-        # Reuse the existing enrolled SWPC credential path (works in Path 2
-        # and any locally authorized equivalent worker environment).
-        import ppu_path2_hardware_baseline as enrolled
-        return enrolled._existing_bootstrap_token_via_z2_ssh(host)
+        # The existing enrolled credential route; the caller's own OS rights
+        # and SSH enrollment decide, never an execution path or Runner.
+        return ppu_bootstrap_transport.existing_bootstrap_token_via_z2_ssh(host)
     info = path.lstat()
     require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
             and stat.S_IMODE(info.st_mode) == 0o600
@@ -181,25 +184,8 @@ def owner_token(host: str, path: Path | None) -> str:
 
 def open_bootstrap(host: str, token: str):
     """Reuse the qualified private commissioning client; never fake TLS."""
-    import ppu_path2_hardware_baseline as enrolled
-
-    class ExistingBootstrap(enrolled.DirectSSHAuthenticatedBootstrap):
-        def _install_body(self, admitted, mode, fpga_load):
-            return self.module.BootstrapAPIClient._install_body(
-                self, admitted, mode, fpga_load)
-
-        def install_bundle(self, admitted, *, mode, fpga_load):
-            return self.module.BootstrapAPIClient.install_bundle(
-                self, admitted, mode=mode, fpga_load=fpga_load)
-
-        def assets_status(self):
-            return self.module.BootstrapAPIClient.assets_status(self)
-
-        def reconcile_bundle_assets(self, archive, *, fpga_load):
-            return self.module.BootstrapAPIClient.reconcile_bundle_assets(
-                self, archive, fpga_load=fpga_load)
-
-    return ExistingBootstrap(host, module=ppu_deploy_api, token=token)
+    return ppu_bootstrap_transport.DirectSSHAuthenticatedBootstrap(
+        host, module=ppu_deploy_api, token=token)
 
 
 def get_gateway(host: str, endpoint: str) -> dict:

@@ -146,5 +146,7 @@ def test_verifier_exposes_fleet_target_and_main_dispatch_contract() -> None:
 
     assert "fleet) verify_fleet" in verifier_source
     assert "plasmactl verify TARGET" in verifier_source
-    assert "verify)" in plasmactl_source
-    assert "plasmactl-verify" in plasmactl_source
+    operations_source = (REPO_ROOT / "utilities/plasmactl/src/plasma_cli/operations.py").read_text(encoding="utf-8")
+    assert "exec python3 -m plasma_cli.main" in plasmactl_source
+    assert '"verify": "plasmactl_verify"' in operations_source
+    assert "scripts/plasmactl-verify" in operations_source

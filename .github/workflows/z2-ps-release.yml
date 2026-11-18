@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/plasmactl"
+      - "utilities/plasmactl/src/**"
       - "scripts/plasmactl-z2-ps"
       - "scripts/ppu_runtime_local_readiness.py"
       - "scripts/ppu-bootstrap-deployment.py"
@@ -57,6 +58,7 @@ on:
     paths:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/plasmactl"
+      - "utilities/plasmactl/src/**"
       - "scripts/plasmactl-z2-ps"
       - "scripts/ppu_runtime_local_readiness.py"
       - "scripts/ppu-bootstrap-deployment.py"
@@ -138,7 +140,10 @@ jobs:
           python scripts/z2-python-runtime.py --help
           python scripts/ppu-z2-installer.py --help
           python scripts/ppu-bootstrap-deployment.py --help
+          # The kit launcher runs the Unified CLI with PYNQ System Python 3.10.
+          bash scripts/plasmactl help >/dev/null
           python -m pip install pytest
+          PYTHONPATH=utilities/plasmactl/src python -m pytest -q utilities/plasmactl/tests
           python -m pytest -q \
             software/python/tests/test_z2_python_runtime_artifact.py \
             software/python/tests/test_z2_ps_release_cache_contract.py \
@@ -498,6 +503,9 @@ jobs:
           root="$RUNNER_TEMP/plasma-z2-ps-kit-$IDENTITY"
           mkdir -p "$root/scripts" "$root/artifacts" "$root/docs"
           cp scripts/plasmactl "$root/scripts/plasmactl"
+          # The launcher runs the canonical Unified CLI (Python 3.10-compatible).
+          mkdir -p "$root/utilities/plasmactl/src/plasma_cli"
+          cp utilities/plasmactl/src/plasma_cli/*.py "$root/utilities/plasmactl/src/plasma_cli/"
           cp scripts/plasmactl-z2-ps "$root/scripts/plasmactl-z2-ps"
           cp scripts/ppu-bootstrap-deployment.py "$root/scripts/ppu-bootstrap-deployment.py"
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
@@ -534,9 +542,10 @@ jobs:
           python "$root/scripts/openocd-runtime.py" verify "${openocd_archives[0]}" \
             --sidecar "${openocd_archives[0]}.sha256"
           bash "$root/scripts/plasmactl" help >/dev/null
+          rm -rf "$root"/utilities/plasmactl/src/plasma_cli/__pycache__
           (
             cd "$root"
-            find scripts artifacts docs -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+            find scripts utilities artifacts docs -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
           )
           kit="$RUNNER_TEMP/plasma-z2-ps-kit-$IDENTITY.tar.gz"
           tar -C "$RUNNER_TEMP" -czf "$kit" "plasma-z2-ps-kit-$IDENTITY"

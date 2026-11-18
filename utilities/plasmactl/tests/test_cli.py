@@ -8,7 +8,8 @@ from unittest.mock import patch
 import pytest
 
 from plasma_cli.api import FleetError, manager_batch, manager_deployment_status, manager_fleet
-from plasma_cli.main import main, observe_deployments, select_fleet, verify_batch_receipt
+from plasma_cli.main import main, observe_deployments, select_fleet
+from plasma_cli.programming import verify_batch_receipt
 from plasma_cli.targets import parse_targets
 
 
@@ -254,7 +255,7 @@ def test_receipt_bad_id_denied_before_io(bad):
 
 def test_receipt_cli_readonly(capsys):
     with patch("plasma_cli.main.manager_batch", return_value=recorded_batch()) as get:
-        status = main(["test", "receipt", "--batch-id", BATCH_ID,
+        status = main(["program", "receipt", "--batch-id", BATCH_ID,
                        "--target", "z2:1,2"])
     assert status == 0
     output = json.loads(capsys.readouterr().out)

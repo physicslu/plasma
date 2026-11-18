@@ -156,8 +156,8 @@ def test_receipt_negative_cases(bad_field, bad_value) -> None:
 
 def test_no_auto_deploy_or_legacy_programmer() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
-    router = (ROOT / "scripts/plasmactl").read_text(encoding="utf-8")
-    assert '  hil)' in router and 'plasma_engineering_hil.py' in router
+    router = (ROOT / "utilities/plasmactl/src/plasma_cli/operations.py").read_text(encoding="utf-8")
+    assert "def hil_programming" in router and "plasma_engineering_hil.py" in router
     assert "plasma_wordport_program.py" not in source
     assert "plasmactl deploy" not in source
     assert "--execute" in source

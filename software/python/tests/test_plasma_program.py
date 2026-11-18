@@ -282,7 +282,7 @@ def test_job_http_payload_carries_one_programming_list_and_binding(monkeypatch, 
 
 def test_existing_private_bootstrap_assets_read_only(monkeypatch):
     """New CLI reuses existing device-bound Bootstrap, not fake HTTPS."""
-    import ppu_path2_hardware_baseline as enrolled
+    import ppu_bootstrap_transport as enrolled
     from .bootstrap_request_auth_fixture import AuthenticatedFakePPU
     calls = []
     credential = "x" * 32

@@ -1,6 +1,6 @@
 # HIL 兩 Site 並行時間量測（`plasma_hil_timing.py`）
 
-**狀態：Reference。** 本文件說明如何重現 2026-11-18 Z2 兩 Site 並行 Erase/Program/Verify 的時間分析。工具只做觀察：不驅動硬體、不寫入 PPU 狀態，也不決定 Job 結果。燒錄本身仍走既有 Path 2 Work Order 與 `scripts/plasma_programming_load.py`；LA2016 的使用限制以 [KINGST LA2016 工具操作手冊](la2016-tool-operations.md) 為準。
+**狀態：Reference。** 本文件說明如何重現 2026-11-18 Z2 兩 Site 並行 Erase/Program/Verify 的時間分析。工具只做觀察：不驅動硬體、不寫入 PPU 狀態，也不決定 Job 結果。燒錄本身走 Unified CLI `plasmactl program submit`（Manager Batch API），與 Path 2／Path 3 無關；LA2016 的使用限制以 [KINGST LA2016 工具操作手冊](la2016-tool-operations.md) 為準。
 
 ## 1. 量到什麼
 
@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | LA2016 外部波形 | 每個 Site 的 SWCLK 頻率、SWD 開始／結束、兩 Site 同時活動時間 | `la-capture`、`la-analyze` |
 | PPU Job log `stage_timing` | Job 建立的各小步驟、排隊、預檢、Engine／Bundle 驗證、Site 工作階段、Site Worker admission／OpenOCD／revoke、Root admission 分段、快取命中 | `summarize` |
-| Path 2 loading report | Batch／Job／Receipt、Readback、SAFE_OFF、CPU／RAM 分階段、OpenOCD PID 重疊 | `summarize` |
+| `plasmactl program` 輸出 | Manager Batch outcome、各 Site Job ID／attempts／SAFE_OFF、Manager 時鐘 Batch 耗時 | `summarize` |
 | PPU `/proc` 取樣（選用） | admission／OpenOCD 程序起訖、kernel 等待點（lock／flock）、Runtime 主執行緒 CPU | `proc-trace`、`proc-analyze` |
 | PPU 上單獨計時（選用） | `read_active`、`preflight_runtime_flash`、`load_engine` 耗時 | `preadmission-profile` |
 
@@ -25,7 +25,7 @@
 
 ## 3. 重現步驟
 
-1. **開始錄波**（SWPC，Path 2 派工前；長度涵蓋 Dispatcher 排隊、baseline、Batch 與 recovery，約 190 秒）：
+1. **開始錄波**（SWPC，送出 Batch 前；長度涵蓋 idle baseline、Batch 與 recovery）：
 
    ```bash
    python3 scripts/plasma_hil_timing.py la-capture --output la.sr --seconds 190 \
@@ -34,9 +34,16 @@
 
    `la.sr.capture.json` 記錄實際 sigrok 命令與開始時間。
 
-2. **派送 Path 2 Work Order**：用既有 `scripts/plasma_programming_load.py measure ... --run-batch`。設定檔的 `deployed_sha` 必須等於 Z2 目前的 Runtime git SHA，否則會在建立 Batch 前以 `DEPLOYED_IDENTITY_MISMATCH` 停止，這是正確行為。Work Order 只能使用允許欄位（不要加 `verification`）。
+2. **送出 Batch**（需已授權的硬體操作範圍）：
 
-3. **取回 Job log**（Z2，需 root 讀取）：從 loading report 的 `site_results[].job_id` 找 `/var/log/plasma/<日期>/SITE<n>/<job_id>.jsonl`。
+   ```bash
+   scripts/plasmactl program submit --target z2:1,2 --icpn STM32F103C8T6 \
+     --image fw.bin --journal run/journal.json > report.json
+   ```
+
+   每次量測使用新的 `--journal`；既有 journal 會拒絕第二次送出。回應遺失時用 `plasmactl program reconcile --journal run/journal.json`（唯讀），不要重送。CPU／RAM 用下方選用的 `proc-trace` 取得。
+
+3. **取回 Job log**（Z2，需 root 讀取）：從 `report.json` 的 `batch.sites[].attempts[].job_id` 找 `/var/log/plasma/<日期>/SITE<n>/<job_id>.jsonl`。
 
 4. **分析與彙整**：
 

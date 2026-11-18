@@ -156,16 +156,12 @@ def test_summarize_combines_report_job_logs_and_la(tmp_path):
               "site_worker": {"admission_ms": 4300.0, "openocd_ms": 5000.0, "revoke_ms": 500.0,
                               "openocd_start_unix_ms": 1000.0, "admission_root_total": 3300.0}}
     site2 = {**phases, "site_worker": {**phases["site_worker"], "openocd_start_unix_ms": 2200.0}}
-    report = {"outcome": "PASS", "batch_id": "b" * 32, "start_id": "s" * 32, "source_sha": "c9e4",
-              "site_results": [{"site_id": 1, "job_id": "job-1", "result": "PASS",
-                                "elapsed_ms": 13823, "readback_sha256": "e691ab23" + "0" * 56,
-                                "safe_off": True}],
-              "throughput": {"bytes": 125600, "elapsed_s": 17.75, "bytes_per_s": 7076.1,
-                             "elapsed_basis": "MANAGER_BATCH_STARTED_TO_FINISHED",
-                             "observed_elapsed_s": 23.5},
-              "comparison": {"sampled_pid_overlap_s": 3.5, "overlap_boundary_uncertainty_s": 0.43,
-                             "phases": {"idle": {"n": 101, "cpu_pct": {"mean": 50.47, "peak": 100.0},
-                                                 "ram_used_kib": {"peak": 140836}}}}}
+    report = {"schema": "plasma.utility.program.v1", "start_id": "s" * 32,
+              "batch": {"batch_id": "b" * 32, "start_id": "s" * 32, "state": "finished",
+                        "outcome": "PASS", "created_at": "2026-11-18T01:00:00+00:00",
+                        "finished_at": "2026-11-18T01:00:17.750000+00:00",
+                        "sites": [{"ppu_alias": "z2", "site_id": 1, "outcome": "PASS",
+                                   "attempts": [{"job_id": "job-1", "safe_off": True}]}]}}
     (tmp_path / "report.json").write_text(json.dumps(report))
     la = {"samplerate_hz": 2e7, "duration_s": 190.0,
           "channels": {"site1": {"swclk_freq_median_hz": 2e6, "active_first_s": 86.34,
@@ -180,9 +176,8 @@ def test_summarize_combines_report_job_logs_and_la(tmp_path):
         "--job-log", str(_job_log(tmp_path / "1.jsonl", 1, "T1", phases)),
         "--output", str(out)]) == 0
     text = out.read_text()
-    assert "outcome PASS" in text and "7076 B/s (MANAGER_BATCH_STARTED_TO_FINISHED)" in text
-    assert "observer-read elapsed 23.5 s" in text
-    assert "idle         101     50.5%    100.0%" in text
+    assert "outcome PASS" in text and "17.75 s (MANAGER_BATCH_CREATED_TO_FINISHED)" in text
+    assert "z2:1 PASS job job-1 attempts 1 safe_off True" in text
     assert "Site 1 job_started T1" in text.splitlines()[text.splitlines().index(
         next(line for line in text.splitlines() if line.startswith("stage timing"))) + 1]
     assert "site_worker.admission_ms" in text and "site_worker.admission_root_total" in text

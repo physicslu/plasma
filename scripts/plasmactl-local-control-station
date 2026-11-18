@@ -541,6 +541,23 @@ status_profile() {
   probe_target
 }
 
+logs_profile() {
+  require_linux_user_runtime
+  journalctl --user -u plasma-local-manager.service -u plasma-control-station.service \
+    -n "${PLASMACTL_LOG_LINES:-200}" --no-pager
+}
+
+restart_profile() {
+  # Restart the installed release only; no source activation or unit rewrite.
+  require_linux_user_runtime
+  resolve_base_python
+  validate_settings
+  require_owned_installation
+  systemctl --user restart plasma-local-manager.service
+  systemctl --user restart plasma-control-station.service
+  verify_profile
+}
+
 require_clean_first_install_boundary() {
   local path
   for path in "$current_link" "$evidence" "$manager_unit" "$console_unit"; do
@@ -790,6 +807,8 @@ Commands:
             --dev-fresh-state: archive old development State and start clean (no migration)
   verify    Verify Console + Manager only; target PPU reachability is reported separately
   status    Show release, target configuration and user-service state
+  logs      Show recent Manager + Console user-service journal lines (read-only)
+  restart   Restart the installed release's two user services, then verify
 
 Options:
   --python PATH          Python >= 3.11 used to build the immutable runtime
@@ -822,6 +841,8 @@ case "$command" in
   deploy) deploy_profile ;;
   verify) verify_profile ;;
   status) status_profile ;;
+  logs) logs_profile ;;
+  restart) restart_profile ;;
   help|-h|--help) usage ;;
   *) usage >&2; die "unknown command: $command" ;;
 esac

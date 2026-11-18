@@ -1,6 +1,8 @@
-# PLASMA 通用 Bundle 燒錄 CLI
+# PLASMA 單一 PPU Bundle Commissioning 工具
 
-**入口：scripts/plasma_program.py**。名稱與 Path 2、Path 3、Site 2、特定 MCU 無關；這是原一鍵工具的取代版本，不是另一套 Operator、燒錄引擎或 Deployment Coordinator。
+**入口：scripts/plasma_program.py**。名稱與 Path 2、Path 3、Site 2、特定 MCU 無關；不是另一套 Operator、燒錄引擎或 Deployment Coordinator。
+
+> **正式燒錄入口是 `plasmactl program`（Manager Batch API，多 PPU／多 Site、Start ID、Reconciliation；見 [Unified CLI](../../utilities/plasmactl/README.md)）。** 本工具直接對單一 PPU 的 Bootstrap／Gateway 操作，保留給 Bundle 啟用（B1/B2/B3）、受信任 CI Runtime Kit 部署與單 Site 工程診斷燒錄，不得作為繞過 Manager 的生產燒錄入口。Credential 取得與 Bootstrap Transport 位於執行路徑中立的 `scripts/ppu_bootstrap_transport.py`，不再匯入 Path 2 模組。
 
 命令：diagnose（唯讀）、deploy（只部署/啟用 Bundle）、flash（只對已啟用 Bundle 執行一次 Job）、run（一次執行部署/啟用及 Flash）。所有寫入都必須有既有 Owner／執行環境授權，--approved-once 僅是防誤觸，並非授權憑證。
 
@@ -32,4 +34,4 @@ Job 的 Erase/Program/Readback、Site Ownership、Root Admission、FPGA Reload L
 
 ## Gate
 
-Gate 1：Draft PR、Host-only 正負向測試與 CI。Gate 2：Owner 核准後才合併；部署 Z2 與 DUT A/B 實機 Flash 是獨立執行範圍。原歷史性 `scripts/plasma_site2_path2_ops.py` 已退休；本次 S2/S3 收斂再刪除硬編碼 v0.1 的 `scripts/plasma_site2_single_flash_path2.py` 與其專屬測試。**唯一通用受控 Bundle Flash CLI 是 `scripts/plasma_program.py`**，並繼續使用既有 PPU Runtime、C-3/Root/Site 安全機制。
+Gate 1：Draft PR、Host-only 正負向測試與 CI。Gate 2：Owner 核准後才合併；部署 Z2 與 DUT A/B 實機 Flash 是獨立執行範圍。原歷史性 `scripts/plasma_site2_path2_ops.py` 已退休；本次 S2/S3 收斂再刪除硬編碼 v0.1 的 `scripts/plasma_site2_single_flash_path2.py` 與其專屬測試。`scripts/plasma_program.py` 是唯一的直接 PPU Bundle commissioning 工具，並繼續使用既有 PPU Runtime、C-3/Root/Site 安全機制；Manager 管理的燒錄一律使用 `plasmactl program`。

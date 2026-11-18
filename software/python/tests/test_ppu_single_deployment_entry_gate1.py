@@ -565,6 +565,10 @@ def test_old_bootstrap_kit_verifier_accepts_a_kit_with_the_legacy_core(tmp_path:
                        "ppu-z2-installer.py", "ppu_package_units.py", "z2-python-runtime.py",
                        "openocd-runtime.py", "ppu_runtime_local_readiness.py"):
             (root / "scripts" / script).write_bytes((ROOT / "scripts" / script).read_bytes())
+        cli = root / "utilities/plasmactl/src/plasma_cli"
+        cli.mkdir(parents=True)
+        for source in (ROOT / "utilities/plasmactl/src/plasma_cli").glob("*.py"):
+            (cli / source.name).write_bytes(source.read_bytes())
         if with_core:
             (root / "scripts/ppu-z2-installer-core.py").write_bytes(legacy)
         for artifact in ("plasma-ppu-0.2.1-aaaaaaaaaaaa-linux-armv7l.tar.gz",
@@ -594,6 +598,39 @@ def test_old_bootstrap_kit_verifier_accepts_a_kit_with_the_legacy_core(tmp_path:
         assert "missing required deployment tooling" not in str(exc)
     else:
         assert verified.plasmactl.name == "plasmactl"
+
+
+def test_kit_launcher_routes_bootstrap_install_argv_unchanged_to_z2_backend(tmp_path: Path):
+    """The Bootstrap runs `bash kit/scripts/plasmactl deploy z2-ps ...` (any version).
+
+    Copy the kit layout the release workflow assembles and prove the Unified
+    CLI launcher hands the exact argv to the kit's z2-ps backend, with no
+    checkout, no bytecode written into the hash-pinned tree and System Python.
+    """
+    import subprocess as sp
+    root = tmp_path / "plasma-z2-ps-kit-0.2.1-aaaaaaaaaaaa"
+    (root / "scripts").mkdir(parents=True)
+    (root / "scripts/plasmactl").write_bytes((ROOT / "scripts/plasmactl").read_bytes())
+    log = tmp_path / "argv.log"
+    (root / "scripts/plasmactl-z2-ps").write_text(f'printf "%s\\n" "$@" > {log}\n')
+    cli = root / "utilities/plasmactl/src/plasma_cli"
+    cli.mkdir(parents=True)
+    for source in (ROOT / "utilities/plasmactl/src/plasma_cli").glob("*.py"):
+        (cli / source.name).write_bytes(source.read_bytes())
+    argv = ["deploy", "z2-ps", "--release-artifact", "/k/a.tar.gz", "--release-sidecar",
+            "/k/a.tar.gz.sha256", "--gateway-host", "192.168.2.99", "--ppu-id", "z2-hil",
+            "--facility-id", "lab", "--display-name", "Plasma Z2 PS"]
+    env = {"PATH": "/usr/bin:/bin"}
+    result = sp.run(["bash", str(root / "scripts/plasmactl"), *argv], env=env,
+                    capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    assert log.read_text().splitlines() == ["deploy", *argv[2:]]
+    assert not list(root.rglob("__pycache__"))
+    workflow = (ROOT / ".github/workflows/z2-ps-release.yml").read_text(encoding="utf-8")
+    assert 'cp utilities/plasmactl/src/plasma_cli/*.py "$root/utilities/plasmactl/src/plasma_cli/"' in workflow
+    assert "find scripts utilities artifacts docs -type f" in workflow
+    kit_source = (ROOT / "scripts/ppu-bootstrap-kit.py").read_text(encoding="utf-8")
+    assert 'root / "utilities/plasmactl/src/plasma_cli/main.py"' in kit_source
 
 
 def _recovery_lab(tmp_path: Path, *, error=None, journal_api="4f30ccc9101a4c7bbe146d36b0f80819"):

@@ -365,3 +365,4 @@ python scripts/tests/test-documentation-integrity.py
 The guard checks Markdown headings and local links, verifies that every `docs/**/*.md` file is listed here, rejects known retired document names and protocol/config drift, and protects the canonical Gateway base-module name.
 
 - **Current** — [z2like-demo QEMU Retirement Gate 1 Audit](development/z2like-demo-qemu-retirement-gate1.md)：紀錄程式退役範圍、保留的產品路徑、外部下線待辦與 PR #1476 整合。
+- **Current** — [Unified CLI Integration Gate 1](development/unified-cli-integration-gate1-20261118.md)：`plasmactl program` Manager Batch 燒錄、Profile Router 收斂、Path 2 負載量測與 P2HW Claim 退役、Before／After 數據。

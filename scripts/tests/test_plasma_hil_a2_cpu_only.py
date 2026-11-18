@@ -249,7 +249,7 @@ class A2Gate1OfflineContracts(unittest.TestCase):
         self.assertIn("plasma-hil-a2-source", workflow)
         self.assertIn("scripts/tests/test_plasma_hil_a2_cpu_only.py", workflow)
         self.assertIn("development-claim:", workflow)
-        self.assertIn("needs: [development-authorize, development-claim, development-hardware-claim]", workflow)
+        self.assertIn("needs: [development-authorize, development-claim]", workflow)
         self.assertIn("needs.development-claim.result == 'success'", workflow)
         a2_job = workflow.split("  development-execute:", 1)[1].split("\n  development-codex:", 1)[0]
         self.assertNotIn("needs.development-codex.result == 'success'", a2_job)
