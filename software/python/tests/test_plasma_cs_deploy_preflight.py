@@ -155,7 +155,7 @@ def test_corrupted_journal_blocks(state: Path) -> None:
 
 
 def test_deployment_hook_runs_preflight_twice_and_never_uses_z2_ssh() -> None:
-    code = (ROOT / "scripts/plasmactl-local-control-station").read_text()
+    code = (ROOT / "utilities/plasmactl/backends/plasmactl-local-control-station").read_text()
     section = code.split("deploy_profile() {", 1)[1].split("parse_options()", 1)[0]
     assert section.count("run_deployment_preflight") == 2
     assert section.index("run_deployment_preflight") < section.index("prepare_release")
@@ -503,7 +503,7 @@ def test_v2_terminal_outcomes_and_stopped_skips(state, outcome):
 @pytest.mark.parametrize('checkpoint', [1, 2])
 def test_actual_deploy_flow_stops_at_either_checkpoint(tmp_path, checkpoint):
     import subprocess
-    code = (ROOT / 'scripts/plasmactl-local-control-station').read_text()
+    code = (ROOT / 'utilities/plasmactl/backends/plasmactl-local-control-station').read_text()
     deploy = 'deploy_profile() {' + code.split('deploy_profile() {', 1)[1].split('parse_options()', 1)[0]
     trace = tmp_path / 'trace'
     # Execute the real deploy function with host-only stubs. Any activation

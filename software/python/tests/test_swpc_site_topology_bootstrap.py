@@ -12,7 +12,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BOOTSTRAP_PATH = REPO_ROOT / "scripts" / "swpc-site-topology-bootstrap.py"
-BOOTSTRAP_FRONTEND_PATH = REPO_ROOT / "scripts" / "plasmactl-swpc-z2like-bootstrap-sites"
+BOOTSTRAP_FRONTEND_PATH = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-swpc-z2like-bootstrap-sites"
 PLASMACTL_PATH = REPO_ROOT / "scripts" / "plasmactl"
 
 

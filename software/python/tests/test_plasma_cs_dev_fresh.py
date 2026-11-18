@@ -10,7 +10,7 @@ from plasma_manager.registry import PPURegistryStore
 
 
 ROOT = Path(__file__).resolve().parents[3]
-BACKEND = ROOT / "scripts/plasmactl-local-control-station"
+BACKEND = ROOT / "utilities/plasmactl/backends/plasmactl-local-control-station"
 HARNESS = r"""
 set -Eeuo pipefail
 source "$1" help >/dev/null

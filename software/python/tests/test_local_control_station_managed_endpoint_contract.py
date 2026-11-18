@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-LOCAL_CONTROL_STATION = ROOT / "scripts" / "plasmactl-local-control-station"
+LOCAL_CONTROL_STATION = ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-local-control-station"
 LOCAL_CONTROL_STATION_DOC = ROOT / "docs" / "deployment" / "local-control-station.md"
 SWPC_INSTALLER = ROOT / "scripts" / "swpc-z2like-ppu-install.sh"
 

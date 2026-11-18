@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 ROUTER = ROOT / "utilities" / "plasmactl" / "src" / "plasma_cli" / "main.py"
-ORCHESTRATOR = ROOT / "scripts" / "plasmactl-swpc-z2like-orchestrator"
+ORCHESTRATOR = ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-swpc-z2like-orchestrator"
 
 
 def test_swpc_verify_operator_contract_requires_root() -> None:

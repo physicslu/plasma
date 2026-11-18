@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-ORCHESTRATOR = REPO_ROOT / "scripts" / "plasmactl-swpc-z2like-orchestrator"
+ORCHESTRATOR = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-swpc-z2like-orchestrator"
 ROUTER = REPO_ROOT / "utilities" / "plasmactl" / "src" / "plasma_cli" / "operations.py"
 PROGRAMMING_MARKER = "# Managed by Plasma SWPC Z2-like configured Mock Programming activation"
 MANAGED_MARKER = "# Managed by Plasma SWPC Z2-like managed programming ingress"
