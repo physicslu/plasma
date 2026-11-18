@@ -1,8 +1,9 @@
 # PLASMA Unified CLI — first read-only diagnostic slice
 
 Source of the portable CLI utility: this directory only. The existing
-`scripts/plasmactl` profile router and `plasma_client.cli` remain unchanged
-until the complete migration is proven. They are **not** replacement implementations
+`scripts/plasmactl` profile router delegates the new read-only commands to
+this package, while its existing deployment functions and `plasma_client.cli`
+remain unchanged until the full migration is proven. They are **not** replacement implementations
 of PPU programming, provisioning or privileged recovery.
 
 ## Install on an engineering host or a future Controller
@@ -17,8 +18,10 @@ plasmactl deploy status --ppu z2 --ppu ppu-b
 ```
 
 The Manager URL is configurable; localhost is only the SWPC Control Station
-default. Run this as a **separate test environment** until the old `plasmactl`
-router is retired. There is no requirement for a Git checkout at runtime.
+default. On an engineering checkout, the existing `scripts/plasmactl` now
+routes these three strictly read-only subcommands to this package source.
+It retains its existing deployment and integration test behavior unchanged.
+A separately installed utility wheel does not require a Git checkout at runtime.
 
 Data is read exclusively through Manager's existing `GET /api/fleet`.
 Site IDs are validated against live Fleet topology, never a hard-coded Site2
@@ -38,5 +41,8 @@ Current scope: read-only `diagnose` and `test receipt` only. `test receipt` read
 Manager's canonical `GET /api/programming/batches/{batch_id}` and checks the
 Target-Set/Unit identity. It reports the **Manager-reported whole-Batch PASS**,
 not an independent hardware or electrical qualification. It never issues Start,
-POST or retries. `deploy status` also reads Manager's existing per-PPU Bootstrap status route;\nit exposes only pairing/deployment/runtime state, not credentials or full payload.\nDeployment mutation and execution-oriented `test programming` are\n**NOT IMPLEMENTED**.
+POST or retries. `deploy status` also reads Manager's existing per-PPU Bootstrap status route;
+it exposes only pairing/deployment/runtime state, not credentials or full payload.
+Deployment mutation and execution-oriented `test programming` are
+**NOT IMPLEMENTED**.
 Do not install this candidate on the live SWPC or Controller yet.

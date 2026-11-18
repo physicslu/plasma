@@ -65,6 +65,14 @@ run_z2_ps_backend() {
   bash "$z2_ps_backend" "$@"
 }
 
+run_unified_readonly_cli() {
+  local utility_root="$repo_root/utilities/plasmactl/src"
+  [[ -f "$utility_root/plasma_cli/main.py" ]] || wrapper_die "unified CLI source is missing"
+  # Read-only CLI implementation is canonical in utilities/plasmactl/.
+  # Keep the existing installed SWPC launcher and Path 2 command allowlist intact.
+  PYTHONPATH="$utility_root${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m plasma_cli.main "$@"
+}
+
 profile_for_optional_arg() {
   case "${1:-}" in
     ""|integration) printf '%s\n' integration ;;
@@ -79,6 +87,12 @@ profile_for_optional_arg() {
 usage() {
   cat <<'EOF'
 Usage: plasmactl COMMAND [PROFILE] [OPTIONS]
+
+Read-only portable utility commands (Manager APIs only):
+  plasmactl diagnose --target PPU:SITE[,SITE...] [--target ...] [--manager-url URL]
+  plasmactl diagnose --all [--manager-url URL]
+  plasmactl deploy status --ppu ALIAS [--ppu ...] [--manager-url URL]
+  plasmactl test receipt --batch-id 32-HEX [--target PPU:SITE[,SITE...]]
 
 Deployment profiles:
   integration             SWPC development/integration host; user systemd, Vite, optional Manager/Mock
@@ -147,6 +161,9 @@ command="${1:-help}"
 shift || true
 
 case "$command" in
+  diagnose)
+    run_unified_readonly_cli diagnose "$@"
+    ;;
   install)
     profile="$(profile_for_optional_arg "${1:-}")" || wrapper_die "unknown deployment profile: ${1:-}"
     [[ "${1:-}" == "$profile" ]] && shift || true
@@ -163,6 +180,10 @@ case "$command" in
     esac
     ;;
   deploy)
+    if [[ "${1:-}" == "status" ]]; then
+      shift
+      run_unified_readonly_cli deploy status "$@"
+    fi
     profile="$(profile_for_optional_arg "${1:-}")" || wrapper_die "unknown deployment profile: ${1:-}"
     [[ "${1:-}" == "$profile" ]] && shift || true
     case "$profile" in
@@ -264,6 +285,10 @@ case "$command" in
     esac
     ;;
   test)
+    if [[ "${1:-}" == "receipt" ]]; then
+      shift
+      run_unified_readonly_cli test receipt "$@"
+    fi
     (($# == 0)) || wrapper_die "test is integration-only and accepts no profile argument"
     load_integration_backend
     run_tests

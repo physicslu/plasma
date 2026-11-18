@@ -510,3 +510,30 @@ def test_local_control_station_accepts_clean_linked_worktree_source() -> None:
     assert '[[ -d "$repo_root/.git" ]]' not in clean
     assert "rev-parse --show-toplevel" in clean
     assert "--untracked-files=normal" in clean
+
+def test_portable_readonly_commands_are_available_through_existing_plasmactl() -> None:
+    # Existing SWPC launcher must delegate to the one canonical Python source.
+    # All cases stop at argparse; neither Manager nor hardware is accessed.
+    env = {"PLASMACTL_INTEGRATION_BACKEND": "/not-a-real-deployment-backend"}
+    for args, option in (
+        (("diagnose", "--help"), "--target"),
+        (("deploy", "status", "--help"), "--ppu"),
+        (("test", "receipt", "--help"), "--batch-id"),
+    ):
+        result = run(*args, env=env)
+        assert result.returncode == 0, (args, result.stderr)
+        assert option in result.stdout
+
+    bad = run("diagnose", "--target", "z2:0", env=env)
+    assert bad.returncode == 2
+    assert "Site IDs must be unique positive integers" in bad.stderr
+
+
+def test_unified_readonly_dispatch_does_not_replace_existing_deploy_or_test() -> None:
+    source = PLASMACTL.read_text(encoding="utf-8")
+    assert "run_local_control_station_backend deploy" in source
+    assert "run_tests" in source
+    assert "run_unified_readonly_cli diagnose" in source
+    assert "run_unified_readonly_cli deploy status" in source
+    assert "run_unified_readonly_cli test receipt" in source
+
