@@ -644,3 +644,34 @@ def test_batch_wall_clock_is_16_seconds_for_overlapping_sites(tmp_path, monkeypa
     reloaded = ProgrammingBatchCoordinator(h.workflow, journal_path=tmp_path / "batches.json")
     assert reloaded.status_batch(batch["batch_id"])["batch"]["finished_at"] == batch["finished_at"]
     assert len(gateway.posts) == count
+
+
+def test_first_pass_reads_each_site_verdict_once_and_rereads_after_a_yield(tmp_path):
+    """No yield between the lane's initial Site verdict and its first pass:
+    that verdict is not read twice. The Platform gate is still re-read, and
+    a Site that waited (RUN_IN_PROGRESS) re-reads both before planning."""
+    platform_calls = []
+    h = Harness(tmp_path, (1, 2), platform_gate=lambda alias: platform_calls.append(alias))
+    calls = []
+    original = h.workflow.target_block
+
+    def counted(alias, site, **kwargs):
+        calls.append(site)
+        return original(alias, site, **kwargs)
+
+    h.workflow.target_block = counted
+    h.start([one("z2", 1, 2)])
+    batch = h.finish()
+    assert batch["counts"]["pass"] == 2
+    assert sorted(calls) == [1, 2]                  # was [1, 1, 2, 2]
+    assert len(platform_calls) == 3                 # leader verdict + one re-read per lane
+
+
+def test_job_status_is_polled_faster_than_b3_deployment(tmp_path):
+    from plasma_manager.programming import BundleProgrammingWorkflow
+    import inspect
+    defaults = inspect.signature(BundleProgrammingWorkflow.__init__).parameters
+    assert defaults["poll_interval_s"].default == 1.0
+    assert defaults["job_poll_interval_s"].default == 0.25
+    assert inspect.signature(ProgrammingBatchCoordinator.__init__).parameters[
+        "poll_interval_s"].default == 0.1
