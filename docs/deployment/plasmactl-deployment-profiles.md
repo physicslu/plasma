@@ -53,10 +53,11 @@ plasmactl  (utilities/plasmactl/src/plasma_cli/operations.py)
 ```
 
 All nine backend/verification implementations live in `utilities/plasmactl/backends/`.
-The original `scripts/plasmactl-*` names are compatibility symlinks for direct
-engineering callers; the standalone Z2 release kit copies its Z2 backend into
-kit-local `scripts/`. This changes neither runtime privilege nor deployment
-ownership. The local Control Station backend owns only Console/BFF + Manager lifecycle. It never starts a local Plasma Server or Plasma Gateway.
+The nine repository backends have no legacy `scripts/plasmactl-*` aliases:
+internal callers and tests use `utilities/plasmactl/backends/`, and operators use
+`scripts/plasmactl`. The standalone Z2 release kit intentionally materializes
+its Z2 backend under kit-local `scripts/`; this is not a repository alias.
+This changes neither runtime privilege nor deployment ownership. The local Control Station backend owns only Console/BFF + Manager lifecycle. It never starts a local Plasma Server or Plasma Gateway.
 
 The SWPC backend remains a surrogate-only host adapter. The Z2 backend is distinct: it accepts only a real ARMv7 target at runtime and reuses the canonical PPU release plus the existing Z2 installer instead of reimplementing those internals. The Z2 installer uses one canonical `ppu-z2-installer.py` containing the verified release core and runtime-activation integration.
 
