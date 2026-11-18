@@ -1,0 +1,5 @@
+[plasmactl] batch e3d6c9d222657252b598a3f29ab10385 RUNNING: z2:1 NOT_RUN, z2:2 NOT_RUN
+[plasmactl] batch e3d6c9d222657252b598a3f29ab10385 RUNNING: z2:1 RUNNING, z2:2 RUNNING
+[plasmactl] batch e3d6c9d222657252b598a3f29ab10385 RUNNING: z2:1 queued, z2:2 programming 0%
+[plasmactl] batch e3d6c9d222657252b598a3f29ab10385 RUNNING: z2:1 programming 0%, z2:2 programming 0%
+[plasmactl] batch e3d6c9d222657252b598a3f29ab10385 COMPLETED: z2:1 PASS 100%, z2:2 PASS 100%

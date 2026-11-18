@@ -1,0 +1,8 @@
+SWPC Control Station deploy, main d282adcbfcade7d6190b2acd69b771db49c25815 (#1488 Start retention fix) — 2026-11-19
+
+before   ebde888471c8 (rollback target)
+after    d282adcbfcad, via `scripts/plasmactl deploy local-control-station` (normal deploy, no dev-fresh state)
+preflight before activation: PASS (journal 3 Batches / 6 Runs / 11 Starts, PPU IDLE)
+verify: PASS (Console + Manager healthy, Manager Device Selector healthy, z2 managed-control probe READY)
+preflight after restart: PASS (same journal, re-read by the new Manager)
+Z2 Runtime unchanged: 0.2.1-ebde888471c8 (#1488 is Manager-only)
