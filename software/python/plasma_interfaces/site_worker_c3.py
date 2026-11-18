@@ -28,6 +28,7 @@ import socket
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from plasma_core import job_timing
 from plasma_core.errors import ErrorCode, PlasmaError
 
 PROTOCOL = "plasma.ppu.site-worker.v3"
@@ -202,15 +203,18 @@ async def run_job_operations(
     digest = hashlib.sha256(image).hexdigest() if image_operation else None
     context = {"job_id": job_id, "site_id": site_id, "icpn": icpn, "operation": operation,
                "operations": list(steps), "address": address, "length": length}
-    staged = stage_image(image_root, job_id, image) if image_operation else None
+    # Staging stays synchronous: a cancelled await must never orphan a
+    # half-written Job image outside the cleanup below.
+    with job_timing.span("stage_image"):
+        staged = stage_image(image_root, job_id, image) if image_operation else None
     session_id: str | None = None
     try:
         try:
-            opened = await asyncio.to_thread(session_factory)
+            opened = await job_timing.in_thread("open_session", session_factory)
             session_id = str(opened["session_id"])
             if image_operation:
-                bound = await asyncio.to_thread(
-                    client.call, "bind_image", session_id=session_id,
+                bound = await job_timing.in_thread(
+                    "bind_image", client.call, "bind_image", session_id=session_id,
                     image_sha256=digest, image_size=length, load_address=address)
                 bound_ok = (bound.get("load_address") == address
                             and bound.get("image_size") == length
@@ -219,8 +223,8 @@ async def run_job_operations(
                                  or (bound.get("erase_address"), bound.get("erase_length"))
                                  == erase_range))
             else:
-                bound = await asyncio.to_thread(
-                    client.call, "bind_range", session_id=session_id,
+                bound = await job_timing.in_thread(
+                    "bind_range", client.call, "bind_range", session_id=session_id,
                     address=address, length=length)
                 bound_ok = (bound.get("address") == address and bound.get("length") == length
                             and bound.get("operation") == steps[0])
@@ -231,9 +235,12 @@ async def run_job_operations(
                     context={**context, "site_worker_stage": "bind",
                              "site_worker_bind": dict(bound)},
                 )
-            result = await asyncio.to_thread(
-                client.call, "run", timeout_s=max_runtime_s + 30.0, session_id=session_id,
-                site=site_id, operation=operation)
+            result = await job_timing.in_thread(
+                "worker_run", client.call, "run", timeout_s=max_runtime_s + 30.0,
+                session_id=session_id, site=site_id, operation=operation)
+            if isinstance(result.get("timing_ms"), dict):
+                # Site Worker admission / OpenOCD / revoke timing for this run.
+                job_timing.mark("site_worker", **result["timing_ms"])
         except SiteWorkerRefused as exc:
             stage = "open" if session_id is None else "run"
             raise _refusal(stage, exc, **context) from None

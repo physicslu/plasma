@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -36,6 +37,9 @@ class JobRuntime:
     job_binding: dict[str, Any] | None = None
     trusted_provider: Any | None = field(default=None, repr=False)
     updated_at: str = ""
+    # Observation only: monotonic creation time and enqueue admission timing.
+    created_monotonic: float = field(default_factory=time.monotonic, repr=False)
+    admission_timing_ms: dict[str, float] | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if not self.created_at:
