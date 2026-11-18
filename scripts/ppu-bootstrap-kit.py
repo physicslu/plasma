@@ -212,6 +212,7 @@ def verify_kit(artifact: Path, *, sidecar: Path, extract_to: Path) -> VerifiedKi
         scripts / "z2-python-runtime.py",
         scripts / "openocd-runtime.py",
         scripts / "ppu_runtime_local_readiness.py",
+        root / "utilities/plasmactl/src/plasma_cli/main.py",
     ]
     if not all(path.is_file() for path in required_scripts):
         raise BootstrapKitError("Z2 PS kit is missing required deployment tooling")

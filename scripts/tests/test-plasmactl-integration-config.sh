@@ -4,6 +4,7 @@ set -Eeuo pipefail
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 repo="$(cd "$(dirname "$script_path")/../.." && pwd)"
 plasmactl_path="${PLASMACTL_PATH:-$repo/scripts/plasmactl}"
+integration_path="$repo/scripts/plasmactl-integration"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 
@@ -344,16 +345,16 @@ XDG_STATE_HOME="$temporary/state-manager-invalid" \
 bash -c 'source "$1"; validate_manager_settings' _ "$plasmactl_path" >/dev/null 2>&1 && \
   fail 'invalid PLASMA_MANAGER_ENABLED value was accepted'
 
-grep -Fq 'PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy' "$plasmactl_path" || fail 'deploy does not re-exec updated plasmactl'
-grep -Fq 'reconcile_service_units' "$plasmactl_path" || fail 'service-unit reconciliation is missing'
-grep -Fq 'ensure_config_completeness' "$plasmactl_path" || fail 'deployment config completeness reconciliation is missing'
-grep -Fq 'manager_health_check' "$plasmactl_path" || fail 'Manager health check integration is missing'
-grep -Fq 'engineering_mock_health_check' "$plasmactl_path" || fail 'Engineering Mock Provider health check integration is missing'
-grep -Fq 'systemctl --user is-active --quiet plasma-manager.service' "$plasmactl_path" || fail 'Manager health check does not verify systemd service ownership'
-grep -Fq 'manager) units=(-u plasma-manager.service)' "$plasmactl_path" || fail 'Manager log target is missing'
-grep -Fq 'PLASMA_CONTROL_STATION_MODE=managed' "$plasmactl_path" || fail 'managed Control Station mode deployment wiring is missing'
-grep -Fq 'PLASMA_MANAGER_PPU_ALIAS' "$plasmactl_path" || fail 'Manager BFF target alias deployment wiring is missing'
-grep -Fq 'PLASMA_MANAGER_API_URL' "$plasmactl_path" || fail 'Manager BFF API URL deployment wiring is missing'
+grep -Fq 'PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy' "$integration_path" || fail 'deploy does not re-exec updated plasmactl'
+grep -Fq 'reconcile_service_units' "$integration_path" || fail 'service-unit reconciliation is missing'
+grep -Fq 'ensure_config_completeness' "$integration_path" || fail 'deployment config completeness reconciliation is missing'
+grep -Fq 'manager_health_check' "$integration_path" || fail 'Manager health check integration is missing'
+grep -Fq 'engineering_mock_health_check' "$integration_path" || fail 'Engineering Mock Provider health check integration is missing'
+grep -Fq 'systemctl --user is-active --quiet plasma-manager.service' "$integration_path" || fail 'Manager health check does not verify systemd service ownership'
+grep -Fq 'manager) units=(-u plasma-manager.service)' "$integration_path" || fail 'Manager log target is missing'
+grep -Fq 'PLASMA_CONTROL_STATION_MODE=managed' "$integration_path" || fail 'managed Control Station mode deployment wiring is missing'
+grep -Fq 'PLASMA_MANAGER_PPU_ALIAS' "$integration_path" || fail 'Manager BFF target alias deployment wiring is missing'
+grep -Fq 'PLASMA_MANAGER_API_URL' "$integration_path" || fail 'Manager BFF API URL deployment wiring is missing'
 
 # Web deployment hygiene: source changes make a long-running Vite runtime stale,
 # but package metadata alone must not cause npm ci under the live dev server.
@@ -399,6 +400,6 @@ if grep -Eq 'plasma-(server|web|manager)\.service' "$web_restart_calls"; then
   fail 'web-restart unexpectedly restarts Plasma Server, REST Gateway, or Manager'
 fi
 
-grep -Fq 'web-restart|restart-web) restart_web_console' "$plasmactl_path" || fail 'web-restart command is not wired into plasmactl'
+grep -Fq 'web-restart|restart-web) restart_web_console' "$integration_path" || fail 'web-restart command is not wired into plasmactl'
 
 printf '[plasmactl-test] PASS\n'

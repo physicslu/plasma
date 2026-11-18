@@ -1,3 +1,8 @@
+"""`plasma`: PPU-local Gateway engineering/debug client (direct, single PPU).
+
+Not a Controller or production programming CLI: Manager-owned programming,
+diagnosis and deployment use the Unified CLI `plasmactl` (utilities/plasmactl).
+"""
 from __future__ import annotations
 
 import argparse

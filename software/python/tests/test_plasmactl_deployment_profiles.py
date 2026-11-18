@@ -14,6 +14,8 @@ INTEGRATION = REPO_ROOT / "scripts" / "plasmactl-integration"
 LOCAL_CONTROL_STATION = REPO_ROOT / "scripts" / "plasmactl-local-control-station"
 SWPC_Z2LIKE = REPO_ROOT / "scripts" / "plasmactl-swpc-z2like"
 Z2_PS = REPO_ROOT / "scripts" / "plasmactl-z2-ps"
+CLI_MAIN = REPO_ROOT / "utilities" / "plasmactl" / "src" / "plasma_cli" / "main.py"
+CLI_OPERATIONS = REPO_ROOT / "utilities" / "plasmactl" / "src" / "plasma_cli" / "operations.py"
 
 
 def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -77,11 +79,14 @@ def test_library_mode_preserves_legacy_integration_functions_but_reexecs_through
 
 
 def test_legacy_default_and_explicit_integration_profiles_are_declared() -> None:
-    source = PLASMACTL.read_text(encoding="utf-8")
-    assert '""|integration) printf' in source
-    assert "Legacy integration-host install (default; backward compatible)" in source
-    assert "update-and-restart" in source
-    assert "plasmactl-integration" in source
+    # One canonical router (Python); integration stays the default profile.
+    operations_source = CLI_OPERATIONS.read_text(encoding="utf-8")
+    main_source = CLI_MAIN.read_text(encoding="utf-8")
+    assert 'add_argument("target", nargs="?", default="integration"' in main_source
+    assert "SWPC development/integration host (default; user systemd)" in main_source
+    assert '"update-and-restart": "deploy"' in operations_source
+    assert '"plasmactl-integration"' in operations_source
+    assert "exec python3 -m plasma_cli.main" in PLASMACTL.read_text(encoding="utf-8")
 
 
 def test_local_control_station_profile_delegates_to_dedicated_backend(tmp_path: Path) -> None:
@@ -263,11 +268,10 @@ def test_z2_ps_profile_delegates_without_aliasing_swpc_surrogate(tmp_path: Path)
         result = run(*args, env=env)
         assert result.returncode == 0, result.stderr
     assert log.read_text(encoding="utf-8").splitlines() == [expected for _, expected in cases]
-    source = PLASMACTL.read_text(encoding="utf-8")
-    assert "z2-ps" in source
-    assert "Real PYNQ-Z2 ARMv7 PS-only" in source
-    assert "z2-ps) run_z2_ps_backend" in source
-    assert "z2-ps) run_swpc_z2like_backend" not in source
+    assert "Real PYNQ-Z2 ARMv7 PS-only" in run("help").stdout
+    source = CLI_OPERATIONS.read_text(encoding="utf-8")
+    assert '"z2-ps": ("PLASMA_Z2_PS_BACKEND", "plasmactl-z2-ps")' in source
+    assert '"z2-ps": ("PLASMA_SWPC_Z2LIKE_BACKEND"' not in source
 
 
 def test_z2_ps_backend_keeps_pynq_python_and_hardware_boundary_closed() -> None:
@@ -294,9 +298,9 @@ def test_unknown_profile_fails_closed() -> None:
 
 
 def test_unqualified_real_z2_profiles_remain_reserved_not_aliases() -> None:
-    source = PLASMACTL.read_text(encoding="utf-8")
+    source = run("help").stdout
     assert "z2-full remains reserved" in source
-    assert "`z2` is" in source and "intentionally not accepted" in source
+    assert "`z2` is intentionally not accepted" in source
     for profile in ("z2", "z2-full"):
         result = run("deploy", profile)
         assert result.returncode != 0
@@ -470,7 +474,8 @@ def test_portable_readonly_commands_are_available_through_existing_plasmactl() -
     for args, option in (
         (("diagnose", "--help"), "--target"),
         (("deploy", "status", "--help"), "--ppu"),
-        (("test", "receipt", "--help"), "--batch-id"),
+        (("program", "receipt", "--help"), "--batch-id"),
+        (("program", "submit", "--help"), "--journal"),
     ):
         result = run(*args, env=env)
         assert result.returncode == 0, (args, result.stderr)
@@ -482,12 +487,15 @@ def test_portable_readonly_commands_are_available_through_existing_plasmactl() -
 
 
 def test_unified_readonly_dispatch_does_not_replace_existing_deploy_or_test() -> None:
-    source = PLASMACTL.read_text(encoding="utf-8")
-    assert "run_local_control_station_backend deploy" in source
-    assert "run_tests" in source
-    assert "run_unified_readonly_cli diagnose" in source
-    assert "run_unified_readonly_cli deploy status" in source
-    assert "run_unified_readonly_cli test receipt" in source
+    operations_source = CLI_OPERATIONS.read_text(encoding="utf-8")
+    main_source = CLI_MAIN.read_text(encoding="utf-8")
+    assert '"plasmactl-local-control-station"' in operations_source
+    assert '"test": "run_tests"' in operations_source
+    assert 'subs.add_parser("diagnose"' in main_source
+    assert 'argv[:2] == ["deploy", "status"]' in main_source
+    assert 'psub.add_parser("receipt"' in main_source
+    # The retired split read-only entry is not kept as a second name.
+    assert run("test", "receipt").returncode != 0
 
 def test_retired_z2like_demo_profile_is_rejected() -> None:
     for command in ("install", "deploy", "verify", "status", "update"):

@@ -9,7 +9,7 @@ Reproduces the 2026-11-18 two-Site concurrency investigation
   proc-trace           (on the PPU, as root) sample /proc: process lifetimes + wchan
   proc-analyze         admission/OpenOCD lifetimes, lock waits, Runtime loop CPU from a trace
   preadmission-profile (on the PPU) time the Runtime's pre-admission verification steps
-  summarize            text report from a Path 2 loading report, Job logs and LA analysis
+  summarize            text report from a `plasmactl program` receipt, Job logs and LA analysis
 
 No subcommand drives hardware, writes PPU state, or decides a Job outcome.
 """
@@ -360,32 +360,23 @@ def read_job_log(path: Path) -> dict[str, Any]:
 def summarize(*, report: dict | None, jobs: list[dict], la: dict | None) -> str:
     lines: list[str] = []
     if report:
-        lines += [f"outcome {report.get('outcome')}  batch {report.get('batch_id')}  "
-                  f"start {report.get('start_id')}  source {report.get('source_sha')}"]
-        for site in report.get("site_results", []):
-            lines.append(f"  Site {site['site_id']} {site['job_id']} {site['result']} "
-                         f"{site['elapsed_ms']} ms readback {site['readback_sha256'][:8]} "
-                         f"safe_off {site['safe_off']}")
-        throughput = report.get("throughput") or {}
-        lines.append(f"  throughput {throughput.get('bytes')} B / "
-                     f"{round(throughput.get('elapsed_s', 0), 2)} s = "
-                     f"{round(throughput.get('bytes_per_s', 0))} B/s"
-                     f" ({throughput.get('elapsed_basis', 'OBSERVER_TERMINAL_SAMPLE')})")
-        if throughput.get("observed_elapsed_s"):
-            lines.append(f"  observer-read elapsed {round(throughput['observed_elapsed_s'], 2)} s "
-                         f"(includes benchmark polling delay)")
-        comparison = report.get("comparison") or {}
-        if "sampled_pid_overlap_s" in comparison:
-            lines.append(f"  OpenOCD PID overlap {round(comparison['sampled_pid_overlap_s'], 2)} s"
-                         f" (+/-{round(comparison.get('overlap_boundary_uncertainty_s', 0), 2)})")
-        lines.append("  phase        n    CPU mean  CPU peak  RAM peak KiB")
-        for name, phase in (comparison.get("phases") or {}).items():
-            cpu, ram = phase.get("cpu_pct") or {}, phase.get("ram_used_kib") or {}
-            mean, peak = cpu.get("mean"), cpu.get("peak")
-            lines.append(f"  {name:<12}{phase.get('n', 0):>4}  "
-                         f"{'-' if mean is None else f'{mean:.1f}%':>8}  "
-                         f"{'-' if peak is None else f'{peak:.1f}%':>8}"
-                         f"  {ram.get('peak', '-'):>12}")
+        # `plasmactl program submit|status` output: the Manager's own Batch record.
+        batch = report.get("batch") or {}
+        lines += [f"outcome {batch.get('outcome')}  batch {batch.get('batch_id')}  "
+                  f"start {batch.get('start_id') or report.get('start_id')}  "
+                  f"state {batch.get('state')}"]
+        try:
+            began = _dt.datetime.fromisoformat(batch["created_at"])
+            ended = _dt.datetime.fromisoformat(batch["finished_at"])
+            lines.append(f"  Manager Batch elapsed {round((ended - began).total_seconds(), 2)} s "
+                         "(MANAGER_BATCH_CREATED_TO_FINISHED)")
+        except (KeyError, TypeError, ValueError):
+            lines.append("  Manager Batch elapsed - (not finished or not recorded)")
+        for site in batch.get("sites", []):
+            last = (site.get("attempts") or [{}])[-1]
+            lines.append(f"  {site.get('ppu_alias')}:{site.get('site_id')} {site.get('outcome')} "
+                         f"job {last.get('job_id')} attempts {len(site.get('attempts') or [])} "
+                         f"safe_off {last.get('safe_off')}")
     if jobs:
         jobs = sorted(jobs, key=lambda j: j["site_id"] or 0)
         lines.append("")
@@ -485,8 +476,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--repeat", type=int, default=1)
     p.set_defaults(func=cmd_preadmission_profile)
 
-    p = sub.add_parser("summarize", help="text report from loading report, Job logs, LA analysis")
-    p.add_argument("--report", type=Path, help="Path 2 loading-benchmark report.json")
+    p = sub.add_parser("summarize", help="text report from program receipt, Job logs, LA analysis")
+    p.add_argument("--report", type=Path,
+                   help="`plasmactl program submit|status` JSON output (Manager Batch record)")
     p.add_argument("--job-log", type=Path, action="append", default=[],
                    help="PPU Job log (.jsonl) with stage_timing events")
     p.add_argument("--la", type=Path, help="la-analyze output")

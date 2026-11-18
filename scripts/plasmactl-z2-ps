@@ -78,6 +78,7 @@ Commands:
   deploy    Activate a new verified PPU release on an already installed Z2
   verify    Read-only local Z2 PS runtime + PS diagnostic verification
   status    Installed release/runtime/service summary
+  logs      Recent Runtime/Gateway/activation journal lines (read-only)
 
 Install/deploy options:
   --release-artifact PATH   Canonical plasma-ppu-*-linux-armv7l.tar.gz
@@ -464,6 +465,12 @@ case "$command" in
   status)
     (($# == 0)) || die "status accepts no profile options"
     show_status
+    ;;
+  logs)
+    # Read-only. Restart stays with the Deployment Coordinator (quiescence/Root Guard).
+    (($# == 0)) || die "logs accepts no profile options"
+    journalctl -u plasma-server.service -u plasma-web.service \
+      -u plasma-runtime-activation.service -n "${PLASMACTL_LOG_LINES:-200}" --no-pager
     ;;
   help|-h|--help)
     usage

@@ -6,7 +6,13 @@
 
 **Current deployment control-plane contract.**
 
-`plasmactl` is the operator entry point for Plasma deployment/runtime lifecycle commands. A deployment **profile** selects a host role and its backend; it does not collapse development-host, Control Station, surrogate-PPU, and real-appliance ownership into one implementation.
+`plasmactl` is the one operator entry point for Plasma deployment/runtime lifecycle, diagnosis and Manager Batch programming. Its canonical implementation is the path-neutral Python package [`utilities/plasmactl/`](../../utilities/plasmactl/README.md); `scripts/plasmactl` is only the repository launcher that points it at this checkout's platform backends (and ships in the Z2 PS kit). A deployment **profile** selects a host role and its backend; it does not collapse development-host, Control Station, surrogate-PPU, and real-appliance ownership into one implementation, and the CLI core never calls systemd, sudo or SSH itself.
+
+| Command | integration | local-control-station | swpc-z2like | z2-ps |
+|---|---|---|---|---|
+| `install` / `deploy` / `verify` / `status` | yes | yes | yes | yes |
+| `logs` | yes | yes (user journal, read-only) | no | yes (system journal, read-only) |
+| `restart` | yes | yes (installed release, then verify) | no | no: Deployment Coordinator owns quiescence and Root Guard |
 
 Current profiles:
 
@@ -32,7 +38,7 @@ The backend answers:
 Therefore:
 
 ```text
-plasmactl
+plasmactl  (utilities/plasmactl/src/plasma_cli/operations.py)
 ├── integration
 │   └── scripts/plasmactl-integration
 ├── local-control-station
@@ -280,7 +286,7 @@ The full package and qualification contract is documented at `docs/deployment/z2
 ```text
 Plasma-owned CPython ARMv7 runtime
 canonical ppu/linux/armv7l release
-plasmactl router + z2-ps backend
+plasmactl launcher + Unified CLI (utilities/plasmactl/src) + z2-ps backend
 Z2 PPU installer wrapper + sibling installer core
 hash/evidence metadata
 ```
