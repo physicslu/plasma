@@ -1,0 +1,126 @@
+"""Host-only tests: mocked Manager GET, no PPU, Z2, FPGA, network or DUT."""
+from __future__ import annotations
+
+import io
+import json
+from unittest.mock import patch
+
+import pytest
+
+from plasma_cli.api import FleetError, manager_fleet
+from plasma_cli.main import main, select_fleet
+from plasma_cli.targets import parse_targets
+
+
+def fleet():
+    return {
+        "ok": True,
+        "observed_at": "2026-11-18T00:00:00Z",
+        "ppus": [
+            {
+                "alias": "z2", "gateway_live": True, "execution_ready": False,
+                "identity_conflict": False, "errors": [],
+                "ppu": {"ppu_id": "physical-z2", "facility_id": "lab"},
+                "sites": [{"site_id": 1, "enabled": True}, {"site_id": 2, "enabled": False}],
+            },
+            {
+                "alias": "second", "gateway_live": True, "execution_ready": True,
+                "identity_conflict": False, "errors": [],
+                "ppu": {"ppu_id": "physical-second", "facility_id": "lab"},
+                "sites": [{"site_id": 14, "enabled": True}],
+            },
+        ],
+    }
+
+
+@pytest.mark.parametrize("raw", [
+    ["z2:0"], ["z2:1,1"], ["z2:1", "z2:2"], ["z2:"],
+    ["z2:-1"], ["z2:1,"], ["z2:1:2"], [":1"], [" z2:1"], ["z2:true"],
+])
+def test_invalid_target_set_fails_closed(raw):
+    with pytest.raises(ValueError):
+        parse_targets(raw)
+
+
+def test_any_site_topology_and_multi_ppu():
+    targets = parse_targets(["z2:1,2", "second:14"])
+    result, complete = select_fleet(fleet(), targets, all_ppus=False)
+    assert complete
+    assert [x["ppu_alias"] for x in result["ppus"]] == ["z2", "second"]
+    assert [x["site_id"] for x in result["ppus"][1]["sites"]] == [14]
+    assert result["ppus"][0]["execution_ready"] is False
+    assert result["ppus"][0]["status"] == "OBSERVED"  # Never HIL PASS.
+
+
+def test_missing_ppu_or_site_does_not_pass():
+    result, complete = select_fleet(fleet(), parse_targets(["unknown:1", "z2:3"]), all_ppus=False)
+    assert not complete
+    assert result["ppus"][0]["status"] == "NOT_FOUND"
+    assert result["ppus"][1]["status"] == "NOT_VERIFIED"
+    assert result["ppus"][1]["missing_site_ids"] == [3]
+
+
+def test_unreachable_ppu_is_not_verified():
+    bad = fleet()
+    bad["ppus"][0]["gateway_live"] = False
+    result, complete = select_fleet(bad, parse_targets(["z2:1"]), all_ppus=False)
+    assert not complete
+    assert result["ppus"][0]["status"] == "NOT_VERIFIED"
+
+
+def test_all_returns_fleet_without_programming():
+    result, complete = select_fleet(fleet(), (), all_ppus=True)
+    assert complete and len(result["ppus"]) == 2
+
+
+class _Response(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        self.close()
+
+
+class _Opener:
+    def __init__(self, payload):
+        self.payload = payload
+        self.request = None
+
+    def open(self, request, *, timeout):
+        self.request = request
+        assert timeout == 5.0
+        return _Response(json.dumps(self.payload).encode())
+
+
+def test_manager_transport_only_uses_get():
+    opener = _Opener(fleet())
+    with patch("plasma_cli.api.build_opener", return_value=opener):
+        result = manager_fleet("http://127.0.0.1:18280")
+    assert result["ok"] is True
+    assert opener.request.get_method() == "GET"
+    assert opener.request.full_url == "http://127.0.0.1:18280/api/fleet"
+
+
+@pytest.mark.parametrize("url", [
+    "file:///etc/passwd", "http://user:pass@host", "http://host/api/fleet",
+    "http://host/?x=1", "http://host/#test", "http://host:invalid",
+])
+def test_unsafe_manager_url_does_not_open_network(url):
+    with patch("plasma_cli.api.build_opener", side_effect=AssertionError("network forbidden")):
+        with pytest.raises(FleetError):
+            manager_fleet(url)
+
+
+def test_cli_diagnose_targets_and_no_write(capsys):
+    with patch("plasma_cli.main.manager_fleet", return_value=fleet()) as get:
+        status = main(["diagnose", "--target", "z2:1,2", "--target", "second:14"])
+    assert status == 0
+    assert json.loads(capsys.readouterr().out)["ppus"][1]["sites"][0]["site_id"] == 14
+    get.assert_called_once()
+
+
+def test_cli_error_does_not_claim_pass(capsys):
+    with patch("plasma_cli.main.manager_fleet", side_effect=FleetError("unavailable")):
+        status = main(["diagnose", "--all"])
+    assert status == 2
+    assert json.loads(capsys.readouterr().err)["ok"] is False
