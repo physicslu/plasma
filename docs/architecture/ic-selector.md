@@ -78,7 +78,7 @@ Research Registry cardinality remains a separate engineering metric.
 
 The browser must present the visible range and total matches separately, for example `1–30 / 1,400`, and provide explicit previous/next navigation when `total_count > limit`. Changing the query resets `offset=0`; changing pages clears a prior selection so the detail panel never implies that an off-page row is still selected. The ranked ordering contract is stable across pages, so repeated `query + offset + limit` requests must return the same identifiers while the underlying catalog revision is unchanged.
 
-The research CSV is an import/source artifact, not a permanent storage contract. A future database-backed catalog may replace it without changing Selector semantics.
+The research CSV is an import/source artifact, not a permanent storage contract. The Manager SQLite read-path opt-in is implemented under `PLASMA_CATALOG_SQLITE_DB=/absolute/path/catalog.sqlite3`: it reads an SHA-256-verified, source-pinned snapshot through `plasma_web.catalog_sqlite_selector`, and returns the same API payload and L0/L1/L2/L3 rules. The PPU and Gateway remain Catalog-free. The snapshot must be imported with `--with-qualification` and currently match the existing canonical source revision exactly because Provider/Manufacturer enrichment is still source-backed. Database missing, source drift, incomplete qualification or corrupt data returns `503 DEVICE_SELECTOR_UNAVAILABLE` rather than falling back to a stale/empty CSV result. Unset the variable to roll back the read path. This opt-in cutover is **not** the later data-only publisher: adding ICs without re-releasing code remains a separate implementation milestone.
 
 ## ICPN semantics
 

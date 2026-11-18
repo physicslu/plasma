@@ -13,6 +13,7 @@ This module must not import the PPU Gateway (Manager imports it standalone).
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 from urllib.parse import parse_qs
@@ -22,6 +23,7 @@ from plasma_core.manufacturer_device_basic import get_default_manufacturer_devic
 
 from .backend_candidate_registry import get_default_backend_candidate_registry
 from .backend_source_reference import backend_source_reference, default_pinned_upstream
+from .catalog_sqlite_selector import read_selector_view
 from .device_catalog import (
     DEFAULT_SEARCH_LIMIT,
     MAX_SEARCH_LIMIT,
@@ -32,6 +34,8 @@ from .microchip_upstream_openocd_evidence import microchip_upstream_openocd_evid
 from .nxp_manufacturer_device_evidence import get_default_nxp_manufacturer_device_evidence
 from .openocd_provider_registry import get_default_openocd_provider_registry
 from .programming_qualification import get_default_programming_qualification_registry
+
+SQLITE_SELECTOR_DB_ENV = "PLASMA_CATALOG_SQLITE_DB"
 
 # Web REST contract version of the Selector payload; equality with the PPU
 # Gateway contract is enforced by tests (this module must not import it).
@@ -214,15 +218,24 @@ def _device_search_payload(
     *,
     levels: tuple[int, ...] = (1, 2, 3),
 ) -> dict[str, Any]:
-    catalog = get_default_device_catalog()
-    programming_qualification = get_default_programming_qualification_registry()
-    qualification_cache: dict[tuple[str, str], dict[str, Any]] = {}
+    if SQLITE_SELECTOR_DB_ENV in os.environ:
+        catalog, qualification_cache, level_counts = read_selector_view(
+            os.environ[SQLITE_SELECTOR_DB_ENV]
+        )
+        programming_qualification = None
+    else:
+        catalog = get_default_device_catalog()
+        programming_qualification = get_default_programming_qualification_registry()
+        qualification_cache = {}
+        level_counts = programming_qualification.summary["catalog_level_counts"]
 
     def qualification_for(record: Any) -> dict[str, Any]:
         exact_icpn = record.icpn or record.identifier
-        key = (record.vendor, exact_icpn)
+        key = (record.vendor.casefold(), exact_icpn.casefold())
         qualification = qualification_cache.get(key)
         if qualification is None:
+            if programming_qualification is None:
+                raise DeviceCatalogIntegrityError("SQLite Selector qualification record unavailable")
             qualification = programming_qualification.describe(record.vendor, exact_icpn)
             qualification_cache[key] = qualification
         return qualification
@@ -301,7 +314,6 @@ def _device_search_payload(
         item["programming_qualification"] = qualification
         results.append(item)
 
-    level_counts = programming_qualification.summary["catalog_level_counts"]
     catalog_size = sum(int(level_counts[str(level)]) for level in levels)
     return {
         "ok": True,
@@ -327,7 +339,10 @@ def search(query: str, limit: int, offset: int = 0, *, levels: tuple[int, ...] =
 
 def warm() -> dict[str, int]:
     """Build the immutable Qualification registry once; return Level counts."""
-    counts = get_default_programming_qualification_registry().summary["catalog_level_counts"]
+    if SQLITE_SELECTOR_DB_ENV in os.environ:
+        _catalog, _qualifications, counts = read_selector_view(os.environ[SQLITE_SELECTOR_DB_ENV])
+    else:
+        counts = get_default_programming_qualification_registry().summary["catalog_level_counts"]
     return {str(level): int(counts[str(level)]) for level in range(4)}
 
 

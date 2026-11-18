@@ -85,6 +85,14 @@ def _probe(blocked, modules):
     return json.loads(completed.stdout.strip().splitlines()[-1])
 
 
+def test_sqlite_catalog_is_manager_only_and_excluded_from_ppu_zipapp():
+    for module in (
+        "plasma_web/catalog_sqlite_repository.py",
+        "plasma_web/catalog_sqlite_selector.py",
+    ):
+        assert module in packaging.CATALOG_ONLY_MODULES, module
+
+
 # --- import layer -----------------------------------------------------------------------
 
 def test_gateway_and_runtime_entrypoints_import_with_every_catalog_module_blocked():

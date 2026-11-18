@@ -46,6 +46,8 @@ CATALOG_ONLY_MODULES = (
     "plasma_core/ic_support.py",
     "plasma_core/manufacturer_device_basic.py",
     "plasma_web/legacy_device_selector.py",
+    "plasma_web/catalog_sqlite_repository.py",
+    "plasma_web/catalog_sqlite_selector.py",
     "plasma_web/device_catalog.py",
     "plasma_web/programming_qualification.py",
     "plasma_web/openocd_software_qualification.py",
