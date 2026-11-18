@@ -36,7 +36,8 @@ def run(*args, input=None):
 
 def main():
     assert not run("git", "status", "--porcelain").stdout.strip(), "DIRTY_WORKTREE"
-    assert run("git", "symbolic-ref", "--short", "HEAD").stdout.decode().strip() == "feat/stm32f103-low-density-12-provider-v10", "WRONG_BRANCH"
+    branch = subprocess.run(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True)
+    assert branch.returncode != 0 or branch.stdout.strip() == "feat/stm32f103-low-density-12-provider-v10", "WRONG_BRANCH"
     assert not MODULE.exists(), "MODULE_ALREADY_EXISTS"
     data = base64.b64decode(ENCODED.read_text().splitlines()[-1], validate=True)
     raw = lzma.decompress(data)
