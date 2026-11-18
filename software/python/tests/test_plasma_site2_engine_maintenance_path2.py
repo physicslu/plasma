@@ -111,6 +111,9 @@ def test_remote_script_denies_an_unexpected_mode(tmp_path, monkeypatch):
 
 def test_retired_one_shot_site2_pid_stage_recovery_clis_stay_absent():
     # The hard-pinned PID 680 / .tmp-680 recovery programs are not products.
-    # Actual owner-gated Operator Recovery and Engine Maintenance remain separate.
+    # Retain genuine Preflight/Owner Recovery/Engine Maintenance code and tests.
     assert not (ROOT / "scripts/plasma_site2_engine_cancel_stuck_prepare.py").exists()
     assert not (ROOT / "scripts/plasma_site2_engine_finalize_stage_path2.py").exists()
+    assert not (ROOT / "scripts/plasma_site2_engine_readonly_inventory.py").exists()
+    assert not (ROOT / "scripts/plasma_site2_recovery_denial_inspect.py").exists()
+    assert not (ROOT / "scripts/opf_site2_readonly_preflight_paired.py").exists()
