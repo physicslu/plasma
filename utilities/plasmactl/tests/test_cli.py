@@ -16,6 +16,7 @@ def fleet():
     return {
         "ok": True,
         "observed_at": "2026-11-18T00:00:00Z",
+        "degraded": False,
         "ppus": [
             {
                 "alias": "z2", "gateway_live": True, "execution_ready": False,
@@ -73,6 +74,34 @@ def test_unreachable_ppu_is_not_verified():
     result, complete = select_fleet(bad, parse_targets(["z2:1"]), all_ppus=False)
     assert not complete
     assert result["ppus"][0]["status"] == "NOT_VERIFIED"
+
+
+@pytest.mark.parametrize("change", [
+    {"degraded": True}, {"degraded": None}, {"ppus": []},
+])
+def test_all_fails_closed_for_unhealthy_or_empty_fleet(change):
+    snapshot = fleet()
+    snapshot.update(change)
+    _, complete = select_fleet(snapshot, (), all_ppus=True)
+    assert not complete
+
+
+def test_all_fails_closed_for_offline_or_conflicting_ppu():
+    snapshot = fleet()
+    snapshot["ppus"][1]["identity_conflict"] = True
+    _, complete = select_fleet(snapshot, (), all_ppus=True)
+    assert not complete
+    snapshot["ppus"][1]["identity_conflict"] = False
+    snapshot["ppus"][1]["gateway_live"] = False
+    _, complete = select_fleet(snapshot, (), all_ppus=True)
+    assert not complete
+
+
+def test_all_rejects_duplicate_ppu_observations():
+    snapshot = fleet()
+    snapshot["ppus"].append(dict(snapshot["ppus"][0]))
+    with pytest.raises(FleetError, match="duplicate"):
+        select_fleet(snapshot, (), all_ppus=True)
 
 
 def test_all_returns_fleet_without_programming():
@@ -137,15 +166,16 @@ BATCH_ID = "a" * 32
 
 def recorded_batch():
     return {
-        "batch_id": BATCH_ID, "state": "completed", "outcome": "PASS",
+        "batch_id": BATCH_ID, "state": "finished", "outcome": "PASS",
+        "journal_persisted": True,
         "targets": [{"ppu_alias": "z2", "site_ids": [1, 2]},
                     {"ppu_alias": "second", "site_ids": [14]}],
         "units": [
-            {"ppu_alias": "z2", "site_id": 1, "status": "TERMINAL",
+            {"ppu_alias": "z2", "site_id": 1, "status": "FINISHED",
              "outcome": "PASS", "attempts": [{"job_id": "job1"}]},
-            {"ppu_alias": "z2", "site_id": 2, "status": "TERMINAL",
+            {"ppu_alias": "z2", "site_id": 2, "status": "FINISHED",
              "outcome": "PASS", "attempts": [{"job_id": "job2"}]},
-            {"ppu_alias": "second", "site_id": 14, "status": "TERMINAL",
+            {"ppu_alias": "second", "site_id": 14, "status": "FINISHED",
              "outcome": "PASS", "attempts": [{"job_id": "job3"}]},
         ],
     }
@@ -166,6 +196,28 @@ def test_receipt_never_passes_when_batch_does_not_pass(outcome):
     record["outcome"] = outcome
     _, success = verify_batch_receipt(record, parse_targets(["z2:1"]))
     assert not success
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("state", "running"),
+    ("state", "completed"),
+    ("journal_persisted", False),
+    ("journal_persisted", None),
+])
+def test_receipt_requires_finished_and_durable_journal(field, value):
+    record = recorded_batch()
+    record[field] = value
+    result, success = verify_batch_receipt(record, parse_targets(["z2:1"]))
+    assert not success
+    assert result["manager_reported_pass"] is False
+
+
+def test_receipt_unfinished_unit_cannot_be_misreported_as_pass():
+    record = recorded_batch()
+    record["units"][0]["status"] = "NOT_RUN"
+    result, success = verify_batch_receipt(record, parse_targets(["second:14"]))
+    assert not success
+    assert not result["manager_reported_pass"]
 
 
 def test_receipt_cannot_hide_peer_failure_by_filtering_target():

@@ -12,14 +12,6 @@ from .targets import Target, parse_targets
 
 def select_fleet(fleet: dict, targets: tuple[Target, ...], *, all_ppus: bool) -> tuple[dict, bool]:
     """Present exact observed data, never interpret mock/host data as HIL PASS."""
-    if all_ppus:
-        return {
-            "schema": "plasma.utility.diagnose.v1",
-            "observed_at": fleet.get("observed_at"),
-            "summary": fleet.get("summary"),
-            "degraded": fleet.get("degraded"),
-            "ppus": fleet["ppus"],
-        }, True
     available: dict[str, dict] = {}
     for item in fleet["ppus"]:
         if not isinstance(item, dict) or not isinstance(item.get("alias"), str):
@@ -28,6 +20,25 @@ def select_fleet(fleet: dict, targets: tuple[Target, ...], *, all_ppus: bool) ->
         if alias in available:
             raise FleetError("Manager Fleet contains duplicate PPU aliases")
         available[alias] = item
+    if all_ppus:
+        # A successful GET is not a healthy Fleet; fail closed on degraded,
+        # missing, duplicate or offline PPU observations.
+        healthy = (
+            bool(available) and fleet.get("degraded") is False
+            and all(
+                item.get("gateway_live") is True
+                and item.get("identity_conflict") is False
+                and item.get("errors") == []
+                for item in available.values()
+            )
+        )
+        return {
+            "schema": "plasma.utility.diagnose.v1",
+            "observed_at": fleet.get("observed_at"),
+            "summary": fleet.get("summary"),
+            "degraded": fleet.get("degraded"),
+            "ppus": fleet["ppus"],
+        }, healthy
     observations = []
     complete = True
     for target in targets:
@@ -124,8 +135,12 @@ def verify_batch_receipt(batch: dict, targets: tuple[Target, ...]) -> tuple[dict
          "attempts": indexed[(alias, site)].get("attempts")}
         for alias, site in selected
     ]
-    complete = batch.get("outcome") == "PASS" and all(
-        unit.get("outcome") == "PASS" for unit in units
+    complete = (
+        batch.get("state") == "finished"
+        and batch.get("journal_persisted") is True
+        and batch.get("outcome") == "PASS"
+        and all(unit.get("outcome") == "PASS"
+                and unit.get("status") == "FINISHED" for unit in units)
     )
     return {
         "schema": "plasma.utility.test-receipt.v1",
@@ -133,6 +148,7 @@ def verify_batch_receipt(batch: dict, targets: tuple[Target, ...]) -> tuple[dict
         "batch_state": batch.get("state"),
         "batch_outcome": batch.get("outcome"),
         "manager_reported_pass": complete,
+        "journal_persisted": batch.get("journal_persisted"),
         "evidence_kind": "MANAGER_REPORTED_BATCH_ONLY",
         "sites": projected,
     }, complete
