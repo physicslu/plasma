@@ -348,7 +348,7 @@ class CatalogSqliteShadowRepository:
             raise DeviceCatalogIntegrityError("L3 physical evidence missing")
 
     @staticmethod
-    def _validate_l2_source(record: DeviceCatalogRecord, q: dict[str, Any]) -> None:
+    def _validate_l2_source(record: DeviceCatalogRecord, q: dict[str, Any]) -> dict[str, Any]:
         """Bind reviewed documentary facts to the exact published qualification."""
         evidence = q["publication_evidence"]
         source_path = evidence.get("source_path")
@@ -372,6 +372,10 @@ class CatalogSqliteShadowRepository:
         }
         references = reviewed.get("fact_references") if isinstance(reviewed, dict) else None
         if (not isinstance(reviewed, dict)
+                or set(reviewed) != {"schema_version", "manufacturer", "exact_icpn",
+                                     "exact_applicability", "source_authority", "source_reference",
+                                     "provider", "profile", "operations", "review_status",
+                                     "reviewer", "fact_references"}
                 or reviewed.get("schema_version") != "catalog-l2-reviewed-evidence-v1"
                 or reviewed.get("manufacturer") != record.vendor
                 or reviewed.get("exact_icpn") != record.identifier
@@ -388,6 +392,7 @@ class CatalogSqliteShadowRepository:
                 or any(not isinstance(references.get(key), str) or not references[key].strip()
                        for key in ("identity", "route", "geometry", "operations"))):
             raise DeviceCatalogIntegrityError("L2 reviewed facts do not match exact Provider/Profile/geometry")
+        return reviewed
 
     def stage_revision(self, changes: list[dict[str, Any]], *, actor: str) -> str:
         """Stage exact records against the current active revision; staging is never public."""
@@ -459,7 +464,7 @@ class CatalogSqliteShadowRepository:
                 q = dict(change["qualification"])
                 self._validate_publication(record, q)
                 if q["catalog_level"] >= 2:
-                    self._validate_l2_source(record, q)
+                    reviewed = self._validate_l2_source(record, q)
                     p = q["provider"]
                     lock = (p["provider_id"], p["version"], p["source_commit"], p["target_config"],
                             q["programming"]["programming_profile_id"])
@@ -476,6 +481,8 @@ class CatalogSqliteShadowRepository:
                         field: value for field, value in q["publication_evidence"].items()
                         if field != "source_path"
                     }
+                    q["publication_evidence"]["reviewer"] = reviewed["reviewer"]
+                    q["publication_evidence"]["fact_references"] = reviewed["fact_references"]
                 q["data_only_publication"] = True
                 records[key], qualifications[key] = replace(
                     record, catalog_revision_sha256=source_revision

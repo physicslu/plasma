@@ -135,6 +135,8 @@ the exact ICPN, exact applicability, source authority/reference, pinned Provider
 release/target/driver, Profile/geometry, operation scopes, an `ADMITTED` reviewer
 decision, and per-fact document references for identity, route, geometry and
 operations. These fields must match the staged row and qualification exactly.
+The immutable published revision retains the reviewer and per-fact references
+alongside the reviewed packet digest, while removing the host-local file path.
 The packet hash attests the reviewed packet bytes, **not** the original PDF bytes;
 unavailable original-document custody must not be represented as a PDF digest.
 The trusted Publisher OS identity is the admission authority; the reviewer's
