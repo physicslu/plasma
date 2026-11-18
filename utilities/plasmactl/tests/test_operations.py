@@ -22,6 +22,7 @@ REPO = Path(__file__).resolve().parents[3]
 
 ENV_FOR = {
     "integration": "PLASMACTL_INTEGRATION_BACKEND",
+    "integration-verify": "PLASMACTL_VERIFY_BACKEND",
     "local-control-station": "PLASMA_LOCAL_CONTROL_STATION_BACKEND",
     "swpc-z2like": "PLASMA_SWPC_Z2LIKE_BACKEND",
     "swpc-z2like-bootstrap": "PLASMA_SWPC_Z2LIKE_BOOTSTRAP_BACKEND",
@@ -80,8 +81,8 @@ def backends(tmp_path, monkeypatch):
     (["logs"], ["integration", "show_logs", "all"]),
     (["logs", "web"], ["integration", "show_logs", "web"]),
     (["update"], ["integration", "update_code"]),
-    (["verify", "fleet"], ["integration", "bash", "/nonexistent/scripts/plasmactl-verify", "fleet"]),
-    (["verify"], ["integration", "bash", "/nonexistent/scripts/plasmactl-verify", ""]),
+    (["verify", "fleet"], ["integration-verify", "fleet"]),
+    (["verify"], ["integration-verify"]),
     (["test"], ["integration", "run_tests"]),
     (["restart-web"], ["integration", "restart_web_console"]),
     (["update-and-restart"], ["integration", "deploy"]),
@@ -174,3 +175,35 @@ def test_programming_commissioning_tool_no_longer_imports_path2_module():
     assert "import ppu_bootstrap_transport" in source
     neutral = (REPO / "scripts/ppu_bootstrap_transport.py").read_text()
     assert "path2" not in neutral.lower() and "GITHUB_" not in neutral
+
+
+# Source ownership: all legacy entry paths link to one implementation.
+@pytest.mark.parametrize("name", [
+    "plasmactl-integration",
+    "plasmactl-local-control-station",
+    "plasmactl-swpc-z2like",
+    "plasmactl-swpc-z2like-bootstrap-sites",
+    "plasmactl-swpc-z2like-managed-ingress",
+    "plasmactl-swpc-z2like-orchestrator",
+    "plasmactl-swpc-z2like-programming",
+    "plasmactl-verify",
+    "plasmactl-z2-ps",
+])
+def test_legacy_backend_path_is_thin_link_to_canonical_source(name):
+    canonical = REPO / "utilities" / "plasmactl" / "backends" / name
+    legacy = REPO / "scripts" / name
+    assert canonical.is_file()
+    assert legacy.is_symlink()
+    assert legacy.resolve() == canonical
+
+
+def test_launcher_points_at_canonical_backend_directory():
+    launcher = (REPO / "scripts/plasmactl").read_text()
+    assert 'backend_root="$repo_root/utilities/plasmactl/backends"' in launcher
+    assert 'PLASMA_CLI_BACKEND_DIR="$backend_root"' in launcher
+
+
+def test_integration_install_uses_operator_launcher_not_backend():
+    integration = (REPO / "utilities/plasmactl/backends/plasmactl-integration").read_text()
+    assert 'ln -sfn "$repo/scripts/plasmactl" "$bin_dir/plasmactl"' in integration
+    assert 'PLASMACTL_DEPLOY_REEXEC=1 exec "$repo/scripts/plasmactl" deploy' in integration

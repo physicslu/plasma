@@ -12,8 +12,10 @@ programming authority.
   (installer, Bundle v3/Bootstrap, Deployment Coordinator, Root Guard,
   rollback). The CLI core never calls systemd, sudo, SSH or a Z2 directly.
 
-`scripts/plasmactl` is only the repository launcher (it sets the backend
-directory) and ships with this package in the Z2 PS kit. The package is
+`scripts/plasmactl` is the only repository Operator CLI launcher. The
+platform implementations live under `utilities/plasmactl/backends/` (not the
+portable Python core). The old `scripts/plasmactl-*` paths are compatibility
+symlinks only; do not add logic there. The launcher sets the backend directory and ships with this package in the Z2 PS kit. The package is
 Python 3.10-compatible (stock PYNQ System Python) and has no dependencies.
 
 ```bash
@@ -67,7 +69,7 @@ on stderr. Exit codes are the same for every command:
 * A PASS is the Manager-persisted Batch outcome, not an independent electrical
   or HIL qualification. Host-only tests use a fake Manager.
 
-## Legacy entry points (Gate 1, 2026-11-18)
+## Legacy entry points (Gate 1, 2026-11-18; backend consolidation 2026-11-19)
 
 | Former entry | Status | Now |
 |---|---|---|
@@ -75,7 +77,20 @@ on stderr. Exit codes are the same for every command:
 | `plasmactl test receipt` | MIGRATE | `plasmactl program receipt` (single name) |
 | `scripts/plasma_programming_load.py`, `specs/programming-loading-benchmark-v1.schema.json`, Path 2 `p2hw-*` claim | DELETE | `plasmactl program` + `scripts/plasma_hil_timing.py` |
 | `scripts/plasma_program.py` | RETAIN | single-PPU Bundle commissioning (B1/B2/B3, Runtime Kit, one-Site diagnostic flash); not the formal programming entry; uses neutral `ppu_bootstrap_transport.py` |
-| `scripts/plasmactl-*` backends | RETAIN | platform-owned operations behind the CLI |
+| `scripts/plasmactl-*` backends | CONSOLIDATED | canonical `utilities/plasmactl/backends/`; prior paths are symlinks |
 | `scripts/plasma_engineering_hil.py` (`hil programming`) | RETAIN | Blue Pill A/B + USB CDC verification harness (unique CDC check) |
 | `software/python/plasma_client/cli.py` (`plasma`) | RETAIN | PPU-local Gateway debug client; not a Controller CLI |
 | `scripts/plasma_ppu.py` | RETAIN | read-only SWPC→PPU deployment doctor (direct PPU observation, no Manager) |
+
+## Backend source ownership
+
+All nine platform and verification shell backends live in
+`utilities/plasmactl/backends/`. This is source organization, **not** a new
+privilege layer: integration/local Control Station keep user-systemd ownership;
+surrogate PPU/Z2 PS keep the existing Root/Coordinator authority. `operations.py`
+routes by profile and delegates unchanged args and exit codes. The old
+`scripts/plasmactl-*` paths are compatibility symlinks, not copied code.
+The Z2 PS kit materializes only its required backend into its own `scripts/`
+for standalone execution. A standalone Python wheel without a checkout still
+has no deployment backend. Engineering `plasma_program.py` and the PPU Gateway
+debug client are not additional Operator CLIs.

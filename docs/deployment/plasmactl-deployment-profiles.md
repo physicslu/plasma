@@ -40,19 +40,23 @@ Therefore:
 ```text
 plasmactl  (utilities/plasmactl/src/plasma_cli/operations.py)
 ├── integration
-│   └── scripts/plasmactl-integration
+│   └── utilities/plasmactl/backends/plasmactl-integration
 ├── local-control-station
-│   └── scripts/plasmactl-local-control-station
+│   └── utilities/plasmactl/backends/plasmactl-local-control-station
 ├── swpc-z2like
-│   └── scripts/plasmactl-swpc-z2like
+│   └── utilities/plasmactl/backends/plasmactl-swpc-z2like-orchestrator
 │       └── scripts/swpc-z2like-ppu-install.sh
 └── z2-ps
-    └── scripts/plasmactl-z2-ps
+    └── utilities/plasmactl/backends/plasmactl-z2-ps
         ├── scripts/z2-python-runtime.py
         ├── scripts/ppu-z2-installer.py
 ```
 
-The local Control Station backend owns only Console/BFF + Manager lifecycle. It never starts a local Plasma Server or Plasma Gateway.
+All nine backend/verification implementations live in `utilities/plasmactl/backends/`.
+The original `scripts/plasmactl-*` names are compatibility symlinks for direct
+engineering callers; the standalone Z2 release kit copies its Z2 backend into
+kit-local `scripts/`. This changes neither runtime privilege nor deployment
+ownership. The local Control Station backend owns only Console/BFF + Manager lifecycle. It never starts a local Plasma Server or Plasma Gateway.
 
 The SWPC backend remains a surrogate-only host adapter. The Z2 backend is distinct: it accepts only a real ARMv7 target at runtime and reuses the canonical PPU release plus the existing Z2 installer instead of reimplementing those internals. The Z2 installer uses one canonical `ppu-z2-installer.py` containing the verified release core and runtime-activation integration.
 
