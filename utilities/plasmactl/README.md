@@ -71,7 +71,7 @@ on stderr. Exit codes are the same for every command:
 
 | Former entry | Status | Now |
 |---|---|---|
-| `scripts/plasmactl` Bash profile router (310 LOC) | MIGRATE | `plasma_cli/operations.py`; launcher kept (Z2 kit, installed symlink, Path 2 `CONTROL_STATION_OPERATOR_COMMANDS`) |
+| `scripts/plasmactl` Bash profile router (310 LOC) | MIGRATE | `plasma_cli/operations.py`; launcher kept (Z2 kit and installed symlink); Path 2 invokes the owner-authorized exact-argv CLI without a second command allowlist |
 | `plasmactl test receipt` | MIGRATE | `plasmactl program receipt` (single name) |
 | `scripts/plasma_programming_load.py`, `specs/programming-loading-benchmark-v1.schema.json`, Path 2 `p2hw-*` claim | DELETE | `plasmactl program` + `scripts/plasma_hil_timing.py` |
 | `scripts/plasma_program.py` | RETAIN | single-PPU Bundle commissioning (B1/B2/B3, Runtime Kit, one-Site diagnostic flash); not the formal programming entry; uses neutral `ppu_bootstrap_transport.py` |
