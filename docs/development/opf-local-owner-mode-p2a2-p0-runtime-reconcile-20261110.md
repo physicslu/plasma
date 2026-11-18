@@ -15,7 +15,7 @@ Consequences on the device:
 - the Manager's Managed relay answers `ppu_platform_recovery_required`;
 - a Recovery-Gated Takeover would commit `RECOVERY_ONLY`.
 
-CI did not catch the failure because the QEMU kit path (`z2like-demo-qemu-kit.py`) never runs `plasmactl-z2-ps`.
+At the time, CI did not catch the failure because the now-retired QEMU kit path did not run `plasmactl-z2-ps`.
 
 ## 2. Work 1 — kit self-check (read-only)
 
@@ -31,7 +31,7 @@ Owner decisions:
 | --- | --- |
 | New `scripts/ppu_runtime_local_readiness.py` (stdlib, Python ≥ 3.10) | Sends **GET only**. (1) `/api/health/ready` returns `alive`/`ready`. (2) `/api/auth/challenge` on the Gateway is served through the Bootstrap admission socket and returns a well-formed P2A-1 challenge with `controller_generation`. (3) That challenge's `device_id` equals the local Bootstrap `/v1/status` identity. A host-lab (unauthenticated) Gateway has no challenge route and fails. Evidence: `signed_ps_loopback: DELEGATED_TO_MANAGER_ACCEPTANCE`, `controller_credential_access: NONE`, `http_methods_used: [GET]`. |
 | `scripts/plasmactl-z2-ps` `verify_runtime` | The unsigned `curl` POST loopback is deleted and the readiness tool is called instead. |
-| Kit packaging | The tool ships in every kit assembly: `z2-ps-release.yml`, the QEMU workflow, `z2like-demo-qemu-build-kit.py`, `ppu-bootstrap-kit.py` (required file), `plasma_ppu.py`. CI path filters are updated. |
+| Kit packaging | The tool ships in every kit assembly: `z2-ps-release.yml`, `ppu-bootstrap-kit.py` (required file), `plasma_ppu.py` (historically also the now-retired QEMU workflow/build kit). CI path filters are updated. |
 
 ## 3. Work 2 — controlled close of one already-activated Runtime transaction
 

@@ -8,9 +8,9 @@ import {
   maintenanceCapabilityContract,
 } from "../app/api/manager/maintenance-capability.mjs";
 
-const ORIGIN = "https://plasma-control-station-lab.example";
-const INTERNAL_ORIGIN = "https://plasma-control-station-lab.onrender.com";
-const ALIAS = "z2like-qemu";
+const ORIGIN = "https://control-station.example.example";
+const INTERNAL_ORIGIN = "https://control-station.example.onrender.com";
+const ALIAS = "managed-ppu";
 const SECRET = "test-maintenance-capability-secret-0123456789abcdef";
 const NOW = 1_800_000_000_000;
 
@@ -112,7 +112,7 @@ test("fixed lifecycle policy fails closed when canonical public origin is missin
   try {
     delete process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
     assert.throws(() => maintenanceCapabilityConfigured(), /PUBLIC_ORIGIN/);
-    process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = "http://plasma-control-station-lab.example";
+    process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = "http://control-station.example.example";
     assert.throws(() => maintenanceCapabilityConfigured(), /origin-only HTTPS URL/);
     process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = `${ORIGIN}/path`;
     assert.throws(() => maintenanceCapabilityConfigured(), /origin-only HTTPS URL/);

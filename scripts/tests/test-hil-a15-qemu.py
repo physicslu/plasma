@@ -160,7 +160,7 @@ class GitHubHostedPolicy(unittest.TestCase):
             ("dst=/artifact,readonly", "dst=/artifact"),
             ('test "$RUNNER_ENVIRONMENT" = github-hosted',
              'test "$RUNNER_ENVIRONMENT" = self-hosted'),
-            ("timeout 120s docker run", "docker exec plasma-z2like-demo-qemu"),
+            ("timeout 120s docker run", "docker exec plasma-retired-persistent-qemu"),
         )
         for before, after in mutations:
             mutated = self.hosted.replace(before, after, 1)

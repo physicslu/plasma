@@ -216,7 +216,7 @@
 - **Current** · `engineering SSH route` · `PR #1207` — [通用 PPU 工程模組部署 `ppu-deploy`](development/ppu-deploy-engineering-modules.md)：工程部署路線（Route B），不是產品安裝路徑；Z2 PS WordPort／OpenOCD Python 整合與 SWPC A/B Runner 由同一來源版本協調部署，包含 SHA、互斥、啟用驗證與回滾；目前只有 Host-only 測試，不代表 GitHub PR 已合併或 Z2／SWPC 已部署。
 - **Current** — [Deployment Index](deployment/README.md)
 - **Current** — [`plasmactl` Deployment Profiles](deployment/plasmactl-deployment-profiles.md)：定義統一 operator CLI、`integration`／`local-control-station`／`swpc-z2like` profile ownership、activation rollback 與 qualification boundary。
-- **Current** — [Deployment Port / Profile Matrix](deployment/port-profile-matrix.md)：定義 production、SWPC engineering 與 `z2like-demo` scenario 的 profile-specific port ownership、exposure 與安全邊界。
+- **Current** — [Deployment Port / Profile Matrix](deployment/port-profile-matrix.md)：定義 production 與 SWPC engineering 的 profile-specific port ownership、exposure 與安全邊界。
 - **Current** — [Local Control Station Reference Deployment](deployment/local-control-station.md)：定義 Linux user-systemd 的 Console/BFF + Manager 本機參考部署、可設定 PPU Endpoint、loopback-only ingress、immutable release 與 rollback；macOS／Windows 保留相同產品契約但使用平台原生 packaging。
 - **Plan** · `partly implemented` — [Product Deployment Foundation](deployment/product-deployment-foundation.md)：定義跨平台 Control Station（macOS／Linux／Windows）、Z2 PPU、SWPC integration host 的產品部署責任邊界，以及 immutable release 與跨平台 read-only readiness audit。
 - **Current** — [Product Release Format v1](deployment/product-release-format.md)：定義 product version、release manifest、角色／平台 artifact matrix、SHA-256 integrity、safe verification 與 clean-extraction acceptance。
@@ -224,7 +224,6 @@
 - **Current** — [PPU Runtime Packaging](deployment/ppu-runtime-packaging.md)：定義 Z2 PS Phase-1 source-tree-independent PPU Python zipapp、`linux-armv7l` immutable release、PS-only fail-closed configuration、systemd topology與 Managed PS Loopback 驗收邊界。
 - **Current** — [PYNQ-Z2 PS Installer and Managed Loopback Acceptance](deployment/z2-ps-installer.md)：定義 verified PPU release → immutable side-by-side install、PYNQ/System-Python ownership isolation、explicit Plasma Python >= 3.11 binding、systemd activation/rollback、local readiness 與 real Managed PS Loopback evidence boundary。
 - **Current** · `physical Z2 PS evidence` — [PPU Bootstrap Factory Provisioning and Z2 HIL](deployment/ppu-bootstrap-factory-and-hil.md)：定義獨立 Bootstrap／recovery service、Console-managed Z2 Runtime deployment、durable rollback/recovery contract，以及 real PYNQ-Z2 HIL qualification 邊界。
-- **Current** — [SWPC z2like-demo QEMU ARMv7 Backend](deployment/z2like-demo-qemu.md)：固定 SWPC 為唯一 simulation environment、QEMU ARMv7 simulated Z2 為 `z2like-demo` 唯一 PPU backend，並定義 Bootstrap/Control Station 私有路由與非實機 qualification 邊界。
 - **Current** — [SWPC Z2-like Configured Mock Programming](deployment/swpc-z2like-configured-mock-programming.md)：將 Engineering Programming 綁定到 canonical `lab/swpc-z2like-01/SITE1..SITE8` 與既有 Plasma Server，明確拒絕 non-mock Site，且不建立舊 32-PPU demo topology；僅屬 software/mock qualification。
 - **Reference** — [PPU ARMv7 Runtime Lab](deployment/ppu-armv7-runtime-lab.md)：定義 integration-host QEMU ARMv7 一鍵 runtime/resource 診斷、live／ready／PS Loopback 路徑隔離與非 Z2-HIL 證據邊界。
 - **Reference** — [Control Station Runtime Acceptance Evidence](deployment/control-station-runtime-acceptance.md)：定義 macOS／Linux／Windows clean-runtime CI 的證據範圍與不可延伸宣稱的邊界。
@@ -245,7 +244,6 @@
 - **Reference** · `RCA closure` · `PR #1128/#1129` — [PLASMA Path 3 Token Optimization RCA Closure](development/plasma-path3-token-optimization-rca-closure-2026-10-23.md)：固定 PR #1128 與兩次 SWPC 9×9 Run ID、Token/時間/81 成功率、Artifact SHA-256 與尚未完成的模型／Effort 因果歸因；Repo-first 工作流 DONE，逐請求 Token Attribution 保留低優先級技術債。
 - **Reference** · `local tool` — [Codex Desktop vs Path 3 Token Usage Benchmark](development/codex-benchmark-usage.md)：針對 2026-10-22 9×9 測試，提供僅讀取指定本機 Session JSONL 的 Token 統計工具，區分單次 Turn、累計快照與 Path 3 Codex exec 用量；GitHub-hosted CI 使用合成資料，不代表已讀取 Mac Desktop 真實 Session，也不授權 SWPC、Z2 或 DUT。
 - **Current** — [AI-assisted Git Workflow](development/ai-git-development-workflow.md)
-- **Current** — [PLASMA GitHub Actions Control Bridge](development/plasma-actions-control-bridge.md)：定義 Issue #814、actor／workflow allowlist、`dispatch`／`cancel`／`rerun` 命令與最小權限安全邊界。
 - **Reference** · `historical 2026-10-23` — [PLASMA Codex Hardware Access Parity](development/plasma-codex-hardware-parity.md)：舊版 Runner USB／TTY 群組與 udev 配置歷史；不得用於判定現行 Path 3 禁止實機操作。權威規則見 [Path 3 Contract](development/plasma-path3-codex.md)，實際權限以當次 SWPC Linux UID／群組／ACL／設備觀測為準。
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
@@ -271,7 +269,6 @@ STM32F103 OpenOCD qualification: [v7](architecture/openocd-software-qualificatio
 - **Current** — Z2 PS-local OpenOCD + WordPort/RemoteBitbang + paired PL SWD Image for Blue Pill: see root `AGENTS.md`, [PS OpenOCD architecture](architecture/ic-support-openocd-plan-executor.md), [retirement map](development/swd-legacy-path-retirement.md).
 - **Plan** · `accepted policy` — [IC Information Catalog Level 0 Evidence Contract](architecture/ic-information-phase1.md)：歷史檔名保留 `phase1`，但正式語意為 Level 0 Exact ICPN identity/evidence；具 programming route 才升 L1，qualification `SUPPORTED` 才升 L2，HIL PASS 才升 L3；L0 僅供 Internal Research，Customer IC Selector 從 L1 開始。
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
-- **Plan** · `Gate 1 / Draft` · `Data-only Catalog` — [Catalog Database v1 + Data-only Publication Contract](architecture/catalog-database-v1-data-only-publication.md)：SQLite-first 的 Manager Canonical Catalog、獨立 L0–L3/Provider Qualification、Controller-scoped overlay、可稽核且具交易性的資料修訂發布；一般料號更新不觸發 PPU/FPGA/整套 CI，執行仍由 Bundle v3 與 PPU 安全 Gate 獨立控管。
 - **Current** — [IC Selector Upstream Evidence / Binding Contract Gate A](architecture/ic-selector-upstream-evidence-consistency-gate-a.md)：區分 OpenOCD 上游 CFG／Driver／DEVID、Production CFG Binding 與 Programming Qualification。
 - **Plan** — [KL25 Installed Backend Lock Root v1](architecture/kl25-runtime-backend-lock-root-v1.md)：以既有 IC Support Root 契約載入固定的 KL25 implementation lock，non-editable 安裝與 fail-closed 測試通過才能合併；不新增 KL25 Operation Admission。
 - **Current** — [Selected IC Profile v1](architecture/selected-ic-profile-v1.md)：將 exact ICPN 的 Device operating characteristics、Programming requirements、Backend evidence 與 PLASMA compatibility 分層組合；STM32F103C8T6 為第一個 manufacturer-first pilot。
@@ -364,3 +361,5 @@ python scripts/tests/test-documentation-integrity.py
 ```
 
 The guard checks Markdown headings and local links, verifies that every `docs/**/*.md` file is listed here, rejects known retired document names and protocol/config drift, and protects the canonical Gateway base-module name.
+
+- **Current** — [z2like-demo QEMU Retirement Gate 1 Audit](development/z2like-demo-qemu-retirement-gate1.md)：紀錄程式退役範圍、保留的產品路徑、外部下線待辦與 PR #1476 整合。

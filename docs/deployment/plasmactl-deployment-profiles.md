@@ -257,7 +257,7 @@ sudo ./scripts/plasmactl verify swpc-z2like
 
 This is a local, read-only qualification check of the already installed surrogate. It verifies install evidence/current identity, Plasma-owned canonical config, Server/Gateway/runtime-activation system units, active services, direct local Site Desired API, PS diagnostic loopback through the local Gateway, and absence of the retired host `18081` listener/config. Dynamic canonical Site configuration is accepted within the one-based `id` and `max_supported_sites <= 8` contract.
 
-Managed/public access is a separate deployment role: Local Control Station uses the full configured Gateway, while public `z2like-demo` uses host `18082` to the private QEMU backend. The x86 surrogate no longer has a public restricted ingress.
+Managed access is a separate deployment role: Local Control Station uses the full configured Gateway. The x86 surrogate has no public restricted ingress.
 
 It does **not** prove the Render/Manager managed path, ARMv7/PYNQ behavior, PL/FPGA, Site electrical behavior, or real IC programming.
 

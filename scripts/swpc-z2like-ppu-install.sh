@@ -13,7 +13,7 @@ filesystem, bounded runtime-activation, and systemd ownership model as the Z2
 PS installer. This is an x86_64 integration surrogate, not ARMv7/Z2
 qualification evidence. The retired SWPC host diagnostics ingress on :18081
 is never recreated; public/managed access belongs to the maintained Control
-Station and z2like-demo managed-ingress paths.
+Station path.
 EOF
 }
 
@@ -335,4 +335,4 @@ EOF
 chmod 0644 /opt/plasma/install/last-swpc-z2like-install.json
 
 printf '[swpc-z2like] PASS: local P3-capable PPU ready on 127.0.0.1:18080; SWPC host :18081 remains retired\n'
-printf '[swpc-z2like] public/managed traffic must use the maintained Control Station or z2like-demo managed-ingress path\n'
+printf '[swpc-z2like] managed traffic must use the maintained Control Station path\n'

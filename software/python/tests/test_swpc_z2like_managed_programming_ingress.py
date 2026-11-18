@@ -5,7 +5,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 INGRESS = ROOT / "scripts" / "plasmactl-swpc-z2like-managed-ingress"
-RENDER_START = ROOT / "scripts" / "render-control-station-start.sh"
 BASE_INSTALLER = ROOT / "scripts" / "swpc-z2like-ppu-install.sh"
 
 
@@ -59,15 +58,3 @@ def test_ingress_preserves_explicit_method_boundaries() -> None:
     assert "limit_except POST { deny all; }" in source
     assert "limit_except GET POST { deny all; }" in source
     assert "managed ingress did not reject GET /api/jobs" in source
-
-
-def test_render_service_identity_is_optional_but_pairwise_fail_closed_and_not_serialized() -> None:
-    source = RENDER_START.read_text(encoding="utf-8")
-    assert "PLASMA_RENDER_PPU_ACCESS_CLIENT_ID" in source
-    assert "PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET" in source
-    assert "requires both PLASMA_RENDER_PPU_ACCESS_CLIENT_ID and PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET" in source
-    assert 'export PLASMA_MANAGER_CF_ACCESS_ORIGIN="${ppu_endpoint%/}"' in source
-    assert 'export PLASMA_MANAGER_CF_ACCESS_CLIENT_ID="${ppu_access_client_id}"' in source
-    assert 'export PLASMA_MANAGER_CF_ACCESS_CLIENT_SECRET="${ppu_access_client_secret}"' in source
-    assert '"ppus": [{"alias": alias, "endpoint": endpoint}]' in source
-    assert '"client_secret"' not in source

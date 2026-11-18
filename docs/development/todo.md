@@ -349,7 +349,7 @@ Architectural invariant:
 
 **Layer:** Control Station / release identity / operator diagnostics
 
-**Reason:** The global header currently shows the canonical Plasma Product Version (for example `v0.2.1`) but does not identify the exact deployed build. Product Version is intentionally stable across ordinary PR merges, so using it alone makes it difficult to distinguish which commit/release is actually running on `plasma-demo`, `z2like-demo`, `plasma.open4th.com`, or an installed Control Station.
+**Reason:** The global header currently shows the canonical Plasma Product Version (for example `v0.2.1`) but does not identify the exact deployed build. Product Version is intentionally stable across ordinary PR merges, so using it alone makes it difficult to distinguish which commit/release is actually running on `plasma-demo`, `plasma.open4th.com`, or an installed Control Station.
 
 Required work:
 
@@ -360,7 +360,7 @@ Required work:
 - source build identity from immutable release/build metadata rather than a manually maintained UI constant;
 - keep development/demo builds explicit when no immutable product release artifact exists;
 - add tests proving that Product Version and Build/Release identity remain distinct and that packaged/installed Control Station builds expose the exact build they contain;
-- verify the behavior consistently across Render `plasma-demo`, `z2like-demo`, `plasma.open4th.com`, Windows/macOS/Linux Control Station packages, and future production deployments.
+- verify the behavior consistently across Render `plasma-demo`, `plasma.open4th.com`, Windows/macOS/Linux Control Station packages, and future production deployments.
 
 Architectural invariant:
 

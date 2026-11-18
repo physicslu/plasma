@@ -176,7 +176,6 @@ class Path2OperatorCLI(unittest.TestCase):
             {"script": "scripts/plasmactl", "argv": ["install", "local-control-station"]},
             {"script": "scripts/plasmactl", "argv": ["deploy", "z2-ps"]},
             {"script": "scripts/plasmactl", "argv": ["deploy", "local-control-station", "--dev-fresh-state"]},
-            {"script": "scripts/plasmactl", "argv": ["update", "z2like-demo"]},
             {"script": "scripts/plasmactl", "argv": ["deploy"]},
             {"script": "scripts/plasmactl", "argv": ["status", "local-control-station", "--anything"]},
             {"script": "scripts/experiments/../bad.py"},

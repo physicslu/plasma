@@ -31,7 +31,7 @@ def _managed(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _registry(tmp_path: Path) -> PPURegistryStore:
     return PPURegistryStore(
-        (PPURegistryEntry(endpoint=MANAGED_ORIGIN, alias="z2like-qemu"),),
+        (PPURegistryEntry(endpoint=MANAGED_ORIGIN, alias="managed-ppu"),),
         tmp_path / "registry.json",
     )
 
@@ -40,7 +40,7 @@ def test_managed_transport_reuses_protected_https_origin(monkeypatch: pytest.Mon
     _managed(monkeypatch)
     assert bootstrap_endpoint_for_gateway(MANAGED_ORIGIN) == MANAGED_ORIGIN
     with pytest.raises(BootstrapManagerError, match="protected HTTPS"):
-        bootstrap_endpoint_for_gateway("http://172.30.77.2:18080")
+        bootstrap_endpoint_for_gateway("http://10.42.0.2:18080")
 
 
 def test_unknown_managed_transport_policy_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -124,7 +124,7 @@ def test_managed_coordinator_keeps_public_reachability_separate_from_device_bind
 ) -> None:
     FakeBootstrapClient.instances.clear()
     _managed(monkeypatch)
-    monkeypatch.setenv(MANAGED_BOOTSTRAP_RUNTIME_GATEWAY_HOST_ENV, "172.30.77.2")
+    monkeypatch.setenv(MANAGED_BOOTSTRAP_RUNTIME_GATEWAY_HOST_ENV, "10.42.0.2")
     coordinator = VerifiedManagerBootstrapCoordinator(
         _registry(tmp_path),
         BootstrapCredentialStore(tmp_path / "bootstrap-credentials.json"),
@@ -132,16 +132,16 @@ def test_managed_coordinator_keeps_public_reachability_separate_from_device_bind
         client_factory=FakeBootstrapClient,
     )
 
-    before = coordinator.status("z2like-qemu")
+    before = coordinator.status("managed-ppu")
     assert before["bootstrap_endpoint_policy"] == MANAGED_BOOTSTRAP_TRANSPORT
     assert FakeBootstrapClient.instances[-1].endpoint == MANAGED_ORIGIN
 
-    coordinator.credentials.set("z2like-qemu", DEVICE_ID, TOKEN)   # enrolled (LOM-P2A-2)
+    coordinator.credentials.set("managed-ppu", DEVICE_ID, TOKEN)   # enrolled (LOM-P2A-2)
     status, _ = coordinator.start_deployment(
-        "z2like-qemu",
+        "managed-ppu",
         {
             "upload_id": "a" * 32,
-            "ppu_id": "z2like-qemu-01",
+            "ppu_id": "managed-ppu-01",
             "facility_id": "swpc-simulation",
             "display_name": "SWPC QEMU ARMv7 Z2 Simulation",
         },
@@ -154,7 +154,7 @@ def test_managed_coordinator_keeps_public_reachability_separate_from_device_bind
     assert operation == "start_deployment"
     assert token == TOKEN
     assert body is not None
-    assert body["gateway_host"] == "172.30.77.2"
+    assert body["gateway_host"] == "10.42.0.2"
 
 
 def test_managed_deployment_requires_manager_owned_private_runtime_gateway_host(
@@ -169,7 +169,7 @@ def test_managed_deployment_requires_manager_owned_private_runtime_gateway_host(
         2.0,
         client_factory=FakeBootstrapClient,
     )
-    coordinator.credentials.set("z2like-qemu", DEVICE_ID, TOKEN)   # enrolled (LOM-P2A-2)
+    coordinator.credentials.set("managed-ppu", DEVICE_ID, TOKEN)   # enrolled (LOM-P2A-2)
 
     for value in (None, "127.0.0.1", "0.0.0.0", "ppu-managed-lab.example"):
         if value is None:
@@ -178,10 +178,10 @@ def test_managed_deployment_requires_manager_owned_private_runtime_gateway_host(
             monkeypatch.setenv(MANAGED_BOOTSTRAP_RUNTIME_GATEWAY_HOST_ENV, value)
         with pytest.raises(BootstrapManagerError, match="runtime Gateway host"):
             coordinator.start_deployment(
-                "z2like-qemu",
+                "managed-ppu",
                 {
                     "upload_id": "a" * 32,
-                    "ppu_id": "z2like-qemu-01",
+                    "ppu_id": "managed-ppu-01",
                     "facility_id": "swpc-simulation",
                     "display_name": "SWPC QEMU ARMv7 Z2 Simulation",
                 },

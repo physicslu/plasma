@@ -53,7 +53,7 @@ test("managed Engineering session keeps Manager routing authoritative and saniti
 
   try {
     const request = new Request(
-      "https://plasma-control-station-lab.onrender.com/api/manager/ppu/api/engineering/session",
+      "https://control-station.example.onrender.com/api/manager/ppu/api/engineering/session",
       {
         method: "POST",
         headers: {
@@ -105,7 +105,7 @@ test("managed PPU binary readback remains byte-for-byte pass-through", async () 
 
   try {
     const request = new Request(
-      "https://plasma-control-station-lab.onrender.com/api/manager/ppu/api/engineering/targets/fac-a/ppu-a/api/jobs/job-1/files/readback.bin",
+      "https://control-station.example.onrender.com/api/manager/ppu/api/engineering/targets/fac-a/ppu-a/api/jobs/job-1/files/readback.bin",
     );
     const response = await relayManagerPpuRequest(
       request,
@@ -135,7 +135,7 @@ test("managed PPU non-JSON success is promoted to a deterministic gateway-contra
 
   try {
     const response = await relayManagerPpuRequest(
-      new Request("https://plasma-control-station-lab.onrender.com/api/manager/ppu/api/status"),
+      new Request("https://control-station.example.onrender.com/api/manager/ppu/api/status"),
       "/api/status",
     );
     const payload = await response.json();
