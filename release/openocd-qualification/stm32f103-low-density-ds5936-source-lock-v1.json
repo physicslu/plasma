@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_lock_id": "stm32f103-low-density-ds5936-source-lock-v1",
-  "status": "INCOMPLETE_FAIL_CLOSED",
+  "status": "REVIEWED_DOCUMENTARY_EVIDENCE",
   "manufacturer": "STMicroelectronics",
   "evidence": {
     "official_datasheet": {
@@ -14,13 +14,53 @@
       "sha256": null,
       "byte_length": null,
       "original_bytes_attested": false,
-      "attestation_blocker": "OFFICIAL_PDF_ORIGINAL_BYTES_NOT_ACQUIRED_FOR_SHA256"
+      "attestation_blocker": "OFFICIAL_PDF_ORIGINAL_BYTES_NOT_ACQUIRED_FOR_SHA256",
+      "byte_attestation_status": "NOT_ATTESTED",
+      "documentary_review": {
+        "status": "VERIFIED",
+        "reviewed_on": "2026-11-17",
+        "sections": [
+          "Table 1, p1: C4/C6/R4/R6 device scope",
+          "Table 2, p11: density and package applicability",
+          "Section 3, pp22-28: package pinouts and SWJ pins",
+          "Section 7 Table 58, p95: pin/density/package/temperature/A/TR ordering"
+        ],
+        "facts": {
+          "C": [
+            "LQFP48",
+            "UFQFPN48"
+          ],
+          "R": [
+            "LQFP64",
+            "TFBGA64"
+          ],
+          "T": [
+            "VFQFPN36"
+          ],
+          "4_flash_bytes": 16384,
+          "6_flash_bytes": 32768,
+          "internal_code": [
+            "A",
+            "blank"
+          ],
+          "TR": "packing only, tape and reel"
+        },
+        "method": "Official ST PDF text and table review; original PDF bytes and digest NOT_ATTESTED",
+        "original_bytes_required_for_l2": false
+      }
     },
     "programming_manual": {
       "source_id": "st_pm0075_rev2",
       "source_lock": "data/ic-support/benchmarks/stm32f103c/source-lock.json",
       "sha256": "2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a",
-      "byte_length": 302996
+      "byte_length": 302996,
+      "sections": [
+        "Table 1: STM32F103xx applicability",
+        "1.2/Table 2: low-density 1-KiB pages at 0x08000000",
+        "2.3.1-2.3.4: keys, unlock, halfword program, page erase",
+        "2.4: read/write protection"
+      ],
+      "source_lock_git_blob_sha1": "ad2ae3f33147546315d997ea7bb0393547789edc"
     },
     "openocd": {
       "source_lock": "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
@@ -31,13 +71,21 @@
       "device_id": "0x412",
       "page_size_bytes": 1024,
       "max_family_flash_kib": 32,
-      "write_alignment_bytes": 2
+      "write_alignment_bytes": 2,
+      "reviewed_sections": {
+        "probe": "stm32x_probe lines 805-1046; 0x412 lines 905-910; size read/fallback/override lines 979-1007",
+        "erase": "stm32x_erase lines 366-413; whole-bank request redirects to mass erase at 376-377",
+        "program": "stm32x_write_block/stm32x_write lines 650-731; halted target, aligned halfwords, status/lock; working-area fallback",
+        "read_verify": "stm32x_flash default_flash_read callback; src/flash/nor/tcl.c flash verify_image and src/flash/nor/core.c flash_driver_read"
+      },
+      "source_lock_git_blob_sha1": "cd51329857250a24fcb5cc34b14d20076f648462",
+      "read_framework_blob_sha1": "5e6c971527f7a5fbbf3175711dddd127059f9ace",
+      "flash_framework_blob_sha1": "4ff6d983868f74233235189b2d90efd11c7f9ae5"
     }
   },
   "not_authorized": [
-    "L2_SUPPORTED",
-    "catalog_promotion",
     "deployed_runtime",
-    "hardware_programming"
+    "hardware_programming",
+    "job_batch_execution"
   ]
 }

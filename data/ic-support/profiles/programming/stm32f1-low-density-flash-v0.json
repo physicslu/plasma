@@ -2,7 +2,7 @@
   "schema_version": "0.1.0",
   "profile_id": "stm32f1-low-density-flash-v0",
   "kind": "programming",
-  "status": "pilot_source_review_candidate_not_qualified",
+  "status": "reviewed_source_only",
   "scope": {
     "manufacturer": "STMicroelectronics",
     "family": "STM32F1",
@@ -94,7 +94,7 @@
     ]
   },
   "acceptance_boundary": {
-    "software_state": "UNKNOWN",
+    "software_state": "SUPPORTED",
     "physical_programming_qualified": false,
     "runtime_execution_authorized": false
   },

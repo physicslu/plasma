@@ -2,10 +2,10 @@
   "schema_version": 1,
   "applicability_id": "st-stm32f103-low-density-exact-12-v1",
   "adr": "ADR-0002",
-  "status": "CANDIDATE_SOURCE_CUSTODY_INCOMPLETE",
+  "status": "reviewed_source_only",
   "manufacturer_source": {
     "path": "release/openocd-qualification/stm32f103-low-density-ds5936-source-lock-v1.json",
-    "git_blob_sha1": "66c440a9ba9a0bc25dde01ad6afe99735513aa94"
+    "git_blob_sha1": "9efb62f463e9180457f7afbc63a30aabdb75b7de"
   },
   "production_catalog": {
     "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
@@ -30,10 +30,16 @@
       "source_nontr_exact_icpn": null,
       "geometry_profile_id": "stm32f103c4-16k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c4-16k-v0.json",
-      "geometry_git_blob_sha1": "49e0a274338b89a7692c1f47eb150bdfda1febfe",
+      "geometry_git_blob_sha1": "0371ab67d3067827b63d7369b93a4e5c57192a30",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -41,11 +47,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -60,10 +67,16 @@
       "source_nontr_exact_icpn": null,
       "geometry_profile_id": "stm32f103c6-32k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
-      "geometry_git_blob_sha1": "78a487ec7adc2269d4d8b481cd1630a62c98577a",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -71,11 +84,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -90,10 +104,16 @@
       "source_nontr_exact_icpn": "STM32F103C6T6A",
       "geometry_profile_id": "stm32f103c6-32k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
-      "geometry_git_blob_sha1": "78a487ec7adc2269d4d8b481cd1630a62c98577a",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -101,11 +121,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -120,10 +141,16 @@
       "source_nontr_exact_icpn": null,
       "geometry_profile_id": "stm32f103c6-32k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
-      "geometry_git_blob_sha1": "78a487ec7adc2269d4d8b481cd1630a62c98577a",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -131,11 +158,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -150,10 +178,16 @@
       "source_nontr_exact_icpn": "STM32F103C6T7A",
       "geometry_profile_id": "stm32f103c6-32k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
-      "geometry_git_blob_sha1": "78a487ec7adc2269d4d8b481cd1630a62c98577a",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -161,11 +195,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -180,10 +215,16 @@
       "source_nontr_exact_icpn": null,
       "geometry_profile_id": "stm32f103c6-32k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
-      "geometry_git_blob_sha1": "78a487ec7adc2269d4d8b481cd1630a62c98577a",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -191,11 +232,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -210,10 +252,16 @@
       "source_nontr_exact_icpn": null,
       "geometry_profile_id": "stm32f103r4-16k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r4-16k-v0.json",
-      "geometry_git_blob_sha1": "e0652728929e3349d2c99edfb55e80a3471544de",
+      "geometry_git_blob_sha1": "836b54e3e0823a5286cf01d50699f729a50c8241",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -221,11 +269,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -240,10 +289,16 @@
       "source_nontr_exact_icpn": null,
       "geometry_profile_id": "stm32f103r4-16k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r4-16k-v0.json",
-      "geometry_git_blob_sha1": "e0652728929e3349d2c99edfb55e80a3471544de",
+      "geometry_git_blob_sha1": "836b54e3e0823a5286cf01d50699f729a50c8241",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -251,11 +306,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -270,10 +326,16 @@
       "source_nontr_exact_icpn": null,
       "geometry_profile_id": "stm32f103r6-32k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r6-32k-v0.json",
-      "geometry_git_blob_sha1": "23271c290d48ce12f55e70670931228535e77881",
+      "geometry_git_blob_sha1": "8731d025ae52c22f01062934da3b67003b10f0f4",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -281,11 +343,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -300,10 +363,16 @@
       "source_nontr_exact_icpn": null,
       "geometry_profile_id": "stm32f103r6-32k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r6-32k-v0.json",
-      "geometry_git_blob_sha1": "23271c290d48ce12f55e70670931228535e77881",
+      "geometry_git_blob_sha1": "8731d025ae52c22f01062934da3b67003b10f0f4",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -311,11 +380,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -330,10 +400,16 @@
       "source_nontr_exact_icpn": "STM32F103R6T6A",
       "geometry_profile_id": "stm32f103r6-32k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r6-32k-v0.json",
-      "geometry_git_blob_sha1": "23271c290d48ce12f55e70670931228535e77881",
+      "geometry_git_blob_sha1": "8731d025ae52c22f01062934da3b67003b10f0f4",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -341,11 +417,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     },
     {
       "manufacturer": "STMicroelectronics",
@@ -360,10 +437,16 @@
       "source_nontr_exact_icpn": null,
       "geometry_profile_id": "stm32f103r6-32k-v0",
       "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r6-32k-v0.json",
-      "geometry_git_blob_sha1": "23271c290d48ce12f55e70670931228535e77881",
+      "geometry_git_blob_sha1": "8731d025ae52c22f01062934da3b67003b10f0f4",
       "programming_profile_id": "stm32f1-low-density-flash-v0",
-      "software_state": "CANDIDATE",
-      "supported_operations": [],
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
       "requested_operations": [
         "probe",
         "erase",
@@ -371,11 +454,12 @@
         "read",
         "verify"
       ],
-      "blockers": [
-        "OFFICIAL_DS5936_PDF_SHA256_NOT_ATTESTED",
-        "EXACT_LOW_DENSITY_PROVIDER_QUALIFICATION_NOT_REVIEWED"
-      ],
-      "runtime_execution_authorized": false
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
     }
   ],
   "excluded_exact_icpns": [
@@ -385,8 +469,8 @@
   ],
   "blocked_package_reason": "Production UFQFPN36 conflicts with manufacturer DS5936 VFQFPN36",
   "acceptance_boundary": {
-    "qualification_state": "CANDIDATE",
-    "supported_count": 0,
+    "qualification_state": "SUPPORTED",
+    "supported_count": 12,
     "execution_authorized": false
   }
 }

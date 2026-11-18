@@ -1443,8 +1443,39 @@ class OpenOCDSoftwareQualificationRegistry:
         ):
             _require(boundary.get(key) is False, f"unsafe Programming Qualification boundary: {key}")
 
+        # Add the reviewed low-density data through the existing provider, after
+        # retaining and validating all 77 prior exact qualifications unchanged.
+        from .stm32f103_low_density_candidate import audit_candidate, load_snapshot
+
+        audit_candidate(root)
+        low = load_snapshot(root)
+        low_q = low["qual"]
+        for raw in low_q["records"]:
+            key = (raw["manufacturer"], raw["icpn"])
+            row = catalog_by_key.get(key)
+            applicability_row = next(x for x in low["app"]["records"] if x["icpn"] == raw["icpn"])
+            _require(key not in self._records and row is not None,
+                     "low-density duplicate or missing canonical exact identity")
+            _require(row.base_device == raw["base_device"]
+                     and row.package == applicability_row["package"]
+                     and int(row.pin_count) == applicability_row["pin_count"]
+                     and row.flash_size == str(raw["main_flash_size_bytes"] // 1024) + " KiB"
+                     and row.temperature_grade == applicability_row["temperature_grade"]
+                     and row.option_suffix == ("ATR" if applicability_row["tape_and_reel"] else "A")
+                     and row.target_config == q_provider["target_config"],
+                     "low-density canonical identity/route mismatch " + raw["icpn"])
+            record = deepcopy(raw)
+            record["operations"] = list(REQUIRED_OPERATIONS)
+            record["qualification_basis"] = {
+                "kind": "manufacturer_applicability",
+                "applicability_id": low["app"]["applicability_id"],
+            }
+            self._records[key] = record
+        _require(len(self._records) == low["v10"]["supported_exact_icpn_count"],
+                 "low-density combined unique exact count mismatch")
+
         self.source_lock_id = source_lock["source_lock_id"]
-        self.qualification_id = qualification_v9["qualification_id"]
+        self.qualification_id = low["v10"]["qualification_id"]
         self.provider = deepcopy(q_provider)
         self.programming_group = deepcopy(group)
         self.operation_qualification = deepcopy(opq)
@@ -1456,6 +1487,10 @@ class OpenOCDSoftwareQualificationRegistry:
             group["manufacturer_evidence"]["programming_profile_id"]: deepcopy(opq),
             high_group["manufacturer_evidence"]["programming_profile_id"]: deepcopy(high_opq),
         }
+        low_group = low_q["manufacturer_programming_group"]
+        self._programming_groups_by_profile["stm32f1-low-density-flash-v0"] = deepcopy(low_group)
+        self._operation_qualification_by_profile["stm32f1-low-density-flash-v0"] = deepcopy(
+            low_group["operation_qualification"])
         self.acceptance_boundary = deepcopy(boundary)
         self.default_unreviewed_state = qualification_manifest.get(
             "default_unreviewed_software_state"

@@ -2,7 +2,7 @@
   "schema_version": "0.1.0",
   "profile_id": "stm32f103c6-32k-v0",
   "kind": "memory_geometry",
-  "status": "pilot_source_review_candidate_not_qualified",
+  "status": "reviewed_source_only",
   "scope": {
     "manufacturer": "STMicroelectronics",
     "base_device": "STM32F103C6"
@@ -36,7 +36,7 @@
   },
   "acceptance_boundary": {
     "source_pdf_sha256_attested": false,
-    "programming_qualification_state": "UNKNOWN",
+    "programming_qualification_state": "SUPPORTED",
     "runtime_execution_authorized": false
   },
   "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1"
