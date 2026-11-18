@@ -129,7 +129,16 @@ source-backed route, then publishes the complete snapshot in one SQLite transact
 The same database file must be writable only by the trusted Manager/Publisher OS
 identity; `--actor` is an audit label, not an authentication secret. Evidence paths
 for L2 must be locally available to that identity at both stage and publish time;
-the recorded SHA-256 is checked against actual bytes. The Publisher uses only
+the recorded SHA-256 is checked against actual bytes. An L2 evidence file is a
+reviewed JSON packet (`schema_version=catalog-l2-reviewed-evidence-v1`) containing
+the exact ICPN, exact applicability, source authority/reference, pinned Provider
+release/target/driver, Profile/geometry, operation scopes, an `ADMITTED` reviewer
+decision, and per-fact document references for identity, route, geometry and
+operations. These fields must match the staged row and qualification exactly.
+The packet hash attests the reviewed packet bytes, **not** the original PDF bytes;
+unavailable original-document custody must not be represented as a PDF digest.
+The trusted Publisher OS identity is the admission authority; the reviewer's
+name in the packet is an audit claim, not authentication by itself. The Publisher uses only
 Provider release/Profile locks already admitted in the active Catalog. A new
 Provider implementation, Profile schema or release requires a code/schema change.
 

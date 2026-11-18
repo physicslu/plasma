@@ -195,8 +195,22 @@ def test_l1_to_l2_requires_evidence_and_known_provider_profile(tmp_path: Path, m
               socket_ready=False, ppu_readiness_source=None, family_ready=None,
               verified_configurations=[])
     evidence_path = tmp_path / "reviewed-source.json"
-    evidence_path.write_text(json.dumps({"manufacturer": record.vendor, "exact_icpn": record.identifier,
-                                         "provider": l2["provider"], "profile": l2["programming"]}), encoding="utf-8")
+    reviewed = {
+        "schema_version": "catalog-l2-reviewed-evidence-v1",
+        "manufacturer": record.vendor, "exact_icpn": record.identifier,
+        "exact_applicability": record.identifier,
+        "source_authority": record.source_authority,
+        "source_reference": record.source_reference,
+        "provider": {key: l2["provider"][key] for key in
+                     ("provider_id", "version", "source_commit", "target_config", "flash_driver")},
+        "profile": {key: l2["programming"][key] for key in
+                    ("programming_profile_id", "memory_geometry_profile_id", "flash_geometry")},
+        "operations": l2["operations"],
+        "review_status": "ADMITTED", "reviewer": "test-reviewer",
+        "fact_references": {key: "test-document section 1" for key in
+                            ("identity", "route", "geometry", "operations")},
+    }
+    evidence_path.write_text(json.dumps(reviewed), encoding="utf-8")
     l2["publication_evidence"] = {
         "manufacturer": record.vendor, "exact_icpn": record.identifier,
         "source_authority": record.source_authority, "source_reference": record.source_reference,
@@ -212,6 +226,14 @@ def test_l1_to_l2_requires_evidence_and_known_provider_profile(tmp_path: Path, m
     bad["provider"]["provider_id"] = "invented-provider"
     with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
         repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
+    for field, value in (("exact_applicability", "different-part"), ("review_status", "CANDIDATE")):
+        mismatched = {**reviewed, field: value}
+        evidence_path.write_text(json.dumps(mismatched), encoding="utf-8")
+        bad = json.loads(json.dumps(l2))
+        bad["publication_evidence"]["source_sha256"] = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+        with pytest.raises(DeviceCatalogIntegrityError, match="reviewed facts"):
+            repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
+    evidence_path.write_text(json.dumps(reviewed), encoding="utf-8")
     bad = json.loads(json.dumps(l2))
     bad["programming"]["programming_profile_id"] = "wrong-profile"
     with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
@@ -263,6 +285,12 @@ def test_rejected_publication_keeps_active_and_local_namespace_isolated(tmp_path
     with pytest.raises(DeviceCatalogIntegrityError, match="official L2"):
         repo.put_local_profile("controller-a", record.vendor, record.identifier,
                                {**profile, "catalog_level": 2}, actor="owner")
+    with pytest.raises(DeviceCatalogIntegrityError, match="official L2"):
+        repo.put_local_profile("controller-a", record.vendor, record.identifier,
+                               {**profile, "job_selectable": True}, actor="owner")
+    with pytest.raises(DeviceCatalogIntegrityError, match="official L2"):
+        repo.put_local_profile("controller-a", record.vendor, record.identifier,
+                               {**profile, "state": "SUPPORTED"}, actor="owner")
     assert repo.read_active().revision_sha256 == initial
 
 

@@ -312,7 +312,7 @@ class CatalogSqliteShadowRepository:
                 or evidence.get("exact_icpn") != record.identifier
                 or evidence.get("manufacturer") != record.vendor
                 or evidence.get("source_authority") != record.source_authority
-                or not evidence.get("source_reference")
+                or evidence.get("source_reference") != record.source_reference
                 or not isinstance(evidence.get("source_sha256"), str)
                 or len(evidence["source_sha256"]) != 64
                 or any(ch not in "0123456789abcdef" for ch in evidence["source_sha256"])
@@ -347,6 +347,48 @@ class CatalogSqliteShadowRepository:
         if level == 3 and not (q.get("ppu_ready") or q.get("socket_ready")):
             raise DeviceCatalogIntegrityError("L3 physical evidence missing")
 
+    @staticmethod
+    def _validate_l2_source(record: DeviceCatalogRecord, q: dict[str, Any]) -> None:
+        """Bind reviewed documentary facts to the exact published qualification."""
+        evidence = q["publication_evidence"]
+        source_path = evidence.get("source_path")
+        if not isinstance(source_path, str) or not source_path:
+            raise DeviceCatalogIntegrityError("L2 reviewed evidence file missing")
+        try:
+            source_bytes = Path(source_path).read_bytes()
+            if hashlib.sha256(source_bytes).hexdigest() != evidence["source_sha256"]:
+                raise DeviceCatalogIntegrityError("L2 documentary evidence bytes unavailable or mismatched")
+            reviewed = json.loads(source_bytes)
+        except (OSError, ValueError, TypeError, UnicodeDecodeError) as exc:
+            raise DeviceCatalogIntegrityError("L2 reviewed evidence file unavailable or malformed") from exc
+        provider, programming = q["provider"], q["programming"]
+        expected_provider = {key: provider.get(key) for key in (
+            "provider_id", "version", "source_commit", "target_config", "flash_driver"
+        )}
+        expected_profile = {
+            "programming_profile_id": programming.get("programming_profile_id"),
+            "memory_geometry_profile_id": programming.get("memory_geometry_profile_id"),
+            "flash_geometry": programming.get("flash_geometry"),
+        }
+        references = reviewed.get("fact_references") if isinstance(reviewed, dict) else None
+        if (not isinstance(reviewed, dict)
+                or reviewed.get("schema_version") != "catalog-l2-reviewed-evidence-v1"
+                or reviewed.get("manufacturer") != record.vendor
+                or reviewed.get("exact_icpn") != record.identifier
+                or reviewed.get("exact_applicability") != record.identifier
+                or reviewed.get("source_authority") != record.source_authority
+                or reviewed.get("source_reference") != record.source_reference
+                or reviewed.get("provider") != expected_provider
+                or reviewed.get("profile") != expected_profile
+                or reviewed.get("operations") != q["operations"]
+                or reviewed.get("review_status") != "ADMITTED"
+                or not isinstance(reviewed.get("reviewer"), str)
+                or not reviewed["reviewer"].strip()
+                or not isinstance(references, dict)
+                or any(not isinstance(references.get(key), str) or not references[key].strip()
+                       for key in ("identity", "route", "geometry", "operations"))):
+            raise DeviceCatalogIntegrityError("L2 reviewed facts do not match exact Provider/Profile/geometry")
+
     def stage_revision(self, changes: list[dict[str, Any]], *, actor: str) -> str:
         """Stage exact records against the current active revision; staging is never public."""
         if not actor.strip() or not changes:
@@ -364,10 +406,7 @@ class CatalogSqliteShadowRepository:
                 raise DeviceCatalogIntegrityError("malformed staged qualification")
             self._validate_publication(record, q)
             if q.get("catalog_level", 0) >= 2:
-                evidence = q["publication_evidence"]
-                path = Path(evidence.get("source_path", ""))
-                if (not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != evidence["source_sha256"]):
-                    raise DeviceCatalogIntegrityError("L2 documentary evidence bytes unavailable or mismatched")
+                self._validate_l2_source(record, q)
             key = _identity(record)
             if key in seen:
                 raise DeviceCatalogIntegrityError("duplicate exact ICPN in staging")
@@ -420,10 +459,7 @@ class CatalogSqliteShadowRepository:
                 q = dict(change["qualification"])
                 self._validate_publication(record, q)
                 if q["catalog_level"] >= 2:
-                    evidence = q["publication_evidence"]
-                    path = Path(evidence.get("source_path", ""))
-                    if (not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != evidence["source_sha256"]):
-                        raise DeviceCatalogIntegrityError("L2 documentary evidence bytes unavailable or mismatched")
+                    self._validate_l2_source(record, q)
                     p = q["provider"]
                     lock = (p["provider_id"], p["version"], p["source_commit"], p["target_config"],
                             q["programming"]["programming_profile_id"])
@@ -485,7 +521,11 @@ class CatalogSqliteShadowRepository:
             raise DeviceCatalogIntegrityError("local namespace, identity and actor required")
         if (not isinstance(profile, dict) or not profile.get("profile_id")
                 or profile.get("official") is not False or profile.get("execution_authorized") is not False
-                or profile.get("catalog_level") in (2, 3)):
+                or profile.get("catalog_level") not in (None, 0, 1)
+                or profile.get("job_selectable") is True
+                or profile.get("state") == "SUPPORTED"
+                or profile.get("installed_runtime_attested") is True
+                or profile.get("hardware_runtime_ready") is True):
             raise DeviceCatalogIntegrityError("local Profile cannot claim official L2 or execution")
         with sqlite3.connect(self.path, timeout=10) as conn:
             conn.execute("BEGIN IMMEDIATE")
