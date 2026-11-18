@@ -51,7 +51,7 @@ idle, no Job, no OpenOCD on SWPC.
 
 After the Batch both Sites were idle with no current Job and no OpenOCD on
 SWPC. Files: [`report.json`](report.json) (CLI output),
-[`progress.log`](progress.log) (CLI stderr progress),
+[`progress.txt`](progress.txt) (CLI stderr progress),
 [`timing-summary.txt`](timing-summary.txt) (`plasma_hil_timing.py summarize`).
 Job JSON is the PPU Gateway `GET /api/status?job=…` record.
 
