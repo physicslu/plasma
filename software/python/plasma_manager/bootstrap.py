@@ -98,11 +98,9 @@ def bootstrap_endpoint_for_gateway(gateway_endpoint: str) -> str:
     """Resolve Bootstrap transport without changing registry endpoint semantics.
 
     Direct/private Manager deployments keep the same-host ``:18081`` contract.
-    The Render-managed z2like-demo profile instead reuses the exact managed
-    Gateway origin and reaches Bootstrap only through the fixed, allowlisted
-    ``/__plasma/bootstrap`` prefix. This lets Cloudflare Access remain scoped to
-    one origin while keeping the device Bootstrap on its independent :18081
-    service behind SWPC.
+    A managed ingress can reuse the exact Gateway origin and reach Bootstrap
+    through the fixed, allowlisted ``/__plasma/bootstrap`` prefix. The
+    independent PPU Bootstrap service remains behind the trusted ingress.
     """
 
     canonical = normalize_endpoint(gateway_endpoint)

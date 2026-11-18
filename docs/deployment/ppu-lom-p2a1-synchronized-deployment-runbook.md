@@ -24,7 +24,7 @@
 | **Current Bearer Bootstrap** | Works (today) | Anonymous status works; every authenticated call fails: `GET /v1/auth/challenge` → 404 → "challenge unavailable". **No side effect** | Works | Fails `API_CHALLENGE_REJECTED:404`; no side effect |
 | **P2A-1 Bootstrap (`3c2145f3d`)** | Every POST → 401 `unauthorized`; Console shows pairing/authorization failure. **No side effect** | **Works** (target) | Fails `API_HTTP_REJECTED:401`; no side effect | Works |
 | Z2 Runtime `a1b1c6f3b` | Unaffected (Runtime does not call Bootstrap HTTP) | Unaffected | Unaffected | Unaffected |
-| z2like-demo QEMU / Render profiles | Separate Bootstrap inside the QEMU kit; **out of scope** for this window; CI `qemu-bootstrap-e2e` already PASS on `3c2145f3d` | — | — | — |
+| Former QEMU demo / Render profiles (retired) | Historical CI `qemu-bootstrap-e2e` PASS on `3c2145f3d`; no current deployment path | — | — | — |
 
 Every mixed state fails closed with 401/404 **before** any write, but it is non-functional. Therefore both sides change in **one window**, and rollback restores **both** sides (§6).
 

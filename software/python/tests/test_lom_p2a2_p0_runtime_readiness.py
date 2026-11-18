@@ -139,10 +139,9 @@ def test_kit_verify_no_longer_sends_an_unsigned_loopback_write():
 
 def test_every_kit_assembly_ships_the_readiness_tool():
     name = "ppu_runtime_local_readiness.py"
-    for path in (".github/workflows/z2-ps-release.yml", ".github/workflows/z2like-demo-qemu.yml"):
+    for path in (".github/workflows/z2-ps-release.yml",):
         text = (ROOT / path).read_text(encoding="utf-8")
         assert f'cp scripts/{name} "$root/scripts/{name}"' in text, path
-    assert f'"{name}",' in (ROOT / "scripts" / "z2like-demo-qemu-build-kit.py").read_text(encoding="utf-8")
     assert f'scripts / "{name}"' in (ROOT / "scripts" / "ppu-bootstrap-kit.py").read_text(encoding="utf-8")
 
 

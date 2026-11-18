@@ -83,7 +83,6 @@ def validate_workstream_registry() -> None:
         ".github/workflows/python-tests.yml": "sw_ppu",
         ".github/workflows/ppu-release.yml": "sw_ppu",
         ".github/workflows/z2-ps-release.yml": "sw_ppu",
-        ".github/workflows/z2like-demo-qemu.yml": "sw_ppu",
         ".github/workflows/persistent-integration-host.yml": "sw_ppu",
         ".github/workflows/openocd-software-qualification.yml": "sw_ppu",
         ".github/workflows/device-catalog-validation.yml": "icpn",
@@ -175,7 +174,6 @@ def validate_p1_path_filter_contracts() -> None:
         ("mock-cd-browser.yml", "software/python/**", 2),
         ("ppu-release.yml", "software/python/plasma_web/**", 1),
         ("z2-ps-release.yml", "software/python/plasma_web/**", 2),
-        ("z2like-demo-qemu.yml", "software/python/plasma_web/**", 2),
     ):
         source = read(name)
         owner = f"P1 research-only PoC routing: {name}"
@@ -193,25 +191,6 @@ def validate_p1_path_filter_contracts() -> None:
             ):
                 raise SystemExit(f"{owner}: ordered paths exclusion was lost")
             cursor = exclusion + len(negative_marker)
-
-    # Host-only C-3 Site Session changes are covered by Python PS tests, not
-    # the ARMv7 Bootstrap deploy/QEMU acceptance. Keep each ordered exclusion
-    # under the positive plasma_interfaces glob for push and pull_request.
-    qemu = read("z2like-demo-qemu.yml")
-    positive = '"software/python/plasma_interfaces/**"'
-    negative = '"!software/python/plasma_interfaces/site_worker_c3.py"'
-    require_count(qemu, positive, 2, owner="OPF C-3/QEMU path routing")
-    require_count(qemu, negative, 2, owner="OPF C-3/QEMU path routing")
-    cursor = 0
-    for _ in ("push", "pull_request"):
-        start = qemu.find(positive, cursor)
-        exclusion = qemu.find(negative, start + len(positive))
-        next_positive = qemu.find(positive, start + len(positive))
-        if start < 0 or exclusion < 0 or (
-            next_positive >= 0 and exclusion > next_positive
-        ):
-            raise SystemExit("OPF C-3/QEMU: ordered paths exclusion was lost")
-        cursor = exclusion + len(negative)
 
     # The repository-wide docs contract owns docs/README.md. These dedicated
     # jobs do not consume that file; retain their own domain document triggers.
@@ -279,7 +258,6 @@ def main() -> int:
     repository_contracts = read("repository-contracts.yml")
     ppu_release = read("ppu-release.yml")
     z2_release = read("z2-ps-release.yml")
-    z2like_qemu = read("z2like-demo-qemu.yml")
     ai_support = read("ic-support-validation.yml")
     openocd_qualification = read("openocd-software-qualification.yml")
     ppu_network_trigger = (ROOT / "scripts/ci/ppu-network-trigger.py").read_text(encoding="utf-8")
@@ -293,32 +271,6 @@ def main() -> int:
         forbid(python_tests, token, owner="SW/PPU Python/PL")
     forbid(ppu_release, '"data/device-catalog/production/**"', owner="SW/PPU PPU release")
     forbid(z2_release, '"data/device-catalog/production/**"', owner="SW/PPU Z2 release")
-    for token in (
-        '"data/device-catalog/production/**"',
-        '"data/device-catalog/research/*-commercial-icpn.csv"',
-    ):
-        forbid(z2like_qemu, token, owner="SW/PPU QEMU acceptance")
-
-    # QEMU acceptance still owns executable Gateway/runtime changes, but catalog-only
-    # modules are an explicit narrow cross-workstream exclusion. Keep both push and
-    # pull_request filters aligned so IC Selector evidence updates do not compile ARMv7.
-    require_count(
-        z2like_qemu,
-        '"software/python/plasma_web/**"',
-        2,
-        owner="SW/PPU QEMU acceptance",
-    )
-    for token in (
-        '"!software/python/plasma_web/device_catalog.py"',
-        '"!software/python/plasma_web/*_manufacturer_device_evidence.py"',
-    ):
-        require_count(z2like_qemu, token, 2, owner="SW/PPU QEMU acceptance")
-    require_count(
-        repository_contracts,
-        '".github/workflows/z2like-demo-qemu.yml"',
-        3,
-        owner="REPO QEMU CI-boundary governance",
-    )
 
     # REPO governance tests are not SW/PPU source tests. Because python-tests
     # still owns the broad scripts/tests/** software-helper surface, explicitly

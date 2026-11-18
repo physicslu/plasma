@@ -16,7 +16,7 @@ The former scheme sent `Authorization: Bearer <paired credential>` in clear over
 3. PPU, **before reading the body**: strict header syntax, `device_id` equals its own identity, nonce issued and unexpired — the nonce is consumed here, so a nonce never admits a second attempt. Then it reads the bounded body and verifies the MAC in constant time. Any failure → `401 {"ok":false,"error":"unauthorized"}` with no side effect; missing credential → `503 control_not_provisioned`.
 4. Every response to an authenticated request carries `X-Plasma-PPU-Response-Auth: v1 mac=<64 hex>` over `"<schema>\nresponse\n<METHOD>\n<target>\n<device_id>\n<nonce>\n<cnonce>\n<request mac>\n<status>\n<SHA256(response body)>"` with `K_resp = HMAC-SHA256(credential, "<schema>/response-key")`. Clients accept a success, receipt or status only with a valid proof. The SWPC CLI reports an unproven POST response as `OUTCOME_UNKNOWN` (never retried) and an unproven read as a failure; the Manager raises `BootstrapManagerError` on its existing transport-failure path. Unproven 401/503 are treated only as refusals.
 
-The request target is the **PPU-local** path. The managed `z2like-demo` ingress strips `/__plasma/bootstrap` and adds one allowlisted `GET /v1/auth/challenge` route; the MAC therefore remains valid through it.
+The request target is the **PPU-local** path. A managed ingress must preserve the signed request target when forwarding Bootstrap requests.
 
 Anonymous reads (`/v1/health`, `/v1/status`, `/v1/assets`, `/v1/deployment`) remain available for discovery. When an `Authorization` header is present on `/v1/status`, `/v1/assets` or `/v1/deployment`, it must verify and the response is MACed. All `POST` routes require authentication.
 
@@ -29,7 +29,6 @@ Anonymous reads (`/v1/health`, `/v1/status`, `/v1/assets`, `/v1/deployment`) rem
 | `software/python/plasma_manager/verified_bootstrap.py` | Pairing proof = one MACed status for the observed device (the zero-size upload probe is retired) |
 | `software/python/plasma_manager/client.py` | `relay(..., extra_response_headers=)` so only the Bootstrap client receives the proof header |
 | `scripts/ppu_deploy_api.py`, `scripts/ppu_path2_hardware_baseline.py` | SWPC CLI and Path 2 direct baseline sign/verify; transport returns response headers |
-| `scripts/plasmactl-z2like-demo-managed-ingress`, `scripts/z2like-demo-nginx-ephemeral.py` | allowlisted challenge route |
 | `scripts/ppu-bootstrap-installer.py`, `.github/workflows/ppu-bootstrap.yml` | ships/compiles `ppu_bootstrap_request_auth.py` |
 
 ## What this does not change or claim

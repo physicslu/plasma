@@ -18,7 +18,6 @@
 - **Single deployment entry design** — [PPU single deployment entry](../architecture/ppu-unified-deployment-gate1.md): design record of Route A (one installation endpoint and one Coordinator transaction); not a separate route.
 - **FPGA image admission** — [Z2 six necessary checks](z2-minimal-six-check-admission.md): staging vs PL activation vs MMIO/SWD admission checks.
 - **ARMv7 runtime lab** — [PPU ARMv7 Runtime Lab](ppu-armv7-runtime-lab.md).
-- **QEMU Z2-like demo** — [SWPC z2like-demo QEMU ARMv7 Backend](z2like-demo-qemu.md).
 - **Control Station runtime acceptance** — [Control Station Runtime Acceptance](control-station-runtime-acceptance.md); Manager/BFF wiring: [Manager BFF Runtime Wiring](manager-bff-runtime-wiring.md).
 - **Z2 PS installer** — [PYNQ-Z2 PS Installer and Managed Loopback Acceptance](z2-ps-installer.md): verified release consumption, PYNQ/System-Python isolation, immutable side-by-side installation, explicit isolated Python >= 3.11 binding, P3 bounded runtime activation, systemd activation/rollback, Z2-local readiness, and the separate Managed PS Loopback qualification boundary.
 - **macOS installer pilot** — [macOS Control Station Installer Pilot](macos-control-station-installer-pilot.md): unsigned `.pkg`, immutable `/Library/Application Support/Plasma` runtime, per-user `launchd` LaunchAgents, absolute external Node/Python runtime binding, install/restart/stop-start/basic-uninstall acceptance, and downloadable CI artifact.

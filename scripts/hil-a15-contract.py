@@ -73,7 +73,7 @@ def validate(workflow: str, hosted: str, probe_text: str) -> None:
         require(marker in hosted, "Hosted runner isolation missing: " + marker)
     require("--privileged" not in hosted and "--cap-add=" not in hosted
             and "docker exec" not in hosted and "docker cp" not in hosted
-            and "plasma-z2like-demo-qemu" not in hosted,
+            and "plasma-retired-persistent-qemu" not in hosted,
             "Probe cannot access an existing container or privileged Docker")
     for marker in (
         "435e8a1e14b644396a5a14b52211bb50535176448442c08b4b55aed1a0463956",

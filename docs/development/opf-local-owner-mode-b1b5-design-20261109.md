@@ -61,7 +61,7 @@ Principle: **only a physically bounded, PPU-local action can create or replace t
 
 ### B4 — Render `fixed-lifecycle` profile kept as an isolated demo/test profile
 
-- Retain `PLASMA_MANAGER_REGISTRY_POLICY=fixed-lifecycle`, the maintenance cookie and the HTTPS-origin check **only** for `render-control-station-start.sh` / `render.yaml`.
+- Historical design: the fixed-lifecycle policy was scoped to the former Render QEMU demo. Its service entrypoint was retired; the generic Manager policy remains available for independent consumers.
 - Local Owner Mode code paths (local-control-station, desktop packages, P1 `Connect PPU`) **must not import, require or branch on** that profile. P1 acceptance adds a contract test that the local profile works with the policy unset and that removing the Render profile would not break Local Owner flows.
 
 ### B5 — Arbitrary custom FPGA images remain hardware NO_GO

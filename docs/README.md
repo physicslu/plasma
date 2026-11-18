@@ -217,7 +217,7 @@
 - **Current** · `engineering SSH route` · `PR #1207` — [通用 PPU 工程模組部署 `ppu-deploy`](development/ppu-deploy-engineering-modules.md)：工程部署路線（Route B），不是產品安裝路徑；Z2 PS WordPort／OpenOCD Python 整合與 SWPC A/B Runner 由同一來源版本協調部署，包含 SHA、互斥、啟用驗證與回滾；目前只有 Host-only 測試，不代表 GitHub PR 已合併或 Z2／SWPC 已部署。
 - **Current** — [Deployment Index](deployment/README.md)
 - **Current** — [`plasmactl` Deployment Profiles](deployment/plasmactl-deployment-profiles.md)：定義統一 operator CLI、`integration`／`local-control-station`／`swpc-z2like` profile ownership、activation rollback 與 qualification boundary。
-- **Current** — [Deployment Port / Profile Matrix](deployment/port-profile-matrix.md)：定義 production、SWPC engineering 與 `z2like-demo` scenario 的 profile-specific port ownership、exposure 與安全邊界。
+- **Current** — [Deployment Port / Profile Matrix](deployment/port-profile-matrix.md)：定義 production 與 SWPC engineering 的 profile-specific port ownership、exposure 與安全邊界。
 - **Current** — [Local Control Station Reference Deployment](deployment/local-control-station.md)：定義 Linux user-systemd 的 Console/BFF + Manager 本機參考部署、可設定 PPU Endpoint、loopback-only ingress、immutable release 與 rollback；macOS／Windows 保留相同產品契約但使用平台原生 packaging。
 - **Plan** · `partly implemented` — [Product Deployment Foundation](deployment/product-deployment-foundation.md)：定義跨平台 Control Station（macOS／Linux／Windows）、Z2 PPU、SWPC integration host 的產品部署責任邊界，以及 immutable release 與跨平台 read-only readiness audit。
 - **Current** — [Product Release Format v1](deployment/product-release-format.md)：定義 product version、release manifest、角色／平台 artifact matrix、SHA-256 integrity、safe verification 與 clean-extraction acceptance。
@@ -225,7 +225,6 @@
 - **Current** — [PPU Runtime Packaging](deployment/ppu-runtime-packaging.md)：定義 Z2 PS Phase-1 source-tree-independent PPU Python zipapp、`linux-armv7l` immutable release、PS-only fail-closed configuration、systemd topology與 Managed PS Loopback 驗收邊界。
 - **Current** — [PYNQ-Z2 PS Installer and Managed Loopback Acceptance](deployment/z2-ps-installer.md)：定義 verified PPU release → immutable side-by-side install、PYNQ/System-Python ownership isolation、explicit Plasma Python >= 3.11 binding、systemd activation/rollback、local readiness 與 real Managed PS Loopback evidence boundary。
 - **Current** · `physical Z2 PS evidence` — [PPU Bootstrap Factory Provisioning and Z2 HIL](deployment/ppu-bootstrap-factory-and-hil.md)：定義獨立 Bootstrap／recovery service、Console-managed Z2 Runtime deployment、durable rollback/recovery contract，以及 real PYNQ-Z2 HIL qualification 邊界。
-- **Current** — [SWPC z2like-demo QEMU ARMv7 Backend](deployment/z2like-demo-qemu.md)：固定 SWPC 為唯一 simulation environment、QEMU ARMv7 simulated Z2 為 `z2like-demo` 唯一 PPU backend，並定義 Bootstrap/Control Station 私有路由與非實機 qualification 邊界。
 - **Current** — [SWPC Z2-like Configured Mock Programming](deployment/swpc-z2like-configured-mock-programming.md)：將 Engineering Programming 綁定到 canonical `lab/swpc-z2like-01/SITE1..SITE8` 與既有 Plasma Server，明確拒絕 non-mock Site，且不建立舊 32-PPU demo topology；僅屬 software/mock qualification。
 - **Reference** — [PPU ARMv7 Runtime Lab](deployment/ppu-armv7-runtime-lab.md)：定義 integration-host QEMU ARMv7 一鍵 runtime/resource 診斷、live／ready／PS Loopback 路徑隔離與非 Z2-HIL 證據邊界。
 - **Reference** — [Control Station Runtime Acceptance Evidence](deployment/control-station-runtime-acceptance.md)：定義 macOS／Linux／Windows clean-runtime CI 的證據範圍與不可延伸宣稱的邊界。
@@ -246,7 +245,6 @@
 - **Reference** · `RCA closure` · `PR #1128/#1129` — [PLASMA Path 3 Token Optimization RCA Closure](development/plasma-path3-token-optimization-rca-closure-2026-10-23.md)：固定 PR #1128 與兩次 SWPC 9×9 Run ID、Token/時間/81 成功率、Artifact SHA-256 與尚未完成的模型／Effort 因果歸因；Repo-first 工作流 DONE，逐請求 Token Attribution 保留低優先級技術債。
 - **Reference** · `local tool` — [Codex Desktop vs Path 3 Token Usage Benchmark](development/codex-benchmark-usage.md)：針對 2026-10-22 9×9 測試，提供僅讀取指定本機 Session JSONL 的 Token 統計工具，區分單次 Turn、累計快照與 Path 3 Codex exec 用量；GitHub-hosted CI 使用合成資料，不代表已讀取 Mac Desktop 真實 Session，也不授權 SWPC、Z2 或 DUT。
 - **Current** — [AI-assisted Git Workflow](development/ai-git-development-workflow.md)
-- **Current** — [PLASMA GitHub Actions Control Bridge](development/plasma-actions-control-bridge.md)：定義 Issue #814、actor／workflow allowlist、`dispatch`／`cancel`／`rerun` 命令與最小權限安全邊界。
 - **Reference** · `historical 2026-10-23` — [PLASMA Codex Hardware Access Parity](development/plasma-codex-hardware-parity.md)：舊版 Runner USB／TTY 群組與 udev 配置歷史；不得用於判定現行 Path 3 禁止實機操作。權威規則見 [Path 3 Contract](development/plasma-path3-codex.md)，實際權限以當次 SWPC Linux UID／群組／ACL／設備觀測為準。
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
@@ -365,3 +363,5 @@ python scripts/tests/test-documentation-integrity.py
 ```
 
 The guard checks Markdown headings and local links, verifies that every `docs/**/*.md` file is listed here, rejects known retired document names and protocol/config drift, and protects the canonical Gateway base-module name.
+
+- **Current** — [z2like-demo QEMU Retirement Gate 1 Audit](development/z2like-demo-qemu-retirement-gate1.md)：紀錄程式退役範圍、保留的產品路徑、外部下線待辦與 PR #1476 整合。
