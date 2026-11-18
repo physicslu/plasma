@@ -23,7 +23,9 @@ routes these three strictly read-only subcommands to this package source.
 It retains its existing deployment and integration test behavior unchanged.
 A separately installed utility wheel does not require a Git checkout at runtime.
 
-Data is read exclusively through Manager's existing `GET /api/fleet`.
+Data is read exclusively through the existing Manager GET endpoints:
+`/api/fleet`, `/api/programming/batches/{batch_id}` and
+`/api/registry/{ppu_alias}/bootstrap`. No POST is performed.
 Site IDs are validated against live Fleet topology, never a hard-coded Site2
 or eight-Site list. The diagnostic may report OBSERVED/NOT_VERIFIED, not
 a physical programming or electrical PASS. Invalid or missing Targets
@@ -37,7 +39,7 @@ into this one utility and migrate **all** callers/tests/CI before retiring
 Manager/PPU APIs, Owner authorization, durable receipts and local safety
 guards. Never implement a second Batch scheduler or programming engine.
 
-Current scope: read-only `diagnose` and `test receipt` only. `test receipt` reads
+Current scope: read-only `diagnose`, `test receipt` and `deploy status` only. `test receipt` reads
 Manager's canonical `GET /api/programming/batches/{batch_id}` and checks the
 Target-Set/Unit identity. It reports the **Manager-reported whole-Batch PASS**,
 not an independent hardware or electrical qualification. It never issues Start,

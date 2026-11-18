@@ -23,7 +23,7 @@ def parse_targets(values: Sequence[str]) -> tuple[Target, ...]:
             raise ValueError("target must be a string")
         alias, separator, site_text = value.partition(":")
         if (
-            not separator or ":" in site_text or not alias or len(alias) > 96
+            not separator or ":" in site_text or not alias or len(alias) > 128
             or alias != alias.strip() or any(ch.isspace() for ch in alias)
         ):
             raise ValueError("target must be PPU_ALIAS:SITE[,SITE...]")

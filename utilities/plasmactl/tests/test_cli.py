@@ -42,6 +42,13 @@ def test_invalid_target_set_fails_closed(raw):
         parse_targets(raw)
 
 
+def test_manager_alias_maximum_length_matches_registry_contract():
+    alias = "a" * 128
+    assert parse_targets([f"{alias}:1"])[0].ppu_alias == alias
+    with pytest.raises(ValueError, match="PPU_ALIAS"):
+        parse_targets([f"{alias}b:1"])
+
+
 def test_any_site_topology_and_multi_ppu():
     targets = parse_targets(["z2:1,2", "second:14"])
     result, complete = select_fleet(fleet(), targets, all_ppus=False)
