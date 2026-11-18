@@ -7,9 +7,12 @@ of Site admission, image binding, cancellation, SAFE_OFF and sealing.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
+import os
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +52,133 @@ class ReferenceBinding:
     profile: dict[str, Any]
     engine: ppu_site_engine.EngineSelection
     profile_sha256: str
+
+
+# --- verified-result cache ------------------------------------------------------
+# load_engine and qualify_reference re-hash the same root-owned Engine files and
+# the same immutable staged Asset Set for every Job. A result is reused only
+# while the stat identity (inode, size, mtime, ctime, mode, owner) of every file
+# and directory it was derived from is unchanged; any change re-runs the full
+# verification. A result is cached only when the identity taken before and after
+# the full verification match. Concurrent Jobs with the same key wait for one
+# verification instead of repeating it. Observation of reuse goes to the Job
+# timing log; no gate, authority or fallback is added.
+
+_STAT_FIELDS = ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns")
+_CACHE_LIMIT = 16
+# File timestamps are kernel-tick coarse: a same-size rewrite within one tick of
+# the verification would keep its stat identity. Like git's racy-index rule, a
+# result derived from any source changed within this window is never reused.
+_RACY_WINDOW_NS = 2_000_000_000
+
+
+class _NoIdentity(Exception):
+    """A source cannot be identified, so its result is never reused."""
+
+
+def _stat_identity(path: Path) -> tuple[Any, ...]:
+    try:
+        info = os.lstat(path)
+    except OSError:
+        raise _NoIdentity(str(path)) from None
+    return (str(path), *(getattr(info, name) for name in _STAT_FIELDS))
+
+
+def _tree_identity(root: Path) -> tuple[Any, ...]:
+    entries = [_stat_identity(root)]
+    def unreadable(_error: OSError) -> None:
+        raise _NoIdentity(str(root))
+
+    for directory, dirnames, filenames in os.walk(root, onerror=unreadable, followlinks=False):
+        dirnames.sort()
+        for name in sorted(dirnames + filenames):
+            entries.append(_stat_identity(Path(directory) / name))
+    return tuple(entries)
+
+
+def _engine_identity(record: Path, base: Path) -> tuple[Any, ...]:
+    entries: list[Any] = [_stat_identity(record), _stat_identity(base)]
+    try:
+        root = Path(json.loads(record.read_bytes())["openocd_root"])
+    except (OSError, ValueError, KeyError, TypeError):
+        raise _NoIdentity(str(record)) from None
+    for path in (root, root / "bin" / "openocd",
+                 root / "libexec" / ppu_site_engine.ADMISSION_NAME,
+                 root / "share" / "openocd" / "scripts"):
+        entries.append(_stat_identity(path))
+    return tuple(entries)
+
+
+def _identity_or_none(identity) -> tuple[Any, ...] | None:
+    try:
+        return identity()
+    except _NoIdentity:
+        return None
+
+
+def _newest_ctime_ns(identity: tuple[Any, ...]) -> int:
+    newest = 0
+    for item in identity:
+        if isinstance(item, tuple):
+            if item and isinstance(item[0], str) and len(item) == len(_STAT_FIELDS) + 1:
+                newest = max(newest, item[-1])
+            else:
+                newest = max(newest, _newest_ctime_ns(item))
+    return newest
+
+
+class _VerifiedCache:
+    def __init__(self, limit: int = _CACHE_LIMIT) -> None:
+        self._lock = threading.Lock()
+        self._entries: dict[Any, tuple[tuple[Any, ...], Any]] = {}
+        self._flights: dict[Any, threading.Lock] = {}
+        self._limit = limit
+
+    def clear(self) -> None:
+        with self._lock:
+            self._entries.clear()
+
+    def get(self, key: Any, identity, compute) -> tuple[Any, bool]:
+        with self._lock:
+            flight = self._flights.setdefault(key, threading.Lock())
+        with flight:
+            before = _identity_or_none(identity)
+            with self._lock:
+                cached = self._entries.get(key)
+            if before is not None and cached is not None and cached[0] == before:
+                return copy.deepcopy(cached[1]), True
+            value = compute()
+            if (before is not None and _identity_or_none(identity) == before
+                    and time.time_ns() - _newest_ctime_ns(before) >= _RACY_WINDOW_NS):
+                with self._lock:
+                    if len(self._entries) >= self._limit and key not in self._entries:
+                        self._entries.clear()
+                    self._entries[key] = (before, copy.deepcopy(value))
+            else:
+                with self._lock:
+                    self._entries.pop(key, None)
+            return value, False
+
+
+_ENGINE_CACHE = _VerifiedCache()
+_REFERENCE_CACHE = _VerifiedCache()
+
+
+def load_engine_verified(record: Path = ppu_site_engine.ENGINE_SELECTION, *,
+                         base: Path = ppu_site_engine.ENGINE_BASE,
+                         require_root: bool = True) -> ppu_site_engine.EngineSelection:
+    """``ppu_site_engine.load_engine`` reused while its files are unchanged."""
+    record, base = Path(record), Path(base)
+    value, hit = _ENGINE_CACHE.get(
+        (str(record), str(base), require_root),
+        lambda: _engine_identity(record, base),
+        lambda: ppu_site_engine.load_engine(record, base=base, require_root=require_root))
+    job_timing.mark("load_engine_cache", hit=hit)
+    return value
+
+
+def _canonical(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), default=repr)
 
 
 PROGRAMMING = ppu_provider_contract.PROGRAMMING
@@ -309,6 +439,44 @@ def qualify_reference(
     return ReferenceBinding(route, profile, engine, profile_sha)
 
 
+def qualify_reference_cached(
+    *, product_root: Path, asset_set_sha256: str,
+    selection: Mapping[str, Any], policy: TimeoutPolicy, target: str,
+    site_id: int, image_size: int, hardware: Mapping[str, Any],
+    engine_record: Path = ppu_site_engine.ENGINE_SELECTION,
+    engine_base: Path = ppu_site_engine.ENGINE_BASE,
+    require_root: bool = True,
+    operation: str = PROGRAMMING,
+    operations: tuple[str, ...] | None = None,
+) -> ReferenceBinding:
+    """``qualify_reference`` reused for identical inputs while the Active
+    record, the staged Asset Set tree and the Engine files are unchanged."""
+    product_root = Path(product_root)
+    engine_record, engine_base = Path(engine_record), Path(engine_base)
+    key = (str(product_root), asset_set_sha256, _canonical(selection), repr(policy),
+           target, site_id, image_size, _canonical(hardware), str(engine_record),
+           str(engine_base), require_root, operation, operations)
+
+    def identity() -> tuple[Any, ...]:
+        if (type(asset_set_sha256) is not str
+                or ppu_provider_contract.SHA64.fullmatch(asset_set_sha256) is None):
+            raise _NoIdentity("asset_set_sha256")
+        assets = product_root / "assets"
+        return (_stat_identity(product_root), _stat_identity(assets),
+                _stat_identity(assets / "active.json"), _stat_identity(assets / "staged"),
+                _tree_identity(assets / "staged" / asset_set_sha256),
+                _engine_identity(engine_record, engine_base))
+
+    value, hit = _REFERENCE_CACHE.get(key, identity, lambda: qualify_reference(
+        product_root=product_root, asset_set_sha256=asset_set_sha256,
+        selection=selection, policy=policy, target=target, site_id=site_id,
+        image_size=image_size, hardware=hardware, engine_record=engine_record,
+        engine_base=engine_base, require_root=require_root, operation=operation,
+        operations=operations))
+    job_timing.mark("qualify_reference_cache", hit=hit)
+    return value
+
+
 async def execute_reference_flash(
     client: SiteWorkerControlClient, *, product_root: Path,
     asset_set_sha256: str, selection: Mapping[str, Any], policy: TimeoutPolicy,
@@ -343,7 +511,7 @@ async def execute_reference_flash(
     # Blocking file reads and SHA256 checks run off the Runtime event loop so
     # one Job's verification never stalls another Site's Job.
     binding = await job_timing.in_thread(
-        "qualify_reference", qualify_reference,
+        "qualify_reference", qualify_reference_cached,
         product_root=product_root, asset_set_sha256=asset_set_sha256,
         selection=selection, policy=policy, target=target, site_id=site_id,
         image_size=len(image), hardware=hardware,
@@ -448,7 +616,7 @@ async def execute_runtime_flash(
                      "provider": pinned_profile["provider_package"],
                      "profile": profile["id"], "options": {}}
         engine = await job_timing.in_thread(
-            "load_engine", ppu_site_engine.load_engine, require_root=True)
+            "load_engine", load_engine_verified, require_root=True)
         remaining = job_deadline_monotonic - time.monotonic()
         _need(math.isfinite(remaining) and remaining > 0, "JOB_DEADLINE_EXPIRED")
         status = await job_timing.in_thread(
