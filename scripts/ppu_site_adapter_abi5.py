@@ -69,6 +69,28 @@ OPENOCD_MAX_S = 45
 CLEANUP_PROBE_MAX_S = 5
 
 
+def _unix_ms() -> float:
+    return round(time.time() * 1000.0, 1)
+
+
+def _admission_root_timing(stdout: str) -> dict[str, float]:
+    """Root admission's own phase timing (observation only, best effort)."""
+    for line in stdout.splitlines():
+        if not line.startswith("PLASMA_SWD_SITE_ADMISSION="):
+            continue
+        try:
+            phases = json.loads(line.split("=", 1)[1]).get("timing_ms")
+        except (ValueError, AttributeError):
+            return {}
+        if not isinstance(phases, dict):
+            return {}
+        return {"admission_root_" + str(key): float(value)
+                for key, value in phases.items()
+                if re.fullmatch(r"[a-z][a-z0-9_]{0,47}", str(key))
+                and type(value) in (int, float)}
+    return {}
+
+
 @dataclass(frozen=True, slots=True)
 class SafeOff:
     """What one OpenOCD session observed about leaving the Site safe.
@@ -146,6 +168,8 @@ class Abi5OpenocdAdapter:
         # systemd StateDirectory is root-owned and writable despite ProtectSystem=strict.
         state_root = Path(os.environ.get("STATE_DIRECTORY") or "/var/lib/plasma-site-worker")
         self.evidence_dir = Path(evidence_dir) if evidence_dir is not None else state_root / "openocd-evidence"
+        # Observation only: the last admitted session's timing per Site.
+        self._session_timing: dict[int, dict[str, Any]] = {}
 
     @property
     def openocd(self) -> Path:
@@ -316,9 +340,13 @@ class Abi5OpenocdAdapter:
             argv = self._operation_argv(site, bound, actions)
             log, rc, safe_off = self._session(site, deadline=deadline, cancel=cancel,
                                               argv=argv, max_duration_s=300)
+            timing = self._session_timing.pop(site, None)
+            if timing is not None:
+                base["timing_ms"] = timing
 
             def failed(code: str, rc: Any, **extra: Any) -> dict[str, Any]:
                 return {"result": "FAIL", "code": code, "openocd_rc": rc,
+                        **({"timing_ms": timing} if timing is not None else {}),
                         **safe_off.receipt(), **extra}
 
             erased, wrote = ERASED.findall(log), WROTE.findall(log)
@@ -478,6 +506,9 @@ class Abi5OpenocdAdapter:
         # A different Site's OpenOCD process does not block this Site.
         if os.path.lexists(self._record(site)):
             raise TransportDenied("EXTERNAL_SITE_OWNER_PRESENT")
+        timing: dict[str, Any] = {"admission_start_unix_ms": _unix_ms()}
+        self._session_timing[site] = timing
+        clock = time.monotonic()
         try:
             a = self._run([str(self.python), "-I", "-B", str(self.admission), "admit", str(site)],
                           capture_output=True, text=True, timeout=ADMIT_TIMEOUT_S)
@@ -504,6 +535,11 @@ class Abi5OpenocdAdapter:
                     if type(code) is str and re.fullmatch(r"[A-Z][A-Z0-9_]{0,95}", code):
                         denial += ":" + code
             raise TransportDenied(denial)
+        now = time.monotonic()
+        timing["admission_ms"] = round((now - clock) * 1000.0, 1)
+        timing.update(_admission_root_timing(a.stdout))
+        timing["openocd_start_unix_ms"] = _unix_ms()
+        clock = now
         log, raw, reason, rc = "", b"", None, None
         child = None
         operation_error = None
@@ -545,7 +581,10 @@ class Abi5OpenocdAdapter:
             except Exception:
                 cleanup_error = True
         finally:
+            now = time.monotonic()
+            timing["openocd_ms"] = round((now - clock) * 1000.0, 1)
             revoked = self._revoke(site)
+            timing["revoke_ms"] = round((time.monotonic() - now) * 1000.0, 1)
         safe_off = SafeOff(marker_present=SAFE_OFF.encode("ascii") in raw,
                            admission_revoked=revoked, termination_reason=reason)
         try:

@@ -11,6 +11,7 @@ from plasma_core.config import SiteConfig
 from plasma_core.enums import JobState, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.failure_policy import terminal_state_for_error
+from plasma_core import job_timing
 from plasma_core.job_logging import JobEventLogger, OutputManager
 from plasma_core.models import ErrorDetail, ExecutionOutput, JobAttemptResult, JobResult, iso_now
 from plasma_handlers.base import BaseHandler
@@ -259,6 +260,14 @@ class SiteWorker:
         }
 
     async def _process(self, runtime: JobRuntime) -> None:
+        # The Job timing sink is bound only while this Job is processed.
+        token = job_timing.bind(None)
+        try:
+            await self._process_job(runtime)
+        finally:
+            job_timing.unbind(token)
+
+    async def _process_job(self, runtime: JobRuntime) -> None:
         request = runtime.request
         logger = JobEventLogger(self.log_root, request.site_id, request.job_id)
         if runtime.cancel_requested:
@@ -287,6 +296,16 @@ class SiteWorker:
                 image_reference_scheme=request.image_ref.scheme if request.image_ref else None,
             )
             started_monotonic = time.monotonic()
+
+            def timing_sink(phase: str, **fields: Any) -> None:
+                logger.event("stage_timing", phase=phase,
+                             t_ms=round((time.monotonic() - started_monotonic) * 1000.0, 1),
+                             **fields)
+
+            job_timing.bind(timing_sink)
+            job_timing.mark("job_admission", **(runtime.admission_timing_ms or {}))
+            job_timing.mark("queued", duration_ms=round(
+                (started_monotonic - runtime.created_monotonic) * 1000.0, 1))
             # One Job budget includes every attempt, cleanup, and retry delay.
             job_deadline = started_monotonic + request.timeout_s
             runtime.deadline_monotonic = job_deadline

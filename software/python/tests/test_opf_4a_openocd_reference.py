@@ -663,3 +663,82 @@ def test_job_without_binding_is_refused():
     with pytest.raises(ValueError, match="JOB_BINDING_REQUIRED"):
         reference.job_flash_window(F103_PROFILE, profile_package=PROFILE, site_id=2,
                                    image_size=20, job_binding=None)
+
+
+def test_runtime_flash_records_stage_timing_and_site_worker_timing(monkeypatch):
+    """Each pre-admission check and the Worker admission/OpenOCD/revoke split
+    land in the Job timing sink; the Flash outcome is unchanged."""
+    from plasma_core import job_timing
+
+    records = []
+    with installed_bundle(with_control_socket=False, with_fpga=False,
+                          platform_provider=True) as env:
+        admitted = env["sim"].run
+
+        def admission_with_root_timing(argv, **kw):
+            done = admitted(argv, **kw)
+            if argv[-2] == "admit":
+                done.stdout += "\nPLASMA_SWD_SITE_ADMISSION=" + json.dumps(
+                    {"result": "SITE_ADMISSION_RECORD_ISSUED",
+                     "timing_ms": {"total": 12.5, "lock_and_fence": 0.4}})
+            return done
+
+        monkeypatch.setattr(env["sim"], "run", admission_with_root_timing)
+        monkeypatch.setattr(env["adapter"], "_run", admission_with_root_timing)
+        token = job_timing.bind(lambda phase, **fields: records.append((phase, fields)))
+        try:
+            result = _runtime_execute(env, monkeypatch)
+        finally:
+            job_timing.unbind(token)
+    assert result["result"] == "PASS" and result["safe_off"] is True
+    phases = [phase for phase, _ in records]
+    for phase in ("preflight", "staged_manifest", "load_engine", "worker_status",
+                  "qualify_reference", "stage_image", "open_session", "bind_image",
+                  "worker_run", "site_worker"):
+        assert phase in phases, phase
+    fields = dict(records)
+    for phase in ("preflight", "staged_manifest", "load_engine", "qualify_reference"):
+        assert fields[phase]["thread"] is True
+    worker_timing = fields["site_worker"]
+    for key in ("admission_ms", "openocd_ms", "revoke_ms",
+                "admission_start_unix_ms", "openocd_start_unix_ms"):
+        assert type(worker_timing[key]) is float and worker_timing[key] >= 0, key
+    assert worker_timing["admission_root_total"] == 12.5
+    assert worker_timing["admission_root_lock_and_fence"] == 0.4
+    assert result["timing_ms"] == worker_timing
+
+
+def test_runtime_flash_blocking_verification_leaves_the_event_loop_free(monkeypatch):
+    """A slow Bundle/Engine check of one Site's Job must not stall the loop
+    (the other Site's Job and the HTTP server share it)."""
+    with installed_bundle(with_control_socket=False, with_fpga=False,
+                          platform_provider=True) as env:
+        slow_engine = engine.load_engine
+
+        def slow_load(*args, **kwargs):
+            time.sleep(0.4)
+            return slow_engine(*args, **kwargs)
+
+        monkeypatch.setattr(engine, "load_engine", slow_load)
+        ticks = []
+        original = reference.execute_runtime_flash
+
+        async def with_ticker(*args, **kwargs):
+            async def ticker():
+                while True:
+                    ticks.append(time.monotonic())
+                    await asyncio.sleep(0.01)
+
+            task = asyncio.create_task(ticker())
+            try:
+                return await original(*args, **kwargs)
+            finally:
+                task.cancel()
+
+        monkeypatch.setattr(reference, "execute_runtime_flash", with_ticker)
+        result = _runtime_execute(env, monkeypatch)
+    assert result["result"] == "PASS"
+    # Two load_engine calls (Runtime + qualify_reference) sleep 0.8 s in total;
+    # a blocked loop would show one long gap instead of steady 10 ms ticks.
+    assert len(ticks) >= 40
+    assert max(b - a for a, b in zip(ticks, ticks[1:])) < 0.3

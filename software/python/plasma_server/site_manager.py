@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import re
 import threading
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
@@ -602,12 +603,24 @@ class SiteManager:
         # The same lease excludes activation/FPGA reload through every queued
         # Job, retry and cancellation cleanup, across the whole PPU.
         runtime = self.registry.create(request)
+        # Observation only: per-step admission durations (ms) for this Job.
+        timing: dict[str, float] = {}
+        clock = time.monotonic()
+
+        def lap(name: str) -> None:
+            nonlocal clock
+            now = time.monotonic()
+            timing[name + "_ms"] = round((now - clock) * 1000.0, 1)
+            clock = now
+
         try:
             owner_kind, owner_id = self._reserve_execution_job(request)
+            lap("reserve")
             # Pin the trusted Active Set when the Runtime composition provides it.
             pinned = deepcopy(self._active_asset_set_reader()) if self._active_asset_set_reader else {
                 "state": "EMPTY", "asset_set_sha256": None, "ready": False,
             }
+            lap("active_set")
             bundle_keys = {
                 "bundle_asset_set_sha256", "bundle_asset_package_id",
                 "bundle_asset_sha256",
@@ -619,8 +632,10 @@ class SiteManager:
                                   "JOB_IMAGE_SOURCE_NOT_EXCLUSIVE")
             if binding_selected:
                 runtime.job_binding = self._admit_job_binding(request, pinned)
+                lap("job_binding")
             request = self.execution_routers[request.site_id].admit(
                 request, trusted_provider=trusted_provider)
+            lap("route_admit")
             if trusted_provider is not None:
                 if (pinned.get("state") != "ACTIVE"
                         or pinned.get("asset_set_sha256") != trusted_provider.route.asset_set_sha256):
@@ -629,6 +644,8 @@ class SiteManager:
             runtime.active_asset_set = pinned
             runtime.trusted_provider = trusted_provider
             self.output.write_state(request.job_id, worker._state_payload(runtime))
+            lap("write_state")
+            runtime.admission_timing_ms = timing
             worker.enqueue(runtime)
         except Exception:
             self.registry.discard(request.job_id)
@@ -647,6 +664,7 @@ class SiteManager:
             operation=request.operation.value,
             execution_owner_kind=owner_kind,
             execution_owner_id=owner_id,
+            admission_timing_ms=timing,
         )
         return runtime.future
 
