@@ -402,7 +402,7 @@ def test_local_control_station_release_catalog_ships_l3_evidence(tmp_path: Path)
     """Execute export_release_catalog against this repository's HEAD."""
     source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
     function = "export_release_catalog() {" + source.split("export_release_catalog() {", 1)[1].split("\nprepare_release() {", 1)[0]
-    repo_root = LOCAL_CONTROL_STATION.parents[1]
+    repo_root = REPO_ROOT
     script = (
         "set -euo pipefail\n"
         'die() { echo "$*" >&2; exit 1; }\n'
