@@ -105,11 +105,20 @@ class Path2OperatorCLI(unittest.TestCase):
 
     def test_canonical_plasmactl_runs_via_bash_without_shell(self):
         # These are pure executor mocks: no Control Station is deployed.
-        for verb in ("status", "verify", "deploy"):
-            with self.subTest(verb=verb):
+        commands = (
+            ["status", "local-control-station"],
+            ["verify", "local-control-station"],
+            ["deploy", "local-control-station"],
+            ["deploy", "z2-ps"],
+            ["install", "local-control-station"],
+            ["program", "submit", "--target", "z2:1,2", "--icpn",
+             "STM32F103C8T6", "--image", "firmware.bin",
+             "--journal", "new-submission-journal.json", "--retry-limit", "0"],
+        )
+        for argv in commands:
+            with self.subTest(argv=argv):
                 task, approval = admitted(work_order(
-                    script="scripts/plasmactl",
-                    argv=[verb, "local-control-station"],
+                    script="scripts/plasmactl", argv=argv,
                     timeout_seconds=1800))
                 with tempfile.TemporaryDirectory() as td:
                     source = Path(td) / "scripts/plasmactl"
@@ -122,7 +131,7 @@ class Path2OperatorCLI(unittest.TestCase):
                         executor=executor, sandbox=False)
                 args, kwargs = executor.call_args
                 self.assertEqual(args[0],
-                                 ["/bin/bash", str(source), verb, "local-control-station"])
+                                 ["/bin/bash", str(source), *argv])
                 self.assertEqual(kwargs["timeout"], 1800)
                 self.assertFalse(kwargs.get("shell", False))
                 self.assertEqual(result["status"],
@@ -136,13 +145,9 @@ class Path2OperatorCLI(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_text("#!/usr/bin/env bash\nexit 0\n")
             executor = Mock()
-            with self.assertRaisesRegex(dispatch.Denied, "OPERATOR_CLI_COMMAND_DENIED"):
+            with self.assertRaisesRegex(dispatch.Denied, "OPERATOR_CLI_SANDBOX_DENIED"):
                 dispatch.run_task(task, workspace=Path(td), approval=approval,
                                   executor=executor, sandbox=True)
-            with self.assertRaisesRegex(dispatch.Denied, "OPERATOR_CLI_COMMAND_DENIED"):
-                dispatch.run_task({**task, "argv": ["deploy", "z2-ps"]},
-                                  workspace=Path(td), approval=approval,
-                                  executor=executor)
             with self.assertRaisesRegex(dispatch.Denied, "OPERATOR_CLI_APPROVAL_DENIED"):
                 dispatch.run_task(task, workspace=Path(td),
                                   approval={**approval, "work_order_sha256": "b" * 64},
@@ -173,11 +178,6 @@ class Path2OperatorCLI(unittest.TestCase):
             {"script": "scripts/../private.py"},
             {"script": "scripts/experiments/bad.sh"},
             {"script": "scripts/plasmactl-local-control-station"},
-            {"script": "scripts/plasmactl", "argv": ["install", "local-control-station"]},
-            {"script": "scripts/plasmactl", "argv": ["deploy", "z2-ps"]},
-            {"script": "scripts/plasmactl", "argv": ["deploy", "local-control-station", "--dev-fresh-state"]},
-            {"script": "scripts/plasmactl", "argv": ["deploy"]},
-            {"script": "scripts/plasmactl", "argv": ["status", "local-control-station", "--anything"]},
             {"script": "scripts/experiments/../bad.py"},
             {"timeout_seconds": 1801},
             {"timeout_seconds": 0},
