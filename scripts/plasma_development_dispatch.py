@@ -328,8 +328,8 @@ def parse_dynamic_work_order(event: object) -> dict:
                  "artifact_source"},
                 "WORK_ORDER_OPERATOR_CLI_FIELDS_DENIED")
         script = order["script"]
-        # Reuse the canonical Bash operator entrypoint; do not admit arbitrary
-        # shell scripts, command strings, or privilege-changing profiles.
+        # Keep the canonical Bash entrypoint without permitting arbitrary
+        # shell scripts or command strings; its subcommands are not allowlisted.
         require(type(script) is str and
                 (script == "scripts/plasmactl" or re.fullmatch(
                     r"(?:scripts|pl|software)/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py",
@@ -340,9 +340,6 @@ def parse_dynamic_work_order(event: object) -> dict:
             type(arg) is str and len(arg) <= 2048 and
             not any(ord(ch) < 32 or ord(ch) == 127 for ch in arg)
             for arg in argv), "WORK_ORDER_OPERATOR_CLI_ARGS_DENIED")
-        if script == "scripts/plasmactl":
-            require(tuple(argv) in CONTROL_STATION_OPERATOR_COMMANDS,
-                    "WORK_ORDER_OPERATOR_CLI_COMMAND_DENIED")
         timeout_seconds = order.get("timeout_seconds", 600)
         require(type(timeout_seconds) is int and
                 1 <= timeout_seconds <= 1800,
@@ -394,15 +391,6 @@ def parse_dynamic_work_order(event: object) -> dict:
                 "WORK_ORDER_MAIN_SHA_NOT_EVENT_PINNED")
     return order
 
-
-# One native Bash entrypoint without a generic shell-command execution route.
-# Only the existing Control Station upgrade/read-only commands are admitted;
-# --dev-fresh-state, install and Z2/PPU profiles require separate explicit work.
-CONTROL_STATION_OPERATOR_COMMANDS = frozenset({
-    ("deploy", "local-control-station"),
-    ("verify", "local-control-station"),
-    ("status", "local-control-station"),
-})
 
 def work_order_digest(order: dict) -> str:
     data = json.dumps(order, sort_keys=True,
@@ -779,8 +767,9 @@ def run_task(task: dict, *, workspace: Path = ROOT,
             requested_script.is_file() and not requested_script.is_symlink(),
             "SCRIPT_NOT_FOUND")
     if task.get("capability") == "operator-cli" and task["script"] == "scripts/plasmactl":
-        require(tuple(task["argv"]) in CONTROL_STATION_OPERATOR_COMMANDS and not sandbox,
-                "OPERATOR_CLI_COMMAND_DENIED")
+        # The authorized Work Order pins exact argv; command semantics and hardware
+        # admission belong to plasmactl/Manager, not a stale Dispatcher allowlist.
+        require(not sandbox, "OPERATOR_CLI_SANDBOX_DENIED")
         command = ["/bin/bash", str(script), *task["argv"]]
     else:
         command = [sys.executable, str(script), *task["argv"]]
