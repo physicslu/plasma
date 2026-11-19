@@ -6,6 +6,7 @@ from contextlib import ExitStack, nullcontext
 from dataclasses import replace
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -552,6 +553,258 @@ class GuardProcessCensusRegressionTests(unittest.TestCase):
         self.assertEqual(result, (False, ["3000"]))
         self.assertEqual(detail["status"], "VANISHED_PID_RESCAN_EXHAUSTED")
         self.assertEqual(detail["attempt"], 3)
+
+
+class SiteAdmissionVanishedPidPolicyTests(unittest.TestCase):
+    """2-Site HIL 2026-11-19: concurrent Sites exhausted the strict rescan.
+
+    Site admission (``vanished_pids="skip"``) skips only a PID whose exit is
+    confirmed; FPGA Manager download/test/restore keep ``"rescan"``. Fake
+    /proc only; never touches Z2, real MMIO or a DUT.
+    """
+
+    SITE1 = 0x43C01000
+    SITE2 = 0x43C02000
+
+    def setUp(self):
+        from types import SimpleNamespace
+        self.td = tempfile.TemporaryDirectory()
+        self.addCleanup(self.td.cleanup)
+        self.proc = Path(self.td.name)
+        self.release = SimpleNamespace(
+            owner_base=self.SITE1, owner_bytes=0x2000, site_bitmap=3,
+            axi_base=self.SITE1, axi_bytes=0x2000)
+
+    def pid(self, number, *, fds=(), maps="", start=1000):
+        directory = self.proc / str(number)
+        (directory / "fd").mkdir(parents=True)
+        for index, target in enumerate(fds, start=3):
+            (directory / f"fd/{index}").symlink_to(target)
+        (directory / "maps").write_text(
+            maps or "00100000-00101000 r--p 00000000 00:00 0 [anon]\n")
+        self.restart(number, start)
+        return directory
+
+    def restart(self, number, start):
+        fields = ["S"] + ["0"] * 18 + [str(start)] + ["0"] * 10
+        (self.proc / str(number) / "stat").write_text(
+            f"{number} (proc {number}) " + " ".join(fields) + "\n")
+
+    @staticmethod
+    def devmem(offset):
+        return f"b6f00000-b6f01000 rw-s {offset:08x} 00:06 1029 /dev/mem\n"
+
+    def scan(self, policy, cooperating=None):
+        detail = {}
+        result = guard.scan_proc_consumers(
+            procroot=self.proc, release=self.release, diagnostic=detail,
+            cooperating=cooperating, vanished_pids=policy)
+        return result, detail
+
+    def vanish_on_read(self, victims):
+        import shutil
+        original = Path.read_text
+        def read(path, *args, **kwargs):
+            if path.name == "maps" and path.parent.name in victims and path.parent.exists():
+                shutil.rmtree(path.parent)
+                raise FileNotFoundError("synthetic terminated PID")
+            return original(path, *args, **kwargs)
+        return patch.object(Path, "read_text", new=read)
+
+    # -------------------------------------------------- confirmed exits
+    def test_site_admission_skips_confirmed_exit_without_rescan(self):
+        self.pid(1000)
+        self.pid(2000)
+        with self.vanish_on_read({"1000"}):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (True, []))
+        self.assertEqual((detail["status"], detail["attempt"], detail["rescans"],
+                          detail["vanished_skipped"]), ("COMPLETE", 1, 0, 1))
+
+    def test_concurrent_churn_never_exhausts_site_admission_but_still_does_maintenance(self):
+        """The repro: peer short-lived PIDs exit during every pass."""
+        victims = {str(n) for n in range(1000, 1100)}
+        for number in range(1000, 1100):
+            self.pid(number)
+        self.pid(9000)
+        with self.vanish_on_read(victims):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (True, []))
+        self.assertEqual(detail["vanished_skipped"], 100)
+        for number in range(1000, 1004):
+            self.pid(number)
+        with self.vanish_on_read({"1000", "1001", "1002", "1003"}):
+            result, detail = self.scan("rescan")
+        self.assertFalse(result[0])
+        self.assertEqual(detail["status"], "VANISHED_PID_RESCAN_EXHAUSTED")
+
+    def test_exit_during_fd_phase_is_skipped(self):
+        import shutil
+        gone = self.pid(1000)
+        self.pid(2000)
+        original = Path.iterdir
+        def iterdir(path):
+            if path == gone / "fd":
+                shutil.rmtree(gone)
+                raise FileNotFoundError("synthetic terminated PID")
+            return original(path)
+        with patch.object(Path, "iterdir", new=iterdir):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (True, []))
+        self.assertEqual(detail["vanished_skipped"], 1)
+
+    def test_maintenance_default_policy_is_the_strict_rescan(self):
+        self.pid(1000)
+        with self.vanish_on_read({"1000"}):
+            detail = {}
+            result = guard.scan_proc_consumers(
+                procroot=self.proc, release=self.release, diagnostic=detail)
+        self.assertEqual(result, (False, []))  # nothing left; NO_PROCESS_OBSERVED
+        self.assertEqual(detail["rescans"], 1)
+
+    def test_unknown_policy_is_refused(self):
+        with self.assertRaises(guard.TargetSafetyDenied):
+            self.scan("ignore")
+
+    # -------------------------------------------- still fail closed
+    def test_live_but_unreadable_pid_still_fails_closed(self):
+        active = self.pid(1000)
+        original_read = Path.read_text
+        def denied(path, *args, **kwargs):
+            if path == active / "maps":
+                raise PermissionError("LSM denied")
+            return original_read(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=denied):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+
+    def test_missing_maps_of_a_live_pid_is_not_an_exit(self):
+        active = self.pid(1000)
+        original_read = Path.read_text
+        def missing(path, *args, **kwargs):
+            if path == active / "maps":
+                raise FileNotFoundError("maps hidden but PID alive")
+            return original_read(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=missing):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+
+    def test_real_fpga_owner_conflict_still_refused_even_with_exits(self):
+        self.pid(1000, fds=("/dev/uio1",))
+        self.pid(1500, fds=("/dev/xdevcfg",))
+        self.pid(2000)
+        with self.vanish_on_read({"2000"}):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (True, ["1000", "1500"]))
+        self.assertEqual(detail["status"], "PROC_CONFLICT")
+        self.assertEqual(detail["vanished_skipped"], 1)
+
+    def test_uncooperative_devmem_owner_is_refused(self):
+        # /dev/mem open without the Site lock / admission record: no exemption,
+        # whether it only holds the fd or maps the PL window.
+        self.pid(1000, fds=("/dev/mem",))
+        self.pid(2000, maps=self.devmem(self.SITE2))
+        result, _ = self.scan("skip", cooperating=lambda: {})
+        self.assertEqual(result, (True, ["1000", "2000"]))
+
+    def test_peer_site_owner_is_exempt_only_inside_its_own_page(self):
+        self.pid(1000, fds=("/dev/mem",), maps=self.devmem(self.SITE2))
+        result, _ = self.scan("skip", cooperating=lambda: {"1000": 2})
+        self.assertEqual(result, (True, []))
+        self.restart(1000, 1000)
+        (self.proc / "1000/maps").write_text(self.devmem(self.SITE1))
+        result, _ = self.scan("skip", cooperating=lambda: {"1000": 2})
+        self.assertEqual(result, (True, ["1000"]))
+
+    def test_inherited_devmem_fd_survives_its_exited_parent(self):
+        # The parent exits mid-scan; the child listed with it inherited
+        # /dev/mem and is NOT a proven Site owner, so it is still refused.
+        self.pid(1000, fds=("/dev/mem",))
+        self.pid(1001, fds=("/dev/mem",), maps=self.devmem(self.SITE1))
+        with self.vanish_on_read({"1000"}):
+            result, detail = self.scan("skip", cooperating=lambda: {})
+        self.assertEqual(result, (True, ["1001"]))
+        self.assertEqual(detail["vanished_skipped"], 1)
+
+    # ------------------------------------------------------- PID reuse
+    def test_pid_reused_mid_read_is_reexamined_and_conflict_refused(self):
+        reused = self.pid(1000, start=111)
+        original = Path.read_text
+        state = {"swapped": False}
+        def swap(path, *args, **kwargs):
+            if path == reused / "maps" and not state["swapped"]:
+                # The original exits; a new process takes PID 1000 holding /dev/uio1.
+                state["swapped"] = True
+                (reused / "fd/3").symlink_to("/dev/uio1")
+                self.restart(1000, 222)
+            return original(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=swap):
+            for policy in ("skip", "rescan"):
+                state["swapped"] = False
+                (reused / "fd/3").unlink(missing_ok=True)
+                self.restart(1000, 111)
+                result, _ = self.scan(policy)
+                self.assertEqual(result, (True, ["1000"]), policy)
+
+    def test_pid_reused_twice_is_refused(self):
+        reused = self.pid(1000, start=1)
+        original = Path.read_text
+        counter = iter(range(10, 100))
+        def churn(path, *args, **kwargs):
+            if path == reused / "maps":
+                self.restart(1000, next(counter))
+            return original(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=churn):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual(detail["status"], "PID_REUSED_DURING_SCAN")
+
+    def test_stable_pid_identity_is_unchanged_behaviour(self):
+        self.pid(1000, start=5)
+        result, detail = self.scan("skip")
+        self.assertEqual(result, (True, []))
+        self.assertEqual(detail["observed"], 1)
+
+
+class SiteAdmissionPolicyWiringTests(unittest.TestCase):
+    """Only the Site owner asks for "skip"; the Root reload owner never does."""
+
+    def port_facts(self, site):
+        import threading
+        port = guard.RootZ2TargetPort(release=object())
+        port._locked, port._lock_owner_pid = True, os.getpid()
+        port._lock_owner_thread = threading.get_ident()
+        port._site = site
+        if site is not None:
+            port._site_session = ("boot", "session")
+        with patch.object(guard, "read_live_z2_facts",
+                          side_effect=lambda **kw: kw) as facts:
+            port.current_facts()
+        return facts.call_args.kwargs
+
+    def test_site_admission_uses_skip(self):
+        for site in (1, 2):
+            kwargs = self.port_facts(site)
+            self.assertEqual(kwargs["vanished_pids"], "skip")
+            self.assertIsNotNone(kwargs["cooperating"])
+
+    def test_reload_test_restore_owner_keeps_strict_rescan(self):
+        kwargs = self.port_facts(None)
+        self.assertEqual(kwargs["vanished_pids"], "rescan")
+        self.assertIsNone(kwargs["cooperating"])
+
+    def test_program_session_still_runs_no_census(self):
+        import threading
+        port = guard.RootZ2TargetPort(release=object())
+        port._locked, port._lock_owner_pid = True, os.getpid()
+        port._lock_owner_thread = threading.get_ident()
+        with patch.object(guard, "read_live_z2_facts",
+                          side_effect=lambda **kw: kw) as facts:
+            port.runtime_program_facts()
+        self.assertTrue(facts.call_args.kwargs["runtime_program_session"])
+        self.assertNotIn("vanished_pids", facts.call_args.kwargs)
 
 
 class RootAdmissionFailureClassificationTests(unittest.TestCase):
