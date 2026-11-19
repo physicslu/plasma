@@ -201,7 +201,7 @@ def parse_profile_v2(raw: Mapping[str, Any] | bytes | str) -> Snapshot:
         elif step["type"] == "hardware.action":
             _hardware_step(step)
             _need(not (hardware["power_source"] == "external"
-                       and step["action"].startswith("power.")),
+                       and step["action"] == "power.set"),
                   "EXTERNAL_POWER_CONTROL_DENIED")
         else:
             raise ProfileV2Error("STEP_TYPE_UNSUPPORTED")
