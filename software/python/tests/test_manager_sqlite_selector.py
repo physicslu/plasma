@@ -148,3 +148,98 @@ def test_selector_does_not_require_legacy_source_parity(
     with patch("plasma_web.device_catalog.get_default_device_catalog", return_value=changed):
         loaded, _, _ = read_selector_view(str(source_qualified_database))
     assert loaded.records == actual.records
+
+
+def test_catalog_management_local_round_trip_and_publisher_boundary(
+    tmp_path: Path, manager_port: int, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = tmp_path / "management.db"
+    repo = CatalogSqliteShadowRepository(database)
+    official_revision = repo.import_verified_manifest(
+        default_catalog_manifest_path(),
+        qualification_registry=get_default_programming_qualification_registry(),
+    )
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(database))
+    monkeypatch.setenv("PLASMA_CATALOG_PUBLISH_TOKEN", "test-publisher-secret")
+    status, catalog_search = _get(manager_port, "/api/catalog/management/search?q=STM32F103C8T6")
+    assert status == 200 and catalog_search["official"][0]["source"]
+    assert catalog_search["official"][0]["level"] >= 1
+    entry = {"record": {"vendor": "LocalVendor", "identifier": "LOCAL123", "family": "Demo", "package": "QFN", "flash_size": "64 KB"},
+             "profile": {"profile_id": "custom-v1", "provider_id": "example", "operations": ["erase", "program"]}}
+
+    def post(action: str, payload: dict, token: str | None = "test-publisher-secret") -> tuple[int, dict]:
+        headers = {"Content-Type": "application/json"}
+        if token is not None:
+            headers["X-Plasma-Catalog-Publisher"] = token
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{manager_port}/api/catalog/management/{action}",
+            data=json.dumps(payload).encode(), headers=headers, method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as exc:
+            return exc.code, json.loads(exc.read())
+
+    assert post("local", {"entries": [entry]}, None)[0] == 403
+    assert post("local", {"entries": [entry]}, "wrong")[0] == 403
+    assert post("validate", {"entries": [entry]})[1]["changes"][0]["change"] == "ADDED"
+    assert repo.local_records() == []
+    assert post("local", {"entries": [entry]})[0] == 200
+    assert CatalogSqliteShadowRepository(database).local_records()[0]["revision"] == 1
+    status, result = _get(manager_port, "/api/devices/search?q=LOCAL123")
+    assert status == 200 and result["local_results"][0]["verification"] == "UNVERIFIED"
+    assert result["results"] == []
+    assert repo.read_active().revision_sha256 == official_revision
+    changed = json.loads(json.dumps(entry))
+    changed["profile"]["profile_id"] = "custom-v2"
+    assert post("local", {"entries": [changed]})[1]["changes"][0]["revision"] == 2
+    assert repo.local_records()[0]["profile"]["profile_id"] == "custom-v2"
+    forged = json.loads(json.dumps(entry))
+    forged["record"]["identifier"] = "FORGED1"
+    forged["profile"]["catalog_level"] = 2
+    assert post("local", {"entries": [entry, forged]})[0] == 400
+    assert len(repo.local_records()) == 1
+    assert repo.read_active().revision_sha256 == official_revision
+    official = json.loads(json.dumps(entry))
+    official["record"].update(vendor="STMicroelectronics", identifier="STM32F103C8T6")
+    assert post("local", {"entries": [official]})[0] == 400
+
+
+def test_local_ic_survives_manager_http_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    database = tmp_path / "restart-catalog.db"
+    CatalogSqliteShadowRepository(database).import_verified_manifest(
+        default_catalog_manifest_path(),
+        qualification_registry=get_default_programming_qualification_registry(),
+    )
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(database))
+    monkeypatch.setenv("PLASMA_CATALOG_PUBLISH_TOKEN", "restart-test-publisher")
+
+    def start_manager():
+        server = manager_server.PlasmaManagerHTTPServer(("127.0.0.1", 0), manager_server.PlasmaManagerHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return server, thread
+
+    server, thread = start_manager()
+    try:
+        entry = {"record": {"vendor": "LocalVendor", "identifier": "RESTART123", "family": "Demo", "package": "QFN", "flash_size": "64 KB"},
+                 "profile": {"profile_id": "restart-custom-v1", "operations": ["program"]}}
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{server.server_port}/api/catalog/management/local",
+            data=json.dumps({"entries": [entry]}).encode(), method="POST",
+            headers={"Content-Type": "application/json", "X-Plasma-Catalog-Publisher": "restart-test-publisher"},
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            assert response.status == 200
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+
+    restarted, restarted_thread = start_manager()
+    try:
+        status, result = _get(restarted.server_port, "/api/devices/search?q=RESTART123")
+        assert status == 200 and result["local_results"][0]["record"]["identifier"] == "RESTART123"
+        status, management = _get(restarted.server_port, "/api/catalog/management")
+        assert status == 200 and management["local"][0]["revision"] == 1
+    finally:
+        restarted.shutdown(); restarted.server_close(); restarted_thread.join(timeout=2)

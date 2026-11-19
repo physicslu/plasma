@@ -24,6 +24,8 @@ from plasma_core.manufacturer_device_basic import get_default_manufacturer_devic
 from .backend_candidate_registry import get_default_backend_candidate_registry
 from .backend_source_reference import backend_source_reference, default_pinned_upstream
 from .catalog_sqlite_selector import read_selector_view
+from .catalog_sqlite_repository import CatalogSqliteShadowRepository
+from pathlib import Path
 from .device_catalog import (
     DEFAULT_SEARCH_LIMIT,
     MAX_SEARCH_LIMIT,
@@ -321,6 +323,12 @@ def _device_search_payload(
         results.append(item)
 
     catalog_size = sum(int(level_counts[str(level)]) for level in levels)
+    local_results = []
+    if SQLITE_SELECTOR_DB_ENV in os.environ:
+        for entry in CatalogSqliteShadowRepository(Path(os.environ[SQLITE_SELECTOR_DB_ENV])).local_records():
+            local_record = entry["record"]
+            if query.casefold() in (local_record["vendor"] + " " + local_record["identifier"] + " " + local_record.get("family", "")).casefold():
+                local_results.append(entry)
     return {
         "ok": True,
         "rest_contract_version": WEB_REST_CONTRACT_VERSION,
@@ -333,6 +341,7 @@ def _device_search_payload(
         "limit": limit,
         "offset": offset,
         "results": results,
+        **({"local_results": local_results[:MAX_SEARCH_LIMIT]} if local_results else {}),
     }
 
 

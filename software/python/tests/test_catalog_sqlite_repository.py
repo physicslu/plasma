@@ -696,3 +696,44 @@ def test_readers_observe_complete_revision_during_publish(tmp_path: Path) -> Non
         thread.join()
     assert not failures
     assert set(observed) <= {(initial, repo.read_active().size - 1), (published, repo.read_active().size)}
+
+
+def test_management_local_batch_atomic_preview_and_selector_refresh(tmp_path: Path, monkeypatch) -> None:
+    repo, initial, official_record, l1, _ = _publisher_fixture(tmp_path)
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
+    entry = {"record": {"vendor": "LocalVendor", "identifier": "LOCAL123", "family": "Demo", "package": "QFN", "flash_size": "64 KB"},
+             "profile": {"profile_id": "custom-v1", "operations": ["erase", "program"]}}
+    assert repo.save_local_records([entry], actor="test", dry_run=True)[0]["change"] == "ADDED"
+    assert repo.local_records() == []
+    saved = repo.save_local_records([entry], actor="test")
+    assert saved[0]["revision"] == 1
+    assert repo.save_local_records([entry], actor="test")[0]["change"] == "UNCHANGED"
+    assert repo.local_records()[0]["revision"] == 1
+    assert CatalogSqliteShadowRepository(repo.path).local_records()[0]["profile"]["profile_id"] == "custom-v1"
+    response = selector.search_response("q=LOCAL123")[1]
+    assert response["local_results"][0]["verification"] == "UNVERIFIED"
+    assert response["results"] == []
+    changed = json.loads(json.dumps(entry)); changed["profile"]["profile_id"] = "custom-v2"
+    repo.save_local_records([changed], actor="test")
+    assert repo.local_records()[0]["revision"] == 2
+    forged = json.loads(json.dumps(entry)); forged["record"]["identifier"] = "FORGED1"; forged["profile"]["catalog_level"] = 2
+    with pytest.raises(DeviceCatalogIntegrityError):
+        repo.save_local_records([entry, forged], actor="test")
+    assert len(repo.local_records()) == 1
+    official = json.loads(json.dumps(entry)); official["record"].update(vendor="STMicroelectronics", identifier="STM32F103C8T6")
+    with pytest.raises(DeviceCatalogIntegrityError):
+        repo.save_local_records([official], actor="test")
+    official_changes = [{"record": asdict(official_record), "qualification": l1}]
+    assert repo.validate_changes(official_changes)[0]["status"] == "ADDED"
+    assert repo.read_active().revision_sha256 == initial
+    published = repo.publish_staged(repo.stage_revision(official_changes, actor="test"), actor="test")
+    assert published != initial
+    assert repo.local_records()[0]["revision"] == 2
+    assert selector.search_response("q=STM32F103C8T6-TEST-EXACT")[1]["total_count"] == 1
+    assert repo.history()["active_revision"] == published
+    assert any(change["status"] == "REMOVED" for change in repo.diff_revision(initial))
+    repo.rollback(initial, actor="test")
+    assert repo.local_records()[0]["revision"] == 2
+    repo.delete_local_record("LocalVendor", "LOCAL123", actor="test")
+    assert repo.local_records() == []
+    assert repo.read_active().revision_sha256 == initial

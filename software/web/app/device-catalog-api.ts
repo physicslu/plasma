@@ -462,6 +462,7 @@ export type DeviceSearchResponse = {
   catalog_size: number;
   count: number;
   total_count: number;
+  local_results?: Array<{ record: { vendor: string; identifier: string; family: string; package: string; flash_size: string }; revision: number; origin: "LOCAL"; verification: "UNVERIFIED" }>;
   limit: number;
   offset: number;
   results: DeviceSearchResult[];

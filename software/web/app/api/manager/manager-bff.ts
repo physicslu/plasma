@@ -195,6 +195,7 @@ async function relayManagerRequest(
   requireManagedMode = false,
   responseContract: RelayResponseContract = "passthrough",
   allowBinaryResponse = false,
+  catalogWriter = false,
 ): Promise<Response> {
   let managerBase: string;
   try {
@@ -224,9 +225,16 @@ async function relayManagerRequest(
   }
 
   try {
+    const headers = forwardedHeaders(request);
+    headers.delete("X-Plasma-Catalog-Publisher");
+    if (catalogWriter) {
+      const publisherToken = process.env.PLASMA_CATALOG_PUBLISH_TOKEN;
+      if (!publisherToken) return json(503, { ok: false, error: { message: "Catalog publisher is not configured" } });
+      headers.set("X-Plasma-Catalog-Publisher", publisherToken);
+    }
     const response = await fetch(`${managerBase}${target}`, {
       method: request.method,
-      headers: forwardedHeaders(request),
+      headers,
       body,
       cache: "no-store",
       signal: AbortSignal.timeout(MANAGER_TIMEOUT_MS),
@@ -324,6 +332,27 @@ export async function relayManagerDeviceSearchRequest(request: Request): Promise
   }
   const incoming = new URL(request.url);
   return await relayManagerRequest(request, `/api/devices/search${incoming.search}`, false);
+}
+
+export async function relayManagerCatalogManagementRequest(request: Request, action: string): Promise<Response> {
+  if (!/^(official|search|export|diff|validate|validate-official|local|delete-local|stage|publish|rollback|evidence)?$/.test(action)) {
+    return json(404, { ok: false, error: { message: "unknown Catalog action" } });
+  }
+  if (request.method !== "GET" && request.method !== "POST") {
+    return json(405, { ok: false, error: { message: "Catalog method is not allowed" } });
+  }
+  const write = request.method === "POST";
+  if (write && !["validate", "validate-official", "local", "delete-local", "stage", "publish", "rollback", "evidence"].includes(action)) {
+    return json(405, { ok: false, error: { message: "Catalog write action is not allowed" } });
+  }
+  const incoming = new URL(request.url);
+  if (write) {
+    const origin = request.headers.get("Origin");
+    if ((origin && origin !== incoming.origin) || request.headers.get("Sec-Fetch-Site") === "cross-site") {
+      return json(403, { ok: false, error: { message: "Catalog writes require same-origin Console access" } });
+    }
+  }
+  return await relayManagerRequest(request, `/api/catalog/management${action ? `/${action}` : ""}${incoming.search}`, write, true, "passthrough", false, write);
 }
 
 export async function relayManagerRegistryRequest(request: Request, alias?: string): Promise<Response> {

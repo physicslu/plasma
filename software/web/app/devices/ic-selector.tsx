@@ -166,6 +166,7 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
   const [query, setQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState<CatalogLevelFilter>("all");
   const [results, setResults] = useState<DeviceSearchResult[]>([]);
+  const [localResults, setLocalResults] = useState<NonNullable<import("../device-catalog-api").DeviceSearchResponse["local_results"]>>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [pageOffset, setPageOffset] = useState(0);
   const [selected, setSelected] = useState<DeviceSearchResult | null>(null);
@@ -203,11 +204,13 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
           signal: controller.signal,
         });
         setResults(payload.results);
+        setLocalResults(usage === "lookup" ? (payload.local_results ?? []) : []);
         setTotalCount(payload.total_count);
         setCatalogSize(payload.catalog_size);
       } catch (searchError) {
         if (controller.signal.aborted) return;
         setResults([]);
+        setLocalResults([]);
         setTotalCount(0);
         setError(searchError instanceof Error ? searchError.message : "Device search failed");
       } finally {
@@ -327,13 +330,18 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
           </div>
         )}
 
-        {query.trim() && !loading && !error && results.length === 0 && (
+        {query.trim() && !loading && !error && results.length === 0 && localResults.length === 0 && (
           <div className="icSelectorEmpty">
             {zh ? "目前選取的 Catalog Level 中找不到符合的 ICPN。" : "No matching ICPN exists in the selected Catalog Levels."}
           </div>
         )}
 
         <div className="icSelectorResults" role="list">
+          {localResults.map(item => <div className="icSelectorResult" role="listitem" key={`local:${item.record.vendor}:${item.record.identifier}`}>
+            <div className="icSelectorIdentity"><strong>{item.record.identifier}</strong><span>LOCAL / UNVERIFIED · r{item.revision}</span></div>
+            <div className="icSelectorTaxonomy"><b>{item.record.vendor}</b><span>{item.record.family}</span><span>{item.record.package}</span></div>
+            <div className="icSelectorStatusStack"><span>Controller-local Custom Profile · No official L2/L3 or Job admission</span></div>
+          </div>)}
           {results.map(device => {
             const active = selected?.vendor === device.vendor && selected?.identifier === device.identifier;
             return (

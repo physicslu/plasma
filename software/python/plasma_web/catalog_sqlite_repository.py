@@ -831,6 +831,37 @@ class CatalogSqliteShadowRepository:
                          ("STAGE", actor, parent[0], stage_id, "validated input"))
         return stage_id
 
+    def validate_changes(self, changes: list[dict[str, Any]]) -> list[dict[str, str]]:
+        """Preview an official batch without staging or changing the active snapshot."""
+        if not isinstance(changes, list) or not changes or len(changes) > 1000:
+            raise DeviceCatalogIntegrityError("1-1000 official changes required")
+        active = self.read_active()
+        seen: set[tuple[str, str]] = set()
+        preview = []
+        for change in changes:
+            try:
+                data = dict(change["record"])
+                data["cpu_architectures"] = tuple(data["cpu_architectures"])
+                record = DeviceCatalogRecord(**data)
+                q = change["qualification"]
+            except (KeyError, TypeError, ValueError) as exc:
+                raise DeviceCatalogIntegrityError("malformed official candidate") from exc
+            if not isinstance(q, dict):
+                raise DeviceCatalogIntegrityError("malformed official qualification")
+            self._validate_publication(record, q)
+            if q["catalog_level"] >= 2:
+                reviewed = self._validate_l2_source(record, q)
+                self._validate_l2_applicability(record, q, reviewed)
+            key = _identity(record)
+            if key in seen:
+                raise DeviceCatalogIntegrityError("duplicate exact ICPN in official batch")
+            seen.add(key)
+            old = active.qualifications.get(key)
+            if old and old.get("catalog_level") == 3 and (old != q or active.catalog.resolve(record.vendor, record.identifier) != record):
+                raise DeviceCatalogIntegrityError("L3 revision requires separately authorized revocation")
+            preview.append({"vendor": record.vendor, "identifier": record.identifier, "status": "MODIFIED" if old else "ADDED"})
+        return preview
+
     def publish_staged(self, stage_id: str, *, actor: str) -> str:
         with sqlite3.connect(self.path, timeout=10) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
@@ -965,6 +996,122 @@ class CatalogSqliteShadowRepository:
             row = conn.execute("SELECT profile_json FROM controller_overlays WHERE namespace=? AND vendor_key=? AND icpn_key=?",
                                (namespace, manufacturer.casefold(), exact_icpn.casefold())).fetchone()
         return json.loads(row[0]) if row else None
+
+    def local_records(self) -> list[dict[str, Any]]:
+        """Controller-owned records remain outside immutable official snapshots."""
+        with sqlite3.connect(self.path) as conn:
+            self._init_schema(conn)
+            rows = conn.execute("SELECT profile_json FROM controller_overlays WHERE namespace='user_catalog' ORDER BY vendor_key,icpn_key").fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    def delete_local_record(self, vendor: str, icpn: str, *, actor: str) -> None:
+        if not all(isinstance(value, str) and value.strip() for value in (vendor, icpn, actor)):
+            raise DeviceCatalogIntegrityError("local identity and actor required")
+        with sqlite3.connect(self.path, timeout=10) as conn:
+            self._init_schema(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            cursor = conn.execute("DELETE FROM controller_overlays WHERE namespace='user_catalog' AND vendor_key=? AND icpn_key=?", (vendor.casefold(), icpn.casefold()))
+            if cursor.rowcount != 1:
+                raise DeviceCatalogIntegrityError("local exact ICPN not found")
+            conn.execute("INSERT INTO catalog_audit_events(action,actor,predecessor,revision_sha256,detail) VALUES (?,?,?,?,?)", ("LOCAL_DELETE", actor, None, None, f"{vendor.casefold()}:{icpn.casefold()}"))
+
+    def save_local_records(self, entries: list[dict[str, Any]], *, actor: str, dry_run: bool = False) -> list[dict[str, Any]]:
+        """Validate the entire import before a single atomic local write."""
+        if not actor.strip() or not entries or len(entries) > 1000:
+            raise DeviceCatalogIntegrityError("actor and 1-1000 local records required")
+        prepared = []
+        seen = set()
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get("record"), dict):
+                raise DeviceCatalogIntegrityError("local record must be an object")
+            record = entry["record"]
+            profile = entry.get("profile", {})
+            if (not isinstance(profile, dict) or not isinstance(record.get("vendor"), str)
+                    or not isinstance(record.get("identifier"), str)
+                    or not record["vendor"].strip() or not record["identifier"].strip()
+                    or len(record["vendor"]) > 128 or len(record["identifier"]) > 128
+                    or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+/-]*", record["identifier"])):
+                raise DeviceCatalogIntegrityError("invalid local identity or Profile")
+            if set(record) - {"vendor", "identifier", "family", "package", "flash_size"}:
+                raise DeviceCatalogIntegrityError("unsupported local record field")
+            if (set(profile) - {"profile_id", "provider_id", "operations", "flash_geometry", "source_evidence"}
+                    or not isinstance(profile.get("profile_id"), str) or not profile["profile_id"].strip()
+                    or not isinstance(profile.get("provider_id", ""), str)
+                    or not isinstance(profile.get("operations", []), list)
+                    or any(op not in ("erase", "program", "verify", "read") for op in profile.get("operations", []))
+                    or not isinstance(profile.get("source_evidence", []), list)
+                    or any(not isinstance(item, str) for item in profile.get("source_evidence", []))):
+                raise DeviceCatalogIntegrityError("unsupported local Profile or Evidence field")
+            forbidden = {"catalog_level", "job_selectable", "execution_authorized", "official", "state", "supported", "qualification", "publication_evidence", "installed_runtime_attested", "hardware_runtime_ready"}
+            if forbidden.intersection(record) or forbidden.intersection(profile):
+                raise DeviceCatalogIntegrityError("local data cannot claim official qualification or execution")
+            geometry = profile.get("flash_geometry")
+            if geometry is not None:
+                if not isinstance(geometry, dict):
+                    raise DeviceCatalogIntegrityError("invalid local flash geometry")
+                try:
+                    size, pages, erase, write = (geometry[k] for k in ("main_flash_size_bytes", "page_count", "erase_unit_bytes", "program_unit_bytes"))
+                    valid = all(type(n) is int and n > 0 for n in (size, pages, erase, write)) and size == pages * erase and erase % write == 0
+                except KeyError:
+                    valid = False
+                if not valid:
+                    raise DeviceCatalogIntegrityError("invalid local flash geometry")
+            key = (record["vendor"].strip().casefold(), record["identifier"].strip().casefold())
+            if key in seen:
+                raise DeviceCatalogIntegrityError("duplicate exact ICPN in import")
+            seen.add(key)
+            prepared.append((key, {"record": {"vendor": record["vendor"].strip(), "identifier": record["identifier"].strip(), "family": str(record.get("family", "")), "package": str(record.get("package", "")), "flash_size": str(record.get("flash_size", ""))}, "profile": profile}))
+        with sqlite3.connect(self.path, timeout=10) as conn:
+            self._init_schema(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            active = conn.execute("SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1").fetchone()
+            if active is None:
+                raise DeviceCatalogIntegrityError("no active official Catalog revision")
+            official = self._read_revision(conn, active[0])
+            official_keys = {_identity(row) for row in official.catalog.records}
+            if any(key in official_keys for key, _ in prepared):
+                raise DeviceCatalogIntegrityError("local exact ICPN conflicts with official Catalog")
+            output = []
+            for key, data in prepared:
+                old = conn.execute("SELECT profile_json FROM controller_overlays WHERE namespace='user_catalog' AND vendor_key=? AND icpn_key=?", key).fetchone()
+                previous = json.loads(old[0]) if old else None
+                unchanged = bool(previous and previous["record"] == data["record"] and previous["profile"] == data["profile"])
+                revision = previous.get("revision", 0) if unchanged else (previous.get("revision", 0) if previous else 0) + 1
+                value = {**data, "revision": revision, "origin": "LOCAL", "verification": "UNVERIFIED"}
+                output.append({**value, "change": "UNCHANGED" if unchanged else "UPDATED" if old else "ADDED"})
+                if not dry_run and not unchanged:
+                    conn.execute("INSERT OR REPLACE INTO controller_overlays VALUES ('user_catalog',?,?,?)", (*key, _encoded(value)))
+                    conn.execute("INSERT INTO catalog_audit_events(action,actor,predecessor,revision_sha256,detail) VALUES (?,?,?,?,?)", ("LOCAL_SAVE", actor, None, active[0], f"{key[0]}:{key[1]}:r{revision}"))
+        return output
+
+    def history(self) -> dict[str, Any]:
+        with sqlite3.connect(self.path) as conn:
+            self._init_schema(conn)
+            active = conn.execute("SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1").fetchone()
+            revisions = conn.execute("SELECT revision_sha256,row_count FROM catalog_revisions ORDER BY rowid DESC LIMIT 100").fetchall()
+            audit = conn.execute("SELECT action,actor,predecessor,revision_sha256,detail,created_at FROM catalog_audit_events ORDER BY event_id DESC LIMIT 100").fetchall()
+        return {"active_revision": active[0] if active else None, "revisions": [{"revision": r, "count": n} for r, n in revisions], "audit": [dict(zip(("action", "actor", "predecessor", "revision", "detail", "created_at"), row)) for row in audit]}
+
+    def evidence_history(self) -> list[dict[str, str]]:
+        with sqlite3.connect(self.path) as conn:
+            self._init_schema(conn)
+            rows = conn.execute("SELECT evidence_id,source_authority,source_reference,source_revision,acquired_at FROM catalog_evidence ORDER BY acquired_at DESC LIMIT 100").fetchall()
+        result = []
+        for evidence_id, authority, reference, source_revision, acquired_at in rows:
+            self._read_evidence(evidence_id)
+            result.append({"evidence_id": evidence_id, "authority": authority, "reference": reference, "source_revision": source_revision, "acquired_at": acquired_at})
+        return result
+
+    def diff_revision(self, revision: str) -> list[dict[str, Any]]:
+        with sqlite3.connect(self.path) as conn:
+            self._init_schema(conn)
+            active = conn.execute("SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1").fetchone()
+            if active is None:
+                raise DeviceCatalogIntegrityError("no active Catalog revision")
+            current, target = self._read_revision(conn, active[0]), self._read_revision(conn, revision)
+        before = {_identity(r): {"record": asdict(r), "qualification": current.qualifications.get(_identity(r))} for r in current.catalog.records}
+        after = {_identity(r): {"record": asdict(r), "qualification": target.qualifications.get(_identity(r))} for r in target.catalog.records}
+        return [{"vendor": k[0], "identifier": k[1], "status": "ADDED" if k not in before else "REMOVED" if k not in after else "MODIFIED", "before": before.get(k), "after": after.get(k)} for k in sorted(before.keys() | after.keys()) if before.get(k) != after.get(k)]
 
     def verify_parity(
         self, manifest_path: Path, *, qualification_registry: ProgrammingQualificationRegistry | None = None
