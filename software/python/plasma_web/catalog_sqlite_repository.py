@@ -484,6 +484,9 @@ class CatalogSqliteShadowRepository:
         source_bytes = CatalogSqliteShadowRepository._fetch_official_exact_source(expected_url)
         source_text = html.unescape(source_bytes.decode("utf-8", errors="replace")).upper()
         if (hashlib.sha256(source_bytes).hexdigest() != exact_source["sha256"]
+                or re.search(r"<TITLE[^>]*>[^<]*" + re.escape(record.base_device),
+                             source_text) is None
+                or re.search(r"PART[\s_-]*NUMBER", source_text) is None
                 or re.search(r"(?<![A-Z0-9])" + re.escape(record.identifier) + r"(?![A-Z0-9])",
                              source_text) is None):
             raise DeviceCatalogIntegrityError("L2 official Exact source bytes or identity mismatch")

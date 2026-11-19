@@ -140,7 +140,8 @@ contains `official_exact_source` (`url`, fetched-body `sha256`) and `applicabili
 (base device, density, locked ordering authority/blob, Provider source lock,
 programming group and versioned geometry ID). The Publisher independently
 retrieves the exact product page over manufacturer HTTPS at both Stage and
-Publish, verifies its body digest and exact part token, and rejects redirects
+Publish, verifies its body digest, product title, part-number marker and exact
+part token, and rejects redirects
 outside that product page. It derives the part's pin/package/flash/temperature
 facts from the previously source-locked manufacturer ordering authority; the
 packet cannot set those facts by declaration. This is an identity and document

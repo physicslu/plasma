@@ -401,7 +401,7 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
               verified_configurations=[])
     l2["programming"]["memory_geometry_profile_id"] = geometry_id
     source_url = "https://www.st.com/en/microcontrollers-microprocessors/stm32f103t8.html"
-    official_bytes = b"<html><title>STM32F103T8</title><body>Official parts: STM32F103T8U6, STM32F103T8U6TR</body></html>"
+    official_bytes = b"<html><title>STM32F103T8 - ST</title><body>Part Number: STM32F103T8U6, STM32F103T8U6TR</body></html>"
     source_response = [official_bytes]
     monkeypatch.setattr(CatalogSqliteShadowRepository, "_fetch_official_exact_source",
                         staticmethod(lambda url: source_response[0] if url == source_url else b""))
@@ -457,6 +457,11 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     source_response[0] = b"<html>STM32F103C8T6 only</html>"
     with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source"):
         stage_packet(packet)
+    source_response[0] = b"<html>404: STM32F103T8U6</html>"
+    with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source"):
+        stage_packet({**packet, "official_exact_source": {
+            "url": source_url, "sha256": hashlib.sha256(source_response[0]).hexdigest()
+        }})
     source_response[0] = official_bytes
     bad = json.loads(json.dumps(l2))
     bad["programming"]["memory_geometry_profile_id"] = "stm32f103c8-64k-v0"
