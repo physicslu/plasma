@@ -794,6 +794,8 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 result = {"changes": repo.save_local_records(entries, actor=actor, dry_run=action == "validate")}
             elif self.command == "POST" and action == "stage":
                 result = {"stage_id": repo.stage_revision(body.get("changes"), actor=actor)}
+            elif self.command == "POST" and action == "validate-official":
+                result = {"changes": repo.validate_changes(body.get("changes"))}
             elif self.command == "POST" and action == "evidence":
                 data = dict(body.get("record", {}))
                 data["cpu_architectures"] = tuple(data["cpu_architectures"])

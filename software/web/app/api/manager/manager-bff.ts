@@ -335,14 +335,14 @@ export async function relayManagerDeviceSearchRequest(request: Request): Promise
 }
 
 export async function relayManagerCatalogManagementRequest(request: Request, action: string): Promise<Response> {
-  if (!/^(official|export|diff|validate|local|delete-local|stage|publish|rollback|evidence)?$/.test(action)) {
+  if (!/^(official|export|diff|validate|validate-official|local|delete-local|stage|publish|rollback|evidence)?$/.test(action)) {
     return json(404, { ok: false, error: { message: "unknown Catalog action" } });
   }
   if (request.method !== "GET" && request.method !== "POST") {
     return json(405, { ok: false, error: { message: "Catalog method is not allowed" } });
   }
   const write = request.method === "POST";
-  if (write && !["validate", "local", "delete-local", "stage", "publish", "rollback", "evidence"].includes(action)) {
+  if (write && !["validate", "validate-official", "local", "delete-local", "stage", "publish", "rollback", "evidence"].includes(action)) {
     return json(405, { ok: false, error: { message: "Catalog write action is not allowed" } });
   }
   const incoming = new URL(request.url);

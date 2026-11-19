@@ -721,7 +721,10 @@ def test_management_local_batch_atomic_preview_and_selector_refresh(tmp_path: Pa
     official = json.loads(json.dumps(entry)); official["record"].update(vendor="STMicroelectronics", identifier="STM32F103C8T6")
     with pytest.raises(DeviceCatalogIntegrityError):
         repo.save_local_records([official], actor="test")
-    published = repo.publish_staged(repo.stage_revision([{"record": asdict(official_record), "qualification": l1}], actor="test"), actor="test")
+    official_changes = [{"record": asdict(official_record), "qualification": l1}]
+    assert repo.validate_changes(official_changes)[0]["status"] == "ADDED"
+    assert repo.read_active().revision_sha256 == initial
+    published = repo.publish_staged(repo.stage_revision(official_changes, actor="test"), actor="test")
     assert published != initial
     assert repo.local_records()[0]["revision"] == 2
     assert selector.search_response("q=STM32F103C8T6-TEST-EXACT")[1]["total_count"] == 1

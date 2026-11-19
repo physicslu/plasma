@@ -14,6 +14,7 @@ type LocalEntry = {
 type History = { active_revision: string | null; revisions: Array<{ revision: string; count: number }>; audit: Array<{ action: string; actor: string; revision: string; detail: string; created_at: string }> };
 type OfficialEntry = { record: Record<string, unknown>; qualification: Record<string, unknown>; revision: string };
 type Evidence = { evidence_id: string; authority: string; reference: string; source_revision: string; acquired_at: string };
+type DiffEntry = { vendor: string; identifier: string; status: string; before?: { record: Record<string, unknown>; qualification: Record<string, unknown> }; after?: { record: Record<string, unknown>; qualification: Record<string, unknown> } };
 const base = "/api/manager/catalog/management";
 const empty: LocalEntry = { record: { vendor: "", identifier: "", family: "", package: "", flash_size: "" }, profile: { profile_id: "", provider_id: "", operations: [] } };
 
@@ -67,7 +68,8 @@ export default function ICManagementPage() {
   const [sourceRevision, setSourceRevision] = useState("");
   const [sourceKind, setSourceKind] = useState("manufacturer_https");
   const [stageId, setStageId] = useState("");
-  const [diff, setDiff] = useState<Array<{ vendor: string; identifier: string; status: string }>>([]);
+  const [officialValidated, setOfficialValidated] = useState(false);
+  const [diff, setDiff] = useState<DiffEntry[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const reload = useCallback(async () => {
@@ -93,7 +95,7 @@ export default function ICManagementPage() {
     const entries = Array.isArray(parsed) ? parsed : parsed.local ?? parsed.official;
     if (!Array.isArray(entries)) throw new Error("JSON import must contain a local array");
     if (entries.length && entries.every(entry => entry && typeof entry === "object" && "qualification" in entry)) {
-      setOfficialBatch(entries); setBatch([]); setPreview([]);
+      setOfficialBatch(entries); setBatch([]); setPreview([]); setOfficialValidated(false); setStageId("");
       setMessage(`${entries.length} official candidates loaded. Review before staging.`);
       return;
     }
@@ -143,19 +145,21 @@ export default function ICManagementPage() {
         })}>Export official JSON</button></div>
       {preview.length > 0 && <div className="managementList" aria-label="Changes preview">{preview.map((item, index) => <p key={index}>{item.change} · {item.record.vendor} {item.record.identifier} · r{item.revision}</p>)}</div>}
       {officialBatch.length > 0 && <div className="managementList" aria-label="Official changes preview">{officialBatch.map((item, index) => <p key={index}>OFFICIAL CANDIDATE · {String(item.record.vendor)} {String(item.record.identifier)}</p>)}
-        <button disabled={busy} onClick={() => void run(async () => { const result = await api<{ stage_id: string }>("stage", { changes: officialBatch }); setStageId(result.stage_id); setMessage("Official batch validated and staged atomically."); })}>Validate &amp; Stage official batch</button>
+        <button disabled={busy} onClick={() => void run(async () => { await api("validate-official", { changes: officialBatch }); setOfficialValidated(true); setMessage("Official batch validated. Review the candidates before staging."); })}>Validate official batch</button>
+        <button disabled={busy || !officialValidated} onClick={() => void run(async () => { const result = await api<{ stage_id: string }>("stage", { changes: officialBatch }); setStageId(result.stage_id); setMessage("Official batch staged atomically."); })}>Stage official batch</button>
         <button disabled={busy || !stageId} onClick={() => void run(async () => { const result = await api<{ revision: string }>("publish", { stage_id: stageId }); setStageId(""); setOfficialBatch([]); await reload(); setMessage(`Published ${result.revision}`); })}>Publish official batch</button></div>}
     </section>
     <section><h2>Official Catalog · Validate / Stage / Publish</h2><p>Official Exact ICPN qualification remains governed by source evidence and the existing Publisher. Local profiles never grant Job admission.</p>
       <div className="managementGrid"><label>Manufacturer<input value={officialVendor} onChange={event => setOfficialVendor(event.target.value)} /></label><label>Exact ICPN<input value={officialICPN} onChange={event => setOfficialICPN(event.target.value)} /></label></div>
-      <button disabled={busy} onClick={() => void run(async () => { setOfficial(await api<OfficialEntry>("official", undefined, `?vendor=${encodeURIComponent(officialVendor)}&icpn=${encodeURIComponent(officialICPN)}`)); })}>Load official record</button>
+      <button disabled={busy} onClick={() => void run(async () => { setOfficial(await api<OfficialEntry>("official", undefined, `?vendor=${encodeURIComponent(officialVendor)}&icpn=${encodeURIComponent(officialICPN)}`)); setOfficialValidated(false); setStageId(""); })}>Load official record</button>
       {official && <><p>Editing candidate from revision <code>{official.revision.slice(0, 12)}</code>. Published snapshot stays immutable.</p>
         <div className="managementGrid"><label>Source revision<input value={sourceRevision} onChange={event => setSourceRevision(event.target.value)} /></label>
           <label>Evidence kind<select value={sourceKind} onChange={event => setSourceKind(event.target.value)}><option value="manufacturer_https">Manufacturer HTTPS</option><option value="locked_production_identity">Locked production identity</option></select></label></div>
         <button disabled={busy || !sourceRevision} onClick={() => void run(async () => { const result = await api<{ evidence_id: string }>("evidence", { record: official.record, kind: sourceKind, source_revision: sourceRevision }); await reload(); setMessage(`Evidence ${result.evidence_id} acquired or reused from local store.`); })}>Acquire / reuse Source Evidence</button>
-        <div className="managementGrid">{(["family", "package", "flash_size", "source_reference"] as const).map(key => <label key={key}>{key.replace("_", " ")}<input value={String(official.record[key] ?? "")} onChange={event => { setStageId(""); setOfficial({ ...official, record: { ...official.record, [key]: event.target.value } }); }} /></label>)}</div>
-        <details><summary>Advanced official fields and Evidence</summary><textarea aria-label="Official candidate JSON" defaultValue={JSON.stringify({ record: official.record, qualification: official.qualification }, null, 2)} onBlur={event => { try { const value = JSON.parse(event.target.value); setStageId(""); setOfficial({ ...official, record: value.record, qualification: value.qualification }); } catch { setMessage("Invalid candidate JSON"); } }} /></details>
-        <div className="managementActions"><button disabled={busy} onClick={() => void run(async () => { const result = await api<{ stage_id: string }>("stage", { changes: [{ record: official.record, qualification: official.qualification }] }); setStageId(result.stage_id); setMessage("Candidate validated and staged."); })}>Validate &amp; Stage</button>
+        <div className="managementGrid">{(["family", "package", "flash_size", "source_reference"] as const).map(key => <label key={key}>{key.replace("_", " ")}<input value={String(official.record[key] ?? "")} onChange={event => { setStageId(""); setOfficialValidated(false); setOfficial({ ...official, record: { ...official.record, [key]: event.target.value } }); }} /></label>)}</div>
+        <details><summary>Advanced official fields and Evidence</summary><textarea aria-label="Official candidate JSON" defaultValue={JSON.stringify({ record: official.record, qualification: official.qualification }, null, 2)} onBlur={event => { try { const value = JSON.parse(event.target.value); setStageId(""); setOfficialValidated(false); setOfficial({ ...official, record: value.record, qualification: value.qualification }); } catch { setMessage("Invalid candidate JSON"); } }} /></details>
+        <div className="managementActions"><button disabled={busy} onClick={() => void run(async () => { await api("validate-official", { changes: [{ record: official.record, qualification: official.qualification }] }); setOfficialValidated(true); setMessage("Official candidate validated."); })}>Validate</button>
+          <button disabled={busy || !officialValidated} onClick={() => void run(async () => { const result = await api<{ stage_id: string }>("stage", { changes: [{ record: official.record, qualification: official.qualification }] }); setStageId(result.stage_id); setMessage("Official candidate staged."); })}>Stage</button>
           <button disabled={busy || !stageId} onClick={() => void run(async () => { const result = await api<{ revision: string }>("publish", { stage_id: stageId }); setStageId(""); await reload(); setMessage(`Published ${result.revision}. IC Selector reads the active revision immediately.`); })}>Publish</button></div></>}
     </section>
     <section><h2>Source Evidence</h2><div className="managementList">{evidence.map(item => <p key={item.evidence_id}><code>{item.evidence_id.slice(0, 16)}</code> · {item.authority} · {item.source_revision}<br />{item.reference}</p>)}</div></section>
@@ -163,7 +167,11 @@ export default function ICManagementPage() {
       <div className="managementList">{history?.revisions.map(item => <div key={item.revision}><code>{item.revision.slice(0, 16)}</code> · {item.count} ICs
         <button disabled={busy || item.revision === history.active_revision} onClick={() => void run(async () => { const result = await api<{ changes: typeof diff }>("diff", undefined, `?revision=${item.revision}`); setDiff(result.changes); })}>Diff</button>
         <button disabled={busy || item.revision === history.active_revision} onClick={() => void run(async () => { await api("rollback", { revision: item.revision }); await reload(); setMessage(`Rolled back to ${item.revision}`); })}>Rollback</button></div>)}</div>
-      {diff.map((item, index) => <p key={index}>{item.status} · {item.vendor} {item.identifier}</p>)}
+      {diff.map((item, index) => <details key={index}><summary>{item.status} · {item.vendor} {item.identifier}</summary>
+        <p>Record: {item.before?.record?.family ? String(item.before.record.family) : "—"} → {item.after?.record?.family ? String(item.after.record.family) : "—"}</p>
+        <p>Qualification: {String(item.before?.qualification?.catalog_level ?? "—")} → {String(item.after?.qualification?.catalog_level ?? "—")}</p>
+        <pre>{JSON.stringify({ before: item.before, after: item.after }, null, 2)}</pre>
+      </details>)}
       <details><summary>Audit ({history?.audit.length ?? 0})</summary>{history?.audit.map((item, index) => <p key={index}>{item.created_at} · {item.action} · {item.actor} · {item.detail}</p>)}</details>
     </section>
   </main>;

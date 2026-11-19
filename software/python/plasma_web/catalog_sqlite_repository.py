@@ -831,6 +831,37 @@ class CatalogSqliteShadowRepository:
                          ("STAGE", actor, parent[0], stage_id, "validated input"))
         return stage_id
 
+    def validate_changes(self, changes: list[dict[str, Any]]) -> list[dict[str, str]]:
+        """Preview an official batch without staging or changing the active snapshot."""
+        if not isinstance(changes, list) or not changes or len(changes) > 1000:
+            raise DeviceCatalogIntegrityError("1-1000 official changes required")
+        active = self.read_active()
+        seen: set[tuple[str, str]] = set()
+        preview = []
+        for change in changes:
+            try:
+                data = dict(change["record"])
+                data["cpu_architectures"] = tuple(data["cpu_architectures"])
+                record = DeviceCatalogRecord(**data)
+                q = change["qualification"]
+            except (KeyError, TypeError, ValueError) as exc:
+                raise DeviceCatalogIntegrityError("malformed official candidate") from exc
+            if not isinstance(q, dict):
+                raise DeviceCatalogIntegrityError("malformed official qualification")
+            self._validate_publication(record, q)
+            if q["catalog_level"] >= 2:
+                reviewed = self._validate_l2_source(record, q)
+                self._validate_l2_applicability(record, q, reviewed)
+            key = _identity(record)
+            if key in seen:
+                raise DeviceCatalogIntegrityError("duplicate exact ICPN in official batch")
+            seen.add(key)
+            old = active.qualifications.get(key)
+            if old and old.get("catalog_level") == 3 and (old != q or active.catalog.resolve(record.vendor, record.identifier) != record):
+                raise DeviceCatalogIntegrityError("L3 revision requires separately authorized revocation")
+            preview.append({"vendor": record.vendor, "identifier": record.identifier, "status": "MODIFIED" if old else "ADDED"})
+        return preview
+
     def publish_staged(self, stage_id: str, *, actor: str) -> str:
         with sqlite3.connect(self.path, timeout=10) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
@@ -1076,8 +1107,8 @@ class CatalogSqliteShadowRepository:
             if active is None:
                 raise DeviceCatalogIntegrityError("no active Catalog revision")
             current, target = self._read_revision(conn, active[0]), self._read_revision(conn, revision)
-        before = {_identity(r): asdict(r) for r in current.catalog.records}
-        after = {_identity(r): asdict(r) for r in target.catalog.records}
+        before = {_identity(r): {"record": asdict(r), "qualification": current.qualifications.get(_identity(r))} for r in current.catalog.records}
+        after = {_identity(r): {"record": asdict(r), "qualification": target.qualifications.get(_identity(r))} for r in target.catalog.records}
         return [{"vendor": k[0], "identifier": k[1], "status": "ADDED" if k not in before else "REMOVED" if k not in after else "MODIFIED", "before": before.get(k), "after": after.get(k)} for k in sorted(before.keys() | after.keys()) if before.get(k) != after.get(k)]
 
     def verify_parity(
