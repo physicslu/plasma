@@ -179,6 +179,17 @@ def test_power_source_external_disallows_control_but_allows_provider_only():
     assert plan().data["provider_id"] == "mock-vendor"
 
 
+def test_external_power_can_be_monitored_but_not_driven():
+    p = profile(steps=[
+        {"id": "sense", "type": "hardware.action",
+         "action": "power.wait_good", "domain_id": "vdd", "timeout_ms": 1000},
+        {"id": "program", "type": "provider.execute", "procedure": "programming",
+         "operations": ["erase", "program", "verify"]}])
+    assert [s["id"] for s in plan(p, hw=hardware()).data["steps"]] == [
+        "sense", "program"]
+    denied("HARDWARE_ACTION_UNSUPPORTED", plan, p)
+
+
 def test_hw_before_after_mock_vendor_single_execute():
     p = profile(power="ppu", steps=[
         {"id": "on", "type": "hardware.action", "action": "power.set",
