@@ -308,6 +308,11 @@ def test_l1_to_l2_uses_existing_exact_provider_applicability(tmp_path: Path, mon
     _reviewed_l2_packet(bad_record, bad, evidence_path)
     with pytest.raises(DeviceCatalogIntegrityError, match="exact ICPN/source applicability"):
         repo.stage_revision([{"record": asdict(bad_record), "qualification": bad}], actor="owner")
+    bad = json.loads(json.dumps(l2))
+    bad["physical_programming_qualified"] = True
+    _reviewed_l2_packet(record, bad, evidence_path)
+    with pytest.raises(DeviceCatalogIntegrityError, match="L2 cannot claim physical qualification"):
+        repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
     _reviewed_l2_packet(record, l2, evidence_path)
     stage = repo.stage_revision([{"record": asdict(record), "qualification": l2}], actor="owner")
     source_bytes = evidence_path.read_bytes()

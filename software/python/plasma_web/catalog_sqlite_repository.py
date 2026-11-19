@@ -347,7 +347,9 @@ class CatalogSqliteShadowRepository:
         if level == 3 and not (q.get("ppu_ready") or q.get("socket_ready")):
             raise DeviceCatalogIntegrityError("L3 physical evidence missing")
         if level == 2 and (q.get("ppu_ready") or q.get("socket_ready")
-                           or q.get("verified_configurations") or q.get("family_ready")):
+                           or q.get("verified_configurations") or q.get("family_ready")
+                           or q.get("physical_programming_qualified")
+                           or q.get("ppu_readiness_source")):
             raise DeviceCatalogIntegrityError("L2 cannot claim physical qualification")
 
     @staticmethod
@@ -365,9 +367,10 @@ class CatalogSqliteShadowRepository:
             raise DeviceCatalogIntegrityError("L2 exact ICPN/source applicability is not admitted")
         admitted = registry.describe(record.vendor, record.identifier)
         if (admitted.get("state") != "SUPPORTED"
-                or admitted.get("catalog_level", 0) < 2
+                or admitted.get("catalog_level") not in (2, 3)
                 or any(q.get(field) != admitted.get(field)
-                       for field in ("provider", "programming", "operations"))
+                       for field in ("schema_version", "registry_id", "provider", "programming",
+                                     "operations", "qualification_gaps"))
                 or (q.get("catalog_level") == 3
                     and any(q.get(field) != admitted.get(field) for field in
                             ("verified_configurations", "ppu_ready", "socket_ready",
