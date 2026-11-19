@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ThemeSwitch from "../theme-switch";
+import { useWorkspaceSession } from "../workspace-session";
 import "./style.css";
 
 type LocalEntry = {
@@ -54,7 +55,7 @@ function parseCsv(text: string): LocalEntry[] {
   });
 }
 
-export default function ICManagementPage() {
+function ManagementContent() {
   const [local, setLocal] = useState<LocalEntry[]>([]);
   const [history, setHistory] = useState<History | null>(null);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
@@ -188,4 +189,10 @@ export default function ICManagementPage() {
       <details><summary>Audit ({history?.audit.length ?? 0})</summary>{history?.audit.map((item, index) => <p key={index}>{item.created_at} · {item.action} · {item.actor} · {item.detail}</p>)}</details>
     </section>
   </main>;
+}
+
+export default function ICManagementPage() {
+  const { hydrated } = useWorkspaceSession();
+  if (!hydrated) return <main className="icManagement" aria-busy="true">Resolving Control Station routing…</main>;
+  return <ManagementContent />;
 }

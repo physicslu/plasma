@@ -291,6 +291,7 @@ test("IC Management local save survives reload and appears only in Selector look
     }
   });
   await page.goto("/ic-management");
+  await expect(page.getByRole("heading", { name: "IC Management" })).toBeVisible();
   await page.getByLabel("vendor", { exact: true }).fill("LocalVendor");
   await page.getByLabel("identifier", { exact: true }).fill("LOCAL123");
   await page.getByLabel("family", { exact: true }).fill("Demo");
