@@ -581,3 +581,45 @@ def test_stress_10000_cycles_counts_journal_restart_and_resources(tmp_path):
     out = os.environ.get("PLASMA_REPEAT_STRESS_METRICS")
     if out:
         Path(out).write_text(json.dumps(metrics, indent=1) + "\n")
+
+
+def _platform_busy(s, times):
+    """The Platform gate's PPU_BUSY right after a Cycle (2-Site HIL 2026-11-19):
+    the fleet observation still shows the finished Site, or a peer, active."""
+    seen = []
+    def gate(alias):
+        settled = s.batches._batches[s.batch_id]["units"][0]["cycle"]["settled"]
+        if settled and len(seen) < times:
+            seen.append(alias)
+            return "TARGET_NOT_READY", "PPU_BUSY"
+        return None
+    s.batches.platform_gate = gate
+    return seen
+
+
+def test_platform_ppu_busy_after_a_cycle_is_rechecked_then_proceeds(tmp_path):
+    s = Session(tmp_path, repeat=2, replace_ic_before_next_cycle=False)
+    s.batches.release_wait_s = 5.0
+    seen = _platform_busy(s, 3)
+    batch = s.done()
+    cycle = batch["units"][0]["cycle"]
+    assert len(seen) == 3 and cycle["pass"] == 2 and cycle["continue_seq"] == 0
+    assert len(s.gateway.posts) == 2
+
+
+def test_platform_ppu_busy_that_never_clears_pauses_without_submitting(tmp_path):
+    s = Session(tmp_path, repeat=2, replace_ic_before_next_cycle=False)
+    s.batches.release_wait_s = 0.3
+    _platform_busy(s, 10**6)
+    unit = s.awaiting()
+    assert unit["cycle"]["wait_reason"] == "NEXT_CYCLE_EXECUTION_PPU_BUSY"
+    assert len(s.gateway.posts) == 1
+    s.batches.request_stop_batch(s.batch_id, {"stop": "STOP_QUEUING"})
+    s.done()
+    assert len(s.gateway.posts) == 1
+
+
+def test_release_wait_covers_one_peer_job_plus_observation_refresh():
+    from plasma_manager.programming_batch import RELEASE_PENDING_REASONS, RELEASE_WAIT_S
+    # Observed on Z2 2026-11-19: one E/P/V Job ~12.5 s, fleet poll 2 s.
+    assert RELEASE_WAIT_S >= 30 and {"PPU_BUSY", "SITE_NOT_READY_OR_BUSY"} <= RELEASE_PENDING_REASONS

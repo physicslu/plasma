@@ -555,3 +555,38 @@ def test_malformed_schema_type_is_blocked(state, value):
     (state / 'programming-batches.json').write_text(json.dumps({'schema': value, 'batches': []}))
     with pytest.raises(preflight.Blocked):
         check(state)
+
+
+def partial_repeat_batch() -> dict:
+    """A stopped Manual Repeat Batch as the 2-Site HIL left it (2026-11-19)."""
+    row = completed_v2_batch()
+    row.update(outcome="PARTIAL", execution_status="STOPPED")
+    row["units"][0].update(outcome="PARTIAL", status="FINISHED", attempts=[], cycle={
+        "planned": 3, "settled": 1, "pass": 1, "fail": 0, "state": "ENDED",
+        "disposition": "STOPPED"})
+    return row
+
+
+def test_stopped_repeat_partial_site_is_terminal(state: Path) -> None:
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2", "batches",
+                  [partial_repeat_batch()])
+    assert check(state)["result"] == "PASS"
+
+
+@pytest.mark.parametrize("change", [
+    {"cycle": None},
+    {"status": "RUNNING"},
+    {"cycle": {"planned": 3, "settled": 0, "pass": 0, "fail": 0, "state": "ENDED"}},
+    {"cycle": {"planned": 3, "settled": 3, "pass": 3, "fail": 0, "state": "ENDED"}},
+    {"cycle": {"planned": 3, "settled": 2, "pass": 1, "fail": 0, "state": "ENDED"}},
+    {"cycle": {"planned": 3, "settled": 1, "pass": 1, "fail": 0,
+               "state": "AWAITING_CONTINUE"}},
+])
+def test_inconsistent_partial_site_blocks(state: Path, change) -> None:
+    row = partial_repeat_batch()
+    row["units"][0].update(change)
+    write_journal(state, "programming-batches.json.v2",
+                  "plasma.manager.programming-batch-journal.v2", "batches", [row])
+    with pytest.raises(preflight.Blocked, match="PARTIAL Site Cycle record"):
+        check(state)

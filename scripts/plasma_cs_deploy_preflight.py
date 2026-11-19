@@ -151,7 +151,18 @@ def check_transactions(state_dir: Path) -> dict:
             for unit in units:
                 if not isinstance(unit, dict):
                     raise Blocked(f"Batch {batch_id}: invalid unit")
-                if unit.get("outcome") not in ("PASS", "FAIL", "BLOCKED"):
+                if unit.get("outcome") == "PARTIAL":
+                    # Manual Repeat: a Site that settled some, not all, of its
+                    # Cycles. Terminal only with a consistent Cycle record.
+                    cycle = unit.get("cycle")
+                    if not (isinstance(cycle, dict) and unit.get("status") == "FINISHED"
+                            and all(type(cycle.get(key)) is int
+                                    for key in ("planned", "settled", "pass", "fail"))
+                            and 0 < cycle["settled"] < cycle["planned"]
+                            and cycle["settled"] == cycle["pass"] + cycle["fail"]
+                            and cycle.get("state") == "ENDED"):
+                        raise Blocked(f"Batch {batch_id}: invalid PARTIAL Site Cycle record")
+                elif unit.get("outcome") not in ("PASS", "FAIL", "BLOCKED"):
                     # StopQueuing leaves never-submitted Sites SKIPPED. This
                     # is terminal bookkeeping, not an unknown submitted Job.
                     if not (unit.get("outcome") is None and unit.get("status") == "SKIPPED"
@@ -188,7 +199,8 @@ def check_transactions(state_dir: Path) -> dict:
             outcomes = [unit["outcome"] for unit in units]
             if "FAIL" in outcomes:
                 aggregate = "FAIL"
-            elif not any(outcome == "PASS" for outcome in outcomes):
+            elif not any(outcome in ("PASS", "PARTIAL") for outcome in outcomes):
+                # A Repeat Site that settled some Cycles executed (PARTIAL).
                 aggregate = "BLOCKED"
             elif any(outcome != "PASS" for outcome in outcomes):
                 aggregate = "PARTIAL"
