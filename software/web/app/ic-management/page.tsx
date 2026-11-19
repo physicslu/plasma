@@ -89,8 +89,8 @@ export default function ICManagementPage() {
     try { await task(); } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
     finally { setBusy(false); }
   }
-  const setRecord = (key: keyof LocalEntry["record"], value: string) => { setPreview([]); setForm({ ...form, record: { ...form.record, [key]: value } }); };
-  const setProfile = (key: string, value: unknown) => { setPreview([]); setForm({ ...form, profile: { ...form.profile, [key]: value } }); };
+  const setRecord = (key: keyof LocalEntry["record"], value: string) => { setPreview([]); setForm(current => ({ ...current, record: { ...current.record, [key]: value } })); };
+  const setProfile = (key: string, value: unknown) => { setPreview([]); setForm(current => ({ ...current, profile: { ...current.profile, [key]: value } })); };
   const selectedBatch = batch.length ? batch : [form];
   async function loadOfficial(vendor: string, icpn: string) {
     setOfficial(await api<OfficialEntry>("official", undefined, `?vendor=${encodeURIComponent(vendor)}&icpn=${encodeURIComponent(icpn)}`));
@@ -139,7 +139,7 @@ export default function ICManagementPage() {
         <label>Operations (display only)<input value={Array.isArray(form.profile.operations) ? form.profile.operations.join(", ") : ""} onChange={event => setProfile("operations", event.target.value.split(",").map(value => value.trim()).filter(Boolean))} /></label>
         <label>Source Evidence references<input value={Array.isArray(form.profile.source_evidence) ? form.profile.source_evidence.join(", ") : ""} onChange={event => setProfile("source_evidence", event.target.value.split(",").map(value => value.trim()).filter(Boolean))} /></label>
       </div>
-      <details><summary>Advanced profile fields and Source Evidence</summary><textarea aria-label="Advanced profile JSON" value={JSON.stringify(form.profile, null, 2)} onChange={event => { try { setPreview([]); setForm({ ...form, profile: JSON.parse(event.target.value) }); } catch { /* Keep the last valid object. */ } }} /></details>
+      <details><summary>Advanced profile fields and Source Evidence</summary><textarea aria-label="Advanced profile JSON" value={JSON.stringify(form.profile, null, 2)} onChange={event => { try { const profile = JSON.parse(event.target.value); setPreview([]); setForm(current => ({ ...current, profile })); } catch { /* Keep the last valid object. */ } }} /></details>
       <div className="managementActions"><button disabled={busy} onClick={() => void run(async () => { const result = await api<{ changes: LocalEntry[] }>("validate", { entries: selectedBatch }); setPreview(result.changes); setMessage("Validation passed. Review the changes below."); })}>Validate</button>
       <button disabled={busy || !preview.length} onClick={() => void run(async () => { await api("local", { entries: selectedBatch }); setBatch([]); setPreview([]); await reload(); setMessage("Local records saved atomically."); })}>Save local changes</button></div>
     </section>
