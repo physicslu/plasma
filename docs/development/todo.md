@@ -387,6 +387,21 @@ Required work:
 - add backend or durable local persistence based on the final ownership decision rather than treating browser localStorage as the canonical store;
 - add tests for save/load round-trip, invalid or stale profile rejection, schema migration, partial failure and Managed/Standalone routing invariants.
 
+### Console User Bundle Import and Visual Bundle Builder (OFE-3 / OFE-4)
+
+**Status:** TODO / future product capability, carried over from the closed OPF Frontend post-LOM plan (PR #1377 §4.3–§4.4)
+
+**Layer:** Control Station Console / Manager / OPF Bundle v3
+
+**Reason:** The normal flow is now IC + Firmware + Start through Unified Programming and `plasmactl program`. Engineering users still have no Console route to bring their own complete Bundle or to assemble one. Today the Console B1/B2/B3 deployment page accepts a ready-made Bundle file, but nothing previews its contents, and Bundles are built only with repository scripts (`scripts/bluepill_bundle_v3_firmware_build.py`, `scripts/opf_platform_bundle_v3_build.py`).
+
+Required work:
+
+- OFE-3, user Bundle import: in the advanced Console, accept an externally built canonical `plasma.ppu.bundle.v3` ZIP. Before any install or activation, show its Packages, dependencies, Target Platform, declared capabilities and any executable/FPGA content. Keep Install, Activate and Flash as separate explicit actions.
+- OFE-4, visual Bundle Builder: add, import and link Package files (Provider, Profile, Driver, FPGA, Firmware), show the package graph, then Validate → Build → Export/Download → (authorized) Deploy. Building or importing must never activate an FPGA image or start a Job by itself.
+- Reuse the existing `plasma_opf.bundle_v3` writer and the existing Manager/PPU verifiers. Add no second Bundle format, ZIP writer or privileged bypass.
+- An accepted upload is not B2 admission, B3 activation, Job admission or a physical Flash PASS. Experimental results never promote L2/L3 qualification.
+
 ### Real Provider and Physical IC Quantity Handoff
 
 **Status:** TODO / deferred from the current 1-4 technical-debt sequence
