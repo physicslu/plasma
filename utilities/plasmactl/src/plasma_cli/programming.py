@@ -7,7 +7,11 @@ policy, SAFE_OFF evidence and the durable journal. This module only
 2. records a local submission journal *before* every POST, so a lost answer
    is reconciled read-only (``GET /api/programming/starts/{id}``) instead of
    being resent;
-3. observes the Batch and reports the Manager's persisted outcome.
+3. observes the Batch and reports the Manager's persisted outcome;
+4. Manual Repeat: submits ``repeat`` / ``replace_ic_before_next_cycle`` and,
+   when a Site pauses between Cycles, returns ``EXIT_AWAITING_CONTINUE``
+   instead of waiting; ``continue_sites`` sends the operator's Continue for
+   explicitly named Sites only (the Manager runs every next Cycle itself).
 
 It never resubmits, never retries a Site, never stops other Sites because one
 Site failed, and never turns ``OUTCOME_UNKNOWN`` into a new attempt.
@@ -21,6 +25,7 @@ import os
 import stat
 import sys
 import time
+import getpass
 from collections.abc import Callable
 from pathlib import Path
 
@@ -33,6 +38,9 @@ STOP_TOKEN = "STOP_QUEUING"
 VOID_TOKEN = "VOID_UNSTARTED_START"
 MAX_SOURCE_BYTES = 64 * 1024 * 1024
 OPERATIONS = ("erase", "program", "verify")
+#: Manual Repeat: Cycles per selected Site (Manager contract, WP-02).
+MAX_REPEAT = 10000
+AWAITING_CONTINUE = "AWAITING_CONTINUE"
 
 # One exit-code table for every plasmactl command.
 EXIT_PASS = 0          # Manager-reported PASS, or a read/accept that succeeded
@@ -41,6 +49,7 @@ EXIT_USAGE = 2         # invalid input or contract violation; nothing was submit
 EXIT_UNKNOWN = 3       # OUTCOME_UNKNOWN: reconcile read-only, never resend
 EXIT_NOT_ACCEPTED = 4  # Manager refused, or the start provably was never admitted
 EXIT_IN_PROGRESS = 5   # Batch still running (wait timeout, or reconcile pending)
+EXIT_AWAITING_CONTINUE = 6  # a Repeat Site waits for `program continue` (IC replaced)
 
 _OUTCOME_EXIT = {"PASS": EXIT_PASS, "FAIL": EXIT_NOT_PASS, "PARTIAL": EXIT_NOT_PASS,
                  "BLOCKED": EXIT_NOT_PASS, "OUTCOME_UNKNOWN": EXIT_UNKNOWN}
@@ -67,7 +76,8 @@ def parse_operations(text: str) -> list[str]:
 def build_request(*, icpn: str, operations: list[str], targets: tuple[Target, ...],
                   image: Path | None = None, bundle: Path | None = None,
                   address: int | None = None, length: int | None = None,
-                  retry_limit: int = 0, stop_after_failed_sites: int | None = None
+                  retry_limit: int = 0, stop_after_failed_sites: int | None = None,
+                  repeat: int = 1, replace_ic: bool = True
                   ) -> tuple[dict, dict]:
     """The Batch body (without start_id) and its journal-safe description.
 
@@ -78,12 +88,17 @@ def build_request(*, icpn: str, operations: list[str], targets: tuple[Target, ..
         raise FleetError("icpn is required")
     if not targets:
         raise FleetError("at least one --target PPU:SITE[,SITE...] is required")
+    if type(repeat) is not int or not 1 <= repeat <= MAX_REPEAT:
+        raise FleetError(f"--repeat must be an integer from 1 to {MAX_REPEAT} (Cycles per Site)")
     body: dict = {"icpn": icpn, "operations": list(operations),
                   "targets": [{"ppu_alias": t.ppu_alias, "site_ids": list(t.site_ids)}
                               for t in targets],
                   "repeat": 1, "retry_limit": retry_limit,
                   "stop_policy": ({"kind": "never"} if stop_after_failed_sites is None else
                                   {"kind": "failed_sites", "threshold": stop_after_failed_sites})}
+    if repeat > 1:
+        # repeat=1 keeps the exact pre-Repeat request: one Cycle never pauses.
+        body.update(repeat=repeat, replace_ic_before_next_cycle=bool(replace_ic))
     sources = [s for s in (image, bundle) if s is not None]
     takes_image = "program" in operations or "verify" in operations
     source: dict
@@ -169,7 +184,8 @@ def submit(url: str, body: dict, source: dict, journal_path: Path, *,
     journal = Journal.create(journal_path, {
         "schema": JOURNAL_SCHEMA, "manager_url": url, "icpn": body["icpn"],
         "operations": body["operations"], "targets": body["targets"], "source": source,
-        "policy": {k: body[k] for k in ("repeat", "retry_limit", "stop_policy")},
+        "policy": {k: body[k] for k in ("repeat", "replace_ic_before_next_cycle",
+                                        "retry_limit", "stop_policy") if k in body},
         "start_post_count": 1, "start_id": None, "batch_post_count": 0,
         "submission": "NOT_SUBMITTED", "batch_id": None, "reason": None})
     try:
@@ -239,10 +255,49 @@ def _receipt(journal: Journal, batch: dict | None) -> dict:
             "batch": summarize_batch(batch) if batch is not None else None}
 
 
+def _repeat_of(batch: dict) -> int:
+    policy = batch.get("policy") if isinstance(batch.get("policy"), dict) else {}
+    repeat = policy.get("repeat", 1)
+    return repeat if type(repeat) is int else 1
+
+
+def awaiting_units(batch: dict) -> list[dict]:
+    """Sites of a running Repeat session that wait for the operator's Continue."""
+    if batch.get("outcome") is not None or batch.get("state") == "finished":
+        return []
+    return [u for u in batch.get("units") or [] if isinstance(u, dict)
+            and isinstance(u.get("cycle"), dict) and u["cycle"].get("state") == AWAITING_CONTINUE]
+
+
+def _cycle_view(cycle: dict) -> dict:
+    keys = ("planned", "index", "state", "disposition", "settled", "pass", "fail",
+            "retry_attempts", "remaining", "continue_seq", "continued_seq", "wait_reason")
+    view = {key: cycle.get(key) for key in keys}
+    last = cycle.get("last") if isinstance(cycle.get("last"), dict) else None
+    if last is not None:
+        receipt = last.get("receipt") if isinstance(last.get("receipt"), dict) else {}
+        view["last"] = {"cycle_index": last.get("cycle_index"), "outcome": last.get("outcome"),
+                        "reason": last.get("reason"), "attempts": last.get("attempts"),
+                        "job_id": receipt.get("job_id"), "job_state": receipt.get("job_state"),
+                        "flash_result": receipt.get("flash_result"),
+                        "safe_off": receipt.get("safe_off")}
+    return view
+
+
+def next_steps(batch: dict) -> list[str]:
+    """One explicit Continue per waiting Site: never 'continue everything'."""
+    steps = [f"plasmactl program continue --batch-id {batch.get('batch_id')} "
+             f"--site {u.get('ppu_alias')}:{u.get('site_id')}"
+             for u in awaiting_units(batch)]
+    if steps:
+        steps.append(f"plasmactl program status --batch-id {batch.get('batch_id')} --wait")
+    return steps
+
+
 def summarize_batch(batch: dict) -> dict:
     """Projection of the Manager's own Batch record; never a second verdict."""
     units = batch.get("units") if isinstance(batch.get("units"), list) else []
-    return {
+    summary = {
         "batch_id": batch.get("batch_id"), "start_id": batch.get("start_id"),
         "state": batch.get("state"), "execution_status": batch.get("execution_status"),
         "outcome": batch.get("outcome"), "reason": batch.get("reason"),
@@ -261,9 +316,28 @@ def summarize_batch(batch: dict) -> dict:
             "progress": u.get("progress"),
         } for u in units if isinstance(u, dict)],
     }
+    if _repeat_of(batch) > 1:
+        # Manual Repeat only, so a one-Cycle Batch reads exactly as before.
+        policy = batch.get("policy") if isinstance(batch.get("policy"), dict) else {}
+        summary["repeat"] = {"repeat": _repeat_of(batch),
+                             "replace_ic_before_next_cycle":
+                                 policy.get("replace_ic_before_next_cycle"),
+                             "cycles": batch.get("cycles")}
+        for site, unit in zip(summary["sites"], (u for u in units if isinstance(u, dict))):
+            if isinstance(unit.get("cycle"), dict):
+                site["cycle"] = _cycle_view(unit["cycle"])
+        waiting = awaiting_units(batch)
+        summary["awaiting_continue"] = [
+            {"ppu_alias": u.get("ppu_alias"), "site_id": u.get("site_id"),
+             "continue_seq": u["cycle"].get("continue_seq"),
+             "wait_reason": u["cycle"].get("wait_reason")} for u in waiting]
+        summary["next"] = next_steps(batch)
+    return summary
 
 
 def batch_exit(batch: dict) -> int:
+    if awaiting_units(batch):
+        return EXIT_AWAITING_CONTINUE
     if batch.get("state") != "finished" or batch.get("outcome") is None:
         return EXIT_IN_PROGRESS
     if batch.get("outcome") == "PASS":
@@ -285,7 +359,15 @@ def _progress_line(batch: dict) -> str:
         progress = unit.get("progress") or {}
         stage = progress.get("stage") or progress.get("job_state") or unit.get("status")
         percent = progress.get("progress_percent")
-        parts.append(f"{unit.get('ppu_alias')}:{unit.get('site_id')} "
+        cycle = unit.get("cycle") if isinstance(unit.get("cycle"), dict) else None
+        counters = ""
+        if cycle is not None and _repeat_of(batch) > 1:
+            counters = (f" c{min(cycle.get('index') or 0, cycle.get('planned') or 0)}/"
+                        f"{cycle.get('planned')} P{cycle.get('pass')} F{cycle.get('fail')}"
+                        f" R{cycle.get('retry_attempts')}")
+            if cycle.get("state") == AWAITING_CONTINUE:
+                stage, percent = f"WAITING {cycle.get('wait_reason')}", None
+        parts.append(f"{unit.get('ppu_alias')}:{unit.get('site_id')}{counters} "
                      f"{unit.get('outcome') or stage}"
                      + ("" if percent is None else f" {percent:.0f}%"))
     return f"[plasmactl] batch {batch.get('batch_id')} {batch.get('execution_status')}: " \
@@ -296,10 +378,12 @@ def watch(url: str, batch_id: str, *, wait_timeout: float, interval: float = 1.0
           timeout: float = 5.0, progress: bool = True,
           clock: Callable[[], float] = time.monotonic,
           sleep: Callable[[float], None] = time.sleep) -> dict:
-    """Observe until the Manager records a final outcome or the wait ends.
+    """Observe until the Manager records a final outcome, a Repeat Site waits
+    for the operator, or the wait ends.
 
     Ending the wait never stops, cancels or resubmits anything: the Batch keeps
     running in the Manager and can be observed again with ``program status``.
+    A waiting Site is answered with ``program continue``, never by this loop.
     """
     deadline = clock() + wait_timeout
     last = None
@@ -309,7 +393,7 @@ def watch(url: str, batch_id: str, *, wait_timeout: float, interval: float = 1.0
         if progress and line != last:
             print(line, file=sys.stderr, flush=True)
             last = line
-        if batch.get("state") == "finished" or clock() >= deadline:
+        if batch.get("state") == "finished" or awaiting_units(batch) or clock() >= deadline:
             return batch
         sleep(interval)
 
@@ -345,6 +429,81 @@ def stop_queuing(url: str, batch_id: str, *, timeout: float = 5.0) -> tuple[dict
                 "stop": "OUTCOME_UNKNOWN"}, EXIT_UNKNOWN
     return {"schema": "plasma.utility.program-stop.v1", "batch_id": batch_id,
             "stop": "STOP_QUEUING_RECORDED", "batch": summarize_batch(batch)}, EXIT_PASS
+
+
+def local_actor() -> str:
+    """Audit label for a Continue sent from this host.
+
+    The CLI reaches the Manager directly on its own host and holds no verified
+    operator credential, so this is the local OS user, recorded as such: an
+    unverified local identity, never an authenticated operator.
+    """
+    try:
+        user = getpass.getuser()
+    except Exception:  # noqa: BLE001 - no login name: fall back to the uid
+        user = f"uid{os.getuid()}"
+    label = "plasmactl-local:" + "".join(ch for ch in user if ch.isprintable())
+    return label[:128]
+
+
+def continue_sites(url: str, batch_id: str, sites: list[tuple[str, int]], *,
+                   seq: int | None = None, timeout: float = 5.0) -> tuple[dict, int]:
+    """The operator's Continue for explicitly named waiting Sites.
+
+    Each named Site gets at most ONE Continue POST, echoing the pause it
+    answers. A Site that is not waiting is refused here without a POST; the
+    Manager remains the authority on stale or repeated pauses. A lost answer
+    is reported OUTCOME_UNKNOWN and never resent: observe with ``status``.
+    Only a one-Site Batch may omit ``--site``: it is unambiguous.
+    """
+    batch = manager_batch(url, require_id(batch_id, "Batch ID"), timeout=timeout)
+    units = {(u.get("ppu_alias"), u.get("site_id")): u
+             for u in batch.get("units") or [] if isinstance(u, dict)}
+    if not sites:
+        if len(units) != 1:
+            raise FleetError("--site PPU:SITE is required: name each Site whose IC was replaced")
+        sites = list(units)
+    if len(set(sites)) != len(sites):
+        raise FleetError("a Site is named more than once")
+    if seq is not None and len(sites) != 1:
+        raise FleetError("--seq answers one Site's pause: name exactly one --site")
+    for key in sites:
+        if key not in units:
+            raise FleetError(f"Site {key[0]}:{key[1]} is not part of this Batch")
+    actor = local_actor()
+    results, codes = [], []
+    for alias, site in sites:
+        cycle = units[(alias, site)].get("cycle")
+        cycle = cycle if isinstance(cycle, dict) else {}
+        pause = seq if seq is not None else cycle.get("continue_seq")
+        entry = {"ppu_alias": alias, "site_id": site, "continue_seq": pause,
+                 "wait_reason": cycle.get("wait_reason"), "post_count": 0}
+        if seq is None and cycle.get("state") != AWAITING_CONTINUE:
+            entry["result"] = "NOT_AWAITING_CONTINUE"
+            results.append(entry); codes.append(EXIT_NOT_ACCEPTED)
+            continue
+        entry["post_count"] = 1
+        try:
+            answer = manager_call(url, "POST", f"/api/programming/batches/{batch_id}/continue",
+                                  {"ppu_alias": alias, "site_id": site, "continue_seq": pause,
+                                   "actor": actor}, timeout=timeout)
+        except ManagerRefused as exc:
+            entry["result"] = f"REFUSED: {exc.code}"
+            codes.append(EXIT_NOT_ACCEPTED)
+        except (ManagerUnknown, FleetError) as exc:
+            entry["result"] = f"OUTCOME_UNKNOWN: {exc} (never resent; observe with program status)"
+            codes.append(EXIT_UNKNOWN)
+        else:
+            entry["result"] = "ALREADY_ACCEPTED" if answer.get("duplicate") else "ACCEPTED"
+            if isinstance(answer.get("batch"), dict):
+                batch = answer["batch"]
+            codes.append(EXIT_PASS)
+        results.append(entry)
+    code = (EXIT_UNKNOWN if EXIT_UNKNOWN in codes
+            else EXIT_NOT_ACCEPTED if EXIT_NOT_ACCEPTED in codes else EXIT_PASS)
+    return {"schema": "plasma.utility.program-continue.v1", "batch_id": batch_id,
+            "actor": actor, "actor_verified": False, "sites": results,
+            "batch": summarize_batch(batch)}, code
 
 
 def verify_batch_receipt(batch: dict, targets: tuple[Target, ...]) -> tuple[dict, bool]:
