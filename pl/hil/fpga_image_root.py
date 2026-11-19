@@ -18,7 +18,6 @@ import stat
 import sys
 import tempfile
 import uuid
-import xml.etree.ElementTree as ET
 
 from pl.hil import fpga_image_guard as guard
 from pl.hil import fpga_image_admission as admission
@@ -250,6 +249,11 @@ def validate_hwh_bytes(raw: bytes, manifest: ImageManifest) -> None:
     """
     need(type(raw) is bytes and 0 < len(raw) <= 4_000_000,
          "IMAGE_HWH_SIZE_DENIED")
+    # Imported here, not at module level: only Bundle staging / FPGA
+    # qualification parse HWH, while every per-Job Site admission imports
+    # this module and would otherwise pay ~0.3 s for ElementTree on Z2
+    # (WO-2 measurement 2026-11-19). Same parser, same errors.
+    import xml.etree.ElementTree as ET
     try:
         tree = ET.fromstring(raw)
         system = tree.find("SYSTEMINFO")

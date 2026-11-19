@@ -807,6 +807,72 @@ class SiteAdmissionPolicyWiringTests(unittest.TestCase):
         self.assertNotIn("vanished_pids", facts.call_args.kwargs)
 
 
+class RootLazyHwhParserImportTests(unittest.TestCase):
+    """WO-2 F1: Site admission imports the Root modules on every Job; only
+    HWH validation needs ElementTree. Each case runs in a FRESH interpreter
+    with the Z2 admission flags (-I -B) so another test cannot preload xml.
+    """
+
+    REPO = Path(__file__).resolve().parents[2]
+    RELEASE = "pl/hil/releases/swd-independent-d0add58c/plasma-image-manifest.json"
+    HWH = "pl/tests/fixtures/swd-independent-d0add58c/system.hwh"
+
+    def fresh(self, body):
+        import subprocess
+        code = ("import json, sys\n"
+                f"sys.path.insert(0, {str(self.REPO)!r})\n" + body)
+        done = subprocess.run([sys.executable, "-I", "-B", "-c", code],
+                              capture_output=True, text=True, timeout=120)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return json.loads(done.stdout.strip().splitlines()[-1])
+
+    def test_root_modules_import_without_elementtree(self):
+        out = self.fresh(
+            "from pl.hil import fpga_image_guard, fpga_image_admission, fpga_image_root\n"
+            "print(json.dumps({'xml': 'xml.etree.ElementTree' in sys.modules,\n"
+            "  'validate': callable(fpga_image_root.validate_hwh_bytes)}))\n")
+        self.assertEqual(out, {"xml": False, "validate": True})
+
+    def test_hwh_validation_unchanged_with_lazy_parser(self):
+        out = self.fresh(f"""
+from pathlib import Path
+from pl.hil import fpga_image_root as root
+release = root.parse_image_manifest_bytes(Path({str(self.REPO / self.RELEASE)!r}).read_bytes())
+good = Path({str(self.REPO / self.HWH)!r}).read_bytes()
+before = 'xml.etree.ElementTree' in sys.modules
+root.validate_hwh_bytes(good, release)
+after = 'xml.etree.ElementTree' in sys.modules
+cases = {{
+    'empty': b'', 'not_bytes': 'text', 'too_large': b'x' * 4_000_001,
+    'malformed': b'<ROOT><MEMRANGE', 'bad_number': good.replace(b'0x43C01000', b'0xZZ', 1),
+    'no_ranges': b'<hwh/>',
+    'target': good.replace(b'DEVICE="7z020"', b'DEVICE="7z030"'),
+    'identity': (b"<ROOT><SYSTEMINFO BOARD='pynq-z2' DEVICE='7z020' PACKAGE='clg400' "
+                 b"SPEEDGRADE='-1'/><MEMRANGE MASTERBUSINTERFACE='M_AXI_GP0' "
+                 b"BASEVALUE='0x43c01000' HIGHVALUE='0x43c01fff'/></ROOT>"),
+}}
+codes = {{}}
+for name, raw in cases.items():
+    try:
+        root.validate_hwh_bytes(raw, release)
+        codes[name] = 'ACCEPTED'
+    except root.ImageDeploymentDenied as exc:
+        codes[name] = str(exc)
+print(json.dumps({{'before': before, 'after': after, 'codes': codes}}))
+""")
+        self.assertEqual((out["before"], out["after"]), (False, True))
+        self.assertEqual(out["codes"], {
+            "empty": "IMAGE_HWH_SIZE_DENIED",
+            "not_bytes": "IMAGE_HWH_SIZE_DENIED",
+            "too_large": "IMAGE_HWH_SIZE_DENIED",
+            "malformed": "IMAGE_HWH_INVALID",
+            "bad_number": "IMAGE_HWH_INVALID",
+            "no_ranges": "IMAGE_HWH_RANGE_INVALID",
+            "target": "IMAGE_HWH_TARGET_MISMATCH",
+            "identity": "IMAGE_HWH_IDENTITY_RANGE_MISMATCH",
+        })
+
+
 class RootAdmissionFailureClassificationTests(unittest.TestCase):
     """An incomplete Root snapshot is not a known owner and never passes."""
 
