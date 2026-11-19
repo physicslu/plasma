@@ -9,6 +9,8 @@ import io
 import json
 import re
 import sqlite3
+import os
+import tempfile
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
@@ -26,7 +28,7 @@ if TYPE_CHECKING:
     from .programming_qualification import ProgrammingQualificationRegistry
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _encoded(value: object) -> str:
@@ -66,7 +68,7 @@ class CatalogSqliteShadowRepository:
     @staticmethod
     def _init_schema(conn: sqlite3.Connection) -> None:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, 1, SCHEMA_VERSION):
+        if version not in (0, 1, 2, SCHEMA_VERSION):
             raise DeviceCatalogIntegrityError("unsupported SQLite Catalog schema")
         if version == 0 and conn.execute(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table'"
@@ -117,6 +119,17 @@ class CatalogSqliteShadowRepository:
                 icpn_key TEXT NOT NULL,
                 profile_json TEXT NOT NULL,
                 PRIMARY KEY(namespace, vendor_key, icpn_key)
+            );
+            CREATE TABLE IF NOT EXISTS catalog_evidence (
+                evidence_id TEXT PRIMARY KEY,
+                source_authority TEXT NOT NULL,
+                source_reference TEXT NOT NULL,
+                source_revision TEXT NOT NULL,
+                content_sha256 TEXT NOT NULL,
+                acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                verification_status TEXT NOT NULL CHECK (verification_status = 'VERIFIED'),
+                content_location TEXT NOT NULL,
+                UNIQUE(source_authority, source_reference, source_revision)
             );
         """)
         if version < SCHEMA_VERSION:
@@ -272,16 +285,176 @@ class CatalogSqliteShadowRepository:
             with sqlite3.connect(f"file:{self.path.resolve().as_posix()}?mode=ro", uri=True) as conn:
                 conn.execute("PRAGMA query_only = ON")
                 version = conn.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (1, SCHEMA_VERSION):
+                if version not in (1, 2, SCHEMA_VERSION):
                     raise DeviceCatalogIntegrityError("unsupported SQLite Catalog schema")
                 row = conn.execute(
                     "SELECT revision_sha256 FROM active_catalog_revision WHERE singleton = 1"
                 ).fetchone()
                 if row is None:
                     raise DeviceCatalogIntegrityError("SQLite Catalog has no published shadow revision")
-                return self._read_revision(conn, row[0])
+                snapshot = self._read_revision(conn, row[0])
+                self._verify_snapshot_evidence(snapshot)
+                return snapshot
         except (sqlite3.DatabaseError, ValueError, KeyError, TypeError) as exc:
             raise DeviceCatalogIntegrityError("SQLite Catalog shadow integrity failure") from exc
+
+    def _evidence_file(self, digest: str) -> Path:
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise DeviceCatalogIntegrityError("invalid Evidence content digest")
+        return Path(f"{self.path}.evidence") / "sha256" / digest[:2] / digest
+
+    def _read_evidence(self, evidence_id: str) -> tuple[tuple[str, str, str, str], bytes]:
+        if not isinstance(evidence_id, str) or not re.fullmatch(r"[0-9a-f]{64}", evidence_id):
+            raise DeviceCatalogIntegrityError("Evidence Revision missing")
+        with sqlite3.connect(f"file:{self.path.resolve().as_posix()}?mode=ro", uri=True) as conn:
+            row = conn.execute(
+                "SELECT source_authority,source_reference,source_revision,content_sha256,"
+                "verification_status,content_location FROM catalog_evidence WHERE evidence_id=?",
+                (evidence_id,),
+            ).fetchone()
+        location = f"sha256/{row[3][:2]}/{row[3]}" if row is not None else None
+        if row is None or row[4] != "VERIFIED" or row[5] != location:
+            raise DeviceCatalogIntegrityError("Evidence Revision missing or invalid")
+        try:
+            content = self._evidence_file(row[3]).read_bytes()
+        except OSError as exc:
+            raise DeviceCatalogIntegrityError("Evidence content missing") from exc
+        if hashlib.sha256(content).hexdigest() != row[3]:
+            raise DeviceCatalogIntegrityError("Evidence content digest mismatch")
+        return (row[0], row[1], row[2], row[3]), content
+
+    def _store_evidence(self, authority: str, reference: str, revision: str, content: bytes,
+                        *, actor: str = "publisher") -> str:
+        """Durable CAS write precedes its SQLite reference; orphan bytes are reusable."""
+        if not all(isinstance(x, str) and x.strip() for x in (authority, reference, revision)):
+            raise DeviceCatalogIntegrityError("Evidence source identity/revision required")
+        digest = hashlib.sha256(content).hexdigest()
+        evidence_id = _digest([authority, reference, revision, digest])
+        with sqlite3.connect(self.path, timeout=10) as conn:
+            self._init_schema(conn)
+            existing = conn.execute(
+                "SELECT evidence_id,content_sha256 FROM catalog_evidence "
+                "WHERE source_authority=? AND source_reference=? AND source_revision=?",
+                (authority, reference, revision),
+            ).fetchone()
+        if existing is not None:
+            if existing != (evidence_id, digest):
+                raise DeviceCatalogIntegrityError("Evidence source revision is immutable")
+            self._read_evidence(evidence_id)
+            return evidence_id
+        target = self._evidence_file(digest)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary = tempfile.mkstemp(prefix=".acquire-", dir=target.parent)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            if target.exists():
+                if hashlib.sha256(target.read_bytes()).hexdigest() != digest:
+                    raise DeviceCatalogIntegrityError("Evidence content digest mismatch")
+            else:
+                os.replace(temporary, target)
+                directory_fd = os.open(target.parent, os.O_RDONLY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+            with sqlite3.connect(self.path, timeout=10) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                row = conn.execute(
+                    "SELECT evidence_id,content_sha256 FROM catalog_evidence "
+                    "WHERE source_authority=? AND source_reference=? AND source_revision=?",
+                    (authority, reference, revision),
+                ).fetchone()
+                if row is None:
+                    conn.execute("INSERT INTO catalog_evidence "
+                                 "(evidence_id,source_authority,source_reference,source_revision,"
+                                 "content_sha256,verification_status,content_location) "
+                                 "VALUES (?,?,?,?,?,'VERIFIED',?)",
+                                 (evidence_id, authority, reference, revision, digest,
+                                  f"sha256/{digest[:2]}/{digest}"))
+                    conn.execute("INSERT INTO catalog_audit_events"
+                                 "(action,actor,revision_sha256,detail) VALUES (?,?,?,?)",
+                                 ("ACQUIRE_EVIDENCE", actor, evidence_id, reference))
+                elif row != (evidence_id, digest):
+                    raise DeviceCatalogIntegrityError("Evidence source revision is immutable")
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        self._read_evidence(evidence_id)
+        return evidence_id
+
+    def acquire_exact_evidence(self, record: DeviceCatalogRecord, *, kind: str,
+                               source_revision: str, actor: str = "publisher") -> str:
+        """Acquire and authenticate one official source revision; repeat calls stay offline."""
+        from .openocd_software_qualification import (
+            APPLICABILITY_REL, get_default_openocd_software_qualification_registry, _git_blob_sha1,
+        )
+        if not isinstance(source_revision, str) or not source_revision.strip():
+            raise DeviceCatalogIntegrityError("Evidence source revision required")
+        provider = get_default_openocd_software_qualification_registry()
+        if provider is None or record.vendor != "STMicroelectronics":
+            raise DeviceCatalogIntegrityError("official Exact source authority unsupported")
+        url = ("https://www.st.com/en/microcontrollers-microprocessors/"
+               f"{record.base_device.lower()}.html")
+        if kind == "manufacturer_https":
+            reference = url
+            authority = "STMicroelectronics HTTPS"
+        elif kind == "locked_production_identity":
+            applicability = json.loads((provider._root / APPLICABILITY_REL).read_text(encoding="utf-8"))
+            lock = applicability["manufacturer_authority"]["production_exact_identity"]
+            reference = lock["path"]
+            authority = "STMicroelectronics production identity lock"
+            if source_revision != lock["git_blob_sha1"]:
+                raise DeviceCatalogIntegrityError("official Exact identity lock mismatch")
+        else:
+            raise DeviceCatalogIntegrityError("official Exact source kind unsupported")
+        with sqlite3.connect(self.path, timeout=10) as conn:
+            self._init_schema(conn)
+            row = conn.execute("SELECT evidence_id FROM catalog_evidence WHERE "
+                               "source_authority=? AND source_reference=? AND source_revision=?",
+                               (authority, reference, source_revision)).fetchone()
+        if row is not None:
+            metadata, content = self._read_evidence(row[0])
+            self._validate_exact_content(record, kind, content, source_revision)
+            return row[0]
+        content = (self._fetch_official_exact_source(url) if kind == "manufacturer_https"
+                   else (provider._root / reference).read_bytes())
+        self._validate_exact_content(record, kind, content, source_revision)
+        return self._store_evidence(authority, reference, source_revision, content, actor=actor)
+
+    @staticmethod
+    def _validate_exact_content(record: DeviceCatalogRecord, kind: str, content: bytes,
+                                source_revision: str) -> None:
+        if kind == "manufacturer_https":
+            source_text = html.unescape(content.decode("utf-8", errors="replace")).upper()
+            if (re.search(r"<TITLE[^>]*>[^<]*" + re.escape(record.base_device), source_text) is None
+                    or re.search(r"PART[\s_-]*NUMBER", source_text) is None
+                    or re.search(r"(?<![A-Z0-9])" + re.escape(record.identifier) + r"(?![A-Z0-9])",
+                                 source_text) is None):
+                raise DeviceCatalogIntegrityError("L2 official Exact source bytes or identity mismatch")
+        elif kind == "locked_production_identity":
+            from .openocd_software_qualification import _git_blob_sha1
+            try:
+                rows = [row for row in csv.DictReader(io.StringIO(content.decode("utf-8")))
+                        if row["icpn"] == record.identifier]
+            except (UnicodeError, ValueError, KeyError) as exc:
+                raise DeviceCatalogIntegrityError("L2 official Exact identity source unavailable") from exc
+            expected = {"manufacturer": record.vendor, "icpn": record.identifier,
+                        "family": record.family, "series": record.subfamily,
+                        "base_device": record.base_device, "package": record.package,
+                        "pin_count": record.pin_count, "flash_size": record.flash_size,
+                        "temperature_grade": record.temperature_grade,
+                        "option_suffix": record.option_suffix or "",
+                        "openocd_target_config": record.target_config,
+                        "source_type": record.source_type,
+                        "source_reference": record.source_reference,
+                        "source_authority": record.source_authority,
+                        "verification_status": record.verification_status}
+            if (_git_blob_sha1(content) != source_revision or len(rows) != 1
+                    or any(rows[0].get(key) != value for key, value in expected.items())):
+                raise DeviceCatalogIntegrityError("L2 official Exact identity source drift")
 
     @staticmethod
     def _validate_publication(record: DeviceCatalogRecord, q: dict[str, Any]) -> None:
@@ -358,8 +531,7 @@ class CatalogSqliteShadowRepository:
                            or q.get("ppu_readiness_source")):
             raise DeviceCatalogIntegrityError("L2 cannot claim physical qualification")
 
-    @staticmethod
-    def _validate_l2_applicability(record: DeviceCatalogRecord, q: dict[str, Any],
+    def _validate_l2_applicability(self, record: DeviceCatalogRecord, q: dict[str, Any],
                                    reviewed: dict[str, Any]) -> None:
         """Bind an exact part to source-validated provider semantics and manufacturer facts."""
         from .programming_qualification import get_default_programming_qualification_registry
@@ -386,7 +558,7 @@ class CatalogSqliteShadowRepository:
                                  "ppu_readiness_source", "family_ready")))):
                 raise DeviceCatalogIntegrityError("L2 Provider/Profile/geometry/operations lack exact applicability")
             return
-        CatalogSqliteShadowRepository._validate_data_only_l2(record, q, reviewed)
+        self._validate_data_only_l2(record, q, reviewed)
 
     @staticmethod
     def _fetch_official_exact_source(url: str) -> bytes:
@@ -410,8 +582,7 @@ class CatalogSqliteShadowRepository:
             raise DeviceCatalogIntegrityError("official Exact source has invalid size")
         return content
 
-    @staticmethod
-    def _validate_data_only_l2(record: DeviceCatalogRecord, q: dict[str, Any],
+    def _validate_data_only_l2(self, record: DeviceCatalogRecord, q: dict[str, Any],
                                reviewed: dict[str, Any]) -> None:
         """Data-only medium-density applicability; no exact static qualification allowlist."""
         from .openocd_software_qualification import (
@@ -489,45 +660,24 @@ class CatalogSqliteShadowRepository:
                 "path": identity_lock["path"],
                 "git_blob_sha1": identity_lock["git_blob_sha1"],
                 "exact_icpn": record.identifier,
+                "evidence_id": exact_source.get("evidence_id"),
             }:
                 raise DeviceCatalogIntegrityError("L2 official Exact identity lock mismatch")
-            try:
-                identity_bytes = (root / identity_lock["path"]).read_bytes()
-                identity_rows = [row for row in csv.DictReader(io.StringIO(
-                    identity_bytes.decode("utf-8"))) if row["icpn"] == record.identifier]
-            except (OSError, UnicodeError, ValueError, KeyError) as exc:
-                raise DeviceCatalogIntegrityError("L2 official Exact identity source unavailable") from exc
-            expected_identity = {
-                "manufacturer": record.vendor, "icpn": record.identifier,
-                "family": record.family, "series": record.subfamily,
-                "base_device": record.base_device, "package": record.package,
-                "pin_count": record.pin_count, "flash_size": record.flash_size,
-                "temperature_grade": record.temperature_grade,
-                "option_suffix": record.option_suffix or "",
-                "openocd_target_config": record.target_config,
-                "source_type": record.source_type,
-                "source_reference": record.source_reference,
-                "source_authority": record.source_authority,
-                "verification_status": record.verification_status,
-            }
-            if (_git_blob_sha1(identity_bytes) != identity_lock["git_blob_sha1"]
-                    or len(identity_rows) != 1
-                    or any(identity_rows[0].get(key) != value for key, value in expected_identity.items())):
-                raise DeviceCatalogIntegrityError("L2 official Exact identity source drift")
+            metadata, identity_bytes = self._read_evidence(exact_source.get("evidence_id"))
+            if metadata[:3] != ("STMicroelectronics production identity lock", identity_lock["path"],
+                                identity_lock["git_blob_sha1"]):
+                raise DeviceCatalogIntegrityError("L2 official Exact identity lock mismatch")
+            self._validate_exact_content(record, "locked_production_identity", identity_bytes, metadata[2])
         elif exact_source.get("kind") == "manufacturer_https":
             identity_reference = f"{expected_url}#{record.identifier}"
             if (exact_source.get("url") != expected_url
                     or not isinstance(exact_source.get("sha256"), str)):
                 raise DeviceCatalogIntegrityError("L2 official Exact source missing")
-            source_bytes = CatalogSqliteShadowRepository._fetch_official_exact_source(expected_url)
-            source_text = html.unescape(source_bytes.decode("utf-8", errors="replace")).upper()
-            if (hashlib.sha256(source_bytes).hexdigest() != exact_source["sha256"]
-                    or re.search(r"<TITLE[^>]*>[^<]*" + re.escape(record.base_device),
-                                 source_text) is None
-                    or re.search(r"PART[\s_-]*NUMBER", source_text) is None
-                    or re.search(r"(?<![A-Z0-9])" + re.escape(record.identifier) + r"(?![A-Z0-9])",
-                                 source_text) is None):
+            metadata, source_bytes = self._read_evidence(exact_source.get("evidence_id"))
+            if (metadata[0] != "STMicroelectronics HTTPS" or metadata[1] != expected_url
+                    or metadata[3] != exact_source["sha256"]):
                 raise DeviceCatalogIntegrityError("L2 official Exact source bytes or identity mismatch")
+            self._validate_exact_content(record, "manufacturer_https", source_bytes, metadata[2])
         else:
             raise DeviceCatalogIntegrityError("L2 official Exact source kind unsupported")
         geometry_id = q["programming"].get("memory_geometry_profile_id")
@@ -569,15 +719,20 @@ class CatalogSqliteShadowRepository:
                 or reviewed.get("fact_references") != expected_references):
             raise DeviceCatalogIntegrityError("L2 Provider/Profile/geometry/operations lack exact applicability")
 
-    @staticmethod
-    def _validate_l2_source(record: DeviceCatalogRecord, q: dict[str, Any]) -> dict[str, Any]:
+    def _validate_l2_source(self, record: DeviceCatalogRecord, q: dict[str, Any]) -> dict[str, Any]:
         """Bind reviewed documentary facts to the exact published qualification."""
         evidence = q["publication_evidence"]
         source_path = evidence.get("source_path")
-        if not isinstance(source_path, str) or not source_path:
+        evidence_id = evidence.get("reviewed_evidence_id")
+        if not source_path and not evidence_id:
             raise DeviceCatalogIntegrityError("L2 reviewed evidence file missing")
         try:
-            source_bytes = Path(source_path).read_bytes()
+            if evidence_id:
+                metadata, source_bytes = self._read_evidence(evidence_id)
+                if metadata[:2] != ("PLASMA reviewed qualification", record.identifier):
+                    raise DeviceCatalogIntegrityError("L2 reviewed Evidence identity mismatch")
+            else:
+                source_bytes = Path(source_path).read_bytes()
             if hashlib.sha256(source_bytes).hexdigest() != evidence["source_sha256"]:
                 raise DeviceCatalogIntegrityError("L2 documentary evidence bytes unavailable or mismatched")
             reviewed = json.loads(source_bytes)
@@ -617,12 +772,27 @@ class CatalogSqliteShadowRepository:
             raise DeviceCatalogIntegrityError("L2 reviewed facts do not match exact Provider/Profile/geometry")
         return reviewed
 
+    def _verify_snapshot_evidence(self, snapshot: CatalogShadowSnapshot, *, strict: bool = False) -> None:
+        for record in snapshot.catalog.records:
+            q = snapshot.qualifications.get(_identity(record))
+            if not q or not q.get("data_only_publication") or q.get("catalog_level", 0) < 2:
+                continue
+            evidence = q.get("publication_evidence", {})
+            if not evidence.get("reviewed_evidence_id"):
+                if strict:
+                    raise DeviceCatalogIntegrityError("published L2 requires durable Evidence Revision")
+                # Schema v2 snapshots remain readable for explicit migration.
+                continue
+            reviewed = self._validate_l2_source(record, q)
+            self._validate_l2_applicability(record, q, reviewed)
+
     def stage_revision(self, changes: list[dict[str, Any]], *, actor: str) -> str:
         """Stage exact records against the current active revision; staging is never public."""
         if not actor.strip() or not changes:
             raise DeviceCatalogIntegrityError("publisher actor and changes required")
+        staged_changes = json.loads(_encoded(changes))
         seen: set[tuple[str, str]] = set()
-        for change in changes:
+        for change in staged_changes:
             try:
                 data = dict(change["record"])
                 data["cpu_architectures"] = tuple(data["cpu_architectures"])
@@ -636,11 +806,17 @@ class CatalogSqliteShadowRepository:
             if q.get("catalog_level", 0) >= 2:
                 reviewed = self._validate_l2_source(record, q)
                 self._validate_l2_applicability(record, q, reviewed)
+                if q["publication_evidence"].get("source_path"):
+                    packet = Path(q["publication_evidence"]["source_path"]).read_bytes()
+                    packet_id = self._store_evidence("PLASMA reviewed qualification", record.identifier,
+                                                     hashlib.sha256(packet).hexdigest(), packet, actor=actor)
+                    q["publication_evidence"].pop("source_path")
+                    q["publication_evidence"]["reviewed_evidence_id"] = packet_id
             key = _identity(record)
             if key in seen:
                 raise DeviceCatalogIntegrityError("duplicate exact ICPN in staging")
             seen.add(key)
-        stage_id = _digest(changes)
+        stage_id = _digest(staged_changes)
         with sqlite3.connect(self.path, timeout=10) as conn:
             self._init_schema(conn)
             conn.execute("PRAGMA foreign_keys = ON")
@@ -650,7 +826,7 @@ class CatalogSqliteShadowRepository:
                 raise DeviceCatalogIntegrityError("no active Catalog revision")
             self._read_revision(conn, parent[0])
             conn.execute("INSERT OR REPLACE INTO catalog_staging VALUES (?, ?, ?, ?)",
-                         (stage_id, parent[0], actor, _encoded(changes)))
+                         (stage_id, parent[0], actor, _encoded(staged_changes)))
             conn.execute("INSERT INTO catalog_audit_events(action,actor,predecessor,revision_sha256,detail) VALUES (?,?,?,?,?)",
                          ("STAGE", actor, parent[0], stage_id, "validated input"))
         return stage_id
@@ -671,6 +847,7 @@ class CatalogSqliteShadowRepository:
             if stage is None or active is None or stage[0] != active[0] or stage[1] != actor:
                 raise DeviceCatalogIntegrityError("staging missing, stale or actor mismatch")
             parent = self._read_revision(conn, active[0])
+            self._verify_snapshot_evidence(parent)
             changes = json.loads(stage[2])
             source_revision = _digest({"parent": active[0], "stage": stage_id})
             records = {_identity(row): row for row in parent.catalog.records}
@@ -722,6 +899,10 @@ class CatalogSqliteShadowRepository:
                                     source_count=parent.catalog.source_count)
             rows = [(key[0], key[1], _encoded(asdict(row)), _encoded(qualifications[key]))
                     for row in ordered for key in [_identity(row)]]
+            if any(q.get("data_only_publication") and q.get("catalog_level", 0) >= 2
+                   and not q.get("publication_evidence", {}).get("reviewed_evidence_id")
+                   for q in qualifications.values()):
+                raise DeviceCatalogIntegrityError("published L2 requires durable Evidence Revision")
             metadata = self._metadata(catalog)
             revision = self._fingerprint(metadata, rows)
             if conn.execute("SELECT 1 FROM catalog_revisions WHERE revision_sha256=?", (revision,)).fetchone() is None:
@@ -746,6 +927,7 @@ class CatalogSqliteShadowRepository:
                 raise DeviceCatalogIntegrityError("no active Catalog revision")
             target = self._read_revision(conn, revision)
             current = self._read_revision(conn, previous[0])
+            self._verify_snapshot_evidence(target, strict=True)
             current_records = {_identity(row): row for row in current.catalog.records}
             target_records = {_identity(row): row for row in target.catalog.records}
             if any(
@@ -812,14 +994,25 @@ def main() -> int:
     action.add_argument("--stage-file", type=Path, help="JSON list of exact record/qualification changes")
     action.add_argument("--publish-stage", help="validated stage digest")
     action.add_argument("--rollback", help="previous published revision digest")
+    action.add_argument("--acquire-evidence", type=Path,
+                        help="JSON official source request: manufacturer, exact_icpn, kind, source_revision")
     action.add_argument("--local-file", type=Path, help="JSON local Profile with namespace/manufacturer/icpn/profile")
     parser.add_argument("--actor", help="authorized publisher identity (required for writes)")
     args = parser.parse_args()
     repository = CatalogSqliteShadowRepository(args.db)
-    if args.stage_file or args.publish_stage or args.rollback or args.local_file:
+    if args.stage_file or args.publish_stage or args.rollback or args.local_file or args.acquire_evidence:
         if not args.actor:
             parser.error("--actor is required for publication and local writes")
-        if args.stage_file:
+        if args.acquire_evidence:
+            request = json.loads(args.acquire_evidence.read_text(encoding="utf-8"))
+            record = repository.read_active().catalog.resolve(request["manufacturer"], request["exact_icpn"])
+            if record is None:
+                raise DeviceCatalogIntegrityError("official Exact ICPN not in active Catalog")
+            evidence_id = repository.acquire_exact_evidence(
+                record, kind=request["kind"], source_revision=request["source_revision"], actor=args.actor
+            )
+            result = {"result": "EVIDENCE_VERIFIED", "evidence_id": evidence_id}
+        elif args.stage_file:
             stage_id = repository.stage_revision(json.loads(args.stage_file.read_text(encoding="utf-8")), actor=args.actor)
             result = {"result": "STAGED", "stage_id": stage_id, "active_revision": repository.read_active().revision_sha256}
         elif args.publish_stage:

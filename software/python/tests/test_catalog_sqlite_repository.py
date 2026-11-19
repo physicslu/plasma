@@ -320,11 +320,13 @@ def test_l1_to_l2_uses_existing_exact_provider_applicability(tmp_path: Path, mon
     stage = repo.stage_revision([{"record": asdict(record), "qualification": l2}], actor="owner")
     source_bytes = evidence_path.read_bytes()
     evidence_path.write_text("tampered", encoding="utf-8")
+    stored_path = repo._evidence_file(hashlib.sha256(source_bytes).hexdigest())
+    stored_path.write_text("tampered", encoding="utf-8")
     before = repo.read_active().revision_sha256
-    with pytest.raises(DeviceCatalogIntegrityError, match="evidence bytes"):
+    with pytest.raises(DeviceCatalogIntegrityError, match="Evidence content digest"):
         repo.publish_staged(stage, actor="owner")
     assert repo.read_active().revision_sha256 == before
-    evidence_path.write_bytes(source_bytes)
+    stored_path.write_bytes(source_bytes)
     revision = repo.publish_staged(stage, actor="owner")
     catalog, qualifications, _ = read_selector_view(str(repo.path))
     assert catalog.resolve(record.vendor, record.identifier)
@@ -403,8 +405,15 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     source_url = "https://www.st.com/en/microcontrollers-microprocessors/stm32f103t8.html"
     official_bytes = b"<html><title>STM32F103T8 - ST</title><body>Part Number: STM32F103T8U6, STM32F103T8U6TR</body></html>"
     source_response = [official_bytes]
+    fetches = []
+    def fetch(url):
+        fetches.append(url)
+        return source_response[0] if url == source_url else b""
     monkeypatch.setattr(CatalogSqliteShadowRepository, "_fetch_official_exact_source",
-                        staticmethod(lambda url: source_response[0] if url == source_url else b""))
+                        staticmethod(fetch))
+    exact_evidence_id = repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="st-page-v1")
+    assert repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="st-page-v1") == exact_evidence_id
+    assert fetches == [source_url]
     applicability = json.loads((provider._root / APPLICABILITY_REL).read_text(encoding="utf-8"))
     ordering_lock = applicability["manufacturer_authority"]["ordering"]
     authority = json.loads((provider._root / ordering_lock["path"]).read_text(encoding="utf-8"))
@@ -412,7 +421,8 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     _reviewed_l2_packet(record, l2, packet_path)
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
     packet["official_exact_source"] = {"kind": "manufacturer_https", "url": source_url,
-                                       "sha256": hashlib.sha256(official_bytes).hexdigest()}
+                                       "sha256": hashlib.sha256(official_bytes).hexdigest(),
+                                       "evidence_id": exact_evidence_id}
     group = provider._programming_groups_by_profile["stm32f1-medium-density-flash-v0"]
     packet["applicability"] = {
         "base_device": record.base_device,
@@ -456,14 +466,13 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
             stage_packet({**packet, field: replacement})
     source_response[0] = b"<html>STM32F103C8T6 only</html>"
     with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source"):
-        stage_packet(packet)
+        repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="bad-page-v1")
     source_response[0] = b"<html>404: STM32F103T8U6</html>"
     with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source"):
-        stage_packet({**packet, "official_exact_source": {
-            "kind": "manufacturer_https", "url": source_url,
-            "sha256": hashlib.sha256(source_response[0]).hexdigest()
-        }})
+        repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="bad-page-v2")
     source_response[0] = official_bytes
+    monkeypatch.setattr(CatalogSqliteShadowRepository, "_fetch_official_exact_source",
+                        staticmethod(lambda url: (_ for _ in ()).throw(AssertionError("HTTPS not used"))))
     bad = json.loads(json.dumps(l2))
     bad["programming"]["memory_geometry_profile_id"] = "stm32f103c8-64k-v0"
     bad_packet = json.loads(json.dumps(packet))
@@ -496,12 +505,17 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     with sqlite3.connect(repo.path) as conn:
         audit_before = conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0]
     source_response[0] = b"<html>changed official page</html>"
-    with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source"):
+    official_path = repo._evidence_file(hashlib.sha256(official_bytes).hexdigest())
+    official_path.write_text("tampered", encoding="utf-8")
+    with pytest.raises(DeviceCatalogIntegrityError, match="Evidence content digest"):
         repo.publish_staged(stage, actor="owner")
     assert repo.read_active().revision_sha256 == l1_revision
     with sqlite3.connect(repo.path) as conn:
         assert conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0] == audit_before
-    source_response[0] = official_bytes
+    official_path.write_bytes(official_bytes)
+    packet_path.unlink()
+    repo = CatalogSqliteShadowRepository(repo.path)
+    assert repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="st-page-v1") == exact_evidence_id
     l2_revision = repo.publish_staged(stage, actor="owner")
     snapshot = repo.read_active()
     assert l2_revision != l1_revision
@@ -518,13 +532,42 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     assert "source_path" not in published_evidence
     assert published_evidence["official_exact_source"] == packet["official_exact_source"]
     assert published_evidence["applicability"] == packet["applicability"]
+    assert len(fetches) == 3  # one valid Acquire and two rejected invalid revisions
+    with sqlite3.connect(repo.path) as conn:
+        audit_before = conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0]
+    official_path.unlink()
+    repo.rollback(l1_revision, actor="owner")
+    with pytest.raises(DeviceCatalogIntegrityError, match="Evidence content missing"):
+        repo.rollback(l2_revision, actor="owner")
+    with sqlite3.connect(repo.path) as conn:
+        assert conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0] == audit_before + 1
+        assert conn.execute("SELECT revision_sha256 FROM active_catalog_revision").fetchone()[0] == l1_revision
+    official_path.write_bytes(official_bytes)
+    repo.rollback(l2_revision, actor="owner")
+    assert repo.read_active().revision_sha256 == l2_revision
     repo.rollback(l1_revision, actor="owner")
     assert repo.read_active().revision_sha256 == l1_revision
     assert repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 1
+    # A changed manufacturer page receives a new Evidence Revision; the old bytes remain.
+    newer_bytes = official_bytes.replace(b"</body>", b" New revision</body>")
+    monkeypatch.setattr(CatalogSqliteShadowRepository, "_fetch_official_exact_source",
+                        staticmethod(lambda url: newer_bytes))
+    newer_id = repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="st-page-v2")
+    assert newer_id != exact_evidence_id
+    assert repo._read_evidence(exact_evidence_id)[1] == official_bytes
+    assert repo._read_evidence(newer_id)[1] == newer_bytes
+    with sqlite3.connect(repo.path) as conn:
+        assert conn.execute("SELECT count(*) FROM catalog_evidence WHERE source_authority='STMicroelectronics HTTPS'").fetchone()[0] == 2
+    monkeypatch.setattr(CatalogSqliteShadowRepository, "_fetch_official_exact_source",
+                        staticmethod(lambda url: (_ for _ in ()).throw(AssertionError("HTTPS not used"))))
     identity_lock = applicability["manufacturer_authority"]["production_exact_identity"]
+    locked_evidence_id = repo.acquire_exact_evidence(
+        record, kind="locked_production_identity", source_revision=identity_lock["git_blob_sha1"]
+    )
     locked_packet = {**packet, "official_exact_source": {
         "kind": "locked_production_identity", "path": identity_lock["path"],
         "git_blob_sha1": identity_lock["git_blob_sha1"], "exact_icpn": record.identifier,
+        "evidence_id": locked_evidence_id,
     }, "fact_references": {
         **packet["fact_references"], "identity": f"{identity_lock['path']}#{record.identifier}"
     }}
@@ -532,20 +575,42 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
         stage_packet({**locked_packet, "official_exact_source": {
             **locked_packet["official_exact_source"], "git_blob_sha1": "0" * 40
         }})
-    identity_path = provider._root / identity_lock["path"]
-    original_read_bytes = Path.read_bytes
-    with monkeypatch.context() as patcher:
-        patcher.setattr(Path, "read_bytes", lambda path: (
-            b"tampered identity source" if path == identity_path else original_read_bytes(path)
-        ))
-        with pytest.raises(DeviceCatalogIntegrityError, match="identity source drift"):
-            stage_packet(locked_packet)
+    locked_bytes = (provider._root / identity_lock["path"]).read_bytes()
+    locked_path = repo._evidence_file(hashlib.sha256(locked_bytes).hexdigest())
+    locked_path.write_text("tampered identity source", encoding="utf-8")
+    with pytest.raises(DeviceCatalogIntegrityError, match="Evidence content digest"):
+        stage_packet(locked_packet)
+    locked_path.write_bytes(locked_bytes)
     monkeypatch.setattr(CatalogSqliteShadowRepository, "_fetch_official_exact_source",
                         staticmethod(lambda url: (_ for _ in ()).throw(AssertionError("HTTPS not used"))))
     locked_stage = stage_packet(locked_packet)
+    locked_path.unlink()
+    with sqlite3.connect(repo.path) as conn:
+        audit_before = conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0]
+    with pytest.raises(DeviceCatalogIntegrityError, match="Evidence content missing"):
+        repo.publish_staged(locked_stage, actor="owner")
+    assert repo.read_active().revision_sha256 == l1_revision
+    with sqlite3.connect(repo.path) as conn:
+        assert conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0] == audit_before
+    locked_path.write_bytes(locked_bytes)
     locked_revision = repo.publish_staged(locked_stage, actor="owner")
     assert locked_revision != l2_revision
     assert repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 2
+
+
+def test_v2_schema_upgrade_keeps_revisions_and_audit(tmp_path: Path) -> None:
+    repo = CatalogSqliteShadowRepository(tmp_path / "upgrade.sqlite3")
+    revision = repo.import_verified_manifest(default_catalog_manifest_path())
+    with sqlite3.connect(repo.path) as conn:
+        conn.execute("DROP TABLE catalog_evidence")
+        conn.execute("PRAGMA user_version=2")
+        conn.execute("INSERT INTO catalog_audit_events(action,actor,detail) VALUES ('IMPORT','owner','v2')")
+    assert repo.read_active().revision_sha256 == revision
+    repo._store_evidence("test authority", "test source", "v1", b"persistent bytes")
+    with sqlite3.connect(repo.path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert conn.execute("SELECT revision_sha256 FROM active_catalog_revision").fetchone()[0] == revision
+        assert conn.execute("SELECT detail FROM catalog_audit_events").fetchone()[0] == "v2"
 
 
 def test_official_exact_source_requires_manufacturer_https_and_bounded_redirect(
