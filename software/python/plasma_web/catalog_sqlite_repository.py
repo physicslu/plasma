@@ -346,6 +346,33 @@ class CatalogSqliteShadowRepository:
             raise DeviceCatalogIntegrityError("invalid L2 flash geometry")
         if level == 3 and not (q.get("ppu_ready") or q.get("socket_ready")):
             raise DeviceCatalogIntegrityError("L3 physical evidence missing")
+        if level == 2 and (q.get("ppu_ready") or q.get("socket_ready")
+                           or q.get("verified_configurations") or q.get("family_ready")):
+            raise DeviceCatalogIntegrityError("L2 cannot claim physical qualification")
+
+    @staticmethod
+    def _validate_l2_applicability(record: DeviceCatalogRecord, q: dict[str, Any]) -> None:
+        """Require the existing source-validated Provider to review this exact part."""
+        from .programming_qualification import get_default_programming_qualification_registry
+
+        registry = get_default_programming_qualification_registry()
+        canonical = registry._catalog.resolve(record.vendor, record.identifier)
+        if canonical is None or any(
+            getattr(record, field) != getattr(canonical, field)
+            for field in ("vendor", "identifier", "package", "pin_count", "target_config",
+                          "source_authority", "source_reference", "source_type")
+        ):
+            raise DeviceCatalogIntegrityError("L2 exact ICPN/source applicability is not admitted")
+        admitted = registry.describe(record.vendor, record.identifier)
+        if (admitted.get("state") != "SUPPORTED"
+                or admitted.get("catalog_level", 0) < 2
+                or any(q.get(field) != admitted.get(field)
+                       for field in ("provider", "programming", "operations"))
+                or (q.get("catalog_level") == 3
+                    and any(q.get(field) != admitted.get(field) for field in
+                            ("verified_configurations", "ppu_ready", "socket_ready",
+                             "ppu_readiness_source", "family_ready")))):
+            raise DeviceCatalogIntegrityError("L2 Provider/Profile/geometry/operations lack exact applicability")
 
     @staticmethod
     def _validate_l2_source(record: DeviceCatalogRecord, q: dict[str, Any]) -> dict[str, Any]:
@@ -412,6 +439,7 @@ class CatalogSqliteShadowRepository:
             self._validate_publication(record, q)
             if q.get("catalog_level", 0) >= 2:
                 self._validate_l2_source(record, q)
+                self._validate_l2_applicability(record, q)
             key = _identity(record)
             if key in seen:
                 raise DeviceCatalogIntegrityError("duplicate exact ICPN in staging")
@@ -465,6 +493,7 @@ class CatalogSqliteShadowRepository:
                 self._validate_publication(record, q)
                 if q["catalog_level"] >= 2:
                     reviewed = self._validate_l2_source(record, q)
+                    self._validate_l2_applicability(record, q)
                     p = q["provider"]
                     lock = (p["provider_id"], p["version"], p["source_commit"], p["target_config"],
                             q["programming"]["programming_profile_id"])
@@ -517,7 +546,17 @@ class CatalogSqliteShadowRepository:
             previous = conn.execute("SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1").fetchone()
             if previous is None:
                 raise DeviceCatalogIntegrityError("no active Catalog revision")
-            self._read_revision(conn, revision)
+            target = self._read_revision(conn, revision)
+            current = self._read_revision(conn, previous[0])
+            current_records = {_identity(row): row for row in current.catalog.records}
+            target_records = {_identity(row): row for row in target.catalog.records}
+            if any(
+                target.qualifications.get(key) != qualification
+                or target_records.get(key) != current_records.get(key)
+                for key, qualification in current.qualifications.items()
+                if qualification.get("catalog_level") == 3
+            ):
+                raise DeviceCatalogIntegrityError("L3 revision requires separately authorized revocation")
             conn.execute("UPDATE active_catalog_revision SET revision_sha256=? WHERE singleton=1", (revision,))
             conn.execute("INSERT INTO catalog_audit_events(action,actor,predecessor,revision_sha256,detail) VALUES (?,?,?,?,?)",
                          ("ROLLBACK", actor, previous[0], revision, "validated snapshot"))

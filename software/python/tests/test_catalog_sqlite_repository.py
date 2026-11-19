@@ -159,6 +159,34 @@ def _publisher_fixture(tmp_path: Path):
     return repo, initial, record, l1, registry.describe(st.vendor, st.identifier)
 
 
+def _reviewed_l2_packet(record, l2, evidence_path: Path) -> None:
+    reviewed = {
+        "schema_version": "catalog-l2-reviewed-evidence-v1",
+        "manufacturer": record.vendor, "exact_icpn": record.identifier,
+        "exact_applicability": record.identifier,
+        "source_authority": record.source_authority,
+        "source_reference": record.source_reference,
+        "provider": {key: l2["provider"][key] for key in
+                     ("provider_id", "version", "source_commit", "target_config", "flash_driver")},
+        "profile": {key: l2["programming"][key] for key in
+                    ("programming_profile_id", "memory_geometry_profile_id", "flash_geometry")},
+        "operations": l2["operations"],
+        "review_status": "ADMITTED", "reviewer": "test-reviewer",
+        "fact_references": {key: "test-document section 1" for key in
+                            ("identity", "route", "geometry", "operations")},
+    }
+    evidence_path.write_text(json.dumps(reviewed), encoding="utf-8")
+    l2["publication_evidence"] = {
+        "manufacturer": record.vendor, "exact_icpn": record.identifier,
+        "source_authority": record.source_authority, "source_reference": record.source_reference,
+        "source_path": str(evidence_path),
+        "source_sha256": hashlib.sha256(evidence_path.read_bytes()).hexdigest(),
+        "provider_id": l2["provider"]["provider_id"],
+        "provider_version": l2["provider"]["version"],
+        "profile_id": l2["programming"]["programming_profile_id"],
+    }
+
+
 def test_data_only_publish_l1_search_rollback_and_audit(tmp_path: Path, monkeypatch) -> None:
     repo, initial, record, l1, _ = _publisher_fixture(tmp_path)
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
@@ -238,6 +266,49 @@ def test_l1_to_l2_requires_evidence_and_known_provider_profile(tmp_path: Path, m
     bad["programming"]["programming_profile_id"] = "wrong-profile"
     with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
         repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
+    with pytest.raises(DeviceCatalogIntegrityError, match="exact ICPN/source applicability"):
+        repo.stage_revision([{"record": asdict(record), "qualification": l2}], actor="owner")
+    assert repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 1
+    assert {key for key, q in repo.read_active().qualifications.items() if q["catalog_level"] == 3} == baseline_l3
+
+
+def test_l1_to_l2_uses_existing_exact_provider_applicability(tmp_path: Path, monkeypatch) -> None:
+    registry = get_default_programming_qualification_registry()
+    catalog = get_default_device_catalog()
+    record = next(row for row in catalog.records if row.identifier == "STM32F103C8T6")
+    supported = registry.describe(record.vendor, record.identifier)
+    l1 = json.loads(json.dumps(supported))
+    l1.update(catalog_level=1, catalog_level_state="PROGRAMMING_CANDIDATE", state="CANDIDATE",
+              reviewed=False, job_selectable=False, provider=None, programming=None,
+              operations={}, ppu_ready=False, socket_ready=False, verified_configurations=[])
+    class L1Baseline:
+        _catalog = catalog
+        def describe(self, manufacturer, exact_icpn):
+            return l1 if (manufacturer, exact_icpn) == (record.vendor, record.identifier) else registry.describe(manufacturer, exact_icpn)
+    repo = CatalogSqliteShadowRepository(tmp_path / "promote.sqlite3")
+    initial = repo.import_verified_manifest(default_catalog_manifest_path(), qualification_registry=L1Baseline())
+    l2 = json.loads(json.dumps(supported))
+    l2.update(catalog_level=2, catalog_level_state="PROGRAMMABLE", ppu_ready=False,
+              socket_ready=False, ppu_readiness_source=None, family_ready=None,
+              verified_configurations=[])
+    evidence_path = tmp_path / "reviewed-source.json"
+    _reviewed_l2_packet(record, l2, evidence_path)
+    bad = json.loads(json.dumps(l2))
+    bad["programming"]["flash_geometry"]["main_flash_start"] = "0x08001000"
+    _reviewed_l2_packet(record, bad, evidence_path)
+    with pytest.raises(DeviceCatalogIntegrityError, match="Provider/Profile/geometry/operations"):
+        repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
+    bad = json.loads(json.dumps(l2))
+    bad["operations"]["erase"]["basis"] = "invented"
+    _reviewed_l2_packet(record, bad, evidence_path)
+    with pytest.raises(DeviceCatalogIntegrityError, match="Provider/Profile/geometry/operations"):
+        repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
+    bad_record = replace(record, source_reference="https://example.test/forged-source")
+    bad = json.loads(json.dumps(l2))
+    _reviewed_l2_packet(bad_record, bad, evidence_path)
+    with pytest.raises(DeviceCatalogIntegrityError, match="exact ICPN/source applicability"):
+        repo.stage_revision([{"record": asdict(bad_record), "qualification": bad}], actor="owner")
+    _reviewed_l2_packet(record, l2, evidence_path)
     stage = repo.stage_revision([{"record": asdict(record), "qualification": l2}], actor="owner")
     source_bytes = evidence_path.read_bytes()
     evidence_path.write_text("tampered", encoding="utf-8")
@@ -254,11 +325,40 @@ def test_l1_to_l2_requires_evidence_and_known_provider_profile(tmp_path: Path, m
     assert qualifications[(record.vendor.casefold(), record.identifier.casefold())]["publication_evidence"]["reviewer"] == "test-reviewer"
     assert set(qualifications[(record.vendor.casefold(), record.identifier.casefold())]["publication_evidence"]["fact_references"]) == {"identity", "route", "geometry", "operations"}
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
-    status, body = selector.search_response("q=STM32F103C8T6-TEST-EXACT&levels=2,3")
-    assert status == 200 and body["total_count"] == 1
-    assert body["results"][0]["programming_qualification"]["provider"]["provider_id"] == "openocd-upstream"
-    assert {key for key, q in qualifications.items() if q["catalog_level"] == 3} == baseline_l3
+    status, body = selector.search_response("q=STM32F103C8T6&levels=2,3")
+    assert status == 200 and body["total_count"] >= 1
+    matching = next(item for item in body["results"] if item["icpn"] == record.identifier)
+    assert matching["programming_qualification"]["provider"]["provider_id"] == "openocd-upstream"
     assert revision != initial
+
+
+def test_rollback_rejects_cross_revision_l3_loss_without_audit(tmp_path: Path) -> None:
+    registry = get_default_programming_qualification_registry()
+    catalog = get_default_device_catalog()
+    record = next(row for row in catalog.records if row.identifier == "STM32F103C8T6")
+    supported = registry.describe(record.vendor, record.identifier)
+    l1 = json.loads(json.dumps(supported))
+    l1.update(catalog_level=1, catalog_level_state="PROGRAMMING_CANDIDATE", state="CANDIDATE",
+              reviewed=False, job_selectable=False, provider=None, programming=None,
+              operations={}, ppu_ready=False, socket_ready=False, verified_configurations=[])
+    class L1Baseline:
+        _catalog = catalog
+        def describe(self, manufacturer, exact_icpn):
+            return l1 if (manufacturer, exact_icpn) == (record.vendor, record.identifier) else registry.describe(manufacturer, exact_icpn)
+    repo = CatalogSqliteShadowRepository(tmp_path / "rollback-l3.sqlite3")
+    older = repo.import_verified_manifest(default_catalog_manifest_path(), qualification_registry=L1Baseline())
+    l3 = json.loads(json.dumps(supported))
+    _reviewed_l2_packet(record, l3, tmp_path / "l3-reviewed.json")
+    active = repo.publish_staged(
+        repo.stage_revision([{"record": asdict(record), "qualification": l3}], actor="owner"), actor="owner"
+    )
+    with sqlite3.connect(repo.path) as conn:
+        audit_before = conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0]
+    with pytest.raises(DeviceCatalogIntegrityError, match="L3 revision"):
+        repo.rollback(older, actor="owner")
+    assert repo.read_active().revision_sha256 == active
+    with sqlite3.connect(repo.path) as conn:
+        assert conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0] == audit_before
 
 
 def test_rejected_publication_keeps_active_and_local_namespace_isolated(tmp_path: Path) -> None:
