@@ -1522,3 +1522,67 @@ test("Manual Repeat: a paused Site is continued by the same START, once, with it
   // One Continue, echoing the pause it answers; no actor is ever sent by the Browser.
   expect(continues).toEqual([{ ppu_alias: "z2", site_id: 2, continue_seq: 1 }]);
 });
+
+test("Manual Repeat: with two Sites waiting, START continues only the Site marked as replaced", async ({ page }) => {
+  await mockManager(page);
+  const { workspace, job, start } = await configure(page);
+  await job.getByLabel("Repeat Count").fill("3");
+  const batchId = "f".repeat(32);
+  const continues: Array<Record<string, unknown>> = [];
+  const waitingSites = new Set([1, 2]);
+  let started: Record<string, unknown> = {};
+  const unit = (siteId: number) => {
+    const waiting = waitingSites.has(siteId);
+    return {
+      ppu_alias: "z2", site_id: siteId, status: waiting ? "AWAITING_CONTINUE" : "RUNNING",
+      outcome: null, reason: null, failure_domain: null, attempts: [], progress: null,
+      cycle: {
+        planned: 3, index: 2, cycle_id: `${siteId}`.repeat(32), state: waiting ? "AWAITING_CONTINUE" : "ACTIVE",
+        disposition: null, settled: 1, pass: 1, fail: 0, retry_attempts: 0, remaining: 2,
+        continue_seq: 1, continued_seq: waiting ? 0 : 1, wait_reason: waiting ? "REPLACE_IC" : null,
+        last: { cycle_index: 1, cycle_id: "a".repeat(32), outcome: "PASS", reason: null, attempts: 1, receipt: null },
+      },
+    };
+  };
+  const view = () => ({
+    schema: "plasma.manager.programming-batch.v2", batch_id: batchId, start_id: started.start_id,
+    targets: started.targets, icpn: started.icpn, operations: started.operations, source: "image",
+    policy: { repeat: 3, replace_ic_before_next_cycle: true, retry_limit: 0, stop_policy: { kind: "never" } },
+    state: "running", execution_status: "RUNNING", outcome: null, reason: null, failure_domain: null,
+    stop_requested: false, units: [unit(1), unit(2)], attempts: [], current_run: null,
+    counts: { pass: 0, fail: 0, blocked: 0, unknown: 0, sites: 2, attempts: 0 },
+    cycles: { planned: 6, settled: 2, pass: 2, fail: 0, retry_attempts: 0, remaining: 4,
+      awaiting_continue: waitingSites.size },
+    auto_retry: "DISABLED", created_at: null, started_at: null, finished_at: null,
+  });
+  await page.route(/\/api\/manager\/programming\/batches$/, async route => {
+    started = route.request().postDataJSON() as Record<string, unknown>;
+    // The Manager answers with ITS Target Set; the Console checks it against the request.
+    await route.fulfill({ status: 202, json: { ok: true, batch: view() } });
+  });
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}$/, async route => {
+    await route.fulfill({ json: { ok: true, batch: view() } });
+  });
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}\/continue$/, async route => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    continues.push(body);
+    waitingSites.delete(Number(body.site_id));
+    await route.fulfill({ json: { ok: true, duplicate: false, batch: view() } });
+  });
+  await start.click();
+  await expect(job.getByRole("status", { name: "BATCH STATUS" })).toContainText("WAITING · REPLACE IC");
+  // Two Sites wait: nothing is continued until the operator names a replaced Site.
+  const blocked = job.getByRole("button", { name: /MARK THE REPLACED SITE/ });
+  await expect(blocked).toBeDisabled();
+  await workspace.getByLabel("SITE 2 IC replaced").check();
+  const resume = job.getByRole("button", { name: /CONTINUE SITE-02$/ });
+  await expect(resume).toBeEnabled();
+  await resume.click();
+  await expect.poll(() => continues.length).toBe(1);
+  expect(continues).toEqual([{ ppu_alias: "z2", site_id: 2, continue_seq: 1 }]);
+  // Site 1 still waits; its IC was never declared replaced and no Continue was sent for it.
+  await expect(workspace.getByLabel("SITE 1 IC replaced")).not.toBeChecked();
+  await expect(job.getByRole("button", { name: /MARK THE REPLACED SITE/ })).toBeDisabled();
+  await page.waitForTimeout(1500);
+  expect(continues).toHaveLength(1);
+});

@@ -440,3 +440,61 @@ test("a lost Start reconciled after completion retains terminal Batch Time on re
   expect(counters.issued).toHaveLength(1);
   expect(counters.jobs).toHaveLength(1);
 });
+
+test("Manual Repeat: with two Sites waiting, START continues only the tile marked as replaced", async ({ page }) => {
+  await mockManager(page, { ppus: [{ ...Z2, enabledSites: [1, 2] }] });
+  const { job, start } = await prepare(page, [["z2", [1, 2]]]);
+  await job.getByLabel("Repeat Count").fill("3");
+  const continues: Array<Record<string, unknown>> = [];
+  const waitingSites = new Set([1, 2]);
+  let started: Record<string, unknown> = {};
+  const unit = (siteId: number) => {
+    const waiting = waitingSites.has(siteId);
+    return {
+      ppu_alias: "z2", site_id: siteId, status: waiting ? "AWAITING_CONTINUE" : "RUNNING",
+      outcome: null, reason: null, failure_domain: null, attempts: [], progress: null,
+      cycle: {
+        planned: 3, index: 2, cycle_id: `${siteId}`.repeat(32), state: waiting ? "AWAITING_CONTINUE" : "ACTIVE",
+        disposition: null, settled: 1, pass: 0, fail: 1, retry_attempts: 0, remaining: 2,
+        continue_seq: 1, continued_seq: waiting ? 0 : 1, wait_reason: waiting ? "FAIL_REVIEW" : null,
+        last: { cycle_index: 1, cycle_id: "a".repeat(32), outcome: "FAIL", reason: "JOB_NOT_SUCCESS",
+          attempts: 1, receipt: null },
+      },
+    };
+  };
+  const view = () => ({
+    schema: "plasma.manager.programming-batch.v2", batch_id: "9".repeat(32), start_id: started.start_id,
+    targets: started.targets, icpn: started.icpn, operations: started.operations, source: "image",
+    policy: { repeat: 3, replace_ic_before_next_cycle: true, retry_limit: 0, stop_policy: { kind: "never" } },
+    state: "running", execution_status: "RUNNING", outcome: null, reason: null, failure_domain: null,
+    stop_requested: false, units: [unit(1), unit(2)], attempts: [], current_run: null,
+    counts: { pass: 0, fail: 0, blocked: 0, unknown: 0, sites: 2, attempts: 0 },
+    cycles: { planned: 6, settled: 2, pass: 0, fail: 2, retry_attempts: 0, remaining: 4,
+      awaiting_continue: waitingSites.size },
+    auto_retry: "DISABLED", created_at: null, started_at: null, finished_at: null,
+  });
+  await page.route(/\/api\/manager\/programming\/batches$/, async route => {
+    started = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({ status: 202, json: { ok: true, batch: view() } });
+  });
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}$/, async route => {
+    await route.fulfill({ json: { ok: true, batch: view() } });
+  });
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}\/continue$/, async route => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    continues.push(body);
+    waitingSites.delete(Number(body.site_id));
+    await route.fulfill({ json: { ok: true, duplicate: false, batch: view() } });
+  });
+  await start.click();
+  await expect(job.getByRole("button", { name: /MARK THE REPLACED SITE/ })).toBeDisabled();
+  // Rounds are settled Cycles (FAIL included); PASS and FAIL stay separate.
+  await expect(summary(page)).toContainText(/PROCESSED IC\s*2/);
+  await page.getByLabel(/SITE-01 IC replaced$/).check();
+  await job.getByRole("button", { name: /CONTINUE z2 SITE-01$/ }).click();
+  await expect.poll(() => continues.length).toBe(1);
+  expect(continues).toEqual([{ ppu_alias: "z2", site_id: 1, continue_seq: 1 }]);
+  await expect(job.getByRole("button", { name: /MARK THE REPLACED SITE/ })).toBeDisabled();
+  await page.waitForTimeout(1500);
+  expect(continues).toHaveLength(1);
+});

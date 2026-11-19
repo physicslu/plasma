@@ -102,6 +102,13 @@ LEGACY_JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v1"
 MAX_RETRY_LIMIT = 5
 #: Manual Repeat: Cycles per selected Site in one Manual Session (WP-02).
 MAX_REPEAT = 10000
+#: After a settled Cycle the PPU may not have released the Site yet. The next
+#: Cycle re-reads readiness for at most this long before it pauses for the
+#: operator. Only re-checks: no gate is skipped or relaxed while waiting.
+RELEASE_WAIT_S = 15.0
+RELEASE_RECHECK_S = 0.5
+#: The one readiness verdict that is transient right after a terminal Job.
+RELEASE_PENDING_REASON = "SITE_NOT_READY_OR_BUSY"
 MAX_TARGETS = 32
 MAX_SITES_PER_BATCH = 64
 STOP_TOKEN = "STOP_QUEUING"
@@ -415,7 +422,9 @@ class ProgrammingBatchCoordinator:
                  shared_control_gate: Callable[[], tuple[str, str] | None] | None = None,
                  sleep: Callable[[float], None] = time.sleep,
                  spawn: Callable[[Callable[[], None]], None] | None = None,
-                 poll_interval_s: float = 0.1) -> None:
+                 poll_interval_s: float = 0.1,
+                 monotonic: Callable[[], float] = time.monotonic,
+                 release_wait_s: float = RELEASE_WAIT_S) -> None:
         self.workflow = workflow
         self.journal_path = journal_path
         # The Manager's Platform maintenance gate, evaluated per Target PPU at
@@ -428,6 +437,8 @@ class ProgrammingBatchCoordinator:
         self.spawn = spawn or (lambda target: threading.Thread(
             target=target, name="plasma-programming-batch", daemon=True).start())
         self.poll_interval_s = poll_interval_s
+        self.monotonic = monotonic
+        self.release_wait_s = release_wait_s
         self._lock = threading.RLock()
         self._batches: dict[str, dict[str, Any]] = {}
         self._control_failure: str | None = None
@@ -1498,6 +1509,7 @@ class ProgrammingBatchCoordinator:
         # (Asset Set + Site readiness); the Platform gate is still re-read, and
         # every later pass (after any yield, retry or planning gap) re-reads both.
         site_verdict_fresh = first
+        release_deadline: float | None = None
         if first:
             if platform_leader:
                 platform.set_result(self._platform_block(alias))
@@ -1530,6 +1542,18 @@ class ProgrammingBatchCoordinator:
                 domain, reason = verdict
                 if domain == SHARED_CONTROL_FAILURE:
                     raise _SharedControlFailure(reason)
+                # A later Cycle may find the PPU still releasing the Site it
+                # just finished. Bounded re-check of the same gates, then the
+                # normal BLOCKED pause: never a submission without release.
+                if not first and number == 1 and reason == RELEASE_PENDING_REASON:
+                    now = self.monotonic()
+                    if release_deadline is None:
+                        release_deadline = now + self.release_wait_s
+                    if now < release_deadline:
+                        recheck = min(release_deadline, now + RELEASE_RECHECK_S)
+                        while self.monotonic() < recheck:
+                            yield
+                        continue
                 # An exclusive activation must finish before peer planning.
                 # It is a wait, never a fabricated blocked Site or a reload.
                 if reason == "RUN_IN_PROGRESS" and any(

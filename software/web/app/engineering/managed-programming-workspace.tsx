@@ -13,6 +13,8 @@ import {
   batchSiteVerdict,
   batchVerdict,
   continueAwaitingSites,
+  continueMarkKey,
+  sitesToContinue,
   loadAttemptRun,
   runOfUnit,
   describeBlocked,
@@ -230,6 +232,8 @@ export default function ManagedProgrammingWorkspace() {
   // Batch Policy: Manager-owned Repeat (Cycles per Site), Retry and Stop Policy.
   const [repeatCount, setRepeatCount] = useState("1");
   const [replaceIc, setReplaceIc] = useState(true);
+  // Manual Repeat: Sites the operator marked "IC replaced", per pause.
+  const [replacedMarks, setReplacedMarks] = useState<ReadonlySet<string>>(new Set());
   const [retryLimit, setRetryLimit] = useState(0);
   const [stopPolicy, setStopPolicy] = useState<StopPolicy>({ kind: "never" });
   const [batch, setBatch] = useState<ProgrammingBatch | null>(null);
@@ -654,18 +658,20 @@ export default function ManagedProgrammingWorkspace() {
     appendLog(`[SITE] SELECTION · ${next.length ? next.map(siteLabel).join(", ") : "none"}`, false, "USR");
   }
 
-  // Manual Repeat: Start pressed while Sites wait is their Continue (IC
-  // replaced / FAIL reviewed). One request per waiting Site; the Manager
-  // submits the next Cycle through its own gates.
+  // Manual Repeat: Start pressed while Sites wait continues ONLY the Sites
+  // the operator marked "IC replaced" (a one-Site Session needs no mark).
+  // The Manager submits each next Cycle through its own gates.
   async function continueSites() {
     if (!batch || continueLock.current) return;
     continueLock.current = true;
     try {
-      const waiting = awaitingUnits(batch);
-      const result = await continueAwaitingSites(batch);
+      const result = await continueAwaitingSites(batch, replacedMarks);
       setBatch(result.batch);
-      appendLog(`[CONTINUE] ${waiting.map(unit => `${siteLabel(unit.site_id)} after Cycle ${unit.cycle?.last?.cycle_index ?? "—"} ${unit.cycle?.last?.outcome ?? ""}`).join(", ")} · operator replaced IC · ${result.continued} continued`, false, "USR");
+      if (result.continued.length) {
+        appendLog(`[CONTINUE] ${result.continued.map(unit => `${siteLabel(unit.site_id)} after Cycle ${unit.cycle?.last?.cycle_index ?? "—"} ${unit.cycle?.last?.outcome ?? ""}`).join(", ")} · operator replaced IC`, false, "USR");
+      }
       for (const error of result.errors) appendLog(`[CONTINUE] REFUSED · ${error} · nothing was started`, true, "USR");
+      setReplacedMarks(new Set());
     } finally {
       continueLock.current = false;
     }
@@ -993,6 +999,9 @@ export default function ManagedProgrammingWorkspace() {
   const repeatValue = Number.isSafeInteger(repeatParsed) && repeatParsed >= 1 && repeatParsed <= MAX_REPEAT
     ? repeatParsed : null;
   const waiting = awaitingUnits(batch);
+  const continuing = batch ? sitesToContinue(
+    waiting.map(unit => ({ unit, alias: unit.ppu_alias, siteId: unit.site_id, continueSeq: unit.cycle!.continue_seq })),
+    batch.units.length, replacedMarks).map(item => item.unit) : [];
   const policyNote = locale === "zh-TW"
     ? `每次 Attempt 為獨立 Job（attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}）。Retry：僅在明確 FAIL、SAFE_OFF 已驗證且 Site 已釋放時，由 Manager 以新的 Plan／Job 重試；OUTCOME UNKNOWN 永不重送。Stop Policy 與 STOP QUEUING 只停止尚未提交的 Attempt，不取消執行中的 Job。Repeat：每個 Site 的 Cycle 數（1–10000，FAIL 也計入一個 Cycle，Retry 不另計）；每個 Cycle 結束後更換 IC 並按 START 繼續。`
     : `Each attempt is its own Job (attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}). Retry: the Manager submits a new Plan / Job only after a definite FAIL with SAFE_OFF verified and the Site released; OUTCOME UNKNOWN is never resubmitted. Stop Policy and STOP QUEUING only stop attempts that are not submitted yet; a running Job is never cancelled. Repeat: Cycles per Site (1–10000; a FAIL settles one Cycle, Retries never add one); after each Cycle replace the IC and press START to continue.`;
@@ -1159,8 +1168,11 @@ export default function ManagedProgrammingWorkspace() {
                 },
                 note: policyNote,
               }}
-              startLabel={waiting.length ? `START · CONTINUE ${waiting.map(unit => siteLabel(unit.site_id)).join(", ")}` : "START PROGRAMMING"}
-              startDisabled={waiting.length ? false : !readiness.ready || repeatValue == null}
+              startLabel={waiting.length
+                ? continuing.length ? `START · CONTINUE ${continuing.map(unit => siteLabel(unit.site_id)).join(", ")}`
+                  : "START · MARK THE REPLACED SITE(S)"
+                : "START PROGRAMMING"}
+              startDisabled={waiting.length ? !continuing.length : !readiness.ready || repeatValue == null}
               onStart={start}
               statusLabel="BATCH STATUS"
               statusValue={phaseLabel}
@@ -1246,6 +1258,8 @@ export default function ManagedProgrammingWorkspace() {
                   const state = stage ?? (site.enabled ? site.state.toUpperCase() : "DISABLED");
                   const cycleLabel = ownBatch ? unitCycleLabel(unit) : null;
                   const failDetail = ownBatch ? unitFailDetail(unit) : null;
+                  const waitingMark = ownBatch && batch.units.length > 1 && unit.cycle?.state === "AWAITING_CONTINUE"
+                    && batch.outcome == null ? continueMarkKey(unit.ppu_alias, unit.site_id, unit.cycle.continue_seq) : null;
                   // READ uses the IC Profile's operations and the PPU Site's current readiness.
                   const canRead = routeDeclaring(routes, icpn, site.site_id, ["read"]) != null;
                   const readBlocked = canRead ? readBlockReason(site.site_id) : null;
@@ -1255,13 +1269,29 @@ export default function ManagedProgrammingWorkspace() {
                     <tr key={site.site_id} data-site-selected={selected ? "true" : "false"} data-site-enabled={site.enabled ? "true" : "false"}
                       data-site-programmable={capability?.programmable ? "true" : "false"}>
                       <td className="engineeringBatchSelectCell">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select SITE ${site.site_id} for programming`}
-                          checked={selected}
-                          disabled={active || !capability?.programmable}
-                          onChange={() => toggleSite(site.site_id)}
-                        />
+                        {waitingMark ? (
+                          // While THIS Site waits, its checkbox is the operator's
+                          // "IC replaced" mark for this pause only.
+                          <input
+                            type="checkbox"
+                            aria-label={`SITE ${site.site_id} IC replaced`}
+                            data-site-replaced={site.site_id}
+                            checked={replacedMarks.has(waitingMark)}
+                            onChange={() => setReplacedMarks(current => {
+                              const next = new Set(current);
+                              if (next.has(waitingMark)) next.delete(waitingMark); else next.add(waitingMark);
+                              return next;
+                            })}
+                          />
+                        ) : (
+                          <input
+                            type="checkbox"
+                            aria-label={`Select SITE ${site.site_id} for programming`}
+                            checked={selected}
+                            disabled={active || !capability?.programmable}
+                            onChange={() => toggleSite(site.site_id)}
+                          />
+                        )}
                       </td>
                       <td><b>{siteLabel(site.site_id)}</b></td>
                       <td><b>{icpn ?? site.target ?? "—"}</b><small>{site.interface ?? "—"}</small></td>

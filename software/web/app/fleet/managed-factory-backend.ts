@@ -130,7 +130,9 @@ export function managedProductionSnapshot(
       // Manual Repeat: rounds are the Site's Cycles; a FAIL settles one too.
       current_round: unit.cycle && unit.cycle.planned > 1
         ? Math.min(unit.cycle.index, unit.cycle.planned) : unit.attempts.length ? 1 : 0,
-      completed_rounds: unit.cycle && unit.cycle.planned > 1 ? unit.cycle.pass : passed ? 1 : 0,
+      // Settled Cycles (PASS + FAIL); PASS, FAIL and Retry stay separate below.
+      completed_rounds: unit.cycle && unit.cycle.planned > 1 ? unit.cycle.settled : passed ? 1 : 0,
+      pass_rounds: unit.cycle && unit.cycle.planned > 1 ? unit.cycle.pass : passed ? 1 : 0,
       current_operation: null, current_job_id: last?.job_id ?? null,
       // Each Site's own progress: lanes run concurrently, current_run is one Site.
       progress_percent: passed ? 100 : unitProgressPercent(batch, unit) ?? 0,
@@ -172,6 +174,7 @@ export function managedProductionSnapshot(
     })),
     execution_policy: {
       repeat_count: batch.policy.repeat,
+      replace_ic_before_next_cycle: batch.policy.replace_ic_before_next_cycle ?? true,
       site_retry_limit: batch.policy.retry_limit,
       failed_site_stop_threshold: batch.policy.stop_policy.kind === "failed_sites"
         ? batch.policy.stop_policy.threshold : null,

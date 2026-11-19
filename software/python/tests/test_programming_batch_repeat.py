@@ -8,8 +8,11 @@ recovery decisions only - never real programming.
 from __future__ import annotations
 
 import json
+import os
+import resource
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -475,3 +478,106 @@ def test_blocked_next_cycle_is_neither_failed_nor_skipped(tmp_path):
     s.cont(seq=2)
     batch = s.done()
     assert batch["units"][0]["cycle"]["settled"] == 2 and len(s.gateway.posts) == 2
+
+
+def test_two_sites_waiting_only_the_continued_site_gets_a_new_job(tmp_path):
+    s = Session(tmp_path, sites=(1, 2), repeat=3)
+    s.awaiting(1)
+    two = s.awaiting(2)
+    posts = len(s.gateway.posts)
+    s.cont(site=1)  # only Site 1's IC was replaced
+    s.awaiting(1, seq=2)
+    time.sleep(0.1)
+    sites = [p["job_binding"]["site_id"] for p in s.gateway.posts[posts:]]
+    assert sites == [1]
+    unit = s.unit(2)
+    assert unit["cycle"]["state"] == AWAITING_CONTINUE
+    assert unit["cycle"]["continue_seq"] == two["cycle"]["continue_seq"]
+    assert unit["cycle"]["continued_seq"] == 0 and unit["cycle"]["settled"] == 1
+    assert [e["site_id"] for e in s.ledger("continue")] == [1]
+    s.batches.request_stop_batch(s.batch_id, {"stop": "STOP_QUEUING"})
+    batch = s.done()
+    assert batch["units"][1]["cycle"]["settled"] == 1
+    assert sum(p["job_binding"]["site_id"] == 2 for p in s.gateway.posts) == 1
+
+
+def _release_pending(s, times):
+    original = s.workflow.target_block
+    seen = []
+    def pending(alias, site, **kw):
+        # Only the NEXT Cycle meets a Site the PPU has not released yet.
+        settled = s.batches._batches[s.batch_id]["units"][0]["cycle"]["settled"]
+        if settled and len(seen) < times:
+            seen.append(site)
+            return "TARGET_NOT_READY", "SITE_NOT_READY_OR_BUSY"
+        return original(alias, site, **kw)
+    s.workflow.target_block = pending
+    return seen
+
+
+def test_debug_pass_waits_bounded_for_site_release_then_proceeds(tmp_path):
+    s = Session(tmp_path, repeat=2, replace_ic_before_next_cycle=False)
+    s.batches.release_wait_s = 5.0
+    seen = _release_pending(s, 2)
+    batch = s.done()
+    cycle = batch["units"][0]["cycle"]
+    assert len(seen) == 2 and cycle["pass"] == 2 and cycle["continue_seq"] == 0
+    assert len(s.gateway.posts) == 2
+
+
+def test_site_never_released_pauses_after_the_bound_without_submitting(tmp_path):
+    s = Session(tmp_path, repeat=2, replace_ic_before_next_cycle=False)
+    s.batches.release_wait_s = 0.3
+    seen = _release_pending(s, 10**6)
+    unit = s.awaiting()
+    assert unit["cycle"]["wait_reason"] == "NEXT_CYCLE_EXECUTION_SITE_NOT_READY_OR_BUSY"
+    assert len(seen) >= 1 and len(s.gateway.posts) == 1
+    s.batches.request_stop_batch(s.batch_id, {"stop": "STOP_QUEUING"})
+    s.done()
+    assert len(s.gateway.posts) == 1
+
+
+def test_stop_during_release_wait_submits_nothing(tmp_path):
+    s = Session(tmp_path, repeat=2, replace_ic_before_next_cycle=False)
+    s.batches.release_wait_s = 30.0
+    seen = _release_pending(s, 10**6)
+    s.until(lambda _b: seen, "release wait")
+    s.batches.request_stop_batch(s.batch_id, {"stop": "STOP_QUEUING"})
+    batch = s.done(wait=5)
+    assert batch["execution_status"] == "STOPPED" and len(s.gateway.posts) == 1
+
+
+@pytest.mark.skipif(not os.environ.get("PLASMA_REPEAT_STRESS"),
+                    reason="opt-in Host-only stress: PLASMA_REPEAT_STRESS=1 (about 10000 real Cycles)")
+def test_stress_10000_cycles_counts_journal_restart_and_resources(tmp_path):
+    cycles = MAX_REPEAT
+    began = time.monotonic()
+    s = Session(tmp_path, repeat=cycles, replace_ic_before_next_cycle=False)
+    s.batches.sleep = lambda _s: None
+    batch = s.done(wait=6 * 3600)
+    elapsed = time.monotonic() - began
+    cycle = batch["units"][0]["cycle"]
+    assert batch["outcome"] == "PASS" and cycle["settled"] == cycles and cycle["pass"] == cycles
+    assert cycle["remaining"] == 0 and len(s.gateway.posts) == cycles
+    records = [r for r in s.batches._ledger_records(s.batch_id) if r["type"] == "cycle"]
+    assert [r["cycle_index"] for r in records] == list(range(1, cycles + 1))
+    assert len(set(job_ids(records))) == cycles
+    assert len(s.workflow._runs) <= 64 + 1
+    main = (tmp_path / "batches.json").stat().st_size
+    runs = (tmp_path / "runs.json").stat().st_size
+    segment = s.batches._ledger_path(s.batch_id).stat().st_size
+    assert main < 64 * 1024
+    loaded = time.monotonic()
+    restarted = reload(s)
+    reload_s = time.monotonic() - loaded
+    view = restarted.status_batch(s.batch_id)["batch"]
+    assert view["cycles"]["settled"] == cycles and restarted.cycle_records(s.batch_id)["total"] == cycles
+    metrics = {"cycles": cycles, "elapsed_s": round(elapsed, 1),
+               "cycles_per_s": round(cycles / elapsed, 1),
+               "max_rss_kib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+               "main_journal_bytes": main, "run_journal_bytes": runs,
+               "cycle_segment_bytes": segment, "workflow_runs_in_memory": len(s.workflow._runs),
+               "restart_load_s": round(reload_s, 3)}
+    out = os.environ.get("PLASMA_REPEAT_STRESS_METRICS")
+    if out:
+        Path(out).write_text(json.dumps(metrics, indent=1) + "\n")

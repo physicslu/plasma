@@ -34,7 +34,7 @@ test("PMode and Engineering Programming share one batch readiness source of trut
   assert.match(pmod, /evaluateBatchReadiness\(/);
   assert.match(emode, /evaluateBatchReadiness\(/);
   // Manual Repeat: the same START is the Continue of waiting Sites; otherwise readiness gates it.
-  assert.match(pmod, /\? false : !batchReadiness\.ready \|\| !policyValid\}/);
+  assert.match(pmod, /startDisabled=\{waitingSites\.length \? !continuingSites\.length : !batchReadiness\.ready \|\| !policyValid\}/);
   assert.match(emode, /startDisabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
   assert.match(sharedJob, /disabled=\{startDisabled\}/);
 });

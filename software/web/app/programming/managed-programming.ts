@@ -643,24 +643,47 @@ export function awaitingUnits(batch: ProgrammingBatch | null): ProgrammingBatchU
   return batch.units.filter(unit => unit.cycle?.state === "AWAITING_CONTINUE");
 }
 
+/** Identity of one operator "IC replaced" mark: valid for exactly one pause. */
+export function continueMarkKey(alias: string, siteId: number, continueSeq: number): string {
+  return `${alias}:${siteId}:${continueSeq}`;
+}
+
 /**
- * The existing Start, pressed while Sites wait: one Continue per waiting Site,
- * each echoing the pause it answers. The Browser schedules nothing; a refused
- * or lost Continue is reported and never retried here.
+ * Which waiting Sites one START continues. Only Sites the operator marked
+ * "IC replaced" for their CURRENT pause; a Session of one Site is
+ * unambiguous, so START alone continues it. A waiting Site that is not
+ * marked is never treated as replaced.
+ */
+export function sitesToContinue<T extends { alias: string; siteId: number; continueSeq: number }>(
+  waiting: readonly T[], sessionSites: number, marked: ReadonlySet<string>,
+): T[] {
+  if (sessionSites === 1) return [...waiting];
+  return waiting.filter(site => marked.has(continueMarkKey(site.alias, site.siteId, site.continueSeq)));
+}
+
+/**
+ * The existing Start, pressed while Sites wait: one Continue per Site the
+ * operator marked as replaced, each echoing the pause it answers. The
+ * Browser schedules nothing; a refused or lost Continue is reported and
+ * never retried here.
  */
 export async function continueAwaitingSites(
-  batch: ProgrammingBatch,
-): Promise<{ batch: ProgrammingBatch; continued: number; errors: string[] }> {
+  batch: ProgrammingBatch, marked: ReadonlySet<string>,
+): Promise<{ batch: ProgrammingBatch; continued: ProgrammingBatchUnit[]; errors: string[] }> {
   let latest = batch;
-  let continued = 0;
+  const continued: ProgrammingBatchUnit[] = [];
   const errors: string[] = [];
-  for (const unit of awaitingUnits(batch)) {
+  const chosen = sitesToContinue(
+    awaitingUnits(batch).map(unit => ({ unit, alias: unit.ppu_alias, siteId: unit.site_id,
+      continueSeq: unit.cycle!.continue_seq })),
+    batch.units.length, marked);
+  for (const { unit } of chosen) {
     try {
       const answer = await continueProgrammingBatch(batch.batch_id, {
         ppu_alias: unit.ppu_alias, site_id: unit.site_id, continue_seq: unit.cycle!.continue_seq,
       });
       latest = answer.batch;
-      continued += answer.duplicate ? 0 : 1;
+      if (!answer.duplicate) continued.push(unit);
     } catch (reason) {
       errors.push(`${unit.ppu_alias} Site ${unit.site_id}: ${errorParts(reason).message}`);
     }

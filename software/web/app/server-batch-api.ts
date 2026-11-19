@@ -25,6 +25,8 @@ export type BatchExecutionPolicy = {
   repeat_count: number;
   site_retry_limit: number;
   failed_site_stop_threshold: number | null;
+  /** Manager Manual Repeat: false = same-IC Debug (Cycles are not distinct ICs). */
+  replace_ic_before_next_cycle?: boolean;
 };
 
 export type BatchTargetDeviceSnapshot = {
@@ -61,7 +63,10 @@ export type BatchSiteSnapshot = {
   key: string;
   state: ServerBatchSiteState;
   current_round: number;
+  /** Settled rounds; for a Manager Repeat Site, settled Cycles (PASS + FAIL). */
   completed_rounds: number;
+  /** Manager Repeat only: PASS Cycles of this Site (absent: completed_rounds are PASS rounds). */
+  pass_rounds?: number;
   current_operation: Operation | null;
   current_job_id: string | null;
   progress_percent: number;

@@ -277,7 +277,14 @@ test("PR-D Manager controls Retry/Stop and the Browser restores durable Batch by
   assert.match(factory, /retryValue !== null && retryValue <= 5/);
   assert.match(factory, /repeatValue: repeatCount,/);
   assert.match(factory, /repeatValue !== null && repeatValue <= 10_000\s*&& retryValue !== null && retryValue <= 5/);
-  assert.match(factory, /if \(managed && batchSnapshot\?\.awaiting_continue\?\.length\) \{\s*await continueManagedSites\(\);/);
+  assert.match(factory, /if \(waitingSites\.length\) \{\s*await continueManagedSites\(\);/);
+  // P0: START continues ONLY the Sites marked "IC replaced" for their current
+  // pause (or the single Site of a one-Site Session), never every waiting Site.
+  assert.match(core, /if \(sessionSites === 1\) return \[\.\.\.waiting\];\s*return waiting\.filter\(site => marked\.has\(continueMarkKey\(site\.alias, site\.siteId, site\.continueSeq\)\)\);/);
+  assert.match(core, /return `\$\{alias\}:\$\{siteId\}:\$\{continueSeq\}`;/);
+  assert.match(factory, /const chosen = continuingSites;/);
+  assert.match(emode, /continueAwaitingSites\(batch, replacedMarks\)/);
+  assert.doesNotMatch(factory, /for \(const site of waiting\)/);
   assert.match(factory, /retryValue: siteRetryLimit/);
   assert.match(factory, /await stopProgrammingBatch\(activeBatchId\)/);
   assert.match(factory, /managed \? readManagedBatch\(\)/);
@@ -297,8 +304,14 @@ test("PMode retains Factory UI and no Mock is presented as HIL acceptance", () =
   assert.match(factoryBackend, /readyLabel: "MANAGER BATCH READY"/);
   assert.doesNotMatch(factory, /data-testid="managed-production-mode"/);
   assert.match(factory, /MOCK RESULT/);
-  // One Cycle Site keeps one round; a Repeat Site counts its PASS Cycles.
-  assert.match(factoryBackend, /completed_rounds: unit\.cycle && unit\.cycle\.planned > 1 \? unit\.cycle\.pass : passed \? 1 : 0/);
+  // P1: a Repeat Site's rounds are its settled Cycles (PASS + FAIL); PASS,
+  // FAIL and Retry stay separate, and same-IC Debug never reads as IC output.
+  assert.match(factoryBackend, /completed_rounds: unit\.cycle && unit\.cycle\.planned > 1 \? unit\.cycle\.settled : passed \? 1 : 0/);
+  assert.match(factoryBackend, /pass_rounds: unit\.cycle && unit\.cycle\.planned > 1 \? unit\.cycle\.pass : passed \? 1 : 0/);
+  assert.match(factoryBackend, /final_failures: unit\.cycle && unit\.cycle\.planned > 1\s*\? unit\.cycle\.fail/);
+  assert.match(factory, /site\.pass_rounds \?\? site\.completed_rounds/);
+  assert.match(factory, /"total-ic": "TOTAL CYCLES · SAME IC"/);
+  assert.match(factory, /const sameIcDebug = batchSnapshot\?\.execution_policy\.replace_ic_before_next_cycle === false;/);
 });
 
 // ------------------------------------------- EMode / PMode UI cleanup (Gate 1)
