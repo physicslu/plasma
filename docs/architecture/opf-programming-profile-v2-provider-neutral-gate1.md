@@ -39,7 +39,7 @@ Source: software/python/plasma_opf/profile_v2.py.
    - "provider": provider ID plus opaque JSON settings. These settings still
      require the **existing** verified Provider-owned options schema check at
      future PPU admission. A pure Profile parser alone cannot validate them.
-   - "hardware": optional power_source = external/programmer/fixture.
+   - "hardware": optional power_source = external/ppu/fixture.
      External power cannot be driven by Profile hardware actions.
    - "workflow.steps": 1–32 ordered steps. Two kinds only:
      provider.execute and hardware.action. Provider steps are **whole
