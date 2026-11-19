@@ -207,3 +207,33 @@ def test_integration_install_uses_operator_launcher_not_backend():
     integration = (REPO / "utilities/plasmactl/backends/plasmactl-integration").read_text()
     assert 'ln -sfn "$repo/scripts/plasmactl" "$bin_dir/plasmactl"' in integration
     assert 'PLASMACTL_DEPLOY_REEXEC=1 exec "$repo/scripts/plasmactl" deploy' in integration
+
+
+def test_hil_programming_execs_harness_next_to_launcher(tmp_path, monkeypatch):
+    (tmp_path / "plasma_engineering_hil.py").write_text("")
+    monkeypatch.setenv("PLASMACTL_WRAPPER", str(tmp_path / "plasmactl"))
+    monkeypatch.setenv("PLASMA_CLI_BACKEND_DIR", str(tmp_path / "backends"))
+    seen = []
+    monkeypatch.setattr(operations.os, "execvp", lambda *call: seen.append(call))
+    main(["hil", "programming", "--profile", "bluepill-ab"])
+    assert seen == [("python3", ["python3", str(tmp_path / "plasma_engineering_hil.py"),
+                                 "--profile", "bluepill-ab"])]
+
+
+@pytest.mark.parametrize("launcher", [None, "kit"])
+def test_hil_programming_refuses_without_launcher_or_harness(launcher, tmp_path, monkeypatch,
+                                                             capsys):
+    """A wheel has no launcher; a Z2 kit's scripts/ does not ship the SWPC harness."""
+    monkeypatch.delenv("PLASMACTL_WRAPPER", raising=False)
+    if launcher:
+        monkeypatch.setenv("PLASMACTL_WRAPPER", str(tmp_path / "plasmactl"))
+    monkeypatch.setattr(operations.os, "execvp", lambda *call: pytest.fail("must not exec"))
+    assert main(["hil", "programming"]) != 0
+    assert "hil programming" in capsys.readouterr().err
+
+
+def test_launcher_resolves_existing_hil_harness():
+    run = subprocess.run([str(REPO / "scripts/plasmactl"), "hil", "programming", "--help"],
+                         capture_output=True, text=True, check=False)
+    assert run.returncode == 0, run.stderr
+    assert "--execute" in run.stdout

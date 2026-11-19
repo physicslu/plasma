@@ -114,9 +114,12 @@ def bootstrap_sites(profile: str, args: list[str]) -> int:
 
 def hil_programming(args: list[str]) -> int:
     """SWPC engineering Blue Pill A/B + USB CDC harness (retained, separate)."""
-    root = os.environ.get("PLASMA_CLI_BACKEND_DIR")
-    script = Path(root) / "plasma_engineering_hil.py" if root else None
-    if script is None or not script.is_file():
+    # The harness is a checkout tool in scripts/, next to the launcher (not a backend).
+    launcher = os.environ.get("PLASMACTL_WRAPPER")
+    if not launcher:
         raise OperationError("hil programming requires a PLASMA checkout launcher")
+    script = Path(launcher).parent / "plasma_engineering_hil.py"
+    if not script.is_file():
+        raise OperationError(f"hil programming harness is missing: {script}")
     os.execvp("python3", ["python3", str(script), *args])
     return 1  # pragma: no cover - exec does not return
