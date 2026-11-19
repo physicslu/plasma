@@ -180,7 +180,7 @@ def test_power_source_external_disallows_control_but_allows_provider_only():
 
 
 def test_hw_before_after_mock_vendor_single_execute():
-    p = profile(power="programmer", steps=[
+    p = profile(power="ppu", steps=[
         {"id": "on", "type": "hardware.action", "action": "power.set",
          "domain_id": "vdd", "state": "on"},
         {"id": "good", "type": "hardware.action", "action": "power.wait_good",
@@ -281,6 +281,19 @@ def test_caps_callback_runtime_denied_and_options_remain_opaque():
     assert plan(profile_doc).data["provider_settings"] == profile_doc["provider"]["settings"]
     # The pure Plan cannot grant trusted Provider options schema validation.
     assert "site_lease_granted" not in plan(profile_doc).data
+
+
+def test_forged_snapshots_fail_closed():
+    good = parse_profile_v2(profile())
+    forged = Snapshot(good.canonical_json, "0" * 64)
+    caps = parse_provider_execution_capabilities(provider())
+    denied("PROFILE_SNAPSHOT_CHANGED", build_execution_plan, forged, caps,
+           job_id="job-mock-1", site_id=1, job_binding_sha256=H,
+           asset_set_sha256=B)
+    forged_caps = Snapshot(caps.canonical_json, "0" * 64)
+    denied("CAPABILITIES_SNAPSHOT_CHANGED", build_execution_plan, good, forged_caps,
+           job_id="job-mock-1", site_id=1, job_binding_sha256=H,
+           asset_set_sha256=B)
 
 
 def test_legacy_bundle_v3_and_binding_v1_are_not_replaced():
