@@ -37,7 +37,8 @@ scripts/plasmactl help                           # checkout: also deployment pro
 | `deploy status --ppu A [--ppu B]` | Manager Bootstrap pairing/deployment/runtime state | none |
 | `install\|deploy\|verify\|status\|logs\|restart PROFILE` | existing backend of `integration`, `local-control-station`, `swpc-z2like`, `z2-ps` | backend-owned |
 | `update\|test\|web-restart\|start\|stop\|ports\|update-and-restart` | integration-host maintenance | backend-owned |
-| `bootstrap-sites swpc-z2like`, `hil programming …` | retained engineering backends | backend-owned |
+| `bootstrap-sites swpc-z2like` | retained engineering backend | backend-owned |
+| `hil programming …` | retained SWPC Blue Pill A/B + USB CDC harness `scripts/plasma_engineering_hil.py` (checkout tool next to the launcher, not a backend) | Manager Batch only with `--execute` |
 
 `logs` exists for `integration`, `local-control-station` and `z2-ps`;
 `restart` for `integration` and `local-control-station`. `restart z2-ps` is
