@@ -4,6 +4,8 @@
 
 Status: **engineering deployment implementation included in main; actual SWPC/Z2 deployment unverified by this page**. See [single-entry convergence Gate 1](../architecture/ppu-unified-deployment-gate1.md). The engineering SSH transaction is the designated **Route B (engineering deployment)**, deliberately separate from product Bootstrap (Route A); the new `ppu-deploy plan` exposes a blocked single-API migration intent. This page is not deployment or hardware authorization.
 
+**SSH is never a production fallback** (owner decision 2026-11-02). If a Route A product deployment through Bootstrap fails or is unavailable, it stops there; `ppu-deploy` over SSH must not be used to complete or repair it.
+
 ## Scope and ownership
 
 `scripts/ppu-deploy` is a SWPC operator entry point that coordinates an
