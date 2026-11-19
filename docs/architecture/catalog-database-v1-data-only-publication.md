@@ -130,11 +130,42 @@ The same database file must be writable only by the trusted Manager/Publisher OS
 identity; `--actor` is an audit label, not an authentication secret. Evidence paths
 for L2 must be locally available to that identity at both stage and publish time;
 the recorded SHA-256 is checked against actual bytes. An L2 evidence file is a
-reviewed JSON packet (`schema_version=catalog-l2-reviewed-evidence-v1`) containing
+reviewed JSON packet (`schema_version=catalog-l2-reviewed-evidence-v2`) containing
 the exact ICPN, exact applicability, source authority/reference, pinned Provider
 release/target/driver, Profile/geometry, operation scopes, an `ADMITTED` reviewer
 decision, and per-fact document references for identity, route, geometry and
 operations. These fields must match the staged row and qualification exactly.
+For an Exact ICPN outside the existing Qualification Authority, the packet also
+contains `official_exact_source` (`url`, fetched-body `sha256`) and `applicability`
+(base device, density, locked ordering authority/blob, Provider source lock,
+programming group and versioned geometry ID). The Publisher independently
+retrieves the exact product page over manufacturer HTTPS at both Stage and
+Publish, verifies its body digest and exact part token, and rejects redirects
+outside that product page. It derives the part's pin/package/flash/temperature
+facts from the previously source-locked manufacturer ordering authority; the
+packet cannot set those facts by declaration. This is an identity and document
+review, **not** a real-device Flash PASS.
+The four fact references for a new exact L2 must resolve to the fetched product
+URL and exact token, the validated Provider source lock and target, the locked
+datasheet/programming-manual geometry sources, and the qualified programming
+group. Arbitrary reviewer prose cannot stand in for those references.
+
+The current data-only applicability validator is deliberately bounded to the
+source-validated OpenOCD 0.12.0 STM32F103 medium-density programming group.
+It checks the existing Provider release, driver/target, Programming Profile
+schema, geometry units and supported operation scopes, then derives the exact
+flash size and page count from the ordering code and group. New Geometry IDs
+are scoped to the base device and versioned in the immutable publication
+packet. Other Provider/group combinations fail closed until their existing
+source-backed contracts can be validated by a Publisher implementation. A
+reviewed packet cannot authorize an installed Runtime or a Job.
+The first data-only package route is bounded to STM32F103 medium-density
+VFQFPN36. Its packet must match the source-locked DS5319 Rev 20 Table 5 SWD
+pins (PA13/25 and PA14/28). This is a fresh applicability review for a package
+that the earlier non-LQFP qualification explicitly left outside its scope;
+the earlier exclusion is not silently treated as support. Other package routes
+remain unqualified by this data-only validator.
+
 The immutable published revision retains the reviewer and per-fact references
 alongside the reviewed packet digest, while removing the host-local file path.
 The packet hash attests the reviewed packet bytes, **not** the original PDF bytes;
