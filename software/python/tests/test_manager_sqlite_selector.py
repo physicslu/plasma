@@ -1,4 +1,4 @@
-"""Manager-owned SQLite Selector opt-in: source parity, API parity, fail closed.
+"""Manager-owned SQLite Selector opt-in: API parity and fail closed.
 
 Host-only; no PPU, Z2, DUT, Gateway or live programming is contacted.
 """
@@ -133,7 +133,7 @@ def test_tampered_sqlite_snapshot_fails_closed_not_empty(
     assert body["error"]["error_type"] == "DEVICE_SELECTOR_UNAVAILABLE"
 
 
-def test_source_revision_drift_rejected_without_legacy_fallback(
+def test_selector_does_not_require_legacy_source_parity(
     source_qualified_database: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     actual, _, _ = read_selector_view(str(source_qualified_database))
@@ -145,6 +145,6 @@ def test_source_revision_drift_rejected_without_legacy_fallback(
         revision_sha256=actual.revision_sha256,
         source_count=actual.source_count,
     )
-    with patch("plasma_web.catalog_sqlite_selector.get_default_device_catalog", return_value=changed):
-        with pytest.raises(DeviceCatalogIntegrityError, match="source parity mismatch"):
-            read_selector_view(str(source_qualified_database))
+    with patch("plasma_web.device_catalog.get_default_device_catalog", return_value=changed):
+        loaded, _, _ = read_selector_view(str(source_qualified_database))
+    assert loaded.records == actual.records

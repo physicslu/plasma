@@ -253,15 +253,19 @@ def _device_search_payload(
 
     # Candidate evidence is an independent, read-only display projection.
     # It never modifies authoritative backend routing or Job admission.
-    candidates = get_default_backend_candidate_registry()
-    upstream = default_pinned_upstream()
-    versioned_providers = get_default_openocd_provider_registry()
-    ic_support = get_default_ic_support_resolver()
-    device_basic = get_default_manufacturer_device_basic_resolver()
+    needs_legacy_enrichment = any(
+        not qualification_for(record).get("data_only_publication") for record in matches
+    )
+    candidates = get_default_backend_candidate_registry() if needs_legacy_enrichment else None
+    upstream = default_pinned_upstream() if needs_legacy_enrichment else None
+    versioned_providers = get_default_openocd_provider_registry() if needs_legacy_enrichment else None
+    ic_support = get_default_ic_support_resolver() if needs_legacy_enrichment else None
+    device_basic = get_default_manufacturer_device_basic_resolver() if needs_legacy_enrichment else None
     results = []
     for record in matches:
         item = record.to_payload()
         qualification = qualification_for(record)
+        published_only = bool(qualification.get("data_only_publication"))
         item["catalog_level"] = qualification["catalog_level"]
         item["catalog_level_state"] = qualification["catalog_level_state"]
         item["job_selectable"] = bool(qualification.get("job_selectable", False))
@@ -276,15 +280,17 @@ def _device_search_payload(
             "passed" if qualification.get("socket_ready") else "no_evidence"
         )
 
-        candidate = candidates.lookup(record)
+        candidate = None if published_only else candidates.lookup(record)
         item["backend_candidate"] = candidate
-        item["backend_source_reference"] = backend_source_reference(record, candidate, upstream)
+        item["backend_source_reference"] = (
+            None if published_only else backend_source_reference(record, candidate, upstream)
+        )
         item["backend_providers"] = (
             versioned_providers.describe(record.vendor, record.identifier)
-            if versioned_providers is not None else []
+            if versioned_providers is not None and not published_only else []
         )
         exact_icpn = record.icpn or record.identifier
-        basic = device_basic.resolve_exact(
+        basic = None if published_only else device_basic.resolve_exact(
             exact_icpn,
             manufacturer=record.vendor,
             family=record.family,
@@ -296,16 +302,16 @@ def _device_search_payload(
             temperature_grade=record.temperature_grade,
         )
         item["manufacturer_device_basic_profile"] = (
-            basic.to_payload() if basic is not None else None
+            None if published_only else basic.to_payload() if basic is not None else None
         )
         item["nxp_manufacturer_device_profile"] = (
             get_default_nxp_manufacturer_device_evidence().resolve_exact(record)
-            if record.vendor == "NXP" and record.family in {"MCX", "K32L2"}
+            if not published_only and record.vendor == "NXP" and record.family in {"MCX", "K32L2"}
             else None
         )
-        item["microchip_ic_information"] = _microchip_ic_information(record, qualification)
-        item["upstream_openocd_evidence"] = microchip_upstream_openocd_evidence(record)
-        support = ic_support.resolve_exact(exact_icpn)
+        item["microchip_ic_information"] = None if published_only else _microchip_ic_information(record, qualification)
+        item["upstream_openocd_evidence"] = None if published_only else microchip_upstream_openocd_evidence(record)
+        support = None if published_only else ic_support.resolve_exact(exact_icpn)
         item["selected_profile"] = (
             support.to_selected_profile_payload()
             if support is not None

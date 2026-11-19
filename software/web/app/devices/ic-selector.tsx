@@ -426,7 +426,9 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
                 <div>
                   <h3>{zh ? "IC Information" : "IC Information"}</h3>
                   <p>
-                    {selected.manufacturer_device_basic_profile
+                    {selected.programming_qualification?.data_only_publication
+                      ? (zh ? "Catalog 已發布來源資料；未提供的原廠規格保持未知" : "Published Catalog source data; unavailable manufacturer specifications remain unknown")
+                      : selected.manufacturer_device_basic_profile
                       ? (zh ? "ST 官方 Product Selector / eStore 基本規格" : "Basic specifications from official ST Product Selector / eStore")
                       : selected.nxp_manufacturer_device_profile
                         ? (zh ? "NXP 官方單料號規格；未知欄位不推估，不代表燒錄資格" : "NXP exact-part evidence; unknown fields are not inferred or programming-qualified")
@@ -626,6 +628,9 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
               <div><dt>Pin Count</dt><dd>{selected.pin_count ?? "—"}</dd></div>
               <div><dt>Flash</dt><dd>{selected.flash_size ?? "—"}</dd></div>
               <div><dt>Temperature</dt><dd>{selected.temperature_grade ?? "—"}</dd></div>
+              {selected.programming_qualification?.data_only_publication && (
+                <div><dt>{zh ? "Catalog 來源" : "Catalog source"}</dt><dd>{selected.catalog_verification.source_authority ?? "—"} · {selected.catalog_verification.source_reference ?? "—"}</dd></div>
+              )}
               {selected.manufacturer_device_basic_profile && (
                 <>
                   <div><dt>Device Basic Profile</dt><dd>{selected.manufacturer_device_basic_profile.profile_id}</dd></div>

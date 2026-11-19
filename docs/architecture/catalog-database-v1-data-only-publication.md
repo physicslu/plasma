@@ -119,6 +119,101 @@ Route current Selector API and Qualification projection to the SQLite repository
 **Milestone D — Data-only revision publisher and Controller overlay.**
 Add staging/import, deterministic validators, local edit/create, atomic publish/rollback, audit and namespace isolation. Demonstrate revision publication **without GitHub PR, Python redeploy, PPU image rebuild, or Z2/DUT activity**. Backend code/schema upgrades still use normal targeted CI.
 
+### Milestone D host publisher interface
+
+The Manager-owned SQLite file is selected with `--db`. Initial migration imports the
+verified manifest with `--with-qualification`. Subsequent JSON change sets contain
+`[{"record": <DeviceCatalogRecord fields>, "qualification": <projection fields>}]`.
+The publisher stages against the active digest, checks every exact identity and
+source-backed route, then publishes the complete snapshot in one SQLite transaction.
+The same database file must be writable only by the trusted Manager/Publisher OS
+identity; `--actor` is an audit label, not an authentication secret. Before Stage,
+`--acquire-evidence` imports an official Exact source by `manufacturer`, `exact_icpn`,
+`kind` (`manufacturer_https` or `locked_production_identity`) and `source_revision`.
+The first HTTPS acquisition checks the manufacturer host, TLS URL/redirect scope,
+product title, part-number marker and Exact token. A repeated acquisition of the
+same authority/reference/revision checks the saved bytes and returns the same
+Evidence ID without HTTP. A changed manufacturer source needs a new
+`source_revision`; the old Evidence Revision is retained. An L2 evidence file is a
+reviewed JSON packet (`schema_version=catalog-l2-reviewed-evidence-v2`) containing
+the exact ICPN, exact applicability, source authority/reference, pinned Provider
+release/target/driver, Profile/geometry, operation scopes, an `ADMITTED` reviewer
+decision, and per-fact document references for identity, route, geometry and
+operations. These fields must match the staged row and qualification exactly.
+For an Exact ICPN outside the existing Qualification Authority, the packet also
+contains `official_exact_source` (either a source-locked Production Exact identity
+CSV path/blob or a manufacturer HTTPS product URL and fetched-body SHA-256), its
+saved `evidence_id`, and `applicability`
+(base device, density, locked ordering authority/blob, Provider source lock,
+programming group and versioned geometry ID). The Publisher independently
+checks the saved, source-locked CSV blob and exact row at both Stage and Publish,
+or checks the saved HTTPS body digest, product title, part-number marker and exact
+part token. Neither step performs HTTP. HTTPS redirects outside that product page
+are rejected during acquisition. It derives the part's pin/package/flash/temperature
+facts from the previously source-locked manufacturer ordering authority; the
+packet cannot set those facts by declaration. This is an identity and document
+review, **not** a real-device Flash PASS.
+The four fact references for a new exact L2 must resolve to the selected locked
+Exact identity source or official product URL and exact token, the validated
+Provider source lock and target, the locked
+datasheet/programming-manual geometry sources, and the qualified programming
+group. Arbitrary reviewer prose cannot stand in for those references.
+
+The current data-only applicability validator is deliberately bounded to the
+source-validated OpenOCD 0.12.0 STM32F103 medium-density programming group.
+It checks the existing Provider release, driver/target, Programming Profile
+schema, geometry units and supported operation scopes, then derives the exact
+flash size and page count from the ordering code and group. New Geometry IDs
+are scoped to the base device and versioned in the immutable publication
+packet. Other Provider/group combinations fail closed until their existing
+source-backed contracts can be validated by a Publisher implementation. A
+reviewed packet cannot authorize an installed Runtime or a Job.
+The first data-only package route is bounded to STM32F103 medium-density
+VFQFPN36. Its packet must match the source-locked DS5319 Rev 20 Table 5 SWD
+pins (PA13/25 and PA14/28). This is a fresh applicability review for a package
+that the earlier non-LQFP qualification explicitly left outside its scope;
+the earlier exclusion is not silently treated as support. Other package routes
+remain unqualified by this data-only validator.
+
+The immutable published revision retains the reviewer and per-fact references
+alongside the reviewed packet digest, while removing the host-local file path.
+Stage copies the reviewed packet into the same durable Evidence store and replaces
+its path with `reviewed_evidence_id`; Publish and later reads validate its saved
+bytes. The Evidence store is `<catalog.sqlite3>.evidence/sha256/<prefix>/<digest>`;
+SQLite schema v3 stores source authority/reference/revision, content digest,
+acquisition time, `VERIFIED` status and a relative content location. The content
+file is fsynced and atomically renamed before SQLite metadata commits. A crash
+between those steps may leave an unreferenced content-addressed file; later
+acquisition can reuse it, and operators may remove only files with no metadata
+reference after a consistent backup. Missing or altered referenced files fail
+closed on Stage, Publish, active reads and rollback to that revision. A rollback
+away from a damaged current revision is permitted if its target is intact.
+Schema v2 databases upgrade additively on the next Publisher write: revisions,
+staging, overlays and audit rows remain intact. Existing v2 snapshots remain
+readable for migration; a new publication or rollback target containing legacy
+data-only L2 rows must first replace those rows with durable Evidence IDs.
+The packet hash attests the reviewed packet bytes, **not** the original PDF bytes;
+unavailable original-document custody must not be represented as a PDF digest.
+The trusted Publisher OS identity is the admission authority; the reviewer's
+name in the packet is an audit claim, not authentication by itself. The Publisher uses only
+Provider release/Profile locks already admitted in the active Catalog. A new
+Provider implementation, Profile schema or release requires a code/schema change.
+
+```bash
+python3 -m plasma_web.catalog_sqlite_repository --db /manager-data/catalog.sqlite3 --acquire-evidence source-request.json --actor catalog-owner
+python3 -m plasma_web.catalog_sqlite_repository --db /manager-data/catalog.sqlite3 --stage-file changes.json --actor catalog-owner
+python3 -m plasma_web.catalog_sqlite_repository --db /manager-data/catalog.sqlite3 --publish-stage STAGE_DIGEST --actor catalog-owner
+python3 -m plasma_web.catalog_sqlite_repository --db /manager-data/catalog.sqlite3 --rollback PREVIOUS_REVISION --actor catalog-owner
+```
+
+Controller-local Profiles use `--local-file` with `namespace`, `manufacturer`,
+`exact_icpn` and `profile`; they remain in `controller_overlays`, outside the
+official Selector. Their payload must have `official=false`,
+`execution_authorized=false` and cannot claim L2/L3. The Controller's own
+authorization and Job policy remain separate. The publisher does not call PPU,
+Provider, FPGA or Job execution code. No PR #1147 candidate is published by this
+Milestone D implementation.
+
 **Milestone E — Remove duplicated static coupling.**
 After parity and rollback evidence, retire dynamic per-IC Python registration, global count assertions and Catalog data-triggered product pipelines. Temporary legacy/SQLite parallel reading must exist only in the shadow-comparison phase and be removed when the canonical read path switches, consistent with Replace-by-Default. Keep versioned manufacturer/Provider evidence available for audits and repeatable snapshots.
 
