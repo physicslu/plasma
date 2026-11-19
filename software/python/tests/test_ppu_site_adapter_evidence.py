@@ -201,3 +201,59 @@ def test_consecutive_sessions_keep_separate_immutable_evidence(tmp_path):
     assert all(raw == GOOD for raw, _ in records)
     assert len({record["stdout_file"] for _, record in records}) == 2
     assert calls == [["admit", "2"], ["revoke", "2"]] * 2
+
+
+def _deny_with(tmp_path, receipt):
+    adapter, calls = rig(tmp_path, admit=False)
+    old_run = adapter._run
+
+    def run(argv, **kwargs):
+        if argv[-2] == "admit":
+            return subprocess.CompletedProcess(
+                argv, 1, "PLASMA_SWD_SITE_ADMISSION=" + json.dumps(receipt), "")
+        return old_run(argv, **kwargs)
+
+    adapter._run = run
+    with pytest.raises(worker.TransportDenied) as caught:
+        attempt(adapter)
+    assert calls == [["revoke", "2"]]  # refused before any OpenOCD / hardware
+    assert not (tmp_path / "private").exists()
+    return caught.value.code
+
+
+@pytest.mark.parametrize("receipt, expected", [
+    # The /proc owner census code (pl/hil/fpga_image_admission.py) used to be
+    # dropped whole because of its ':'-separated fields (2-Site HIL 2026-11-19).
+    ({"result": "DENIED", "error": "ValueError",
+      "code": "PROC_SCAN_INCOMPLETE:VANISHED_PID_RESCAN_EXHAUSTED:4321:FD:FileNotFoundError"},
+     "ADMISSION_DENIED:PROC_SCAN_INCOMPLETE:VANISHED_PID_RESCAN_EXHAUSTED:4321:FD:FileNotFoundError"),
+    ({"result": "DENIED", "error": "ValueError",
+      "code": "PROC_SCAN_INCOMPLETE:PROC_VISIBILITY_DENIED:UNKNOWN:MAPS:PermissionError"},
+     "ADMISSION_DENIED:PROC_SCAN_INCOMPLETE:PROC_VISIBILITY_DENIED:UNKNOWN:MAPS:PermissionError"),
+    ({"result": "DENIED", "error": "ValueError", "code": "PROC_RESOURCE_OWNER_CONFLICT"},
+     "ADMISSION_DENIED:PROC_RESOURCE_OWNER_CONFLICT"),
+    # Unstructured fields: keep the token, withhold the rest.
+    ({"result": "DENIED", "error": "ValueError",
+      "code": "PROC_SCAN_INCOMPLETE:/proc/42/fd: some text"},
+     "ADMISSION_DENIED:PROC_SCAN_INCOMPLETE:DETAIL_WITHHELD"),
+    # No usable code: only the exception TYPE, never its message.
+    ({"result": "DENIED", "error": "BlockingIOError",
+      "code": "[Errno 11] Resource temporarily unavailable: '/run/lock/x'"},
+     "ADMISSION_DENIED:UNSTRUCTURED:BlockingIOError"),
+    ({"result": "DENIED", "error": "bad type name!", "code": "/secret/password"},
+     "ADMISSION_DENIED"),
+    ({"result": "DENIED", "code": "A" + ":x" * 7}, "ADMISSION_DENIED:A:DETAIL_WITHHELD"),
+])
+def test_admission_denial_keeps_structured_cause_and_never_free_text(tmp_path, receipt, expected):
+    code = _deny_with(tmp_path, receipt)
+    assert code == expected
+    assert "/" not in code and " " not in code and "'" not in code
+
+
+def test_admission_census_codes_round_trip_through_the_filter():
+    """Every census code shape the Root admission can emit stays attributable."""
+    detail = ":".join(str(v)[:40] for v in ("VANISHED_PID_RESCAN_EXHAUSTED", 31337, "FD",
+                                            "FileNotFoundError"))
+    for code in ("PROC_SCAN_INCOMPLETE:" + detail, "PROC_SCAN_INCOMPLETE:UNKNOWN:UNKNOWN:UNKNOWN:UNKNOWN",
+                 "PROC_RESOURCE_OWNER_CONFLICT", "ROOT_JOURNAL_NOT_HELD_IMAGE"):
+        assert abi5.admission_denial_detail({"code": code}) == ":" + code

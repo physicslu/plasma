@@ -65,6 +65,34 @@ _DUMP_CMD = re.compile(r"dump_image \{[^{}]+\} (0x[0-9a-f]{8}) (0x[0-9a-f]{8})\Z
 DPREG0 = re.compile(r"PLASMA_DPREG0=(0x[0-9a-fA-F]+)")
 SAFE_OFF = "SAFE_OFF_MODE_OFF_VERIFIED"
 ADMIT_TIMEOUT_S = 120
+
+#: A Root denial code: one upper-case token, optionally followed by up to six
+#: ``:``-separated fields of letters, digits or ``_`` (e.g. the /proc census
+#: ``PROC_SCAN_INCOMPLETE:<status>:<pid>:<phase>:<exception type>``).
+_DENIAL_TOKEN = re.compile(r"[A-Z][A-Z0-9_]{0,95}")
+_DENIAL_CODE = re.compile(r"[A-Z][A-Z0-9_]{0,95}(?::[A-Za-z0-9_]{1,40}){0,6}")
+_EXCEPTION_TYPE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
+
+
+def admission_denial_detail(payload: Mapping[str, Any]) -> str:
+    """The bounded, attributable suffix of a Root admission denial.
+
+    Never free text: a structured code is kept whole; a code whose fields are
+    not structured keeps only its leading token; with no usable code at all,
+    only the exception TYPE name Root reported (never its message) is kept.
+    Paths, command lines, values and stderr stay private.
+    """
+    code = payload.get("code")
+    if type(code) is str and len(code) <= 240 and _DENIAL_CODE.fullmatch(code):
+        return ":" + code
+    if type(code) is str:
+        head = code.split(":", 1)[0]
+        if _DENIAL_TOKEN.fullmatch(head):
+            return ":" + head + ":DETAIL_WITHHELD"
+    error = payload.get("error")
+    if type(error) is str and _EXCEPTION_TYPE.fullmatch(error):
+        return ":UNSTRUCTURED:" + error
+    return ""
 OPENOCD_MAX_S = 45
 CLEANUP_PROBE_MAX_S = 5
 
@@ -531,9 +559,7 @@ class Abi5OpenocdAdapter:
                 except (ValueError, TypeError):
                     payload = None
                 if isinstance(payload, dict) and payload.get("result") == "DENIED":
-                    code = payload.get("code")
-                    if type(code) is str and re.fullmatch(r"[A-Z][A-Z0-9_]{0,95}", code):
-                        denial += ":" + code
+                    denial += admission_denial_detail(payload)
             raise TransportDenied(denial)
         now = time.monotonic()
         timing["admission_ms"] = round((now - clock) * 1000.0, 1)
