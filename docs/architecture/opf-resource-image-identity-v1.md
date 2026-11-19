@@ -16,7 +16,8 @@ under an exact Job Binding. Resource reuse is **Host-only PASS, NOT_RUN on
 hardware**; it must not be claimed as hardware-verified before HIL (§8.6).
 
 Base: `main` `efaf3609be23568d4f907fc81c166c2c31cd5328` (same as the OFE-0
-audit base). Plan of record: OPF Frontend post-LOM plan (PR #1377, §4.1 OFE-1).
+audit base). Originating plan: OPF Frontend post-LOM plan (PR #1377, §4.1 OFE-1;
+historical, closed unmerged on 2026-11-19; open items tracked in `docs/development/todo.md`).
 
 ## 1. Problem
 
