@@ -204,3 +204,42 @@ def test_catalog_management_local_round_trip_and_publisher_boundary(
     official = json.loads(json.dumps(entry))
     official["record"].update(vendor="STMicroelectronics", identifier="STM32F103C8T6")
     assert post("local", {"entries": [official]})[0] == 400
+
+
+def test_local_ic_survives_manager_http_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    database = tmp_path / "restart-catalog.db"
+    CatalogSqliteShadowRepository(database).import_verified_manifest(
+        default_catalog_manifest_path(),
+        qualification_registry=get_default_programming_qualification_registry(),
+    )
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(database))
+    monkeypatch.setenv("PLASMA_CATALOG_PUBLISH_TOKEN", "restart-test-publisher")
+
+    def start_manager():
+        server = manager_server.PlasmaManagerHTTPServer(("127.0.0.1", 0), manager_server.PlasmaManagerHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return server, thread
+
+    server, thread = start_manager()
+    try:
+        entry = {"record": {"vendor": "LocalVendor", "identifier": "RESTART123", "family": "Demo", "package": "QFN", "flash_size": "64 KB"},
+                 "profile": {"profile_id": "restart-custom-v1", "operations": ["program"]}}
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{server.server_port}/api/catalog/management/local",
+            data=json.dumps({"entries": [entry]}).encode(), method="POST",
+            headers={"Content-Type": "application/json", "X-Plasma-Catalog-Publisher": "restart-test-publisher"},
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            assert response.status == 200
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=2)
+
+    restarted, restarted_thread = start_manager()
+    try:
+        status, result = _get(restarted.server_port, "/api/devices/search?q=RESTART123")
+        assert status == 200 and result["local_results"][0]["record"]["identifier"] == "RESTART123"
+        status, management = _get(restarted.server_port, "/api/catalog/management")
+        assert status == 200 and management["local"][0]["revision"] == 1
+    finally:
+        restarted.shutdown(); restarted.server_close(); restarted_thread.join(timeout=2)
