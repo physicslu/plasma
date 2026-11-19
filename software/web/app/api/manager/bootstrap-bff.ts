@@ -2,6 +2,7 @@ import { managerApiBase, managerRoutingRequired, validPpuAlias } from "./manager
 import {
   hasMaintenanceCapability,
   issueMaintenanceCapabilityCookie,
+  maintenanceCapabilityActor,
   maintenanceCapabilityConfigured,
   maintenanceCapabilityRequired,
   maintenanceMutationOriginAllowed,
@@ -48,6 +49,8 @@ const BOOTSTRAP_GET_ACTIONS = [
 const PROGRAMMING_POST_RESOURCES = [
   /^batches$/,
   new RegExp(`^batches/${RUN_ID}/stop$`),
+  // Manual Repeat: the operator's Continue of one paused Site (WP-02).
+  new RegExp(`^batches/${RUN_ID}/continue$`),
   /^starts$/,
   new RegExp(`^starts/${RUN_ID}/void$`),
 ];
@@ -265,9 +268,10 @@ async function authorizedAliases(
   resource: string, body: ArrayBuffer | undefined, declared: string | null,
 ): Promise<string[] | null | "unreadable"> {
   if (resource === "batches") return body ? targetAliases(body) : null;
-  const stop = /^batches\/([0-9a-f]{32})\/stop$/.exec(resource);
+  const stop = /^batches\/([0-9a-f]{32})\/(?:stop|continue)$/.exec(resource);
   if (stop) {
-    // Stop queuing changes the Manager's scheduling state for these PPUs.
+    // Stop queuing and Continue change the Manager's scheduling state for
+    // these PPUs; the Manager's own Target Set decides which they are.
     const payload = await managerProgrammingRead(`batches/${stop[1]}`) as
       { batch?: { targets?: unknown } } | null;
     if (payload === null) return "unreadable";
@@ -368,6 +372,35 @@ export async function relayManagerProgrammingRequest(
       }
     } catch {
       return maintenanceCapabilityMisconfigured();
+    }
+    if (/^batches\/[0-9a-f]{32}\/continue$/.test(normalizedResource)) {
+      // The Continue is audited under the identity this BFF verified, never
+      // one a browser names. The capability is per PPU, so the identity is
+      // that of the continued Site's own PPU, which must be in the Batch.
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(new TextDecoder().decode(body)) as Record<string, unknown>;
+      } catch {
+        parsed = {};
+      }
+      if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed) || "actor" in parsed
+          || typeof parsed.ppu_alias !== "string" || !aliases.includes(parsed.ppu_alias)) {
+        return json(400, {
+          ok: false,
+          error: {
+            code: "invalid_request",
+            message: "continue names one Site of this Batch and never an actor",
+          },
+        });
+      }
+      let actor: string | null;
+      try {
+        actor = maintenanceCapabilityActor(request, parsed.ppu_alias);
+      } catch {
+        return maintenanceCapabilityMisconfigured();
+      }
+      if (!actor) return maintenanceCapabilityRequired();
+      body = new TextEncoder().encode(JSON.stringify({ ...parsed, actor })).buffer as ArrayBuffer;
     }
   }
 

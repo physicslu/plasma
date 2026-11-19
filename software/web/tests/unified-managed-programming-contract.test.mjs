@@ -72,9 +72,11 @@ test("one Start: lock -> plan -> exactly one start -> observe; no retry of any w
 
 test("Start is double-click safe and the manual Prepare step is gone from EMode", () => {
   assert.match(emode, /if \(startLock\.current \|\| !readiness\.ready/);
-  assert.match(emode, /startLock\.current = true;\s*const policy = \{ retryLimit, stopPolicy \};\s*const started = \[\.\.\.siteIds\];\s*const request: ManagedBatchRequest =/);
+  assert.match(emode, /startLock\.current = true;\s*const policy = \{ retryLimit, stopPolicy, repeat: repeatValue, replaceIc \};\s*const started = \[\.\.\.siteIds\];\s*const request: ManagedBatchRequest =/);
+  // Manual Repeat: START pressed while Sites wait is their Continue, nothing else.
+  assert.match(emode, /if \(awaitingUnits\(batch\)\.length\) \{\s*await continueSites\(\);\s*return;\s*\}/);
   assert.doesNotMatch(emode, /Prepare Programming|Confirm programming|confirmedPlanId/);
-  assert.match(emode, /startLabel="START PROGRAMMING"/);
+  assert.match(emode, /: "START PROGRAMMING"\}/);
 });
 
 test("EMode Operations are E / P / V checkboxes sent as one operations list; Read is a separate Job", () => {
@@ -182,8 +184,16 @@ test("the standing PROGRAMMING PLAN panel is gone; the Backend plan still runs a
   assert.match(emode, /Resource SHA256 \$\{planned\.resource\.resource_set_sha256\} · Job Binding SHA256/);
 });
 
-test("EMode Batch Policy: Repeat disabled; Retry / Stop Policy are decided by the Manager, never the Browser", () => {
-  assert.match(emode, /repeatValue: String\(MANAGED_JOB_POLICY\.attempts\),\s*repeatDisabled: true/);
+test("EMode Batch Policy: Repeat / Retry / Stop Policy are decided by the Manager, never the Browser", () => {
+  // Manual Repeat (WP-02): an editable Cycle count and the replace-IC choice
+  // (default Yes) are inputs only; the Browser never loops over Cycles.
+  assert.match(emode, /repeatValue: repeatCount,\s*repeatDisabled: active,/);
+  assert.match(emode, /const \[replaceIc, setReplaceIc\] = useState\(true\);/);
+  assert.match(emode, /repeatParsed <= MAX_REPEAT/);
+  assert.match(core, /export async function continueAwaitingSites\(/);
+  assert.equal((core.match(/continueProgrammingBatch\(/g) ?? []).length, 1);
+  assert.match(api, /continue_seq: unit\.continue_seq/);
+  assert.doesNotMatch(api, /actor/);
   // One Batch request; the Browser has no retry loop and no plan / start of its own.
   assert.equal((emode.match(/runManagedBatch\(/g) ?? []).length, 1);
   assert.equal((core.match(/startProgrammingBatch\(/g) ?? []).length, 1);
@@ -265,7 +275,9 @@ test("PR-D PMode submits ONE canonical Manager Target Set instead of a Browser j
 
 test("PR-D Manager controls Retry/Stop and the Browser restores durable Batch by ID", () => {
   assert.match(factory, /retryValue !== null && retryValue <= 5/);
-  assert.match(factory, /repeatValue: managed \? "1" : repeatCount/);
+  assert.match(factory, /repeatValue: repeatCount,/);
+  assert.match(factory, /repeatValue !== null && repeatValue <= 10_000\s*&& retryValue !== null && retryValue <= 5/);
+  assert.match(factory, /if \(managed && batchSnapshot\?\.awaiting_continue\?\.length\) \{\s*await continueManagedSites\(\);/);
   assert.match(factory, /retryValue: siteRetryLimit/);
   assert.match(factory, /await stopProgrammingBatch\(activeBatchId\)/);
   assert.match(factory, /managed \? readManagedBatch\(\)/);
@@ -281,11 +293,12 @@ test("PR-D Manager controls Retry/Stop and the Browser restores durable Batch by
 test("PMode retains Factory UI and no Mock is presented as HIL acceptance", () => {
   assert.match(factory, /useState<ProgrammingSource>\("image"\)/);
   assert.match(factory, /source=\{managed \? \{ value: programmingSource/);
-  assert.match(factory, /repeatDisabled: managed \|\| batchRunning/);
+  assert.match(factory, /repeatDisabled: batchRunning,/);
   assert.match(factoryBackend, /readyLabel: "MANAGER BATCH READY"/);
   assert.doesNotMatch(factory, /data-testid="managed-production-mode"/);
   assert.match(factory, /MOCK RESULT/);
-  assert.match(factoryBackend, /completed_rounds: passed \? 1 : 0/);
+  // One Cycle Site keeps one round; a Repeat Site counts its PASS Cycles.
+  assert.match(factoryBackend, /completed_rounds: unit\.cycle && unit\.cycle\.planned > 1 \? unit\.cycle\.pass : passed \? 1 : 0/);
 });
 
 // ------------------------------------------- EMode / PMode UI cleanup (Gate 1)
@@ -374,7 +387,10 @@ test("PR-C: the Console reaches the canonical Batch resource, never an alias-sco
   assert.match(bff, /for \(const alias of aliases\) \{\s*if \(!hasMaintenanceCapability\(request, alias\)\) return maintenanceCapabilityRequired\(\);/);
   assert.match(bff, /if \(!maintenanceMutationOriginAllowed\(request\)\) return maintenanceCapabilityRequired\(\);/);
   assert.match(bff, /aliases = await authorizedAliases\(normalizedResource, body, declared\);/);
-  assert.match(bff, /const stop = \/\^batches\\\/\(\[0-9a-f\]\{32\}\)\\\/stop\$\/\.exec\(resource\);/);
+  assert.match(bff, /const stop = \/\^batches\\\/\(\[0-9a-f\]\{32\}\)\\\/\(\?:stop\|continue\)\$\/\.exec\(resource\);/);
+  // Continue is audited under the BFF-verified identity; a Browser actor is refused.
+  assert.match(bff, /"actor" in parsed/);
+  assert.match(bff, /actor = maintenanceCapabilityActor\(request, parsed\.ppu_alias\);/);
   assert.match(bff, /const recorded = aliasesOfTargets\(view\?\.identity\?\.targets\);/);
   // Fail closed: an operation whose PPU cannot be established is refused.
   assert.match(bff, /if \(aliases === null \|\| aliases\.length === 0\)/);
@@ -423,7 +439,8 @@ test("PR-C: every Site is judged on its own, and the Batch verdict never replace
 test("concurrent lanes: each Site's run is read by run_id and each attempt is keyed by Site", async () => {
   assert.match(core, /export async function loadAttemptRun\(/);
   assert.match(core, /run\.run_id === runId && run\.ppu_alias === alias && run\.site_id === siteId \? run : null/);
-  assert.match(emode, /const attemptKey = `\$\{attemptSite\}:\$\{attempt\.attempt\}`;/);
+  // Attempts are keyed by Site AND Repeat Cycle: attempt 1 recurs every Cycle.
+  assert.match(emode, /const attemptKey = `\$\{attemptSite\}:\$\{attempt\.cycle_index \?\? 1\}:\$\{attempt\.attempt\}`;/);
   assert.match(emode, /loadAttemptRun\(next, request\.alias, attemptSite, attempt\.run_id\)/);
   assert.match(emode, /await Promise\.allSettled\(pendingRunLogs\);/);
   assert.match(factory, /loadUnitRun\(batch, unit\)/);

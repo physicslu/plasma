@@ -5,7 +5,7 @@ import time
 from http import HTTPStatus
 from threading import RLock
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from . import server as base_server
 from .bootstrap import (
@@ -36,6 +36,10 @@ PROGRAMMING_OUTPUT_RE = re.compile(r"^programming/runs/([0-9a-f]{32})/output$")
 CANONICAL_BATCHES = "/api/programming/batches"
 CANONICAL_BATCH_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})$")
 CANONICAL_BATCH_STOP_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})/stop$")
+#: Manual Repeat: the operator's Continue of one paused Site, and the read-only
+#: page of settled Cycles / Continue events (WP-02).
+CANONICAL_BATCH_CONTINUE_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})/continue$")
+CANONICAL_BATCH_CYCLES_RE = re.compile(r"^/api/programming/batches/([0-9a-f]{32})/cycles$")
 CANONICAL_STARTS = "/api/programming/starts"
 CANONICAL_START_RE = re.compile(r"^/api/programming/starts/([0-9a-f]{32})$")
 CANONICAL_START_VOID_RE = re.compile(r"^/api/programming/starts/([0-9a-f]{32})/void$")
@@ -359,8 +363,9 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         admission and again immediately before each PPU is operated.
         """
         stop_match = CANONICAL_BATCH_STOP_RE.fullmatch(path)
+        continue_match = CANONICAL_BATCH_CONTINUE_RE.fullmatch(path)
         void_match = CANONICAL_START_VOID_RE.fullmatch(path)
-        if (stop_match is None and void_match is None
+        if (stop_match is None and void_match is None and continue_match is None
                 and path not in (CANONICAL_BATCHES, CANONICAL_STARTS)):
             return False
         try:
@@ -373,6 +378,13 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             # Stop queuing only: allowed in any Platform state.
             self._programming_call(
                 lambda: (HTTPStatus.OK, self._batches().request_stop_batch(batch_id, body)))
+            return True
+        if continue_match is not None:
+            batch_id = continue_match.group(1)
+            # Operator Continue of one paused Site lane: idempotent by
+            # continue_seq; the lane re-runs every dispatch/admission gate.
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().continue_site(batch_id, body)))
             return True
         if void_match is not None:
             # Drops an unconsumed start ID; refuses an admitted start. It
@@ -722,6 +734,18 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             batch_id = batch_match.group(1)
             self._programming_call(
                 lambda: (HTTPStatus.OK, self._batches().status_batch(batch_id)))
+            return
+        cycles_match = CANONICAL_BATCH_CYCLES_RE.fullmatch(parsed.path)
+        if cycles_match is not None:
+            batch_id = cycles_match.group(1)
+            query = parse_qs(parsed.query)
+            try:
+                offset = int((query.get("offset") or ["0"])[0])
+                limit = int((query.get("limit") or ["100"])[0])
+            except ValueError:
+                offset, limit = -1, 0
+            self._programming_call(
+                lambda: (HTTPStatus.OK, self._batches().cycle_records(batch_id, offset, limit)))
             return
         start_match = CANONICAL_START_RE.fullmatch(parsed.path)
         if start_match is not None:

@@ -4,7 +4,8 @@
 
 import type { EngineeringTargetCatalog, PPUStatus } from "../plasma-api";
 import {
-  batchSiteVerdict, runOfUnit, siteCapability, unitProgressPercent, type ManagedTopology, type ProgrammingRoute,
+  awaitingUnits, batchSiteVerdict, runOfUnit, siteCapability, unitCycleLabel, unitFailDetail,
+  unitProgressPercent, type ManagedTopology, type ProgrammingRoute,
 } from "../programming/managed-programming";
 import type { ProgrammingBatch, ProgrammingBatchUnit } from "../engineering/bundle-programming-api";
 import type { ProgrammingCapabilityCatalog } from "../programming-capabilities";
@@ -126,14 +127,18 @@ export function managedProductionSnapshot(
       ppu_id: unit.ppu_alias, site_id: unit.site_id,
       key: `${unit.ppu_alias}:${unit.site_id}`,
       state,
-      current_round: unit.attempts.length ? 1 : 0,
-      completed_rounds: passed ? 1 : 0,
+      // Manual Repeat: rounds are the Site's Cycles; a FAIL settles one too.
+      current_round: unit.cycle && unit.cycle.planned > 1
+        ? Math.min(unit.cycle.index, unit.cycle.planned) : unit.attempts.length ? 1 : 0,
+      completed_rounds: unit.cycle && unit.cycle.planned > 1 ? unit.cycle.pass : passed ? 1 : 0,
       current_operation: null, current_job_id: last?.job_id ?? null,
       // Each Site's own progress: lanes run concurrently, current_run is one Site.
       progress_percent: passed ? 100 : unitProgressPercent(batch, unit) ?? 0,
       total_attempts: unit.attempts.length,
-      retry_count: Math.max(0, unit.attempts.length - 1),
-      final_failures: state === "faulted" ? 1 : 0,
+      retry_count: unit.cycle && unit.cycle.planned > 1
+        ? unit.cycle.retry_attempts : Math.max(0, unit.attempts.length - 1),
+      final_failures: unit.cycle && unit.cycle.planned > 1
+        ? unit.cycle.fail : state === "faulted" ? 1 : 0,
       faulted_round: state === "faulted" ? 1 : null,
       faulted_operation: null,
       last_failure_source: state === "faulted" || state === "error" ? unit.failure_domain ?? "manager_programming_run" : null,
@@ -161,8 +166,12 @@ export function managedProductionSnapshot(
     created_at: batch.created_at ?? "",
     started_at: batch.started_at ?? null, finished_at: batch.finished_at ?? null,
     operations: [...batch.operations],
+    awaiting_continue: awaitingUnits(batch).map(unit => ({
+      ppu_id: unit.ppu_alias, site_id: unit.site_id, continue_seq: unit.cycle!.continue_seq,
+      detail: unitFailDetail(unit) ?? unitCycleLabel(unit) ?? "waiting for Continue",
+    })),
     execution_policy: {
-      repeat_count: 1,
+      repeat_count: batch.policy.repeat,
       site_retry_limit: batch.policy.retry_limit,
       failed_site_stop_threshold: batch.policy.stop_policy.kind === "failed_sites"
         ? batch.policy.stop_policy.threshold : null,

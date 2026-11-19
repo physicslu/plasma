@@ -77,7 +77,18 @@ export type BatchSiteSnapshot = {
   operation_statistics: Partial<Record<Operation, BatchOperationStatistics>>;
 };
 
+/** Managed Manual Repeat: one Site waiting for the operator's Continue. */
+export type AwaitingContinueSite = {
+  ppu_id: string;
+  site_id: number;
+  continue_seq: number;
+  /** Why it waits, plus the system's own FAIL evidence when a Cycle failed. */
+  detail: string;
+};
+
 export type ServerBatchSnapshot = {
+  /** Managed mode only (Manual Repeat); absent for the Standalone runtime. */
+  awaiting_continue?: AwaitingContinueSite[];
   batch_id: string;
   state: ServerBatchState;
   created_at: string;

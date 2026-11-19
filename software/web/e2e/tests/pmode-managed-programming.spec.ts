@@ -65,8 +65,9 @@ test("PMode topology remains Manager Registry/Fleet and never calls the Mock pro
 test("one Manager Start and ONE canonical Batch serves two PPUs with separate Job/Binding identities", async ({ page }) => {
   const counters = await mockManager(page, { ppus: [Z2, LINE2] });
   const { job, start } = await prepare(page, [["z2", [2]], ["line2", [2]]]);
-  await expect(job.getByLabel("Repeat Count")).toBeDisabled();
+  await expect(job.getByLabel("Repeat Count")).toBeEnabled();
   await expect(job.getByLabel("Repeat Count")).toHaveValue("1");
+  await expect(job.getByLabel("Replace IC before next Cycle")).toBeChecked();
   await expect(start).toBeEnabled();
   await start.dblclick();
   await finished(page);

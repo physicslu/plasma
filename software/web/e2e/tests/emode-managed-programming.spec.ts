@@ -73,7 +73,7 @@ test("topology comes from Manager Registry / Fleet / Routes; Alias and PPU ID st
   expect(writes(counters)).toEqual([]);
 });
 
-test("Image is the default Source; E / P / V are three checked, independent checkboxes; Repeat stays disabled", async ({ page }) => {
+test("Image is the default Source; E / P / V are three checked, independent checkboxes; Repeat defaults to 1", async ({ page }) => {
   await mockManager(page);
   const { job, start } = await configure(page);
   await expect(job.getByRole("radio", { name: "Programming Image", exact: true })).toHaveAttribute("aria-checked", "true");
@@ -92,10 +92,11 @@ test("Image is the default Source; E / P / V are three checked, independent chec
     }
     await box.check();
   }
-  await expect(job.getByLabel("Repeat Count")).toBeDisabled();
+  await expect(job.getByLabel("Repeat Count")).toBeEnabled();
   await expect(job.getByLabel("Repeat Count")).toHaveValue("1");
+  await expect(job.getByLabel("Replace IC before next Cycle")).toBeChecked();
   await expect(job.locator('[data-programming-job-policy="note"]')).toContainText(/attempts = 1 · auto retry DISABLED/);
-  await expect(job.locator('[data-programming-job-policy="note"]')).toContainText(/Repeat (固定為 1|is fixed at 1)/);
+  await expect(job.locator('[data-programming-job-policy="note"]')).toContainText(/Repeat(：每個 Site 的 Cycle 數|: Cycles per Site)/);
   await expect(page.getByRole("button", { name: "Prepare Programming" })).toHaveCount(0);
   await expect(start).toBeEnabled();
 });
@@ -1190,11 +1191,12 @@ async function setPolicy(job: ReturnType<Page["getByRole"]>, retry: string, stop
   await job.getByLabel("Engineering Stop Policy").selectOption(stop);
 }
 
-test("Batch Policy: Repeat stays 1 and disabled; Retry and Stop Policy are real, bounded controls", async ({ page }) => {
+test("Batch Policy: Repeat defaults to 1; Retry and Stop Policy are real, bounded controls", async ({ page }) => {
   const counters = await mockManager(page);
   const { workspace, job, start } = await configure(page);
-  await expect(job.getByLabel("Repeat Count")).toBeDisabled();
+  await expect(job.getByLabel("Repeat Count")).toBeEnabled();
   await expect(job.getByLabel("Repeat Count")).toHaveValue("1");
+  await expect(job.getByLabel("Replace IC before next Cycle")).toBeChecked();
   const retry = job.getByLabel("Site Retry Limit");
   await expect(retry).toBeEnabled();
   await expect(retry).toHaveValue("0");
@@ -1214,7 +1216,8 @@ test("Batch Policy: Repeat stays 1 and disabled; Retry and Stop Policy are real,
   await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
   expect(counters.batches).toHaveLength(1);
   expect(counters.batches[0].body).toMatchObject({
-    repeat: 1, retry_limit: 2, stop_policy: { kind: "failed_sites", threshold: 1 },
+    repeat: 1, replace_ic_before_next_cycle: true, retry_limit: 2,
+    stop_policy: { kind: "failed_sites", threshold: 1 },
     operations: ["erase", "program", "verify"],
   });
   await expect(jobLog(workspace)).toContainText("Repeat 1 · Retry limit 2 · Stop Policy 1 failed Site");
@@ -1455,3 +1458,67 @@ for (const unitProgress of [true, false]) {
     await expect(jobLog(workspace)).toContainText(/\[RESULT\] PASS · Batch/, { timeout: 30_000 });
   });
 }
+
+
+test("Manual Repeat: a paused Site is continued by the same START, once, with its pause identity", async ({ page }) => {
+  await mockManager(page);
+  const { workspace, job, start } = await configure(page);
+  await job.getByLabel("Repeat Count").fill("2");
+  // The Manager (scripted here) owns every Cycle; the Browser only shows and continues.
+  let view: Record<string, unknown> | null = null;
+  const continues: Array<Record<string, unknown>> = [];
+  const batchId = "c".repeat(32);
+  const unit = (state: string, settled: number, seq: number) => ({
+    ppu_alias: "z2", site_id: 2, status: state === "AWAITING_CONTINUE" ? state : "FINISHED",
+    outcome: state === "ENDED" ? "FAIL" : null, reason: state === "ENDED" ? "COMPLETED_WITH_FAILURES" : null,
+    failure_domain: null, attempts: [], progress: null,
+    cycle: {
+      planned: 2, index: settled + (state === "ENDED" ? 0 : 1), cycle_id: "d".repeat(32), state,
+      disposition: state === "ENDED" ? "COMPLETED_WITH_FAILURES" : null, settled,
+      pass: settled > 1 ? 1 : 0, fail: 1, retry_attempts: 0, remaining: 2 - settled,
+      continue_seq: seq, continued_seq: state === "ENDED" ? seq : 0,
+      wait_reason: state === "AWAITING_CONTINUE" ? "FAIL_REVIEW" : null,
+      last: { cycle_index: 1, cycle_id: "e".repeat(32), outcome: "FAIL", reason: "JOB_NOT_SUCCESS", attempts: 1,
+        receipt: { run_id: null, job_id: "job-cycle-1", job_state: "failed", flash_result: "FAIL", safe_off: true,
+          job_binding_confirmed: true, reason: "JOB_NOT_SUCCESS" } },
+    },
+  });
+  const record = (body: Record<string, unknown>, u: ReturnType<typeof unit>) => ({
+    schema: "plasma.manager.programming-batch.v2", batch_id: batchId, start_id: body.start_id,
+    targets: body.targets, icpn: body.icpn, operations: body.operations, source: "image",
+    policy: { repeat: 2, replace_ic_before_next_cycle: true, retry_limit: 0, stop_policy: { kind: "never" } },
+    state: u.outcome ? "finished" : "running", execution_status: u.outcome ? "COMPLETED" : "RUNNING",
+    outcome: u.outcome, reason: u.reason, failure_domain: null, stop_requested: false,
+    units: [u], attempts: [], current_run: null, ppu_alias: "z2", site_id: 2,
+    counts: { pass: 0, fail: u.outcome ? 1 : 0, blocked: 0, unknown: 0, sites: 1, attempts: 0 },
+    cycles: { planned: 2, settled: u.cycle.settled, pass: u.cycle.pass, fail: 1, retry_attempts: 0,
+      remaining: u.cycle.remaining, awaiting_continue: u.cycle.state === "AWAITING_CONTINUE" ? 1 : 0 },
+    auto_retry: "DISABLED", created_at: null, started_at: null, finished_at: null,
+  });
+  let started: Record<string, unknown> = {};
+  await page.route(/\/api\/manager\/programming\/batches$/, async route => {
+    started = route.request().postDataJSON() as Record<string, unknown>;
+    view = record(started, unit("AWAITING_CONTINUE", 1, 1));
+    await route.fulfill({ status: 202, json: { ok: true, batch: view } });
+  });
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}$/, async route => {
+    await route.fulfill({ json: { ok: true, batch: view } });
+  });
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}\/continue$/, async route => {
+    continues.push(route.request().postDataJSON() as Record<string, unknown>);
+    view = record(started, unit("ENDED", 2, 1));
+    await route.fulfill({ json: { ok: true, duplicate: false, batch: view } });
+  });
+  await start.click();
+  const resume = job.getByRole("button", { name: /CONTINUE SITE-02/ });
+  await expect(resume).toBeEnabled();
+  expect(started).toMatchObject({ repeat: 2, replace_ic_before_next_cycle: true });
+  await expect(job.getByRole("status", { name: "BATCH STATUS" })).toContainText("WAITING · REPLACE IC");
+  // The system's own FAIL evidence is shown; nothing is typed by the operator.
+  await expect(workspace.locator('[data-site-fail-detail="2"]')).toContainText("Cycle 1 FAIL · JOB_NOT_SUCCESS · Job job-cycle-1");
+  await expect(workspace.locator('[data-site-cycle="2"]')).toContainText("Cycle 2/2 · PASS 0 · FAIL 1");
+  await resume.dblclick();
+  await expect(jobLog(workspace)).toContainText("[CYCLES] planned 2 · settled 2");
+  // One Continue, echoing the pause it answers; no actor is ever sent by the Browser.
+  expect(continues).toEqual([{ ppu_alias: "z2", site_id: 2, continue_seq: 1 }]);
+});

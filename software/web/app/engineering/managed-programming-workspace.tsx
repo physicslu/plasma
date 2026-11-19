@@ -9,8 +9,10 @@ import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import { programmingRunLogLines, safeOffLogLabel } from "../programming/programming-run-log";
 import {
+  awaitingUnits,
   batchSiteVerdict,
   batchVerdict,
+  continueAwaitingSites,
   loadAttemptRun,
   runOfUnit,
   describeBlocked,
@@ -30,6 +32,8 @@ import {
   runManagedRead,
   unitProgressPercent,
   unitStageLabel,
+  unitCycleLabel,
+  unitFailDetail,
   runStageLabel,
   runVerdict,
   siteCapability,
@@ -47,6 +51,7 @@ import {
   acknowledgeProgrammingRun,
   getStartReconciliation,
   voidStart,
+  MAX_REPEAT,
   MAX_RETRY_LIMIT,
   normalizeOperations,
   operationsTakeImage,
@@ -222,7 +227,9 @@ export default function ManagedProgrammingWorkspace() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [locked, setLocked] = useState<LockedInput | null>(null);
   const [run, setRun] = useState<ProgrammingRun | null>(null);
-  // Batch Policy: Manager-owned Retry and Stop Policy. Repeat is fixed at 1.
+  // Batch Policy: Manager-owned Repeat (Cycles per Site), Retry and Stop Policy.
+  const [repeatCount, setRepeatCount] = useState("1");
+  const [replaceIc, setReplaceIc] = useState(true);
   const [retryLimit, setRetryLimit] = useState(0);
   const [stopPolicy, setStopPolicy] = useState<StopPolicy>({ kind: "never" });
   const [batch, setBatch] = useState<ProgrammingBatch | null>(null);
@@ -250,6 +257,7 @@ export default function ManagedProgrammingWorkspace() {
   const [jobCollapsed, setJobCollapsed] = useState(false);
 
   const startLock = useRef(false);
+  const continueLock = useRef(false);
   // Keyed by Site and attempt: every Site of a Batch has its own attempt 1.
   const loggedAttempts = useRef(new Map<string, string>());
   // Plan IDs whose [PLAN] detail lines were written (one set per Site attempt).
@@ -646,12 +654,33 @@ export default function ManagedProgrammingWorkspace() {
     appendLog(`[SITE] SELECTION · ${next.length ? next.map(siteLabel).join(", ") : "none"}`, false, "USR");
   }
 
+  // Manual Repeat: Start pressed while Sites wait is their Continue (IC
+  // replaced / FAIL reviewed). One request per waiting Site; the Manager
+  // submits the next Cycle through its own gates.
+  async function continueSites() {
+    if (!batch || continueLock.current) return;
+    continueLock.current = true;
+    try {
+      const waiting = awaitingUnits(batch);
+      const result = await continueAwaitingSites(batch);
+      setBatch(result.batch);
+      appendLog(`[CONTINUE] ${waiting.map(unit => `${siteLabel(unit.site_id)} after Cycle ${unit.cycle?.last?.cycle_index ?? "—"} ${unit.cycle?.last?.outcome ?? ""}`).join(", ")} · operator replaced IC · ${result.continued} continued`, false, "USR");
+      for (const error of result.errors) appendLog(`[CONTINUE] REFUSED · ${error} · nothing was started`, true, "USR");
+    } finally {
+      continueLock.current = false;
+    }
+  }
+
   async function start() {
+    if (awaitingUnits(batch).length) {
+      await continueSites();
+      return;
+    }
     // Double-click protection: the lock is taken synchronously, before any await.
     if (startLock.current || !readiness.ready || !ppu || !siteIds.length || !icpn || !operations || !jobRoute
-      || (needsImage && !file)) return;
+      || (needsImage && !file) || repeatValue == null) return;
     startLock.current = true;
-    const policy = { retryLimit, stopPolicy };
+    const policy = { retryLimit, stopPolicy, repeat: repeatValue, replaceIc };
     const started = [...siteIds];
     const request: ManagedBatchRequest = needsImage && file
       ? { alias: ppu.alias, siteIds: started, icpn, operations, source, file, ...policy }
@@ -687,7 +716,7 @@ export default function ManagedProgrammingWorkspace() {
     setPhase("locking");
     appendLog(`[START] ${operationLabel} · PPU ${ppu.alias} (${ppu.ppuId ?? "—"}) · ${started.map(siteLabel).join(", ")} (${started.length} Site${started.length === 1 ? "" : "s"}) · ${icpn} · ${
       request.file ? `${source.toUpperCase()} ${request.file.name}` : `no Programming Image · ${hex(request.range.address)} + ${request.range.length} B`
-    } · Retry ${retryLimit} · Stop Policy ${stopPolicy.kind === "never" ? "never" : `${stopPolicy.threshold} failed Site${stopPolicy.threshold === 1 ? "" : "s"}`} · Repeat 1 · parallel Site lanes`, false, "USR");
+    } · Retry ${retryLimit} · Stop Policy ${stopPolicy.kind === "never" ? "never" : `${stopPolicy.threshold} failed Site${stopPolicy.threshold === 1 ? "" : "s"}`} · Repeat ${repeatValue} Cycle(s)/Site · ${replaceIc ? "replace IC each Cycle" : "same-IC Debug"} · parallel Site lanes`, false, "USR");
     try {
       const final = await runManagedBatch(request, {
         onLocked: input => {
@@ -711,8 +740,9 @@ export default function ManagedProgrammingWorkspace() {
           // in the Log and in Receipts & Diagnostics, not in a standing panel.
           for (const attempt of next.attempts) {
             const attemptSite = attempt.job_key.site_id;
-            const attemptKey = `${attemptSite}:${attempt.attempt}`;
-            const attemptLabel = `[ATTEMPT ${attempt.attempt}/${next.policy.retry_limit + 1}] ${siteLabel(attemptSite)}`;
+            const attemptKey = `${attemptSite}:${attempt.cycle_index ?? 1}:${attempt.attempt}`;
+            const cycleLabel = next.policy.repeat > 1 ? ` Cycle ${attempt.cycle_index ?? 1}/${next.policy.repeat}` : "";
+            const attemptLabel = `[ATTEMPT ${attempt.attempt}/${next.policy.retry_limit + 1}]${cycleLabel} ${siteLabel(attemptSite)}`;
             const seen = loggedAttempts.current.get(attemptKey);
             if (seen === undefined) {
               loggedAttempts.current.set(attemptKey, "planned");
@@ -757,6 +787,12 @@ export default function ManagedProgrammingWorkspace() {
         final.counts.sites} Site(s) · PASS ${final.counts.pass} · FAIL ${final.counts.fail} · BLOCKED ${
         final.counts.blocked} · UNKNOWN ${final.counts.unknown} · ${final.attempts.length} attempt(s) · one IC per Site`,
         verdict !== "PASS", "PPU");
+      if (final.cycles && final.policy.repeat > 1) {
+        appendLog(`[CYCLES] planned ${final.cycles.planned} · settled ${final.cycles.settled} · PASS ${final.cycles.pass} · FAIL ${
+          final.cycles.fail} · Retry ${final.cycles.retry_attempts} · remaining ${final.cycles.remaining}${
+          final.policy.replace_ic_before_next_cycle ? "" : " · same-IC Debug: PASS Cycles are not distinct ICs"}`,
+          final.cycles.fail > 0 || final.cycles.remaining > 0, "PPU");
+      }
       if (final.outcome === "OUTCOME_UNKNOWN" && final.current_run) setUnresolved(final.current_run);
     } catch (reason) {
       if (reason instanceof ManagedProgrammingBlocked) {
@@ -953,11 +989,15 @@ export default function ManagedProgrammingWorkspace() {
     : source === "bundle"
       ? "Your own canonical Bundle v3. The Manager verifies it against the qualified Programming Route."
       : "Binary Programming Image (.bin). The Manager builds the canonical Bundle v3.";
+  const repeatParsed = /^\d+$/.test(repeatCount.trim()) ? Number(repeatCount.trim()) : NaN;
+  const repeatValue = Number.isSafeInteger(repeatParsed) && repeatParsed >= 1 && repeatParsed <= MAX_REPEAT
+    ? repeatParsed : null;
+  const waiting = awaitingUnits(batch);
   const policyNote = locale === "zh-TW"
-    ? `每次 Attempt 為獨立 Job（attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}）。Retry：僅在明確 FAIL、SAFE_OFF 已驗證且 Site 已釋放時，由 Manager 以新的 Plan／Job 重試；OUTCOME UNKNOWN 永不重送。Stop Policy 與 STOP QUEUING 只停止尚未提交的 Attempt，不取消執行中的 Job。Repeat 固定為 1（暫不實作）。`
-    : `Each attempt is its own Job (attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}). Retry: the Manager submits a new Plan / Job only after a definite FAIL with SAFE_OFF verified and the Site released; OUTCOME UNKNOWN is never resubmitted. Stop Policy and STOP QUEUING only stop attempts that are not submitted yet; a running Job is never cancelled. Repeat is fixed at 1 (not implemented).`;
+    ? `每次 Attempt 為獨立 Job（attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}）。Retry：僅在明確 FAIL、SAFE_OFF 已驗證且 Site 已釋放時，由 Manager 以新的 Plan／Job 重試；OUTCOME UNKNOWN 永不重送。Stop Policy 與 STOP QUEUING 只停止尚未提交的 Attempt，不取消執行中的 Job。Repeat：每個 Site 的 Cycle 數（1–10000，FAIL 也計入一個 Cycle，Retry 不另計）；每個 Cycle 結束後更換 IC 並按 START 繼續。`
+    : `Each attempt is its own Job (attempts = ${MANAGED_JOB_POLICY.attempts} · auto retry ${MANAGED_JOB_POLICY.auto_retry}). Retry: the Manager submits a new Plan / Job only after a definite FAIL with SAFE_OFF verified and the Site released; OUTCOME UNKNOWN is never resubmitted. Stop Policy and STOP QUEUING only stop attempts that are not submitted yet; a running Job is never cancelled. Repeat: Cycles per Site (1–10000; a FAIL settles one Cycle, Retries never add one); after each Cycle replace the IC and press START to continue.`;
   const fileDetails = file ? `${formatBytes(file.size)} · ${fileFormat(file, source)}` : null;
-  const phaseLabel = phase === "locking" ? "LOCKING" : phase === "planning" ? "PLANNING"
+  const phaseLabel = waiting.length ? "WAITING · REPLACE IC" : phase === "locking" ? "LOCKING" : phase === "planning" ? "PLANNING"
     : phase === "starting" ? "STARTING" : run && run.outcome == null ? runStageLabel(run) : readiness.label;
 
   return (
@@ -1078,10 +1118,17 @@ export default function ManagedProgrammingWorkspace() {
               policyLabel="Batch Policy"
               policy={{
                 repeatLabel: "Repeat",
-                repeatValue: String(MANAGED_JOB_POLICY.attempts),
-                repeatDisabled: true,
+                repeatValue: repeatCount,
+                repeatDisabled: active,
                 repeatAriaLabel: "Repeat Count",
-                onRepeatChange: () => {},
+                onRepeatChange: setRepeatCount,
+                replaceIc: {
+                  label: "Replace IC each Cycle",
+                  checked: replaceIc,
+                  disabled: active,
+                  ariaLabel: "Replace IC before next Cycle",
+                  onChange: setReplaceIc,
+                },
                 retryLabel: "Retry",
                 retryValue: String(retryLimit),
                 retryDisabled: active,
@@ -1112,8 +1159,8 @@ export default function ManagedProgrammingWorkspace() {
                 },
                 note: policyNote,
               }}
-              startLabel="START PROGRAMMING"
-              startDisabled={!readiness.ready}
+              startLabel={waiting.length ? `START · CONTINUE ${waiting.map(unit => siteLabel(unit.site_id)).join(", ")}` : "START PROGRAMMING"}
+              startDisabled={waiting.length ? false : !readiness.ready || repeatValue == null}
               onStart={start}
               statusLabel="BATCH STATUS"
               statusValue={phaseLabel}
@@ -1197,6 +1244,8 @@ export default function ManagedProgrammingWorkspace() {
                   const rowVerdict = batch && unit
                     ? batchSiteVerdict(batch, unit, runOfUnit(batch, unit)).verdict : null;
                   const state = stage ?? (site.enabled ? site.state.toUpperCase() : "DISABLED");
+                  const cycleLabel = ownBatch ? unitCycleLabel(unit) : null;
+                  const failDetail = ownBatch ? unitFailDetail(unit) : null;
                   // READ uses the IC Profile's operations and the PPU Site's current readiness.
                   const canRead = routeDeclaring(routes, icpn, site.site_id, ["read"]) != null;
                   const readBlocked = canRead ? readBlockReason(site.site_id) : null;
@@ -1216,11 +1265,11 @@ export default function ManagedProgrammingWorkspace() {
                       </td>
                       <td><b>{siteLabel(site.site_id)}</b></td>
                       <td><b>{icpn ?? site.target ?? "—"}</b><small>{site.interface ?? "—"}</small></td>
-                      <td><span className="state">{state}</span></td>
+                      <td><span className="state">{state}</span>{cycleLabel && <small data-site-cycle={site.site_id}>{cycleLabel}</small>}</td>
                       <td>{progress == null
                         ? <b>—</b>
                         : <div className="tableProgress"><div className="track"><i style={{ width: `${progress}%` }} /></div><b>{Math.round(progress)}%</b></div>}</td>
-                      <td><b className="engineeringResult" data-result={rowVerdict ?? "—"}>{rowVerdict == null || rowVerdict === "RUNNING" ? "—" : rowVerdict.replace("_", " ")}</b></td>
+                      <td><b className="engineeringResult" data-result={rowVerdict ?? "—"}>{rowVerdict == null || rowVerdict === "RUNNING" ? "—" : rowVerdict.replace("_", " ")}</b>{failDetail && <small data-site-fail-detail={site.site_id}>{failDetail}</small>}</td>
                       <td className="siteReadCell" data-testid={`site-read-${site.site_id}`}>
                         {canRead ? (
                           <button

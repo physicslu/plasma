@@ -40,6 +40,17 @@ export type ProgrammingJobPolicy = {
   repeatDisabled: boolean;
   repeatAriaLabel: string;
   onRepeatChange: (value: string) => void;
+  /**
+   * Manual Repeat: wait for the operator to replace the IC after each Cycle
+   * (default on). Off = same-IC Debug. Absent where the backend has no Repeat.
+   */
+  replaceIc?: {
+    label: string;
+    checked: boolean;
+    disabled: boolean;
+    ariaLabel: string;
+    onChange: (checked: boolean) => void;
+  };
   retryLabel: string;
   retryValue: string;
   retryDisabled: boolean;
@@ -236,6 +247,7 @@ export function ProgrammingJobPanel({
             <strong>{fieldNumber(4)} {policyLabel}</strong>
             <div className="programmingJobPolicyControls">
               <label>{policy.repeatLabel}<input data-programming-job-policy="repeat" aria-label={policy.repeatAriaLabel} type="number" min="1" max="10000" value={policy.repeatValue} disabled={policy.repeatDisabled} onChange={event => policy.onRepeatChange(event.target.value)} /></label>
+              {policy.replaceIc && <label><input data-programming-job-policy="replace-ic" aria-label={policy.replaceIc.ariaLabel} type="checkbox" checked={policy.replaceIc.checked} disabled={policy.replaceIc.disabled} onChange={event => policy.replaceIc?.onChange(event.target.checked)} />{policy.replaceIc.label}</label>}
               <label>{policy.retryLabel}<input data-programming-job-policy="retry" aria-label={policy.retryAriaLabel} type="number" min="0" max={policy.retryMax ?? 20} value={policy.retryValue} disabled={policy.retryDisabled} onChange={event => policy.onRetryChange(event.target.value)} /></label>
               <label>{policy.stopLabel}
                 <select data-programming-job-policy="stop" aria-label={policy.stopAriaLabel} value={policy.stopValue} disabled={policy.stopDisabled} onChange={event => policy.onStopChange(event.target.value)}>

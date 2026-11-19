@@ -90,6 +90,14 @@ class StubBatches:
             raise ProgrammingError(400, "invalid_request", "stop requires stop=STOP_QUEUING")
         return {"ok": True, "batch": {"batch_id": batch_id, "stop_requested": True}}
 
+    def continue_site(self, batch_id, body):
+        self.calls.append(("continue_site", batch_id, dict(body)))
+        return {"ok": True, "duplicate": False, "batch": {"batch_id": batch_id}}
+
+    def cycle_records(self, batch_id, offset, limit):
+        self.calls.append(("cycle_records", batch_id, offset, limit))
+        return {"ok": True, "batch_id": batch_id, "total": 0, "offset": offset, "records": []}
+
 
 @pytest.fixture
 def manager(tmp_path: Path):
@@ -273,3 +281,14 @@ def test_an_unknown_canonical_batch_path_is_not_claimed(manager):
     # ordinary Manager routes rather than being answered by this resource.
     assert call("GET", "/api/programming/batches/not-a-batch")[0] == 404
     assert batches.calls == []
+
+
+def test_manual_repeat_continue_and_cycle_page_are_canonical_batch_routes(manager):
+    call, workflow, _poller, batches = manager
+    body = {"ppu_alias": "z2", "site_id": 2, "continue_seq": 1}
+    status, payload = call("POST", f"{CANONICAL}/{RUN_ID}/continue", body)
+    assert status == 200 and payload["duplicate"] is False
+    status, payload = call("GET", f"{CANONICAL}/{RUN_ID}/cycles?offset=5&limit=7")
+    assert status == 200 and payload["records"] == []
+    assert batches.calls == [("continue_site", RUN_ID, body), ("cycle_records", RUN_ID, 5, 7)]
+    assert workflow.calls == []

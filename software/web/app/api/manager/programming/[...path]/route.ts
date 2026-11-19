@@ -9,7 +9,7 @@ function programmingResource(request: Request): string | null {
   const encoded = url.pathname.slice(PROGRAMMING_BROWSER_PREFIX.length + 1);
   if (!encoded) return null;
   const parts = encoded.split("/");
-  // batches | batches/<id> | batches/<id>/stop | starts | starts/<id> | starts/<id>/void
+  // batches | batches/<id> | batches/<id>/stop | batches/<id>/continue | starts | starts/<id> | starts/<id>/void
   if (parts.length > 3 || parts.some(part => !part)) return null;
   try {
     return parts.map(part => decodeURIComponent(part)).join("/");

@@ -30,7 +30,7 @@ import {
   type ManagedTopology, type ProgrammingSource, type RoutesState,
 } from "../programming/managed-programming";
 import { getProgrammingBatch, getStartReconciliation, normalizeOperations,
-  operationsTakeImage, stopProgrammingBatch,
+  continueProgrammingBatch, operationsTakeImage, stopProgrammingBatch,
   type ProgrammingBatch, type ProgrammingRun, type SequenceOperation,
 } from "../engineering/bundle-programming-api";
 import { resolveProgrammingCapabilities } from "../programming-capabilities";
@@ -448,6 +448,7 @@ export default function FactoryConsoleV2() {
   const [batchSnapshot, setBatchSnapshot] = useState<ServerBatchSnapshot | null>(null);
   const [clockNow, setClockNow] = useState(() => Date.now());
   const [repeatCount, setRepeatCount] = useState("1");
+  const [replaceIc, setReplaceIc] = useState(true);
   const [siteRetryLimit, setSiteRetryLimit] = useState("3");
   const [failedSiteThreshold, setFailedSiteThreshold] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -466,6 +467,7 @@ export default function FactoryConsoleV2() {
   // Factory Log is a read-only view of the Manager's per-Site Job/Receipt truth.
   const loggedRecords = useRef(new Map<string, string>());
   const managedStartLock = useRef(false);
+  const managedContinueLock = useRef(false);
 
   const logSequence = useRef(0);
   const activityReleaseRef = useRef<(() => void) | null>(null);
@@ -1025,7 +1027,8 @@ export default function FactoryConsoleV2() {
   const retryValue = parseNonNegativeInt(siteRetryLimit);
   const thresholdValue = failedSiteThreshold === "" ? null : parsePositiveInt(failedSiteThreshold);
   const policyValid = managed
-    ? retryValue !== null && retryValue <= 5
+    ? repeatValue !== null && repeatValue <= 10_000
+      && retryValue !== null && retryValue <= 5
       && (failedSiteThreshold === "" || (thresholdValue !== null && thresholdValue <= Math.max(1, batchCounts.sites)))
     : repeatValue !== null && repeatValue <= 10_000
       && retryValue !== null && retryValue <= 20
@@ -1153,7 +1156,7 @@ export default function FactoryConsoleV2() {
 
   const plannedIcCount = batchSnapshot
     ? batchSnapshot.sites.length * batchSnapshot.execution_policy.repeat_count
-    : batchCounts.sites * (managed ? 1 : repeatValue ?? 0);
+    : batchCounts.sites * (repeatValue ?? 0);
 
   const kpis = [
     { key: "production-sites", label: "SITES", value: batchSnapshot?.sites.length ?? batchCounts.sites },
@@ -1302,7 +1305,7 @@ export default function FactoryConsoleV2() {
       ? {
         alias: primary.ppu_alias, siteIds: primary.site_ids, targets,
         icpn, operations: managedChosen, source: programmingSource, file: managedFile,
-        retryLimit: retryValue ?? 0,
+        retryLimit: retryValue ?? 0, repeat: repeatValue ?? 1, replaceIc,
         stopPolicy: thresholdValue == null ? { kind: "never" as const }
           : { kind: "failed_sites" as const, threshold: thresholdValue },
       }
@@ -1310,7 +1313,7 @@ export default function FactoryConsoleV2() {
         alias: primary.ppu_alias, siteIds: primary.site_ids, targets,
         icpn, operations: ["erase"] as const, source: programmingSource, file: null,
         range: { address: managedRoute.flash_base, length: managedRoute.flash_size },
-        retryLimit: retryValue ?? 0,
+        retryLimit: retryValue ?? 0, repeat: repeatValue ?? 1, replaceIc,
         stopPolicy: thresholdValue == null ? { kind: "never" as const }
           : { kind: "failed_sites" as const, threshold: thresholdValue },
       };
@@ -1321,7 +1324,7 @@ export default function FactoryConsoleV2() {
     setBatchObservationState("connected");
     loggedRecords.current.clear();
     beginActivity();
-    appendLog(`[BAT] START MANAGER · ${targets.length} PPUs · ${batchCounts.sites} Sites · ${managedChosen.join(" → ").toUpperCase()} · ${icpn} · Retry ${retryValue ?? 0} · Stop ${thresholdValue ?? "never"} · Repeat 1`);
+    appendLog(`[BAT] START MANAGER · ${targets.length} PPUs · ${batchCounts.sites} Sites · ${managedChosen.join(" → ").toUpperCase()} · ${icpn} · Retry ${retryValue ?? 0} · Stop ${thresholdValue ?? "never"} · Repeat ${repeatValue ?? 1} Cycle(s)/Site · ${replaceIc ? "replace IC each Cycle" : "same-IC Debug"}`);
     try {
       await runManagedBatch(request, {
         onStartId: startId => {
@@ -1428,7 +1431,35 @@ export default function FactoryConsoleV2() {
     }
   }
 
+  // Manual Repeat: START pressed while Sites wait is their Continue (IC
+  // replaced / FAIL reviewed). The Manager dispatches the next Cycle itself.
+  async function continueManagedSites() {
+    const batchId = batchSnapshot?.batch_id;
+    const waiting = batchSnapshot?.awaiting_continue ?? [];
+    if (!batchId || !waiting.length || managedContinueLock.current) return;
+    managedContinueLock.current = true;
+    try {
+      for (const site of waiting) {
+        try {
+          const answer = await continueProgrammingBatch(batchId, {
+            ppu_alias: site.ppu_id, site_id: site.site_id, continue_seq: site.continue_seq,
+          });
+          appendLog(`[BAT] CONTINUE · ${site.ppu_id} Site ${site.site_id} · IC replaced${answer.duplicate ? " · already accepted" : ""}`);
+          if (catalog) applyBatchSnapshot(managedProductionSnapshot(answer.batch, managedTopology), catalog);
+        } catch (error) {
+          appendLog(`[BAT] CONTINUE REFUSED · ${site.ppu_id} Site ${site.site_id} · ${error instanceof Error ? error.message : "request failed"} · nothing was started`, "WARN");
+        }
+      }
+    } finally {
+      managedContinueLock.current = false;
+    }
+  }
+
   async function executeBatch() {
+    if (managed && batchSnapshot?.awaiting_continue?.length) {
+      await continueManagedSites();
+      return;
+    }
     if (managed) {
       await executeManagedBatch();
       return;
@@ -1725,16 +1756,23 @@ export default function FactoryConsoleV2() {
               policyLabel={text.batchPolicy}
               policy={{
                 repeatLabel: text.repeat,
-                repeatValue: managed ? "1" : repeatCount,
-                repeatDisabled: managed || batchRunning,
+                repeatValue: repeatCount,
+                repeatDisabled: batchRunning,
                 repeatAriaLabel: "Repeat Count",
                 onRepeatChange: setRepeatCount,
+                ...(managed ? { replaceIc: {
+                  label: "Replace IC each Cycle",
+                  checked: replaceIc,
+                  disabled: batchRunning,
+                  ariaLabel: "Replace IC before next Cycle",
+                  onChange: setReplaceIc,
+                } } : {}),
                 retryLabel: text.retry,
                 retryValue: siteRetryLimit,
                 retryMax: managed ? 5 : 20,
                 retryDisabled: batchRunning,
                 note: managed
-                  ? "Manager-owned Batch · Repeat 1 · Retry 0–5 only for definite eligible FAIL (never OUTCOME UNKNOWN) · ABORT stops pending submissions but never cancels an accepted Job."
+                  ? `Manager-owned Batch · Repeat 1–10000 Cycles per Site (a FAIL settles one Cycle; Retries never add one) · Retry 0–5 only for definite eligible FAIL (never OUTCOME UNKNOWN) · ABORT stops pending submissions but never cancels an accepted Job.${batchSnapshot?.awaiting_continue?.length ? ` · WAITING: ${batchSnapshot.awaiting_continue.map(site => `${site.ppu_id} Site ${site.site_id} — ${site.detail}`).join(" | ")} — replace the IC and press START.` : ""}`
                   : undefined,
                 retryAriaLabel: "Site Retry Limit",
                 onRetryChange: setSiteRetryLimit,
@@ -1748,8 +1786,10 @@ export default function FactoryConsoleV2() {
                 ],
                 onStopChange: setFailedSiteThreshold,
               }}
-              startLabel={text.start}
-              startDisabled={!batchReadiness.ready || !policyValid}
+              startLabel={managed && batchSnapshot?.awaiting_continue?.length
+                ? `${text.start} · CONTINUE ${batchSnapshot.awaiting_continue.length} SITE(S)` : text.start}
+              startDisabled={managed && batchSnapshot?.awaiting_continue?.length
+                ? false : !batchReadiness.ready || !policyValid}
               onStart={executeBatch}
               statusLabel={text.batchStatus}
               statusValue={batchStatusLabel}

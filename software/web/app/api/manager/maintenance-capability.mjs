@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const CAPABILITY_COOKIE = "plasma-manager-maintenance";
 const CAPABILITY_VERSION = "v1";
@@ -133,6 +133,26 @@ export function hasMaintenanceCapability(request, alias, nowMs = Date.now()) {
   const actualBuffer = Buffer.from(supplied, "utf8");
   const expectedBuffer = Buffer.from(expected, "utf8");
   return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+/**
+ * The verified operator identity of a mutation, for audit records only
+ * (Manual Repeat Continue, WP-02). Call it only after
+ * `hasMaintenanceCapability` accepted this request for `alias`.
+ *
+ * There are no personal operator accounts: the authenticated principal is the
+ * Control Station enrollment capability this browser holds for that PPU. Its
+ * identity is a digest of the HMAC-verified capability nonce - stable for the
+ * capability session, never the secret token itself. In the mutable
+ * (development) registry policy no capability exists, which is said plainly.
+ */
+export function maintenanceCapabilityActor(request, alias) {
+  if (!fixedLifecycleRegistry()) return "development-console:unauthenticated";
+  const token = cookieValue(request);
+  const nonce = token ? token.split(".")[2] : "";
+  if (!nonce) return null;
+  const digest = createHash("sha256").update(`${alias}\n${nonce}`, "utf8").digest("hex");
+  return `maintenance-capability:${digest.slice(0, 24)}`;
 }
 
 export const maintenanceCapabilityContract = Object.freeze({

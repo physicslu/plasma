@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   hasMaintenanceCapability,
   issueMaintenanceCapabilityCookie,
+  maintenanceCapabilityActor,
   maintenanceCapabilityConfigured,
   maintenanceCapabilityContract,
 } from "../app/api/manager/maintenance-capability.mjs";
@@ -143,4 +144,21 @@ test("mutable non-public registry policy does not require browser capability", (
     if (previousOrigin === undefined) delete process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN;
     else process.env.PLASMA_CONTROL_STATION_PUBLIC_ORIGIN = previousOrigin;
   }
+});
+
+
+test("Manual Repeat Continue actor is derived from the verified capability, never the token", () => {
+  withFixedPolicy(() => {
+    const cookie = cookieHeader(issueMaintenanceCapabilityCookie(ALIAS, NOW));
+    const actor = maintenanceCapabilityActor(request(cookie), ALIAS);
+    assert.match(actor, /^maintenance-capability:[0-9a-f]{24}$/);
+    // Stable for one capability session, distinct per PPU and per capability.
+    assert.equal(maintenanceCapabilityActor(request(cookie), ALIAS), actor);
+    assert.notEqual(maintenanceCapabilityActor(request(cookie), "other-ppu"), actor);
+    const other = cookieHeader(issueMaintenanceCapabilityCookie(ALIAS, NOW));
+    assert.notEqual(maintenanceCapabilityActor(request(other), ALIAS), actor);
+    // The secret token never appears in the audit identity.
+    assert.equal(actor.includes(decodeURIComponent(cookie.split("=")[1])), false);
+    assert.equal(maintenanceCapabilityActor(request(null), ALIAS), null);
+  });
 });

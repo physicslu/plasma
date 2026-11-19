@@ -60,9 +60,14 @@ def final(batches, started):
 # ------------------------------------------------------------------ policy
 
 @pytest.mark.parametrize("policy, code", [
-    ({"repeat": 2}, "repeat_not_supported"),
-    ({"repeat": 0}, "repeat_not_supported"),
-    ({"repeat": True}, "repeat_not_supported"),
+    ({"repeat": 0}, "invalid_request"),
+    ({"repeat": 10001}, "invalid_request"),
+    ({"repeat": -1}, "invalid_request"),
+    ({"repeat": True}, "invalid_request"),
+    ({"repeat": "2"}, "invalid_request"),
+    ({"repeat": 2.0}, "invalid_request"),
+    ({"replace_ic_before_next_cycle": "yes"}, "invalid_request"),
+    ({"replace_ic_before_next_cycle": 1}, "invalid_request"),
     ({"retry_limit": -1}, "invalid_request"),
     ({"retry_limit": MAX_RETRY_LIMIT + 1}, "invalid_request"),
     ({"retry_limit": "1"}, "invalid_request"),
@@ -72,7 +77,7 @@ def final(batches, started):
     ({"stop_policy": {"kind": "failed_sites"}}, "invalid_request"),
     ({"stop_policy": "never"}, "invalid_request"),
 ])
-def test_policy_is_validated_and_repeat_is_not_implemented(tmp_path, policy, code):
+def test_policy_is_validated_including_repeat_bounds(tmp_path, policy, code):
     batches, _w, gateway = rig(tmp_path)
     with pytest.raises(ProgrammingError) as caught:
         start(batches, ALIAS, {**ops_body(FULL), **policy})
@@ -82,7 +87,9 @@ def test_policy_is_validated_and_repeat_is_not_implemented(tmp_path, policy, cod
 
 
 def test_default_policy_is_one_attempt_repeat_one_never_stop():
-    assert parse_policy({}) == {"repeat": 1, "retry_limit": 0, "stop_policy": {"kind": "never"}}
+    assert parse_policy({}) == {"repeat": 1, "replace_ic_before_next_cycle": True,
+                                "retry_limit": 0, "stop_policy": {"kind": "never"}}
+    assert parse_policy({"repeat": 10000, "replace_ic_before_next_cycle": False})["repeat"] == 10000
 
 
 def test_a_batch_takes_an_operations_list_never_a_read_or_flash_cycle(tmp_path):
@@ -106,7 +113,8 @@ def test_pass_on_the_first_attempt_is_one_job_and_counts_once(tmp_path):
     assert len(batch["attempts"]) == 1 and len(gateway.posts) == 1
     assert batch["counts"] == {"pass": 1, "fail": 0, "blocked": 0, "unknown": 0,
                                "sites": 1, "attempts": 1}
-    assert batch["policy"] == {"repeat": 1, "retry_limit": 3, "stop_policy": {"kind": "never"}}
+    assert batch["policy"] == {"repeat": 1, "replace_ic_before_next_cycle": True,
+                               "retry_limit": 3, "stop_policy": {"kind": "never"}}
     assert batch["auto_retry"] == "DISABLED" and batch["operations"] == FULL
     assert batch["current_run"]["outcome"] == "PASS"
     assert gateway.posts[0]["operations"] == FULL
