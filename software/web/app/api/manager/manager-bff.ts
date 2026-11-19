@@ -335,7 +335,7 @@ export async function relayManagerDeviceSearchRequest(request: Request): Promise
 }
 
 export async function relayManagerCatalogManagementRequest(request: Request, action: string): Promise<Response> {
-  if (!/^(official|export|diff|validate|validate-official|local|delete-local|stage|publish|rollback|evidence)?$/.test(action)) {
+  if (!/^(official|search|export|diff|validate|validate-official|local|delete-local|stage|publish|rollback|evidence)?$/.test(action)) {
     return json(404, { ok: false, error: { message: "unknown Catalog action" } });
   }
   if (request.method !== "GET" && request.method !== "POST") {

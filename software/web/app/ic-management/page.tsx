@@ -15,6 +15,7 @@ type History = { active_revision: string | null; revisions: Array<{ revision: st
 type OfficialEntry = { record: Record<string, unknown>; qualification: Record<string, unknown>; revision: string };
 type Evidence = { evidence_id: string; authority: string; reference: string; source_revision: string; acquired_at: string };
 type DiffEntry = { vendor: string; identifier: string; status: string; before?: { record: Record<string, unknown>; qualification: Record<string, unknown> }; after?: { record: Record<string, unknown>; qualification: Record<string, unknown> } };
+type OfficialSummary = { vendor: string; identifier: string; family: string; source: string; level: number };
 const base = "/api/manager/catalog/management";
 const empty: LocalEntry = { record: { vendor: "", identifier: "", family: "", package: "", flash_size: "" }, profile: { profile_id: "", provider_id: "", operations: [] } };
 
@@ -65,6 +66,8 @@ export default function ICManagementPage() {
   const [official, setOfficial] = useState<OfficialEntry | null>(null);
   const [officialVendor, setOfficialVendor] = useState("");
   const [officialICPN, setOfficialICPN] = useState("");
+  const [officialSearch, setOfficialSearch] = useState("");
+  const [officialMatches, setOfficialMatches] = useState<OfficialSummary[]>([]);
   const [sourceRevision, setSourceRevision] = useState("");
   const [sourceKind, setSourceKind] = useState("manufacturer_https");
   const [stageId, setStageId] = useState("");
@@ -89,6 +92,10 @@ export default function ICManagementPage() {
   const setRecord = (key: keyof LocalEntry["record"], value: string) => { setPreview([]); setForm({ ...form, record: { ...form.record, [key]: value } }); };
   const setProfile = (key: string, value: unknown) => { setPreview([]); setForm({ ...form, profile: { ...form.profile, [key]: value } }); };
   const selectedBatch = batch.length ? batch : [form];
+  async function loadOfficial(vendor: string, icpn: string) {
+    setOfficial(await api<OfficialEntry>("official", undefined, `?vendor=${encodeURIComponent(vendor)}&icpn=${encodeURIComponent(icpn)}`));
+    setOfficialVendor(vendor); setOfficialICPN(icpn); setOfficialValidated(false); setStageId("");
+  }
   async function importFile(file: File) {
     const content = await file.text();
     const parsed = file.name.toLowerCase().endsWith(".csv") ? parseCsv(content) : JSON.parse(content);
@@ -150,8 +157,13 @@ export default function ICManagementPage() {
         <button disabled={busy || !stageId} onClick={() => void run(async () => { const result = await api<{ revision: string }>("publish", { stage_id: stageId }); setStageId(""); setOfficialBatch([]); await reload(); setMessage(`Published ${result.revision}`); })}>Publish official batch</button></div>}
     </section>
     <section><h2>Official Catalog · Validate / Stage / Publish</h2><p>Official Exact ICPN qualification remains governed by source evidence and the existing Publisher. Local profiles never grant Job admission.</p>
+      <div className="managementActions"><input aria-label="Search official ICs" placeholder="Vendor, family or exact ICPN" value={officialSearch} onChange={event => setOfficialSearch(event.target.value)} />
+        <button disabled={busy || officialSearch.trim().length < 2} onClick={() => void run(async () => { const result = await api<{ official: OfficialSummary[]; total_count: number }>("search", undefined, `?q=${encodeURIComponent(officialSearch)}`); setOfficialMatches(result.official); setMessage(`${result.total_count} official matches`); })}>Search official</button></div>
+      <div className="managementList">{officialMatches.map(item => <button key={`${item.vendor}:${item.identifier}`} onClick={() => void run(() => loadOfficial(item.vendor, item.identifier))}>
+        <b>{item.identifier}</b><span>{item.vendor} · {item.family} · L{item.level}</span><em>OFFICIAL · {item.source} · {history?.active_revision?.slice(0, 12)}</em>
+      </button>)}</div>
       <div className="managementGrid"><label>Manufacturer<input value={officialVendor} onChange={event => setOfficialVendor(event.target.value)} /></label><label>Exact ICPN<input value={officialICPN} onChange={event => setOfficialICPN(event.target.value)} /></label></div>
-      <button disabled={busy} onClick={() => void run(async () => { setOfficial(await api<OfficialEntry>("official", undefined, `?vendor=${encodeURIComponent(officialVendor)}&icpn=${encodeURIComponent(officialICPN)}`)); setOfficialValidated(false); setStageId(""); })}>Load official record</button>
+      <button disabled={busy} onClick={() => void run(() => loadOfficial(officialVendor, officialICPN))}>Load official record</button>
       {official && <><p>Editing candidate from revision <code>{official.revision.slice(0, 12)}</code>. Published snapshot stays immutable.</p>
         <div className="managementGrid"><label>Source revision<input value={sourceRevision} onChange={event => setSourceRevision(event.target.value)} /></label>
           <label>Evidence kind<select value={sourceKind} onChange={event => setSourceKind(event.target.value)}><option value="manufacturer_https">Manufacturer HTTPS</option><option value="locked_production_identity">Locked production identity</option></select></label></div>

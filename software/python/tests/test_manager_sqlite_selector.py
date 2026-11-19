@@ -161,6 +161,9 @@ def test_catalog_management_local_round_trip_and_publisher_boundary(
     )
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(database))
     monkeypatch.setenv("PLASMA_CATALOG_PUBLISH_TOKEN", "test-publisher-secret")
+    status, catalog_search = _get(manager_port, "/api/catalog/management/search?q=STM32F103C8T6")
+    assert status == 200 and catalog_search["official"][0]["source"]
+    assert catalog_search["official"][0]["level"] >= 1
     entry = {"record": {"vendor": "LocalVendor", "identifier": "LOCAL123", "family": "Demo", "package": "QFN", "flash_size": "64 KB"},
              "profile": {"profile_id": "custom-v1", "provider_id": "example", "operations": ["erase", "program"]}}
 

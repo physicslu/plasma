@@ -782,6 +782,13 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 if record is None:
                     raise DeviceCatalogIntegrityError("official exact ICPN not found")
                 result = {"record": asdict(record), "qualification": snapshot.qualifications[(vendor.casefold(), icpn.casefold())], "revision": snapshot.revision_sha256}
+            elif self.command == "GET" and action == "search":
+                query = parse_qs(raw_query).get("q", [""])[0].strip().casefold()
+                if len(query) < 2 or len(query) > 128:
+                    raise DeviceCatalogIntegrityError("search requires 2-128 characters")
+                snapshot = repo.read_active()
+                matches = [record for record in snapshot.catalog.records if query in (record.vendor + " " + record.identifier + " " + record.family).casefold()]
+                result = {"revision": snapshot.revision_sha256, "total_count": len(matches), "official": [{"vendor": record.vendor, "identifier": record.identifier, "family": record.family, "source": record.source_authority, "level": snapshot.qualifications.get((record.vendor.casefold(), record.identifier.casefold()), {}).get("catalog_level")} for record in matches[:100]]}
             elif self.command == "GET" and action == "export":
                 result = {"local": repo.local_records(), "official": [{"record": asdict(record), "qualification": repo.read_active().qualifications.get((record.vendor.casefold(), record.identifier.casefold()))} for record in repo.read_active().catalog.records]}
             elif self.command == "GET" and action == "diff":
