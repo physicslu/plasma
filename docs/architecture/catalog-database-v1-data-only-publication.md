@@ -136,18 +136,20 @@ release/target/driver, Profile/geometry, operation scopes, an `ADMITTED` reviewe
 decision, and per-fact document references for identity, route, geometry and
 operations. These fields must match the staged row and qualification exactly.
 For an Exact ICPN outside the existing Qualification Authority, the packet also
-contains `official_exact_source` (`url`, fetched-body `sha256`) and `applicability`
+contains `official_exact_source` (either a source-locked Production Exact identity
+CSV path/blob or a manufacturer HTTPS product URL and fetched-body SHA-256) and `applicability`
 (base device, density, locked ordering authority/blob, Provider source lock,
 programming group and versioned geometry ID). The Publisher independently
-retrieves the exact product page over manufacturer HTTPS at both Stage and
-Publish, verifies its body digest, product title, part-number marker and exact
-part token, and rejects redirects
-outside that product page. It derives the part's pin/package/flash/temperature
+checks the locked CSV blob and exact row at both Stage and Publish, or retrieves
+the exact product page over manufacturer HTTPS at both steps and verifies its
+body digest, product title, part-number marker and exact part token. HTTPS
+redirects outside that product page are rejected. It derives the part's pin/package/flash/temperature
 facts from the previously source-locked manufacturer ordering authority; the
 packet cannot set those facts by declaration. This is an identity and document
 review, **not** a real-device Flash PASS.
-The four fact references for a new exact L2 must resolve to the fetched product
-URL and exact token, the validated Provider source lock and target, the locked
+The four fact references for a new exact L2 must resolve to the selected locked
+Exact identity source or official product URL and exact token, the validated
+Provider source lock and target, the locked
 datasheet/programming-manual geometry sources, and the qualified programming
 group. Arbitrary reviewer prose cannot stand in for those references.
 

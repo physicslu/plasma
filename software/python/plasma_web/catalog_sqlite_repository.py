@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import html
+import io
 import json
 import re
 import sqlite3
@@ -477,19 +479,57 @@ class CatalogSqliteShadowRepository:
         exact_source = reviewed.get("official_exact_source")
         expected_url = ("https://www.st.com/en/microcontrollers-microprocessors/"
                         f"{record.base_device.lower()}.html")
-        if (not isinstance(exact_source, dict)
-                or exact_source.get("url") != expected_url
-                or not isinstance(exact_source.get("sha256"), str)):
+        if not isinstance(exact_source, dict):
             raise DeviceCatalogIntegrityError("L2 official Exact source missing")
-        source_bytes = CatalogSqliteShadowRepository._fetch_official_exact_source(expected_url)
-        source_text = html.unescape(source_bytes.decode("utf-8", errors="replace")).upper()
-        if (hashlib.sha256(source_bytes).hexdigest() != exact_source["sha256"]
-                or re.search(r"<TITLE[^>]*>[^<]*" + re.escape(record.base_device),
-                             source_text) is None
-                or re.search(r"PART[\s_-]*NUMBER", source_text) is None
-                or re.search(r"(?<![A-Z0-9])" + re.escape(record.identifier) + r"(?![A-Z0-9])",
-                             source_text) is None):
-            raise DeviceCatalogIntegrityError("L2 official Exact source bytes or identity mismatch")
+        if exact_source.get("kind") == "locked_production_identity":
+            identity_lock = applicability["manufacturer_authority"]["production_exact_identity"]
+            identity_reference = f"{identity_lock['path']}#{record.identifier}"
+            if exact_source != {
+                "kind": "locked_production_identity",
+                "path": identity_lock["path"],
+                "git_blob_sha1": identity_lock["git_blob_sha1"],
+                "exact_icpn": record.identifier,
+            }:
+                raise DeviceCatalogIntegrityError("L2 official Exact identity lock mismatch")
+            try:
+                identity_bytes = (root / identity_lock["path"]).read_bytes()
+                identity_rows = [row for row in csv.DictReader(io.StringIO(
+                    identity_bytes.decode("utf-8"))) if row["icpn"] == record.identifier]
+            except (OSError, UnicodeError, ValueError, KeyError) as exc:
+                raise DeviceCatalogIntegrityError("L2 official Exact identity source unavailable") from exc
+            expected_identity = {
+                "manufacturer": record.vendor, "icpn": record.identifier,
+                "family": record.family, "series": record.subfamily,
+                "base_device": record.base_device, "package": record.package,
+                "pin_count": record.pin_count, "flash_size": record.flash_size,
+                "temperature_grade": record.temperature_grade,
+                "option_suffix": record.option_suffix or "",
+                "openocd_target_config": record.target_config,
+                "source_type": record.source_type,
+                "source_reference": record.source_reference,
+                "source_authority": record.source_authority,
+                "verification_status": record.verification_status,
+            }
+            if (_git_blob_sha1(identity_bytes) != identity_lock["git_blob_sha1"]
+                    or len(identity_rows) != 1
+                    or any(identity_rows[0].get(key) != value for key, value in expected_identity.items())):
+                raise DeviceCatalogIntegrityError("L2 official Exact identity source drift")
+        elif exact_source.get("kind") == "manufacturer_https":
+            identity_reference = f"{expected_url}#{record.identifier}"
+            if (exact_source.get("url") != expected_url
+                    or not isinstance(exact_source.get("sha256"), str)):
+                raise DeviceCatalogIntegrityError("L2 official Exact source missing")
+            source_bytes = CatalogSqliteShadowRepository._fetch_official_exact_source(expected_url)
+            source_text = html.unescape(source_bytes.decode("utf-8", errors="replace")).upper()
+            if (hashlib.sha256(source_bytes).hexdigest() != exact_source["sha256"]
+                    or re.search(r"<TITLE[^>]*>[^<]*" + re.escape(record.base_device),
+                                 source_text) is None
+                    or re.search(r"PART[\s_-]*NUMBER", source_text) is None
+                    or re.search(r"(?<![A-Z0-9])" + re.escape(record.identifier) + r"(?![A-Z0-9])",
+                                 source_text) is None):
+                raise DeviceCatalogIntegrityError("L2 official Exact source bytes or identity mismatch")
+        else:
+            raise DeviceCatalogIntegrityError("L2 official Exact source kind unsupported")
         geometry_id = q["programming"].get("memory_geometry_profile_id")
         if not isinstance(geometry_id, str) or not re.fullmatch(
             rf"{record.base_device.lower()}-{flash_kib}k-catalog-v[1-9][0-9]*", geometry_id
@@ -513,7 +553,7 @@ class CatalogSqliteShadowRepository:
             "package_route": package_route,
         }
         expected_references = {
-            "identity": f"{expected_url}#{record.identifier}",
+            "identity": identity_reference,
             "route": f"{provider.source_lock_id}#{provider.provider['target_config']}",
             "geometry": (f"{band['source_url']}#{band['document']};"
                          f"st_pm0075_rev2:{group['manufacturer_evidence']['source_lock']['st_pm0075_rev2']}"),

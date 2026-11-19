@@ -411,7 +411,7 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     packet_path = tmp_path / "data-only-reviewed.json"
     _reviewed_l2_packet(record, l2, packet_path)
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
-    packet["official_exact_source"] = {"url": source_url,
+    packet["official_exact_source"] = {"kind": "manufacturer_https", "url": source_url,
                                        "sha256": hashlib.sha256(official_bytes).hexdigest()}
     group = provider._programming_groups_by_profile["stm32f1-medium-density-flash-v0"]
     packet["applicability"] = {
@@ -460,7 +460,8 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     source_response[0] = b"<html>404: STM32F103T8U6</html>"
     with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source"):
         stage_packet({**packet, "official_exact_source": {
-            "url": source_url, "sha256": hashlib.sha256(source_response[0]).hexdigest()
+            "kind": "manufacturer_https", "url": source_url,
+            "sha256": hashlib.sha256(source_response[0]).hexdigest()
         }})
     source_response[0] = official_bytes
     bad = json.loads(json.dumps(l2))
@@ -520,6 +521,31 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     repo.rollback(l1_revision, actor="owner")
     assert repo.read_active().revision_sha256 == l1_revision
     assert repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 1
+    identity_lock = applicability["manufacturer_authority"]["production_exact_identity"]
+    locked_packet = {**packet, "official_exact_source": {
+        "kind": "locked_production_identity", "path": identity_lock["path"],
+        "git_blob_sha1": identity_lock["git_blob_sha1"], "exact_icpn": record.identifier,
+    }, "fact_references": {
+        **packet["fact_references"], "identity": f"{identity_lock['path']}#{record.identifier}"
+    }}
+    with pytest.raises(DeviceCatalogIntegrityError, match="identity lock mismatch"):
+        stage_packet({**locked_packet, "official_exact_source": {
+            **locked_packet["official_exact_source"], "git_blob_sha1": "0" * 40
+        }})
+    identity_path = provider._root / identity_lock["path"]
+    original_read_bytes = Path.read_bytes
+    with monkeypatch.context() as patcher:
+        patcher.setattr(Path, "read_bytes", lambda path: (
+            b"tampered identity source" if path == identity_path else original_read_bytes(path)
+        ))
+        with pytest.raises(DeviceCatalogIntegrityError, match="identity source drift"):
+            stage_packet(locked_packet)
+    monkeypatch.setattr(CatalogSqliteShadowRepository, "_fetch_official_exact_source",
+                        staticmethod(lambda url: (_ for _ in ()).throw(AssertionError("HTTPS not used"))))
+    locked_stage = stage_packet(locked_packet)
+    locked_revision = repo.publish_staged(locked_stage, actor="owner")
+    assert locked_revision != l2_revision
+    assert repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 2
 
 
 def test_official_exact_source_requires_manufacturer_https_and_bounded_redirect(
