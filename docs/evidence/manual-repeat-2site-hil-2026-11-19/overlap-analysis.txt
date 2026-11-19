@@ -1,0 +1,19 @@
+== H1b-debug-repeat3-750fbb4cd  outcome=PASS  jobs=6  distinct job/run/plan = 6/6/6
+  S1 c1 job-20261119-121650-31b01f0d success  safe_off=True start+  0.0s end+  9.9s dur  9.9s
+  S2 c1 job-20261119-121651-795cd5bb success  safe_off=True start+  0.5s end+ 10.0s dur  9.4s
+  S1 c2 job-20261119-121704-a9c5971e success  safe_off=True start+ 13.5s end+ 23.2s dur  9.7s
+  S2 c2 job-20261119-121705-cc99bb32 success  safe_off=True start+ 14.2s end+ 23.5s dur  9.3s
+  S1 c3 job-20261119-121717-66d21d3a success  safe_off=True start+ 26.6s end+ 36.2s dur  9.6s
+  S2 c3 job-20261119-121718-291827b7 success  safe_off=True start+ 27.3s end+ 36.5s dur  9.1s
+  cycle 1: Site1/Site2 overlap 9.4s
+  cycle 2: Site1/Site2 overlap 9.0s
+  cycle 3: Site1/Site2 overlap 8.9s
+  wall span 36.5s for 6 Jobs
+== H2b-replace-ic-repeat2-750fbb4cd  outcome=PASS  jobs=4  distinct job/run/plan = 4/4/4
+  S2 c1 job-20261119-121741-b96dfe5c success  safe_off=True start+  0.0s end+  9.7s dur  9.7s
+  S1 c1 job-20261119-121741-b4d56e74 success  safe_off=True start+  0.5s end+  9.8s dur  9.3s
+  S1 c2 job-20261119-121753-27565920 success  safe_off=True start+ 12.4s end+ 20.8s dur  8.4s
+  S2 c2 job-20261119-121823-6ac8341e success  safe_off=True start+ 42.4s end+ 51.4s dur  8.9s
+  cycle 1: Site1/Site2 overlap 9.2s
+  cycle 2: Site1/Site2 overlap 0.0s
+  wall span 51.4s for 4 Jobs

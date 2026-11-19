@@ -1,0 +1,6 @@
+10:55:58Z batch b9cf4e9140c4668810c4bf74a1f553c1 start 4310f87ee5425d64c0b51ae92255f757 repeat 3 replace_ic false
+10:55:58Z S1 ACTIVE c1/3 P0 F0 seq0/0 | S2 ACTIVE c1/3 P0 F0 seq0/0
+10:56:11Z S1 AWAITING_CONTINUE c2/3 P1 F0 seq1/0 NEXT_CYCLE_EXECUTION_PPU_BUSY | S2 AWAITING_CONTINUE c2/3 P1 F0 seq1/0 NEXT_CYCLE_EXECUTION_PPU_BUSY
+10:56:11Z non-PASS pause [(1, 'NEXT_CYCLE_EXECUTION_PPU_BUSY'), (2, 'NEXT_CYCLE_EXECUTION_PPU_BUSY')]: STOP QUEUING, no Continue
+10:56:12Z S1 ENDED c2/3 P1 F0 seq1/0 | S2 ENDED c2/3 P1 F0 seq1/0
+10:56:12Z FINAL PARTIAL STOPPED cycles={'planned': 6, 'settled': 2, 'pass': 2, 'fail': 0, 'retry_attempts': 0, 'remaining': 4, 'awaiting_continue': 0} jobs=2

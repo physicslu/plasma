@@ -1,0 +1,11 @@
+12:17:39Z batch 713d778aae4f4a3235ce957e49806485 start a538bee38d871c2fd0f7d35a2a9cf8de repeat 2 replace_ic true
+12:17:39Z S1 ACTIVE c1/2 P0 F0 seq0/0 | S2 ACTIVE c1/2 P0 F0 seq0/0
+12:17:52Z S1 AWAITING_CONTINUE c1/2 P1 F0 seq1/0 REPLACE_IC | S2 AWAITING_CONTINUE c1/2 P1 F0 seq1/0 REPLACE_IC
+12:17:52Z CONTINUE Site 1 only -> HTTP 200
+12:17:53Z S1 ACTIVE c2/2 P1 F0 seq1/1 | S2 AWAITING_CONTINUE c1/2 P1 F0 seq1/0 REPLACE_IC
+12:18:03Z S1 ENDED c2/2 P2 F0 seq1/1 | S2 AWAITING_CONTINUE c1/2 P1 F0 seq1/0 REPLACE_IC
+12:18:22Z isolation check {'site2_state': 'AWAITING_CONTINUE', 'site2_settled': 1, 'site2_settled_at_continue': 1, 'site2_continued_seq': 0, 'site1_index': 2, 'site1_state': 'ENDED', 'site1_settled': 2}
+12:18:22Z CONTINUE Site 2 -> HTTP 200
+12:18:23Z S1 ENDED c2/2 P2 F0 seq1/1 | S2 ACTIVE c2/2 P1 F0 seq1/1
+12:18:33Z S1 ENDED c2/2 P2 F0 seq1/1 | S2 ENDED c2/2 P2 F0 seq1/1
+12:18:33Z FINAL PASS COMPLETED cycles={'planned': 4, 'settled': 4, 'pass': 4, 'fail': 0, 'retry_attempts': 0, 'remaining': 0, 'awaiting_continue': 0} jobs=4

@@ -1,0 +1,3 @@
+ppu z2-hil exec {'busy': False, 'owner_kind': None, 'owner_id': None, 'active_job_count': 0} max None
+ site 1 True idle openocd None None
+ site 2 True idle openocd None None

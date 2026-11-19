@@ -1,0 +1,109 @@
+{
+ "label": "H1b-debug-repeat3-750fbb4cd",
+ "repeat": 3,
+ "replace_ic": false,
+ "batch_post_count": 1,
+ "continue_posts": [],
+ "physical_ic_replaced": false,
+ "start_id": "75639894654ec3254fb5e716bb3de9a3",
+ "batch_id": "838d27038800459675cde30620f2b8c2",
+ "submission": "ACCEPTED",
+ "outcome": "PASS",
+ "execution_status": "COMPLETED",
+ "reason": "COMPLETED",
+ "cycles": {
+  "planned": 6,
+  "settled": 6,
+  "pass": 6,
+  "fail": 0,
+  "retry_attempts": 0,
+  "remaining": 0,
+  "awaiting_continue": 0
+ },
+ "jobs": [
+  {
+   "site": 2,
+   "cycle": 1,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121651-795cd5bb",
+   "run_id": "a94df06dc11fcc34c38e8868dcb0a9aa",
+   "plan_id": "128f24a14d2fa4745bf27359d88137ca",
+   "safe_off": true,
+   "started": "2026-11-19T12:16:51.788924+00:00",
+   "finished": null
+  },
+  {
+   "site": 1,
+   "cycle": 1,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121650-31b01f0d",
+   "run_id": "3f4b292fdaf8df41f30da751a6ae8277",
+   "plan_id": "d8504e3901c617bd4efe1906ccf3b4d9",
+   "safe_off": true,
+   "started": "2026-11-19T12:16:51.288843+00:00",
+   "finished": null
+  },
+  {
+   "site": 1,
+   "cycle": 2,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121704-a9c5971e",
+   "run_id": "b1d6c9b99f6bea5d0ef2b611441ad9d0",
+   "plan_id": "8975e542a8445ced1f155ecea2940286",
+   "safe_off": true,
+   "started": "2026-11-19T12:17:04.783630+00:00",
+   "finished": null
+  },
+  {
+   "site": 2,
+   "cycle": 2,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121705-cc99bb32",
+   "run_id": "7df55196e495c1da705e9c8d6924d908",
+   "plan_id": "5787b7e2a8c310b7f13d0850fe5b1e1b",
+   "safe_off": true,
+   "started": "2026-11-19T12:17:05.526824+00:00",
+   "finished": null
+  },
+  {
+   "site": 1,
+   "cycle": 3,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121717-66d21d3a",
+   "run_id": "151a6753cf1749d6737cfdfa2feb8957",
+   "plan_id": "86255d821c99ec8d4b911d9cc1445cbf",
+   "safe_off": true,
+   "started": "2026-11-19T12:17:17.862042+00:00",
+   "finished": null
+  },
+  {
+   "site": 2,
+   "cycle": 3,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121718-291827b7",
+   "run_id": "c7fcaa47bca01cd96f7a2164430b1294",
+   "plan_id": "885fa080921cf4c7d138d6ffe52f0262",
+   "safe_off": true,
+   "started": "2026-11-19T12:17:18.610557+00:00",
+   "finished": null
+  }
+ ],
+ "units": {
+  "1": {
+   "planned": 3,
+   "settled": 3,
+   "pass": 3,
+   "fail": 0,
+   "retry_attempts": 0,
+   "disposition": "COMPLETED"
+  },
+  "2": {
+   "planned": 3,
+   "settled": 3,
+   "pass": 3,
+   "fail": 0,
+   "retry_attempts": 0,
+   "disposition": "COMPLETED"
+  }
+ }
+}

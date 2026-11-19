@@ -1,0 +1,3 @@
+2026-11-19T12:15:26Z
+~/.local/share/plasma/local-control-station/releases/e3fa6b3f5887
+{"admission_quiesce": "NOT_IMPLEMENTED", "journal": {"batches": 10, "runs": 20, "starts": 32}, "manager_health": "PASS", "meaning": "read-only snapshot; recheck before activation", "ppu_execution": "IDLE", "result": "PASS"}
