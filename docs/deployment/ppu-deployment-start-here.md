@@ -11,7 +11,7 @@ There are exactly two PPU deployment routes. Everything else listed below is a p
 | Route | Purpose | Entry | Transaction | Authoritative document |
 | --- | --- | --- | --- | --- |
 | **A. Product deployment** | Install / upgrade / roll back the PPU Runtime + OpenOCD and deliver Bundle v3 Asset Sets. | Console (EMode → PPU Sites → Runtime Deployment) → Console BFF → Plasma Manager → Bootstrap on `:18081`: upload (`POST /v1/uploads`, `…/chunks`, `…/commit`), then `POST /v1/deployments` | One Bootstrap Deployment Coordinator: one `deployment.lock`, one `deployment.json` journal | [Bootstrap factory and HIL](ppu-bootstrap-factory-and-hil.md#console-first-install--upgrade-path) |
-| **B. Engineering deployment** | Development-only installation of engineering modules (for example WordPort / OpenOCD Python integration, SWPC A/B Runner). Not a product install path and carries no product qualification. | SWPC `scripts/ppu-deploy` over SSH | Its own SSH transaction (SHA pinning, mutual exclusion, verify, rollback) | [ppu-deploy](../development/ppu-deploy-engineering-modules.md) |
+| **B. Engineering deployment** | Development-only installation of engineering modules (for example WordPort / OpenOCD Python integration, SWPC A/B Runner). Not a product install path and carries no product qualification. Never a fallback for a failed or unavailable Route A product deployment. | SWPC `scripts/ppu-deploy` over SSH | Its own SSH transaction (SHA pinning, mutual exclusion, verify, rollback) | [ppu-deploy](../development/ppu-deploy-engineering-modules.md) |
 
 ### What sits inside Route A
 
