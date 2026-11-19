@@ -15,7 +15,7 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 **Required:** Inventory actual live callers and deploy tools, remove legacy alternate dispatch/admission/receipt/schema/enum/provider/adapter code and migrate still-used CLI or frontend callers to the canonical API/Job Binding. Update normative documentation and focused positive/negative tests; keep immutable historical evidence and old HIL receipts unchanged. No permanent compatibility shim or parallel execution paths. Preserve safety/authorization, stable identities, Resource Set/Job Binding/SAFE_OFF, Site isolation, `OUTCOME_UNKNOWN` no-blind-resend, cancellation/recovery and exact E/P/V/R semantics. Verify with relevant Host-only tests and GitHub CI; report exact SHA and added/removed LOC and any remaining legacy references.
 
-**Exclusions:** Repeat implementation, default Target Finalization/`reset run` behavior changes, FPGA RTL, deployment and any SWPC/Z2/DUT operation. Do not merge without explicit owner Gate 2 approval. This backlog entry is not evidence that the removal is complete.
+**Exclusions:** Repeat implementation, default Target Finalization/`reset run` behavior changes (tracked in [opf-target-finalization-controlled-run-todo.md](../architecture/opf-target-finalization-controlled-run-todo.md)), FPGA RTL, deployment and any SWPC/Z2/DUT operation. Do not merge without explicit owner Gate 2 approval. This backlog entry is not evidence that the removal is complete.
 
 
 ### PLASMA M0–M4 — 安裝／執行／OpenOCD 架構精簡與八通道燒錄路線圖
@@ -32,6 +32,28 @@ An item leaves this register only when its backend invariant, recovery semantics
 - **Higher-priority dependencies from the existing TODO:** electrical programming and Site voltage/power compatibility (especially before multi-IC automation), recovery/uncertain outcomes, and authenticated physical programming. **Defer** DMA/data-plane/UI polish unless measured blocking evidence arises.
 
 **Scope boundary:** documentation only; no source/runtime modification, PR merge, Z2/SWPC/DUT operation or implied HIL result. Do **not** change WBS counts until individually reconciled. Follow the exact Gate 1/Gate 2 boundaries in [AGENTS.md](../../AGENTS.md).
+
+### OPF Programming Profile — Data-driven Memory Regions / Banks / Partitions
+
+**Status:** TODO / DESIGN NOT IMPLEMENTED — recorded 2026-11-11. This backlog item is not approval to change executable contracts, deploy, or operate a PPU/DUT.
+
+**Priority / layer:** P1 architecture follow-up — OPF Programming Profile, evidence-backed Device Memory Geometry, Provider qualification, Resource Set / Job Binding, Manager and Console.
+
+**Current limitation:** The committed OPF `plasma.opf.programming-route.v1` Programming Profile has exactly one `flash_profile.flash_base` and `flash_profile.flash_size`. `bundle_v3.py` exposes those as one Resource Set memory window and validates READ/ERASE ranges against it. The per-Site READ merged in PR #1401 uses this single-window contract for the full default read; it does **not** implement arbitrary memory regions or partitions.
+
+**Target design — Profile-owned declarations, no MCU-specific regions hardcoded in OPF Core / Provider / Console:**
+
+- Model a variable-length, versioned collection of **Memory Regions** in the Programming Profile. Each declares a stable `region_id`, display name, base address, size, read/write/erase constraints, operation eligibility, optional bank/partition affiliation, and a Profile-defined default-READ selection. Region categories/names/counts must remain data-driven; never assume fixed Main Flash, Data Flash, OTP, Option Bytes, ROM, or a fixed number of banks.
+- Distinguish **physical Memory Region**, **Flash Bank** (when applicable), and **logical Partition** (when declared); relationships and applicable constraints must be explicit. A logical partition must remain within an authorized parent region/bank. Handle overlap/aliases deliberately; do not infer that every memory-mapped region can be read using the same protocol.
+- Preserve source-of-truth separation: authoritative manufacturer/exact-IC **Device Profile** owns memory geometry and evidence; the **Programming Profile** selects/maps that geometry into Provider-specific operations and policy. Cross-check exact ICPN, silicon/revision restrictions, geometry, evidence, Site/Provider qualification and hardware admission. A Profile field alone never elevates an operation to SUPPORTED or authorizes protected/irreversible access.
+- Define an explicit, versioned `region_id` in Resource Set constraints, per-Region operation qualification and Job Binding/Receipt identity; bind each READ/ERASE/PROGRAM/VERIFY to a qualified region and exact address/length. Reject out-of-range, cross-region, overlapping/ambiguous, unsupported or protection-restricted requests **before hardware I/O**. Consider bank/partition identifiers only where needed for unambiguous authority; do not use display labels as identity.
+- Make `default_read`/read policy Profile data, not Console code. Per-Site READ may execute multiple separately admitted regions without silently treating a partial result as full PASS. Keep Region-specific Binary files, SHA256, addresses/sizes, provenance and a manifest/receipt; report `PARTIAL`/FAIL accurately when one region cannot be read. Preserve independent Read Job semantics, SAFE_OFF, owner/lease guards, outcome-unknown reconciliation and **no automatic resubmission**.
+- Keep the operator UX compact: one READ action per qualified Site, no raw address/length input by default. For multiple outputs, support a genuine directory-picker flow where available and a clearly disclosed ZIP/download fallback where not; never claim a chosen folder or successful save without evidence.
+- Design a bounded schema migration/replacement and update all producers/consumers together (Programming Profile, Bundle v3 identity, Provider adapter, Manager, API, Console, tests and docs) under a **separate future Gate 1**. Do not retrofit new Region identity into historical immutable receipts or imply that the existing single-window implementation already supports it.
+
+**Acceptance / Gate evidence:** First conduct a read-only design audit against manufacturer geometry and at least two representative, differently organized MCU families; document schemas and source authority. Then separately authorize Host-only positive/negative tests for multi-bank, disjoint regions, aliasing, protected/unsupported regions, boundary crossings, partial results, recovery and output integrity. Real hardware qualification is independent and must be marked NOT_RUN until measured. No WBS counts change without reconciliation.
+
+**Dependency:** none. PR #1401 (merged) deliberately stayed scoped to a single Profile-declared Flash window.
 
 ### IC Electrical Programming Profile / Voltage Capability Database
 
@@ -342,6 +364,32 @@ Architectural invariant:
 > If Programming is split into a Control Path and an Image Data Path, diagnostics must cover both production paths. Plasma must never claim complete Programming Route PASS from a Control Path Loopback alone.
 
 ## Deferred product capability
+
+
+### Factory Log / Engineering Job Log — six-category classification and operator audit
+
+**Status:** TODO / owner requested 2026-11-16; documentation only, implementation NOT_RUN. **Priority:** after Engineering Repeat/burn-in functionality, unless a measured logging defect blocks Repeat HIL.
+
+**Scope:** Reuse the existing shared PMode/EMode Operator Log UI and Manager/PPU event sources. Current `production-log-panel.tsx` infers categories from message prefixes and sends unmatched `[RUN]`, `[SITE]`, `[STEPS]`, `[RECEIPT]`, `[EVIDENCE]` to `SYS` (the main PMode producer of such lines is `factory-console-v2.tsx`; EMode already passes explicit categories); `USR` does not record normal operator commands.
+
+Required event ownership:
+
+- **USR:** operator IC/Image/Bundle/Site selection, E/P/V configuration, Retry/Stop/Repeat changes, Production Set commit, START/ABORT requests and log clearing. Skip cosmetic UI activity. A click records intent, never evidence that Manager accepted it.
+- **NET:** Manager/Gateway/PPU connectivity, transport/observation timeout and reconnection.
+- **PPU:** genuine per-Site/PPU execution, admission, hardware, fault, SAFE_OFF and sealed state based on observed evidence.
+- **DAT:** Image/Bundle/Job Binding/Resource hashes and verified Readback/Receipt metadata, excluding sensitive content and firmware bytes.
+- **BAT:** Manager Start/Batch acceptance, Site scheduling/Retry/Stop, terminal outcomes and unit/cycle counters.
+- **SYS:** actual service/application/configuration lifecycle and system errors, not arbitrary unrecognized programming events.
+
+Implementation principles and acceptance:
+
+- Prefer a small structured `category` + stable `event_code` + severity/time/source/identity contract at the producer over `startsWith()` inference; correlate authoritative Manager/PPU evidence with Start/Batch/Run/Job/PPU/Site IDs. Keep one shared PMode/EMode component and no second Logger.
+- Distinguish browser operator intent from Manager acceptance and PPU observed result. Deduplicate polling/reload events, preserve independent concurrent Site logs, and never turn UNKNOWN or unverified SAFE_OFF into PASS.
+- Phase A: fix existing category producers, ordering, filters, download and browser log boundedness with unit and Playwright positive/negative tests covering all six categories and two-Site concurrency.
+- Phase B: separately qualify the transport already specified in [web-product-modes.md §6](../architecture/web-product-modes.md#6-factory-log-contract-and-current-boundary) (PPU `JobEventLogger` → bounded read-only Gateway API → Manager → retention/search/export); do not restate it here. Current browser `Download .log` is not the full production audit ledger.
+- Log clearing must not erase authoritative audit proof. Do not invent authenticated user IDs in Local Owner Mode or log secrets, raw images or arbitrary filesystem paths.
+- Closure requires six categories with real producers, tested USR actions, no incorrect SYS fallback for programming evidence, EMode/PMode parity and stable identity correlation; production traceability claims require Phase B acceptance.
+
 
 ### Control Station Product Version / Build Identity Visibility
 
