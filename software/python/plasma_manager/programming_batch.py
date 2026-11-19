@@ -102,13 +102,18 @@ LEGACY_JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v1"
 MAX_RETRY_LIMIT = 5
 #: Manual Repeat: Cycles per selected Site in one Manual Session (WP-02).
 MAX_REPEAT = 10000
-#: After a settled Cycle the PPU may not have released the Site yet. The next
-#: Cycle re-reads readiness for at most this long before it pauses for the
-#: operator. Only re-checks: no gate is skipped or relaxed while waiting.
-RELEASE_WAIT_S = 15.0
+#: After a settled Cycle the PPU (or the Manager's fleet observation of it,
+#: polled every few seconds) may not show the Site released yet, and a peer
+#: Site of the same PPU may still be running. The next Cycle re-reads the
+#: same gates for at most this long before it pauses for the operator: long
+#: enough for one peer Job plus an observation refresh. Only re-checks: no
+#: gate is skipped or relaxed while waiting.
+RELEASE_WAIT_S = 60.0
 RELEASE_RECHECK_S = 0.5
-#: The one readiness verdict that is transient right after a terminal Job.
-RELEASE_PENDING_REASON = "SITE_NOT_READY_OR_BUSY"
+#: Verdicts that are transient right after a terminal Job: the Site readiness
+#: read, and the Platform gate's PPU-wide "a Site is active" (2-Site HIL
+#: 2026-11-19: NEXT_CYCLE_EXECUTION_PPU_BUSY on every next Cycle).
+RELEASE_PENDING_REASONS = frozenset({"SITE_NOT_READY_OR_BUSY", "PPU_BUSY"})
 MAX_TARGETS = 32
 MAX_SITES_PER_BATCH = 64
 STOP_TOKEN = "STOP_QUEUING"
@@ -1545,7 +1550,7 @@ class ProgrammingBatchCoordinator:
                 # A later Cycle may find the PPU still releasing the Site it
                 # just finished. Bounded re-check of the same gates, then the
                 # normal BLOCKED pause: never a submission without release.
-                if not first and number == 1 and reason == RELEASE_PENDING_REASON:
+                if not first and number == 1 and reason in RELEASE_PENDING_REASONS:
                     now = self.monotonic()
                     if release_deadline is None:
                         release_deadline = now + self.release_wait_s
