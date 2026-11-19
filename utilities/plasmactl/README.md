@@ -29,10 +29,11 @@ scripts/plasmactl help                           # checkout: also deployment pro
 | Command | What it does | Writes |
 |---|---|---|
 | `diagnose --target PPU:S[,S] … \| --all` | Manager Fleet / PPU / Site observation | none |
-| `program submit --target … --icpn … (--image \| --bundle \| --operations erase --address --length) --journal NEW` | one Manager start ID + exactly one Batch; observes to the end unless `--no-wait` | one `POST /api/programming/starts`, one `POST /api/programming/batches` |
+| `program submit --target … --icpn … (--image \| --bundle \| --operations erase --address --length) --journal NEW [--repeat N] [--replace-ic yes\|no]` | one Manager start ID + exactly one Batch; observes to the end (or until a Repeat Site waits, exit 6) unless `--no-wait` | one `POST /api/programming/starts`, one `POST /api/programming/batches` |
 | `program status --batch-id ID [--wait]` | Manager Batch record, per-Site progress | none |
 | `program receipt --batch-id ID [--target …]` | PASS only for a finished, journal-persisted Batch with every Site PASS | none |
 | `program reconcile --journal F \| --start-id ID` | Start Outcome Reconciliation (`GET /api/programming/starts/{id}`) | none |
+| `program continue --batch-id ID [--site PPU:SITE …] [--seq N]` | Manual Repeat: the operator's Continue for each named waiting Site (IC replaced); `--site` optional only for a one-Site Batch | one `POST …/continue` per named waiting Site |
 | `program stop --batch-id ID` | existing `STOP_QUEUING`; running Jobs finish, nothing is cancelled | one stop POST |
 | `deploy status --ppu A [--ppu B]` | Manager Bootstrap pairing/deployment/runtime state | none |
 | `install\|deploy\|verify\|status\|logs\|restart PROFILE` | existing backend of `integration`, `local-control-station`, `swpc-z2like`, `z2-ps` | backend-owned |
@@ -55,6 +56,7 @@ on stderr. Exit codes are the same for every command:
 | 3 | `OUTCOME_UNKNOWN` — reconcile read-only, **never resend** |
 | 4 | refused by the Manager, or the start provably never admitted |
 | 5 | still in progress (wait ended; the Batch keeps running) |
+| 6 | a Manual Repeat Site waits for `program continue` (IC replaced / FAIL reviewed) |
 
 ## Programming safety
 
@@ -70,6 +72,34 @@ on stderr. Exit codes are the same for every command:
   Manager start ID only makes each admitted start single-use.
 * A PASS is the Manager-persisted Batch outcome, not an independent electrical
   or HIL qualification. Host-only tests use a fake Manager.
+
+### Manual Repeat
+
+`--repeat N` (1..10000) runs N Cycles on **each** selected Site inside the one
+Batch; the Manager runs every Cycle, Retry stays inside a Cycle, and a FAIL
+settles one Cycle. With `--replace-ic yes` (default) each settled Cycle pauses
+that Site; with `no` (same-IC Debug) a PASS continues by itself and a FAIL
+still pauses. The CLI never waits for the operator: `submit` / `status --wait`
+return exit **6** with `awaiting_continue` and the exact `next` commands.
+
+```bash
+plasmactl program submit --target z2:1,2 --icpn STM32F103C8T6 --image fw.bin \
+  --repeat 10 --journal run.json           # exit 6: Sites wait for new ICs
+# replace the IC on Site 1 only, then:
+plasmactl program continue --batch-id B --site z2:1
+plasmactl program status --batch-id B --wait
+```
+
+* `continue` acts only on Sites you name (one POST each, echoing that Site's
+  pause `continue_seq`); a Site that is not waiting is refused without a POST,
+  and an unnamed waiting Site is never continued. Re-running the same pause is
+  answered idempotently by the Manager; a stale pause is refused. A lost answer
+  is `OUTCOME_UNKNOWN` (exit 3) and never resent — check `program status`.
+* The Continue is audited as `plasmactl-local:<OS user>`: the CLI reaches the
+  Manager on its own host with no operator credential, so this is an
+  **unverified local identity** (`actor_verified: false`), unlike the Control
+  Station Console, whose BFF derives the actor from a verified capability.
+* `repeat` 1 sends and prints exactly what it did before Manual Repeat.
 
 ## Legacy entry points (Gate 1, 2026-11-18; backend consolidation 2026-11-19)
 

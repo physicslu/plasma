@@ -196,6 +196,11 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Manager retry of a definite FAIL only (default 0)")
     submit.add_argument("--stop-after-failed-sites", type=int, metavar="N",
                         help="Manager stop policy: submit nothing further after N FAILs")
+    submit.add_argument("--repeat", type=int, default=1, metavar="1..10000",
+                        help="Manual Repeat: Cycles per selected Site (default 1)")
+    submit.add_argument("--replace-ic", choices=("yes", "no"), default="yes",
+                        help="yes (default): each next Cycle waits for `program continue`; "
+                             "no: same-IC Debug, a PASS continues by itself (a FAIL still waits)")
     submit.add_argument("--journal", type=Path, required=True,
                         help="new local submission journal (exclusive create)")
     submit.add_argument("--no-wait", action="store_true", help="return once the Batch is accepted")
@@ -219,6 +224,13 @@ def build_parser() -> argparse.ArgumentParser:
     which = rec.add_mutually_exclusive_group(required=True)
     which.add_argument("--start-id")
     which.add_argument("--journal", type=Path)
+
+    cont = psub.add_parser("continue", help="Manual Repeat: continue Sites whose IC was replaced")
+    _manager(cont)
+    cont.add_argument("--batch-id", required=True)
+    cont.add_argument("--site", action="append", default=[], metavar="PPU:SITE[,SITE...]",
+                      help="each Site whose IC was replaced (optional for a one-Site Batch)")
+    cont.add_argument("--seq", type=int, help="the pause (continue_seq) you answer; one Site only")
 
     stop = psub.add_parser("stop", help="STOP_QUEUING: no further attempts; running Jobs finish")
     _manager(stop)
@@ -259,7 +271,8 @@ def _program(args: argparse.Namespace) -> int:
             icpn=args.icpn, operations=programming.parse_operations(args.operations),
             targets=targets, image=args.image, bundle=args.bundle,
             address=args.address, length=args.length, retry_limit=args.retry_limit,
-            stop_after_failed_sites=args.stop_after_failed_sites)
+            stop_after_failed_sites=args.stop_after_failed_sites,
+            repeat=args.repeat, replace_ic=args.replace_ic == "yes")
         result, code = programming.submit(url, body, source, args.journal, timeout=timeout)
         if code == EXIT_PASS and not args.no_wait:
             try:
@@ -293,6 +306,15 @@ def _program(args: argparse.Namespace) -> int:
         journal = programming.Journal.load(args.journal) if args.journal else None
         start_id = require_id(journal.data.get("start_id") if journal else args.start_id, "start_id")
         response, code = programming.reconcile(url, start_id, journal, timeout=timeout)
+        _emit(response)
+        return code
+    if action == "continue":
+        # Each --site is parsed on its own so `--site z2:1 --site z2:2` works;
+        # a Site named twice is refused by continue_sites.
+        sites = [(target.ppu_alias, site) for value in args.site
+                 for target in parse_targets([value]) for site in target.site_ids]
+        response, code = programming.continue_sites(url, args.batch_id, sites,
+                                                    seq=args.seq, timeout=timeout)
         _emit(response)
         return code
     response, code = programming.stop_queuing(url, args.batch_id, timeout=timeout)

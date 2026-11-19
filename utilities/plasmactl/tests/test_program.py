@@ -100,6 +100,10 @@ class FakeManager:
     def count(self, route: str) -> int:
         return sum(1 for path, _ in self.posts if path == route)
 
+    def continue_site(self, batch: dict, body: dict) -> tuple[int, dict]:
+        refuse = lambda code: (409, {"ok": False, "error": {"code": code, "message": code}})
+        return refuse("programming_continue_stale")
+
 
 def make_handler(manager: FakeManager):
     class Handler(BaseHTTPRequestHandler):
@@ -158,6 +162,9 @@ def make_handler(manager: FakeManager):
                         return self.refuse(409, "programming_start_not_voidable")
                     manager.starts[m.group(1)] = "VOIDED"
                     return self.reply(200, {"ok": True})
+                if m := re.fullmatch(r"/api/programming/batches/([0-9a-f]{32})/continue", self.path):
+                    status, payload = manager.continue_site(manager.batches[m.group(1)], body)
+                    return self.reply(status, payload)
                 if m := re.fullmatch(r"/api/programming/batches/([0-9a-f]{32})/stop", self.path):
                     assert body == {"stop": STOP}
                     batch = manager.batches[m.group(1)]
@@ -424,3 +431,255 @@ def test_accepted_answer_without_batch_identity_is_unknown_not_pass(manager, tmp
     assert submit(manager, tmp_path, image) == programming.EXIT_UNKNOWN
     assert output(capsys)["reason"] == "BATCH_IDENTITY_MISMATCH"
     assert manager.count("/api/programming/batches") == 1
+
+
+# ------------------------------------------------------------------ Manual Repeat
+
+class RepeatManager(FakeManager):
+    """The Manager's Manual Repeat contract: Cycles, pauses and Continue.
+
+    ``cycles[(alias, site)]`` scripts each Cycle's outcome ("PASS"/"FAIL").
+    A settled Cycle pauses (replace-IC, or any FAIL); a Debug PASS proceeds.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.cycles: dict[tuple[str, int], list[str]] = {}
+        self.continues: list[dict] = []
+        self.lose_continue = False
+
+    def admit(self, body):
+        batch = super().admit(body)
+        repeat = body.get("repeat", 1)
+        batch["policy"] = {"repeat": repeat, "retry_limit": body.get("retry_limit", 0),
+                           "replace_ic_before_next_cycle": body.get("replace_ic_before_next_cycle", True),
+                           "stop_policy": body.get("stop_policy")}
+        for unit in batch["units"]:
+            unit["cycle"] = {"planned": repeat, "index": 1, "state": "ACTIVE", "disposition": None,
+                             "settled": 0, "pass": 0, "fail": 0, "retry_attempts": 0,
+                             "remaining": repeat, "continue_seq": 0, "continued_seq": 0,
+                             "wait_reason": None, "last": None}
+        return batch
+
+    def advance(self, batch):
+        if batch.get("policy", {}).get("repeat", 1) == 1:
+            return super().advance(batch)
+        batch["polls"] += 1
+        if batch["state"] == "finished":
+            return
+        for unit in batch["units"]:
+            c = unit["cycle"]
+            if c["state"] != "ACTIVE":
+                continue
+            script = self.cycles.get((unit["ppu_alias"], unit["site_id"]), [])
+            outcome = script[c["settled"]] if c["settled"] < len(script) else "PASS"
+            c["settled"] += 1
+            c["pass" if outcome == "PASS" else "fail"] += 1
+            c["remaining"] = c["planned"] - c["settled"]
+            c["last"] = {"cycle_index": c["index"], "outcome": outcome, "reason": None,
+                         "attempts": 1, "receipt": {"job_id": f"job-{unit['site_id']}-{c['index']}",
+                                                    "job_state": "success" if outcome == "PASS" else "failed",
+                                                    "safe_off": True}}
+            unit["attempts"] = [{"attempt": 1, "job_id": c["last"]["receipt"]["job_id"],
+                                 "outcome": outcome, "safe_off": True}]
+            if c["settled"] >= c["planned"]:
+                c.update(state="ENDED", disposition="COMPLETED_WITH_FAILURES" if c["fail"] else "COMPLETED")
+                unit.update(outcome="FAIL" if c["fail"] else "PASS", status="FINISHED")
+            elif outcome == "PASS" and not batch["policy"]["replace_ic_before_next_cycle"]:
+                c["index"] += 1
+            else:
+                c.update(state="AWAITING_CONTINUE", continue_seq=c["continue_seq"] + 1,
+                         wait_reason="REPLACE_IC" if outcome == "PASS" else "FAIL_REVIEW")
+                unit["status"] = "AWAITING_CONTINUE"
+        if all(u["cycle"]["state"] == "ENDED" for u in batch["units"]):
+            outcomes = [u["outcome"] for u in batch["units"]]
+            batch.update(state="finished", execution_status="COMPLETED",
+                         outcome="FAIL" if "FAIL" in outcomes else "PASS")
+        batch["cycles"] = {k: sum(u["cycle"][k] for u in batch["units"])
+                           for k in ("planned", "settled", "pass", "fail", "remaining")}
+
+    def continue_site(self, batch, body):
+        refuse = lambda code: (409, {"ok": False, "error": {"code": code, "message": code}})
+        self.continues.append(dict(body))
+        unit = next(u for u in batch["units"]
+                    if u["ppu_alias"] == body["ppu_alias"] and u["site_id"] == body["site_id"])
+        c = unit["cycle"]
+        if body["continue_seq"] == c["continued_seq"] and c["continued_seq"]:
+            return 200, {"ok": True, "duplicate": True, "batch": self.view(batch)}
+        if c["state"] != "AWAITING_CONTINUE" or body["continue_seq"] != c["continue_seq"]:
+            return refuse("programming_continue_stale")
+        if batch["stop_requested"]:
+            return refuse("programming_batch_stopping")
+        c.update(continued_seq=body["continue_seq"], state="ACTIVE", wait_reason=None,
+                 index=c["index"] + 1)
+        unit["status"] = "RUNNING"
+        if self.lose_continue:
+            return 500, {"ok": False}
+        return 200, {"ok": True, "duplicate": False, "batch": self.view(batch)}
+
+
+@pytest.fixture
+def repeat_manager():
+    fake = RepeatManager()
+    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(fake))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    fake.url = f"http://127.0.0.1:{server.server_address[1]}"
+    yield fake
+    server.shutdown()
+    server.server_close()
+
+
+def cont(manager, batch_id, *extra):
+    return main(["program", "continue", "--manager-url", manager.url, "--batch-id", batch_id, *extra])
+
+
+def batch_post(manager):
+    return next(body for path, body in manager.posts if path == "/api/programming/batches")
+
+
+def test_repeat_one_request_and_output_are_unchanged(repeat_manager, tmp_path, image, capsys):
+    assert submit(repeat_manager, tmp_path, image, targets=("z2:1",)) == 0
+    out = output(capsys)
+    body = batch_post(repeat_manager)
+    assert body["repeat"] == 1 and "replace_ic_before_next_cycle" not in body
+    assert "repeat" not in out["batch"] and "awaiting_continue" not in out["batch"]
+    assert "cycle" not in out["batch"]["sites"][0]
+    journal = json.loads((tmp_path / "journal.json").read_text())
+    assert journal["policy"] == {"repeat": 1, "retry_limit": 0, "stop_policy": {"kind": "never"}}
+
+
+@pytest.mark.parametrize("value", ["0", "10001", "-3"])
+def test_illegal_repeat_submits_nothing(repeat_manager, tmp_path, image, capsys, value):
+    assert submit(repeat_manager, tmp_path, image, "--repeat", value) == 2
+    assert repeat_manager.posts == [] and not (tmp_path / "journal.json").exists()
+
+
+def test_repeat_and_replace_ic_reach_the_manager_and_the_journal(repeat_manager, tmp_path, image, capsys):
+    assert submit(repeat_manager, tmp_path, image, "--repeat", "10000", "--replace-ic", "no",
+                  "--no-wait", targets=("z2:1",)) == 0
+    body = batch_post(repeat_manager)
+    assert body["repeat"] == 10000 and body["replace_ic_before_next_cycle"] is False
+    journal = json.loads((tmp_path / "journal.json").read_text())
+    assert journal["policy"]["repeat"] == 10000
+    assert journal["policy"]["replace_ic_before_next_cycle"] is False
+
+
+def test_submit_returns_6_when_a_site_waits_and_names_each_continue(repeat_manager, tmp_path, image, capsys):
+    code = submit(repeat_manager, tmp_path, image, "--repeat", "3", targets=("z2:1,2",))
+    out = output(capsys)
+    assert code == 6
+    batch = out["batch"]
+    assert [(w["site_id"], w["wait_reason"], w["continue_seq"]) for w in batch["awaiting_continue"]] \
+        == [(1, "REPLACE_IC", 1), (2, "REPLACE_IC", 1)]
+    bid = out["batch_id"]
+    assert batch["next"] == [f"plasmactl program continue --batch-id {bid} --site z2:1",
+                             f"plasmactl program continue --batch-id {bid} --site z2:2",
+                             f"plasmactl program status --batch-id {bid} --wait"]
+    assert batch["sites"][0]["cycle"]["settled"] == 1 and batch["repeat"]["repeat"] == 3
+    assert repeat_manager.count("/api/programming/batches") == 1
+
+
+def test_continue_only_the_named_site(repeat_manager, tmp_path, image, capsys):
+    submit(repeat_manager, tmp_path, image, "--repeat", "3", targets=("z2:1,2",))
+    bid = output(capsys)["batch_id"]
+    assert cont(repeat_manager, bid, "--site", "z2:1") == 0
+    out = output(capsys)
+    assert [(s["site_id"], s["result"], s["post_count"]) for s in out["sites"]] == [(1, "ACCEPTED", 1)]
+    assert [c["site_id"] for c in repeat_manager.continues] == [1]
+    assert out["actor"].startswith("plasmactl-local:") and out["actor_verified"] is False
+    assert repeat_manager.continues[0]["actor"] == out["actor"]
+    batch = repeat_manager.batches[bid]
+    assert batch["units"][1]["cycle"]["state"] == "AWAITING_CONTINUE"  # Site 2 untouched
+
+
+def test_multi_site_batch_requires_explicit_sites(repeat_manager, tmp_path, image, capsys):
+    submit(repeat_manager, tmp_path, image, "--repeat", "2", targets=("z2:1,2",))
+    bid = output(capsys)["batch_id"]
+    assert cont(repeat_manager, bid) == 2
+    assert repeat_manager.continues == []
+
+
+def test_one_site_batch_may_omit_site(repeat_manager, tmp_path, image, capsys):
+    submit(repeat_manager, tmp_path, image, "--repeat", "2", targets=("z2:1",))
+    bid = output(capsys)["batch_id"]
+    assert cont(repeat_manager, bid) == 0
+    assert [c["site_id"] for c in repeat_manager.continues] == [1]
+
+
+def test_two_sites_named_separately(repeat_manager, tmp_path, image, capsys):
+    submit(repeat_manager, tmp_path, image, "--repeat", "2", targets=("z2:1,2",))
+    bid = output(capsys)["batch_id"]
+    assert cont(repeat_manager, bid, "--site", "z2:1", "--site", "z2:2") == 0
+    assert [c["site_id"] for c in repeat_manager.continues] == [1, 2]
+    assert cont(repeat_manager, bid, "--site", "z2:1", "--site", "z2:1") == 2
+
+
+def test_site_not_waiting_is_refused_without_a_post(repeat_manager, tmp_path, image, capsys):
+    submit(repeat_manager, tmp_path, image, "--repeat", "2", targets=("z2:1,2",))
+    bid = output(capsys)["batch_id"]
+    assert cont(repeat_manager, bid, "--site", "z2:1") == 0
+    capsys.readouterr()
+    assert cont(repeat_manager, bid, "--site", "z2:1") == 4
+    out = output(capsys)
+    assert out["sites"][0]["result"] == "NOT_AWAITING_CONTINUE" and out["sites"][0]["post_count"] == 0
+    assert len(repeat_manager.continues) == 1
+    assert cont(repeat_manager, bid, "--site", "z2:9") == 2
+
+
+def test_repeated_and_stale_seq_follow_the_manager(repeat_manager, tmp_path, image, capsys):
+    submit(repeat_manager, tmp_path, image, "--repeat", "3", targets=("z2:1",))
+    bid = output(capsys)["batch_id"]
+    assert cont(repeat_manager, bid, "--seq", "1") == 0
+    capsys.readouterr()
+    # A double click / re-run with the same pause: idempotent, nothing new runs.
+    assert cont(repeat_manager, bid, "--seq", "1") == 0
+    assert output(capsys)["sites"][0]["result"] == "ALREADY_ACCEPTED"
+    assert cont(repeat_manager, bid, "--seq", "7") == 4
+    assert "programming_continue_stale" in output(capsys)["sites"][0]["result"]
+    assert cont(repeat_manager, bid, "--site", "z2:1", "--site", "z2:2", "--seq", "1") == 2
+
+
+def test_lost_continue_answer_is_unknown_and_never_resent(repeat_manager, tmp_path, image, capsys):
+    submit(repeat_manager, tmp_path, image, "--repeat", "2", targets=("z2:1",))
+    bid = output(capsys)["batch_id"]
+    repeat_manager.lose_continue = True
+    assert cont(repeat_manager, bid) == 3
+    out = output(capsys)
+    assert out["sites"][0]["result"].startswith("OUTCOME_UNKNOWN")
+    assert len(repeat_manager.continues) == 1
+
+
+def test_stop_wins_over_continue(repeat_manager, tmp_path, image, capsys):
+    submit(repeat_manager, tmp_path, image, "--repeat", "2", targets=("z2:1",))
+    bid = output(capsys)["batch_id"]
+    assert main(["program", "stop", "--manager-url", repeat_manager.url, "--batch-id", bid]) == 0
+    capsys.readouterr()
+    assert cont(repeat_manager, bid) == 4
+    assert "programming_batch_stopping" in output(capsys)["sites"][0]["result"]
+
+
+def test_debug_fail_pauses_and_status_wait_returns_6_then_finishes(repeat_manager, tmp_path, image, capsys):
+    repeat_manager.cycles[("z2", 1)] = ["PASS", "FAIL", "PASS"]
+    code = submit(repeat_manager, tmp_path, image, "--repeat", "3", "--replace-ic", "no",
+                  targets=("z2:1",))
+    out = output(capsys)
+    assert code == 6
+    assert out["batch"]["awaiting_continue"][0]["wait_reason"] == "FAIL_REVIEW"
+    site = out["batch"]["sites"][0]["cycle"]
+    assert (site["settled"], site["pass"], site["fail"]) == (2, 1, 1)
+    bid = out["batch_id"]
+    assert cont(repeat_manager, bid) == 0
+    capsys.readouterr()
+    status = main(["program", "status", "--manager-url", repeat_manager.url, "--batch-id", bid,
+                   "--wait", "--quiet"])
+    out = output(capsys)
+    assert status == 1 and out["batch"]["outcome"] == "FAIL"
+    assert out["batch"]["repeat"]["cycles"]["settled"] == 3 and out["batch"]["next"] == []
+
+
+def test_progress_line_shows_cycle_counters(repeat_manager, tmp_path, image, capsys):
+    submit(repeat_manager, tmp_path, image, "--repeat", "2", targets=("z2:1",))
+    bid = output(capsys)["batch_id"]
+    line = programming._progress_line(repeat_manager.view(repeat_manager.batches[bid]))
+    assert "z2:1 c1/2 P1 F0 R0 WAITING REPLACE_IC" in line
