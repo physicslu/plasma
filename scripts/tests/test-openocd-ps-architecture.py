@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ARCH = "docs/architecture/ic-support-openocd-plan-executor.md"
 AGENTS = "AGENTS.md"
 BRIDGE = "scripts/bluepill-wordport-session.py"
-INSTALLER = "scripts/plasmactl-z2-ps"
+INSTALLER = "utilities/plasmactl/backends/plasmactl-z2-ps"
 WORKFLOW = ".github/workflows/repository-contracts.yml"
 
 
@@ -107,7 +107,7 @@ def validate(architecture: str, agents: str, bridge: str,
         reject("CI must trigger on bridge changes for push and pull_request")
     if workflow.count('      - "scripts/tests/test-openocd-ps-architecture.py"') != 2:
         reject("CI must trigger on architecture guard changes for push and pull_request")
-    if workflow.count('      - "scripts/plasmactl-z2-ps"') != 2:
+    if workflow.count('      - "utilities/plasmactl/backends/**"') != 2:
         reject("CI must trigger on Z2 OpenOCD installer changes for push and pull_request")
     if "run: python scripts/tests/test-openocd-ps-architecture.py" not in workflow:
         reject("repository-contracts CI is not executing the architecture guard")

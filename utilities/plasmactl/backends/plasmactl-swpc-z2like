@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-repo_root="$(cd "$(dirname "$script_path")/.." && pwd)"
+repo_root="$(cd "$(dirname "$script_path")/../../.." && pwd)"
 installer="${PLASMA_SWPC_Z2LIKE_INSTALLER:-$repo_root/scripts/swpc-z2like-ppu-install.sh}"
 evidence="${PLASMA_SWPC_Z2LIKE_EVIDENCE:-/opt/plasma/install/last-swpc-z2like-install.json}"
 python_root="${PLASMA_SWPC_Z2LIKE_PYTHON_ROOT:-/opt/plasma/python}"

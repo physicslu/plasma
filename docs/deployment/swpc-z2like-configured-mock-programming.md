@@ -87,13 +87,13 @@ Activate Programming explicitly:
 
 ```bash
 cd "$PLASMA_REPO"
-sudo bash scripts/plasmactl-swpc-z2like-programming install
+sudo bash utilities/plasmactl/backends/plasmactl-swpc-z2like-programming install
 ```
 
 Verify:
 
 ```bash
-sudo bash scripts/plasmactl-swpc-z2like-programming verify
+sudo bash utilities/plasmactl/backends/plasmactl-swpc-z2like-programming verify
 ```
 
 Expected result:
@@ -107,7 +107,7 @@ qualification boundary: software/mock only; no Z2/ARMv7/PL/FPGA/Site electrical/
 The activation is implemented as an explicit systemd drop-in for `plasma-web.service`. Removal is equally explicit:
 
 ```bash
-sudo bash scripts/plasmactl-swpc-z2like-programming remove
+sudo bash utilities/plasmactl/backends/plasmactl-swpc-z2like-programming remove
 ```
 
 Once Programming has been explicitly enabled, normal release upgrades are one operation:

@@ -21,7 +21,7 @@ from . import lom_p0_lab
 from .lom_p0_lab import LOOPBACK, ROOT, GatewayRoutes, close_lab, make_lab
 
 readiness = lom_p0_lab.load_script("lom_p0_runtime_local_readiness", "ppu_runtime_local_readiness.py")
-Z2_PS = ROOT / "scripts" / "plasmactl-z2-ps"
+Z2_PS = ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-z2-ps"
 LOOPBACK_BODY = {"endpoint": "ps", "test_id": "kit-p0", "sequence": 1, "pattern": "zero", "seed": "",
                  "payload_length": 1, "payload_base64": "AA==", "tx_crc32": "d202ef8d",
                  "timeout_ms": 5000}

@@ -25,6 +25,7 @@ _BACKENDS = {
     "swpc-z2like-bootstrap": ("PLASMA_SWPC_Z2LIKE_BOOTSTRAP_BACKEND",
                               "plasmactl-swpc-z2like-bootstrap-sites"),
     "z2-ps": ("PLASMA_Z2_PS_BACKEND", "plasmactl-z2-ps"),
+    "integration-verify": ("PLASMACTL_VERIFY_BACKEND", "plasmactl-verify"),
 }
 # Which profile backend implements which maintenance command.
 SUPPORTED = {
@@ -39,13 +40,12 @@ INTEGRATION_ONLY = {
 }
 _INTEGRATION_FUNCTION = {"install": "install_services", "deploy": "deploy",
                          "status": "show_status", "restart": "restart_services",
-                         "logs": "show_logs", "verify": "plasmactl_verify"}
+                         "logs": "show_logs"}
 # Load the integration backend as a library, then re-exec deploy through the
 # operator launcher so an updated checkout keeps using the unified CLI.
 _INTEGRATION_SHIM = (
     'PLASMACTL_LIB_ONLY=1; source "$0"; unset PLASMACTL_LIB_ONLY; '
     'script_path="${PLASMACTL_WRAPPER:-$script_path}"; '
-    'plasmactl_verify() { bash "$repo/scripts/plasmactl-verify" "${1:-}"; }; '
     '"$@"'
 )
 
@@ -91,6 +91,8 @@ def run_profile(command: str, profile: str, args: list[str]) -> int:
                 raise OperationError("integration verify accepts at most one target")
         elif args:
             raise OperationError(f"integration {command} does not accept profile options")
+        if command == "verify":
+            return _run(["bash", str(backend("integration-verify")), *args])
         return integration(_INTEGRATION_FUNCTION[command], args)
     if command in ("status", "logs", "restart") and args:
         raise OperationError(f"{command} accepts one deployment profile only")

@@ -11,7 +11,7 @@ import pytest
 from .ppu_control_plane_fixture import verify_real_control_plane
 
 ROOT = Path(__file__).resolve().parents[3]
-Z2_BACKEND = ROOT / "scripts" / "plasmactl-z2-ps"
+Z2_BACKEND = ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-z2-ps"
 BOOTSTRAP_KIT = ROOT / "scripts" / "ppu-bootstrap-kit.py"
 BOOTSTRAP_DEPLOYMENT = ROOT / "scripts" / "ppu-bootstrap-deployment.py"
 Z2_RELEASE = ROOT / ".github" / "workflows" / "z2-ps-release.yml"

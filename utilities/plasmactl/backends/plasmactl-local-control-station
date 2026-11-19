@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-repo_root="$(cd "$(dirname "$script_path")/.." && pwd)"
+repo_root="$(cd "$(dirname "$script_path")/../../.." && pwd)"
 python_project="$repo_root/software/python"
 web_dir="$repo_root/software/web"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"

@@ -10,8 +10,12 @@ repo_root="$(cd "$(dirname "$wrapper_path")/.." && pwd)"
 # Documentation/contract marker; the integration backend owns config migration.
 current_config_version=6
 
+backend_root="$repo_root/utilities/plasmactl/backends"
+# Standalone Z2 kits keep their selected platform backend in scripts/.
+[[ -d "$backend_root" ]] || backend_root="$repo_root/scripts"
+
 if [[ "${PLASMACTL_LIB_ONLY:-0}" == "1" ]]; then
-  integration_backend="${PLASMACTL_INTEGRATION_BACKEND:-$repo_root/scripts/plasmactl-integration}"
+  integration_backend="${PLASMACTL_INTEGRATION_BACKEND:-$backend_root/plasmactl-integration}"
   # shellcheck source=/dev/null
   source "$integration_backend"
   # Re-exec `deploy` and the installed ~/.local/bin/plasmactl through this launcher.
@@ -24,7 +28,7 @@ utility_root="$repo_root/utilities/plasmactl/src"
   printf '[plasmactl] ERROR: unified CLI source is missing: %s\n' "$utility_root" >&2
   exit 1
 }
-export PLASMA_CLI_BACKEND_DIR="$repo_root/scripts"
+export PLASMA_CLI_BACKEND_DIR="$backend_root"
 # Never write bytecode into a verified, hash-pinned kit or release tree.
 export PYTHONDONTWRITEBYTECODE=1
 export PLASMACTL_WRAPPER="$wrapper_path"

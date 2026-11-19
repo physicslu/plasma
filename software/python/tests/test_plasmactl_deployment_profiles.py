@@ -10,10 +10,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PLASMACTL = REPO_ROOT / "scripts" / "plasmactl"
-INTEGRATION = REPO_ROOT / "scripts" / "plasmactl-integration"
-LOCAL_CONTROL_STATION = REPO_ROOT / "scripts" / "plasmactl-local-control-station"
-SWPC_Z2LIKE = REPO_ROOT / "scripts" / "plasmactl-swpc-z2like"
-Z2_PS = REPO_ROOT / "scripts" / "plasmactl-z2-ps"
+INTEGRATION = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-integration"
+LOCAL_CONTROL_STATION = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-local-control-station"
+SWPC_Z2LIKE = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-swpc-z2like"
+Z2_PS = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-z2-ps"
 CLI_MAIN = REPO_ROOT / "utilities" / "plasmactl" / "src" / "plasma_cli" / "main.py"
 CLI_OPERATIONS = REPO_ROOT / "utilities" / "plasmactl" / "src" / "plasma_cli" / "operations.py"
 
@@ -402,7 +402,7 @@ def test_local_control_station_release_catalog_ships_l3_evidence(tmp_path: Path)
     """Execute export_release_catalog against this repository's HEAD."""
     source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
     function = "export_release_catalog() {" + source.split("export_release_catalog() {", 1)[1].split("\nprepare_release() {", 1)[0]
-    repo_root = LOCAL_CONTROL_STATION.parents[1]
+    repo_root = REPO_ROOT
     script = (
         "set -euo pipefail\n"
         'die() { echo "$*" >&2; exit 1; }\n'

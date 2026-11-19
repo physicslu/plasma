@@ -11,10 +11,10 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 Z2_INSTALLER = ROOT / "scripts" / "ppu-z2-installer.py"
-Z2_CONTROL = ROOT / "scripts" / "plasmactl-z2-ps"
+Z2_CONTROL = ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-z2-ps"
 PPU_RUNTIME = ROOT / "scripts" / "ppu-runtime.py"
 SWPC_INSTALLER = ROOT / "scripts" / "swpc-z2like-ppu-install.sh"
-SWPC_CONTROL = ROOT / "scripts" / "plasmactl-swpc-z2like"
+SWPC_CONTROL = ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-swpc-z2like"
 
 
 def _load(name: str, path: Path):

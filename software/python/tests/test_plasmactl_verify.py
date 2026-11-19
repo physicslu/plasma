@@ -9,7 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PLASMACTL = REPO_ROOT / "scripts" / "plasmactl"
-VERIFY = REPO_ROOT / "scripts" / "plasmactl-verify"
+VERIFY = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-verify"
 
 
 def run_bash(script: str, *, stdin: str = "") -> subprocess.CompletedProcess[str]:
@@ -148,5 +148,5 @@ def test_verifier_exposes_fleet_target_and_main_dispatch_contract() -> None:
     assert "plasmactl verify TARGET" in verifier_source
     operations_source = (REPO_ROOT / "utilities/plasmactl/src/plasma_cli/operations.py").read_text(encoding="utf-8")
     assert "exec python3 -m plasma_cli.main" in plasmactl_source
-    assert '"verify": "plasmactl_verify"' in operations_source
-    assert "scripts/plasmactl-verify" in operations_source
+    assert '"integration-verify": ("PLASMACTL_VERIFY_BACKEND", "plasmactl-verify")' in operations_source
+    assert 'backend("integration-verify")' in operations_source

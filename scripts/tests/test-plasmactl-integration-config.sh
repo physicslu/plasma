@@ -4,7 +4,7 @@ set -Eeuo pipefail
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 repo="$(cd "$(dirname "$script_path")/../.." && pwd)"
 plasmactl_path="${PLASMACTL_PATH:-$repo/scripts/plasmactl}"
-integration_path="$repo/scripts/plasmactl-integration"
+integration_path="$repo/utilities/plasmactl/backends/plasmactl-integration"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 
@@ -345,7 +345,7 @@ XDG_STATE_HOME="$temporary/state-manager-invalid" \
 bash -c 'source "$1"; validate_manager_settings' _ "$plasmactl_path" >/dev/null 2>&1 && \
   fail 'invalid PLASMA_MANAGER_ENABLED value was accepted'
 
-grep -Fq 'PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy' "$integration_path" || fail 'deploy does not re-exec updated plasmactl'
+grep -Fq 'PLASMACTL_DEPLOY_REEXEC=1 exec "$repo/scripts/plasmactl" deploy' "$integration_path" || fail 'deploy does not re-exec the operator launcher'
 grep -Fq 'reconcile_service_units' "$integration_path" || fail 'service-unit reconciliation is missing'
 grep -Fq 'ensure_config_completeness' "$integration_path" || fail 'deployment config completeness reconciliation is missing'
 grep -Fq 'manager_health_check' "$integration_path" || fail 'Manager health check integration is missing'

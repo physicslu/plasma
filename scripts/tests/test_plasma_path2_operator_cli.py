@@ -177,7 +177,7 @@ class Path2OperatorCLI(unittest.TestCase):
             {"script": "/usr/bin/python3"},
             {"script": "scripts/../private.py"},
             {"script": "scripts/experiments/bad.sh"},
-            {"script": "scripts/plasmactl-local-control-station"},
+            {"script": "utilities/plasmactl/backends/plasmactl-local-control-station"},
             {"script": "scripts/experiments/../bad.py"},
             {"timeout_seconds": 1801},
             {"timeout_seconds": 0},

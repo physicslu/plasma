@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-Z2_PS = REPO_ROOT / "scripts" / "plasmactl-z2-ps"
+Z2_PS = REPO_ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-z2-ps"
 
 
 def test_z2_ps_verify_uses_read_only_g13_readiness_not_an_unsigned_write() -> None:

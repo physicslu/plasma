@@ -71,7 +71,7 @@ def test_z2_installer_preserves_existing_desired_state_and_bounds_privilege() ->
 
 def test_z2_verifier_accepts_p3_installer_evidence_and_checks_runtime_wiring() -> None:
     installer = (ROOT / "scripts/ppu-z2-installer.py").read_text(encoding="utf-8")
-    control = (ROOT / "scripts/plasmactl-z2-ps").read_text(encoding="utf-8")
+    control = (ROOT / "utilities/plasmactl/backends/plasmactl-z2-ps").read_text(encoding="utf-8")
 
     assert 'site_state["runtime_apply_supported"] = True' in installer
     assert 'site_state["runtime_activation_socket"] = str(RUNTIME_ACTIVATION_SOCKET)' in installer
@@ -105,7 +105,7 @@ def test_z2_verifier_accepts_p3_installer_evidence_and_checks_runtime_wiring() -
 
 def test_swpc_surrogate_reuses_p3_privilege_boundary_and_preserves_desired_state() -> None:
     installer = (ROOT / "scripts/swpc-z2like-ppu-install.sh").read_text(encoding="utf-8")
-    control = (ROOT / "scripts/plasmactl-swpc-z2like").read_text(encoding="utf-8")
+    control = (ROOT / "utilities/plasmactl/backends/plasmactl-swpc-z2like").read_text(encoding="utf-8")
 
     assert "preserving existing canonical Desired configuration" in installer
     assert "module.render_systemd_units(" in installer

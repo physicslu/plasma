@@ -2,10 +2,10 @@
 set -Eeuo pipefail
 
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-repo_root="$(cd "$(dirname "$script_path")/.." && pwd)"
-base_backend="${PLASMA_SWPC_Z2LIKE_BASE_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like}"
-programming_backend="${PLASMA_SWPC_Z2LIKE_PROGRAMMING_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like-programming}"
-managed_backend="${PLASMA_SWPC_Z2LIKE_MANAGED_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like-managed-ingress}"
+repo_root="$(cd "$(dirname "$script_path")/../../.." && pwd)"
+base_backend="${PLASMA_SWPC_Z2LIKE_BASE_BACKEND:-$repo_root/utilities/plasmactl/backends/plasmactl-swpc-z2like}"
+programming_backend="${PLASMA_SWPC_Z2LIKE_PROGRAMMING_BACKEND:-$repo_root/utilities/plasmactl/backends/plasmactl-swpc-z2like-programming}"
+managed_backend="${PLASMA_SWPC_Z2LIKE_MANAGED_BACKEND:-$repo_root/utilities/plasmactl/backends/plasmactl-swpc-z2like-managed-ingress}"
 programming_dropin="${PLASMA_SWPC_Z2LIKE_PROGRAMMING_DROPIN:-/etc/systemd/system/plasma-web.service.d/30-z2like-configured-mock-programming.conf}"
 programming_marker="# Managed by Plasma SWPC Z2-like configured Mock Programming activation"
 managed_nginx_conf="${PLASMA_SWPC_Z2LIKE_MANAGED_NGINX_CONF:-/etc/nginx/conf.d/plasma-swpc-z2like-managed.conf}"

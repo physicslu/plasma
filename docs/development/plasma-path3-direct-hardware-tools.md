@@ -46,7 +46,7 @@ The inventory distinguishes dead standalone programs from a live mandatory inter
 
 ## Z2 — existing direct SSH / PS execution
 
-1. Read [Z2 PS WordPort Bridge](../../scripts/bluepill-wordport-session.py), [Z2 PS runtime installer](../../scripts/plasmactl-z2-ps), [SWD tool operations](stlink-swd-tool-operations.md) and current `AGENTS.md` protected FPGA/Golden contract.
+1. Read [Z2 PS WordPort Bridge](../../scripts/bluepill-wordport-session.py), [Z2 PS runtime installer](../../utilities/plasmactl/backends/plasmactl-z2-ps), [SWD tool operations](stlink-swd-tool-operations.md) and current `AGENTS.md` protected FPGA/Golden contract.
 2. Use the enrolled SWPC SSH configuration, pinned Z2 host identity and owner-approved private credential source. Do not invent IP addresses, copy or print private keys, alter sudoers, or add a new gateway. Confirm effective SSH permission on the actual Runner before declaring availability.
 3. On **Z2 PS only**, use existing OpenOCD connected to the **Z2 PS-local UNIX** WordPort/Remote Bitbang bridge. Do not move OpenOCD onto SWPC, forward Remote Bitbang to SWPC, or bypass the protected FPGA Root Entry, MMIO lease, image/Manifest/current-boot checks.
 4. Before enabling the physical interface verify DUT identity, legal voltage/wiring, debugger exclusivity, FPGA image provenance and Golden recovery readiness. When a downstream SWD test fails, stop transactions; reap the PS-local OpenOCD/bridge and safely release ownership. **Keep Loaded** is appropriate only after a genuinely successful FPGA load and while current hardware state remains known safe. Restore is a protected explicitly selected or documented fault-recovery decision, not automatic on every functional failure.

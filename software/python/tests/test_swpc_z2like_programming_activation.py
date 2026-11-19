@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-SCRIPT = ROOT / "scripts" / "plasmactl-swpc-z2like-programming"
+SCRIPT = ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-swpc-z2like-programming"
 PHASE3 = ROOT / "software" / "python" / "plasma_web" / "gateway_phase3.py"
 PROVIDER = ROOT / "software" / "python" / "plasma_web" / "configured_mock_provider.py"
 

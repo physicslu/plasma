@@ -3,6 +3,10 @@ set -Eeuo pipefail
 
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+# Checkout: backends live under utilities/. Standalone Z2 kit: scripts/.
+if [[ "$script_dir" == */utilities/plasmactl/backends ]]; then
+  script_dir="$(cd "$script_dir/../../../scripts" && pwd)"
+fi
 python_runtime_tool="${PLASMA_Z2_PYTHON_RUNTIME_TOOL:-$script_dir/z2-python-runtime.py}"
 openocd_runtime_tool="${PLASMA_Z2_OPENOCD_RUNTIME_TOOL:-$script_dir/openocd-runtime.py}"
 ppu_installer="${PLASMA_Z2_PPU_INSTALLER:-$script_dir/ppu-z2-installer.py}"

@@ -2,7 +2,7 @@
 
 Plasma's SWPC Web Console is currently served by a long-running Vite/Vinext development process. A Git fast-forward can change source files underneath that process, so HMR state must not be treated as a completed deployment.
 
-> **Applies to the SWPC `integration` profile only.** Source check: `scripts/plasmactl` routes unqualified `update`, `deploy`, and `web-restart` to `scripts/plasmactl-integration`; `web-restart` restarts `plasma-vite.service`, while `update_code` checks the Web lockfile before `npm ci`. This development/Vite procedure is not the product's unified PPU deployment API and does not qualify a production Console release.
+> **Applies to the SWPC `integration` profile only.** Source check: `scripts/plasmactl` routes unqualified `update`, `deploy`, and `web-restart` to `utilities/plasmactl/backends/plasmactl-integration`; `web-restart` restarts `plasma-vite.service`, while `update_code` checks the Web lockfile before `npm ci`. This development/Vite procedure is not the product's unified PPU deployment API and does not qualify a production Console release.
 
 ## Rules
 

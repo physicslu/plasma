@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-INGRESS = ROOT / "scripts" / "plasmactl-swpc-z2like-managed-ingress"
+INGRESS = ROOT / "utilities" / "plasmactl" / "backends" / "plasmactl-swpc-z2like-managed-ingress"
 BASE_INSTALLER = ROOT / "scripts" / "swpc-z2like-ppu-install.sh"
 
 
