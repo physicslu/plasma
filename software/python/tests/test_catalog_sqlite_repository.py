@@ -707,6 +707,8 @@ def test_management_local_batch_atomic_preview_and_selector_refresh(tmp_path: Pa
     assert repo.local_records() == []
     saved = repo.save_local_records([entry], actor="test")
     assert saved[0]["revision"] == 1
+    assert repo.save_local_records([entry], actor="test")[0]["change"] == "UNCHANGED"
+    assert repo.local_records()[0]["revision"] == 1
     assert CatalogSqliteShadowRepository(repo.path).local_records()[0]["profile"]["profile_id"] == "custom-v1"
     response = selector.search_response("q=LOCAL123")[1]
     assert response["local_results"][0]["verification"] == "UNVERIFIED"

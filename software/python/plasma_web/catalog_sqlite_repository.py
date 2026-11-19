@@ -1074,10 +1074,12 @@ class CatalogSqliteShadowRepository:
             output = []
             for key, data in prepared:
                 old = conn.execute("SELECT profile_json FROM controller_overlays WHERE namespace='user_catalog' AND vendor_key=? AND icpn_key=?", key).fetchone()
-                revision = (json.loads(old[0]).get("revision", 0) if old else 0) + 1
+                previous = json.loads(old[0]) if old else None
+                unchanged = bool(previous and previous["record"] == data["record"] and previous["profile"] == data["profile"])
+                revision = previous.get("revision", 0) if unchanged else (previous.get("revision", 0) if previous else 0) + 1
                 value = {**data, "revision": revision, "origin": "LOCAL", "verification": "UNVERIFIED"}
-                output.append({**value, "change": "UNCHANGED" if old and json.loads(old[0])["record"] == data["record"] and json.loads(old[0])["profile"] == data["profile"] else "UPDATED" if old else "ADDED"})
-                if not dry_run:
+                output.append({**value, "change": "UNCHANGED" if unchanged else "UPDATED" if old else "ADDED"})
+                if not dry_run and not unchanged:
                     conn.execute("INSERT OR REPLACE INTO controller_overlays VALUES ('user_catalog',?,?,?)", (*key, _encoded(value)))
                     conn.execute("INSERT INTO catalog_audit_events(action,actor,predecessor,revision_sha256,detail) VALUES (?,?,?,?,?)", ("LOCAL_SAVE", actor, None, active[0], f"{key[0]}:{key[1]}:r{revision}"))
         return output
