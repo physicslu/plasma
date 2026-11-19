@@ -61,6 +61,13 @@ export default function DemoLandingPage() {
             </p>
             <strong>{zh ? "開啟操作文件 →" : "Open Documents →"}</strong>
           </Link>
+
+          <Link className="demoCard utility" href="/ic-management">
+            <div className="demoCardHead"><span>05</span><b>{zh ? "料號管理" : "IC CATALOG"}</b></div>
+            <h2>IC Management</h2>
+            <p>{zh ? "管理本地料號與官方 Catalog 候選版本、來源證據及修訂紀錄。" : "Manage local ICs, official Catalog candidates, source evidence, and revision history."}</p>
+            <strong>{zh ? "開啟 IC Management →" : "Open IC Management →"}</strong>
+          </Link>
         </div>
 
         <div className="demoBoundary">

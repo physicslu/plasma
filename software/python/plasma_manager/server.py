@@ -3,8 +3,11 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import hmac
+import os
 import re
 import socketserver
+from dataclasses import asdict
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -45,6 +48,7 @@ MANAGED_PPU_ROUTE_MARKER = "/gateway"
 # in-process from Catalog data available to this Manager, never relayed to a
 # PPU (a Catalog-free PPU answers 503). Absent module/data => explicit 503.
 DEVICE_SEARCH_ROUTE = "/api/devices/search"
+CATALOG_MANAGEMENT_ROUTE = "/api/catalog/management"
 DEVICE_SELECTOR_MODULE = "plasma_web.legacy_device_selector"
 
 
@@ -688,6 +692,9 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == CATALOG_MANAGEMENT_ROUTE or parsed.path.startswith(CATALOG_MANAGEMENT_ROUTE + "/"):
+            self._handle_catalog_management(parsed.path, parsed.query)
+            return
         if parsed.path == "/api/health/live":
             self._json(
                 HTTPStatus.OK,
@@ -743,6 +750,69 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             )
             return
         self._json(status, payload)
+
+    def _handle_catalog_management(self, path: str, raw_query: str = "") -> None:
+        from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+        from plasma_web.device_catalog import DeviceCatalogIntegrityError, DeviceCatalogRecord
+        from urllib.parse import parse_qs
+
+        configured = os.environ.get("PLASMA_CATALOG_SQLITE_DB", "")
+        if not configured:
+            self._json(503, {"ok": False, "error": {"message": "SQLite Catalog is not configured"}})
+            return
+        write = self.command != "GET"
+        if write:
+            expected = os.environ.get("PLASMA_CATALOG_PUBLISH_TOKEN", "")
+            provided = self.headers.get("X-Plasma-Catalog-Publisher", "")
+            if not expected or not hmac.compare_digest(expected, provided):
+                self._json(403, {"ok": False, "error": {"message": "trusted Catalog publisher required"}})
+                return
+        repo = CatalogSqliteShadowRepository(Path(configured))
+        action = path.removeprefix(CATALOG_MANAGEMENT_ROUTE).strip("/")
+        try:
+            body = self._read_json_object() if write else {}
+            actor = "control-station-publisher"
+            if self.command == "GET" and action == "":
+                result = {"local": repo.local_records(), "history": repo.history(), "evidence": repo.evidence_history()}
+            elif self.command == "GET" and action == "official":
+                params = parse_qs(raw_query)
+                vendor, icpn = params.get("vendor", [""])[0], params.get("icpn", [""])[0]
+                snapshot = repo.read_active()
+                record = snapshot.catalog.resolve(vendor, icpn)
+                if record is None:
+                    raise DeviceCatalogIntegrityError("official exact ICPN not found")
+                result = {"record": asdict(record), "qualification": snapshot.qualifications[(vendor.casefold(), icpn.casefold())], "revision": snapshot.revision_sha256}
+            elif self.command == "GET" and action == "export":
+                result = {"local": repo.local_records(), "official": [{"record": asdict(record), "qualification": repo.read_active().qualifications.get((record.vendor.casefold(), record.identifier.casefold()))} for record in repo.read_active().catalog.records]}
+            elif self.command == "GET" and action == "diff":
+                revision = parse_qs(raw_query).get("revision", [""])[0]
+                result = {"changes": repo.diff_revision(revision)}
+            elif self.command == "POST" and action in ("validate", "local"):
+                entries = body.get("entries")
+                if not isinstance(entries, list):
+                    raise DeviceCatalogIntegrityError("entries must be an array")
+                result = {"changes": repo.save_local_records(entries, actor=actor, dry_run=action == "validate")}
+            elif self.command == "POST" and action == "stage":
+                result = {"stage_id": repo.stage_revision(body.get("changes"), actor=actor)}
+            elif self.command == "POST" and action == "evidence":
+                data = dict(body.get("record", {}))
+                data["cpu_architectures"] = tuple(data["cpu_architectures"])
+                record = DeviceCatalogRecord(**data)
+                result = {"evidence_id": repo.acquire_exact_evidence(record, kind=body.get("kind", ""), source_revision=body.get("source_revision", ""), actor=actor)}
+            elif self.command == "POST" and action == "delete-local":
+                repo.delete_local_record(body.get("vendor", ""), body.get("icpn", ""), actor=actor)
+                result = {"deleted": True}
+            elif self.command == "POST" and action == "publish":
+                result = {"revision": repo.publish_staged(body.get("stage_id", ""), actor=actor)}
+            elif self.command == "POST" and action == "rollback":
+                repo.rollback(body.get("revision", ""), actor=actor)
+                result = {"revision": repo.read_active().revision_sha256}
+            else:
+                self._json(404, {"ok": False, "error": {"message": "unknown Catalog management action"}})
+                return
+            self._json(200, {"ok": True, **result})
+        except (DeviceCatalogIntegrityError, ValueError, TypeError, KeyError, OSError) as exc:
+            self._json(400, {"ok": False, "error": {"message": str(exc)}})
 
     def _relay_ps_loopback(self, alias: str) -> None:
         entry = self._resolve_ppu_alias(alias)
@@ -1007,6 +1077,9 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path.startswith(CATALOG_MANAGEMENT_ROUTE + "/"):
+            self._handle_catalog_management(parsed.path)
+            return
         if parsed.path == REGISTRY_ROUTE:
             self._handle_registry_add()
             return

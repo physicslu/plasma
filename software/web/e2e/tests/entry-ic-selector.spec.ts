@@ -274,3 +274,36 @@ test("IC Selector first enriched result renders without page error and paginatio
   await expect(page.getByText("顯示 1–30 / 共 31 筆")).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
+
+test("IC Management local save survives reload and appears only in Selector lookup", async ({ page }) => {
+  let local: Array<{ record: Record<string, string>; profile: Record<string, unknown>; revision: number; origin: string; verification: string }> = [];
+  const history = { active_revision: "a".repeat(64), revisions: [{ revision: "a".repeat(64), count: 1 }], audit: [] };
+  await page.route("**/api/manager/catalog/management**", async route => {
+    const request = route.request();
+    const action = new URL(request.url()).pathname.split("/").pop();
+    if (request.method() === "POST" && (action === "validate" || action === "local")) {
+      const entries = request.postDataJSON().entries as typeof local;
+      const changes = entries.map(entry => ({ ...entry, revision: local.length ? 2 : 1, change: local.length ? "UPDATED" : "ADDED", origin: "LOCAL", verification: "UNVERIFIED" }));
+      if (action === "local") local = changes;
+      await route.fulfill({ json: { ok: true, changes } });
+    } else {
+      await route.fulfill({ json: { ok: true, local, history, evidence: [] } });
+    }
+  });
+  await page.goto("/ic-management");
+  await page.getByLabel("vendor", { exact: true }).fill("LocalVendor");
+  await page.getByLabel("identifier", { exact: true }).fill("LOCAL123");
+  await page.getByLabel("family", { exact: true }).fill("Demo");
+  await page.getByLabel("Profile ID").fill("custom-v1");
+  await page.getByRole("button", { name: "Validate", exact: true }).click();
+  await expect(page.getByLabel("Changes preview")).toContainText("ADDED · LocalVendor LOCAL123");
+  await page.getByRole("button", { name: "Save local changes" }).click();
+  await page.reload();
+  await expect(page.getByText("LOCAL / UNVERIFIED · r1")).toBeVisible();
+  await page.route("**/api/manager/devices/search**", async route => {
+    await route.fulfill({ json: { ok: true, scope: "customer_ic_selector", catalog_size: 0, count: 0, total_count: 0, limit: 30, offset: 0, levels: [1, 2, 3], results: [], local_results: local } });
+  });
+  await page.getByRole("link", { name: "Open IC Selector" }).click();
+  await page.getByRole("textbox", { name: "Search admitted ICPN" }).fill("LOCAL123");
+  await expect(page.getByText("LOCAL / UNVERIFIED · r1")).toBeVisible();
+});

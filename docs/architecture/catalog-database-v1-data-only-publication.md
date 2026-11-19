@@ -121,6 +121,8 @@ Add staging/import, deterministic validators, local edit/create, atomic publish/
 
 ### Milestone D host publisher interface
 
+IC Management uses the existing Manager-owned repository and the same Stage/Publish/Rollback methods. The Console BFF accepts same-origin management writes in managed mode and injects `PLASMA_CATALOG_PUBLISH_TOKEN` from its server environment; Manager requires the matching token and `PLASMA_CATALOG_SQLITE_DB` before any write. The browser cannot supply publisher authority. Provision the token independently to both host services before enabling management. `GET /api/catalog/management` lists local records and revision/audit history; `POST /validate` previews a local batch, `POST /local` writes it atomically, and `POST /stage`, `/publish`, `/rollback` invoke the existing official Publisher. The local overlay is never promoted to official qualification and has no Job admission authority.
+
 The Manager-owned SQLite file is selected with `--db`. Initial migration imports the
 verified manifest with `--with-qualification`. Subsequent JSON change sets contain
 `[{"record": <DeviceCatalogRecord fields>, "qualification": <projection fields>}]`.
