@@ -1,0 +1,6 @@
+12:16:48Z batch 838d27038800459675cde30620f2b8c2 start 75639894654ec3254fb5e716bb3de9a3 repeat 3 replace_ic false
+12:16:48Z S1 ACTIVE c1/3 P0 F0 seq0/0 | S2 ACTIVE c1/3 P0 F0 seq0/0
+12:17:01Z S1 ACTIVE c2/3 P1 F0 seq0/0 | S2 ACTIVE c2/3 P1 F0 seq0/0
+12:17:15Z S1 ACTIVE c3/3 P2 F0 seq0/0 | S2 ACTIVE c3/3 P2 F0 seq0/0
+12:17:28Z S1 ENDED c3/3 P3 F0 seq0/0 | S2 ENDED c3/3 P3 F0 seq0/0
+12:17:29Z FINAL PASS COMPLETED cycles={'planned': 6, 'settled': 6, 'pass': 6, 'fail': 0, 'retry_attempts': 0, 'remaining': 0, 'awaiting_continue': 0} jobs=6

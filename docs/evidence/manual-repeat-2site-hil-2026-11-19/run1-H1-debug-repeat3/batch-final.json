@@ -1,0 +1,154 @@
+{
+ "schema": "plasma.manager.programming-batch.v2",
+ "batch_id": "b9cf4e9140c4668810c4bf74a1f553c1",
+ "start_id": "4310f87ee5425d64c0b51ae92255f757",
+ "targets": [
+  {
+   "ppu_alias": "z2",
+   "site_ids": [
+    1,
+    2
+   ]
+  }
+ ],
+ "operations": [
+  "erase",
+  "program",
+  "verify"
+ ],
+ "source": "image",
+ "icpn": "STM32F103C8T6",
+ "policy": {
+  "repeat": 3,
+  "replace_ic_before_next_cycle": false,
+  "retry_limit": 0,
+  "stop_policy": {
+   "kind": "never"
+  }
+ },
+ "state": "finished",
+ "execution_status": "STOPPED",
+ "outcome": "PARTIAL",
+ "reason": "STOP_REQUESTED_NOTHING_SUBMITTED",
+ "stop_requested": true,
+ "failure_domain": null,
+ "units": [
+  {
+   "ppu_alias": "z2",
+   "site_id": 1,
+   "status": "FINISHED",
+   "outcome": "PARTIAL",
+   "reason": "STOP_REQUESTED_NOTHING_SUBMITTED",
+   "failure_domain": "TARGET_NOT_READY",
+   "attempts": [],
+   "cycle": {
+    "planned": 3,
+    "index": 2,
+    "cycle_id": "86ebd9be755af64735cd94749edd99e0",
+    "state": "ENDED",
+    "disposition": "STOPPED",
+    "settled": 1,
+    "pass": 1,
+    "fail": 0,
+    "retry_attempts": 0,
+    "continue_seq": 1,
+    "continued_seq": 0,
+    "wait_reason": null,
+    "last": {
+     "cycle_index": 1,
+     "cycle_id": "2f09950b457b4804602f42c894877fce",
+     "outcome": "PASS",
+     "reason": null,
+     "attempts": 1,
+     "receipt": {
+      "run_id": "6375d7ffe1678d255ab7eb1fa4b51bf3",
+      "outcome": "PASS",
+      "reason": null,
+      "job_id": "job-20261119-105600-22afb2dd",
+      "job_state": "success",
+      "flash_result": "PASS",
+      "safe_off": true,
+      "safe_off_source": "job_details",
+      "job_binding_confirmed": true,
+      "elapsed_ms": 9519
+     },
+     "settled_at": "2026-11-19T10:56:11.337617+00:00"
+    },
+    "last_continue": null,
+    "remaining": 2
+   },
+   "progress": null
+  },
+  {
+   "ppu_alias": "z2",
+   "site_id": 2,
+   "status": "FINISHED",
+   "outcome": "PARTIAL",
+   "reason": "STOP_REQUESTED_NOTHING_SUBMITTED",
+   "failure_domain": "TARGET_NOT_READY",
+   "attempts": [],
+   "cycle": {
+    "planned": 3,
+    "index": 2,
+    "cycle_id": "b9f47065dd230405ea5366ee0367cd97",
+    "state": "ENDED",
+    "disposition": "STOPPED",
+    "settled": 1,
+    "pass": 1,
+    "fail": 0,
+    "retry_attempts": 0,
+    "continue_seq": 1,
+    "continued_seq": 0,
+    "wait_reason": null,
+    "last": {
+     "cycle_index": 1,
+     "cycle_id": "2567d00207674c61b6f341a20b3156b0",
+     "outcome": "PASS",
+     "reason": null,
+     "attempts": 1,
+     "receipt": {
+      "run_id": "f125d925b574be868f45a2a8c2bf7e16",
+      "outcome": "PASS",
+      "reason": null,
+      "job_id": "job-20261119-105600-1ffb8e2b",
+      "job_state": "success",
+      "flash_result": "PASS",
+      "safe_off": true,
+      "safe_off_source": "job_details",
+      "job_binding_confirmed": true,
+      "elapsed_ms": 9874
+     },
+     "settled_at": "2026-11-19T10:56:11.037641+00:00"
+    },
+    "last_continue": null,
+    "remaining": 2
+   },
+   "progress": null
+  }
+ ],
+ "journal_persisted": true,
+ "created_at": "2026-11-19T10:55:58.449412+00:00",
+ "updated_at": "2026-11-19T10:56:11.635239+00:00",
+ "started_at": "2026-11-19T10:55:58.449412+00:00",
+ "finished_at": "2026-11-19T10:56:11.635222+00:00",
+ "attempts": [],
+ "current_run": null,
+ "counts": {
+  "pass": 0,
+  "fail": 0,
+  "blocked": 0,
+  "unknown": 0,
+  "sites": 2,
+  "attempts": 0
+ },
+ "cycles": {
+  "planned": 6,
+  "settled": 2,
+  "pass": 2,
+  "fail": 0,
+  "retry_attempts": 0,
+  "remaining": 4,
+  "awaiting_continue": 0
+ },
+ "auto_retry": "DISABLED"
+}

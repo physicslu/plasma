@@ -1,0 +1,65 @@
+{
+ "label": "H1-debug-repeat3",
+ "repeat": 3,
+ "replace_ic": false,
+ "batch_post_count": 1,
+ "continue_posts": [],
+ "physical_ic_replaced": false,
+ "start_id": "4310f87ee5425d64c0b51ae92255f757",
+ "batch_id": "b9cf4e9140c4668810c4bf74a1f553c1",
+ "submission": "ACCEPTED",
+ "outcome": "PARTIAL",
+ "execution_status": "STOPPED",
+ "reason": "STOP_REQUESTED_NOTHING_SUBMITTED",
+ "cycles": {
+  "planned": 6,
+  "settled": 2,
+  "pass": 2,
+  "fail": 0,
+  "retry_attempts": 0,
+  "remaining": 4,
+  "awaiting_continue": 0
+ },
+ "jobs": [
+  {
+   "site": 2,
+   "cycle": 1,
+   "outcome": "PASS",
+   "job_id": "job-20261119-105600-1ffb8e2b",
+   "run_id": "f125d925b574be868f45a2a8c2bf7e16",
+   "plan_id": "863105502ff1655115a9876f15b949dd",
+   "safe_off": true,
+   "started": "2026-11-19T10:56:00.870107+00:00",
+   "finished": null
+  },
+  {
+   "site": 1,
+   "cycle": 1,
+   "outcome": "PASS",
+   "job_id": "job-20261119-105600-22afb2dd",
+   "run_id": "6375d7ffe1678d255ab7eb1fa4b51bf3",
+   "plan_id": "86529a031b22813a2939341970e6c9bd",
+   "safe_off": true,
+   "started": "2026-11-19T10:56:01.584715+00:00",
+   "finished": null
+  }
+ ],
+ "units": {
+  "1": {
+   "planned": 3,
+   "settled": 1,
+   "pass": 1,
+   "fail": 0,
+   "retry_attempts": 0,
+   "disposition": "STOPPED"
+  },
+  "2": {
+   "planned": 3,
+   "settled": 1,
+   "pass": 1,
+   "fail": 0,
+   "retry_attempts": 0,
+   "disposition": "STOPPED"
+  }
+ }
+}

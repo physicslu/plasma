@@ -1,0 +1,111 @@
+{
+ "label": "H2b-replace-ic-repeat2-750fbb4cd",
+ "repeat": 2,
+ "replace_ic": true,
+ "batch_post_count": 1,
+ "continue_posts": [
+  {
+   "site_id": 1,
+   "seq": 1,
+   "http": 200,
+   "duplicate": false,
+   "at": 1795090672.4760273
+  },
+  {
+   "site_id": 2,
+   "seq": 1,
+   "http": 200,
+   "duplicate": false,
+   "at": 1795090702.5530121
+  }
+ ],
+ "physical_ic_replaced": false,
+ "start_id": "a538bee38d871c2fd0f7d35a2a9cf8de",
+ "batch_id": "713d778aae4f4a3235ce957e49806485",
+ "submission": "ACCEPTED",
+ "isolation": {
+  "site2_state": "AWAITING_CONTINUE",
+  "site2_settled": 1,
+  "site2_settled_at_continue": 1,
+  "site2_continued_seq": 0,
+  "site1_index": 2,
+  "site1_state": "ENDED",
+  "site1_settled": 2
+ },
+ "outcome": "PASS",
+ "execution_status": "COMPLETED",
+ "reason": "COMPLETED",
+ "cycles": {
+  "planned": 4,
+  "settled": 4,
+  "pass": 4,
+  "fail": 0,
+  "retry_attempts": 0,
+  "remaining": 0,
+  "awaiting_continue": 0
+ },
+ "jobs": [
+  {
+   "site": 2,
+   "cycle": 1,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121741-b96dfe5c",
+   "run_id": "07d76c11808bfba925c2c9d44af644c3",
+   "plan_id": "ec7b88e8bb0bbb57ca90771f22fab545",
+   "safe_off": true,
+   "started": "2026-11-19T12:17:41.786346+00:00",
+   "finished": null
+  },
+  {
+   "site": 1,
+   "cycle": 1,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121741-b4d56e74",
+   "run_id": "caba29a724499ac750cb2efb42445110",
+   "plan_id": "7e293888827dc205819d13a05b280ab2",
+   "safe_off": true,
+   "started": "2026-11-19T12:17:42.276992+00:00",
+   "finished": null
+  },
+  {
+   "site": 1,
+   "cycle": 2,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121753-27565920",
+   "run_id": "9a4c80facaff279746c78f8d62c142b3",
+   "plan_id": "3a11d74bdec0ea27db32dbd25b45d543",
+   "safe_off": true,
+   "started": "2026-11-19T12:17:54.149823+00:00",
+   "finished": null
+  },
+  {
+   "site": 2,
+   "cycle": 2,
+   "outcome": "PASS",
+   "job_id": "job-20261119-121823-6ac8341e",
+   "run_id": "13879a275d927579c9132f75203feb2c",
+   "plan_id": "ee2b73b651c599bd98ae2117e350fc35",
+   "safe_off": true,
+   "started": "2026-11-19T12:18:24.203537+00:00",
+   "finished": null
+  }
+ ],
+ "units": {
+  "1": {
+   "planned": 2,
+   "settled": 2,
+   "pass": 2,
+   "fail": 0,
+   "retry_attempts": 0,
+   "disposition": "COMPLETED"
+  },
+  "2": {
+   "planned": 2,
+   "settled": 2,
+   "pass": 2,
+   "fail": 0,
+   "retry_attempts": 0,
+   "disposition": "COMPLETED"
+  }
+ }
+}

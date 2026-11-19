@@ -1,0 +1,230 @@
+{
+ "ok": true,
+ "batch_id": "713d778aae4f4a3235ce957e49806485",
+ "total": 6,
+ "offset": 0,
+ "records": [
+  {
+   "attempts": [
+    {
+     "attempt": 1,
+     "cycle_id": "9d2560c0599ff65edd19ca07ca98fe77",
+     "cycle_index": 1,
+     "finished_at": "2026-11-19T12:17:51.651002+00:00",
+     "job_binding_sha256": "06505fe424b83f9f424d49e92a8c7349cf70cfe7153d6f2ac84de15db6a848e6",
+     "job_id": "job-20261119-121741-b96dfe5c",
+     "job_key": {
+      "attempt": 1,
+      "batch_id": "713d778aae4f4a3235ce957e49806485",
+      "cycle": 1,
+      "ppu_alias": "z2",
+      "site_id": 2
+     },
+     "outcome": "PASS",
+     "plan_id": "ec7b88e8bb0bbb57ca90771f22fab545",
+     "reason": null,
+     "retry": null,
+     "run_id": "07d76c11808bfba925c2c9d44af644c3",
+     "safe_off": true,
+     "started_at": "2026-11-19T12:17:40.511782+00:00",
+     "state": "finished"
+    }
+   ],
+   "batch_id": "713d778aae4f4a3235ce957e49806485",
+   "cycle_id": "9d2560c0599ff65edd19ca07ca98fe77",
+   "cycle_index": 1,
+   "outcome": "PASS",
+   "ppu_alias": "z2",
+   "reason": null,
+   "receipt": {
+    "elapsed_ms": 9655,
+    "flash_result": "PASS",
+    "job_binding_confirmed": true,
+    "job_id": "job-20261119-121741-b96dfe5c",
+    "job_state": "success",
+    "outcome": "PASS",
+    "reason": null,
+    "run_id": "07d76c11808bfba925c2c9d44af644c3",
+    "safe_off": true,
+    "safe_off_source": "job_details"
+   },
+   "replace_ic_before_next_cycle": true,
+   "settled_at": "2026-11-19T12:17:51.682395+00:00",
+   "site_id": 2,
+   "type": "cycle"
+  },
+  {
+   "attempts": [
+    {
+     "attempt": 1,
+     "cycle_id": "bff2296d0252fe570a26a55f5d12d154",
+     "cycle_index": 1,
+     "finished_at": "2026-11-19T12:17:51.667471+00:00",
+     "job_binding_sha256": "d91a8f822bb9939c93434c12748c9d5eb2a9afcaa5f00c9cc6b9e836e546757b",
+     "job_id": "job-20261119-121741-b4d56e74",
+     "job_key": {
+      "attempt": 1,
+      "batch_id": "713d778aae4f4a3235ce957e49806485",
+      "cycle": 1,
+      "ppu_alias": "z2",
+      "site_id": 1
+     },
+     "outcome": "PASS",
+     "plan_id": "7e293888827dc205819d13a05b280ab2",
+     "reason": null,
+     "retry": null,
+     "run_id": "caba29a724499ac750cb2efb42445110",
+     "safe_off": true,
+     "started_at": "2026-11-19T12:17:40.675293+00:00",
+     "state": "finished"
+    }
+   ],
+   "batch_id": "713d778aae4f4a3235ce957e49806485",
+   "cycle_id": "bff2296d0252fe570a26a55f5d12d154",
+   "cycle_index": 1,
+   "outcome": "PASS",
+   "ppu_alias": "z2",
+   "reason": null,
+   "receipt": {
+    "elapsed_ms": 9292,
+    "flash_result": "PASS",
+    "job_binding_confirmed": true,
+    "job_id": "job-20261119-121741-b4d56e74",
+    "job_state": "success",
+    "outcome": "PASS",
+    "reason": null,
+    "run_id": "caba29a724499ac750cb2efb42445110",
+    "safe_off": true,
+    "safe_off_source": "job_details"
+   },
+   "replace_ic_before_next_cycle": true,
+   "settled_at": "2026-11-19T12:17:51.693021+00:00",
+   "site_id": 1,
+   "type": "cycle"
+  },
+  {
+   "actor": "hil-operator-test",
+   "after_cycle_id": "bff2296d0252fe570a26a55f5d12d154",
+   "after_cycle_index": 1,
+   "after_outcome": "PASS",
+   "at": "2026-11-19T12:17:52.463839+00:00",
+   "batch_id": "713d778aae4f4a3235ce957e49806485",
+   "continue_seq": 1,
+   "ppu_alias": "z2",
+   "site_id": 1,
+   "type": "continue",
+   "wait_reason": "REPLACE_IC"
+  },
+  {
+   "attempts": [
+    {
+     "attempt": 1,
+     "cycle_id": "562750e310faab4ff351e6c5a66941f7",
+     "cycle_index": 2,
+     "finished_at": "2026-11-19T12:18:02.715879+00:00",
+     "job_binding_sha256": "d91a8f822bb9939c93434c12748c9d5eb2a9afcaa5f00c9cc6b9e836e546757b",
+     "job_id": "job-20261119-121753-27565920",
+     "job_key": {
+      "attempt": 1,
+      "batch_id": "713d778aae4f4a3235ce957e49806485",
+      "cycle": 2,
+      "ppu_alias": "z2",
+      "site_id": 1
+     },
+     "outcome": "PASS",
+     "plan_id": "3a11d74bdec0ea27db32dbd25b45d543",
+     "reason": null,
+     "retry": null,
+     "run_id": "9a4c80facaff279746c78f8d62c142b3",
+     "safe_off": true,
+     "started_at": "2026-11-19T12:17:53.202113+00:00",
+     "state": "finished"
+    }
+   ],
+   "batch_id": "713d778aae4f4a3235ce957e49806485",
+   "cycle_id": "562750e310faab4ff351e6c5a66941f7",
+   "cycle_index": 2,
+   "outcome": "PASS",
+   "ppu_alias": "z2",
+   "reason": null,
+   "receipt": {
+    "elapsed_ms": 8370,
+    "flash_result": "PASS",
+    "job_binding_confirmed": true,
+    "job_id": "job-20261119-121753-27565920",
+    "job_state": "success",
+    "outcome": "PASS",
+    "reason": null,
+    "run_id": "9a4c80facaff279746c78f8d62c142b3",
+    "safe_off": true,
+    "safe_off_source": "job_details"
+   },
+   "replace_ic_before_next_cycle": true,
+   "settled_at": "2026-11-19T12:18:02.798272+00:00",
+   "site_id": 1,
+   "type": "cycle"
+  },
+  {
+   "actor": "hil-operator-test",
+   "after_cycle_id": "9d2560c0599ff65edd19ca07ca98fe77",
+   "after_cycle_index": 1,
+   "after_outcome": "PASS",
+   "at": "2026-11-19T12:18:22.542568+00:00",
+   "batch_id": "713d778aae4f4a3235ce957e49806485",
+   "continue_seq": 1,
+   "ppu_alias": "z2",
+   "site_id": 2,
+   "type": "continue",
+   "wait_reason": "REPLACE_IC"
+  },
+  {
+   "attempts": [
+    {
+     "attempt": 1,
+     "cycle_id": "453ef51575c1f47b5e457457c9121143",
+     "cycle_index": 2,
+     "finished_at": "2026-11-19T12:18:33.343039+00:00",
+     "job_binding_sha256": "06505fe424b83f9f424d49e92a8c7349cf70cfe7153d6f2ac84de15db6a848e6",
+     "job_id": "job-20261119-121823-6ac8341e",
+     "job_key": {
+      "attempt": 1,
+      "batch_id": "713d778aae4f4a3235ce957e49806485",
+      "cycle": 2,
+      "ppu_alias": "z2",
+      "site_id": 2
+     },
+     "outcome": "PASS",
+     "plan_id": "ee2b73b651c599bd98ae2117e350fc35",
+     "reason": null,
+     "retry": null,
+     "run_id": "13879a275d927579c9132f75203feb2c",
+     "safe_off": true,
+     "started_at": "2026-11-19T12:18:23.285871+00:00",
+     "state": "finished"
+    }
+   ],
+   "batch_id": "713d778aae4f4a3235ce957e49806485",
+   "cycle_id": "453ef51575c1f47b5e457457c9121143",
+   "cycle_index": 2,
+   "outcome": "PASS",
+   "ppu_alias": "z2",
+   "reason": null,
+   "receipt": {
+    "elapsed_ms": 8910,
+    "flash_result": "PASS",
+    "job_binding_confirmed": true,
+    "job_id": "job-20261119-121823-6ac8341e",
+    "job_state": "success",
+    "outcome": "PASS",
+    "reason": null,
+    "run_id": "13879a275d927579c9132f75203feb2c",
+    "safe_off": true,
+    "safe_off_source": "job_details"
+   },
+   "replace_ic_before_next_cycle": true,
+   "settled_at": "2026-11-19T12:18:33.355798+00:00",
+   "site_id": 2,
+   "type": "cycle"
+  }
+ ]
+}
