@@ -23,6 +23,7 @@ import type {
 import { programmingRunLogLines } from "../programming/programming-run-log";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import {
+  continueMarkKey, sitesToContinue,
   loadManagedTopology, loadProgrammingRoutes,
   ManagedProgrammingBlocked, ManagedStartOutcomeUnknown,
   PROGRAMMING_OPERATION_LABELS, batchSiteVerdict, routeDeclaring, routeSequenceOperations,
@@ -30,7 +31,7 @@ import {
   type ManagedTopology, type ProgrammingSource, type RoutesState,
 } from "../programming/managed-programming";
 import { getProgrammingBatch, getStartReconciliation, normalizeOperations,
-  operationsTakeImage, stopProgrammingBatch,
+  continueProgrammingBatch, operationsTakeImage, stopProgrammingBatch,
   type ProgrammingBatch, type ProgrammingRun, type SequenceOperation,
 } from "../engineering/bundle-programming-api";
 import { resolveProgrammingCapabilities } from "../programming-capabilities";
@@ -414,6 +415,14 @@ function ppuState(sites: SiteRuntime[]): SiteRunState | "partial" {
   return "partial";
 }
 
+/** Same-IC Debug: the IC KPIs count Cycles on one IC per Site, never IC output. */
+const SAME_IC_DEBUG_KPI_LABELS: Record<string, string> = {
+  "total-ic": "TOTAL CYCLES · SAME IC",
+  "processed-ic": "SETTLED CYCLES",
+  pass: "PASS CYCLES",
+  fail: "FAIL CYCLES",
+};
+
 export default function FactoryConsoleV2() {
   const { locale, t } = useI18n();
   const text = copy[locale];
@@ -448,6 +457,9 @@ export default function FactoryConsoleV2() {
   const [batchSnapshot, setBatchSnapshot] = useState<ServerBatchSnapshot | null>(null);
   const [clockNow, setClockNow] = useState(() => Date.now());
   const [repeatCount, setRepeatCount] = useState("1");
+  const [replaceIc, setReplaceIc] = useState(true);
+  // Manual Repeat: Sites the operator marked "IC replaced", per pause.
+  const [replacedMarks, setReplacedMarks] = useState<ReadonlySet<string>>(new Set());
   const [siteRetryLimit, setSiteRetryLimit] = useState("3");
   const [failedSiteThreshold, setFailedSiteThreshold] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -466,6 +478,7 @@ export default function FactoryConsoleV2() {
   // Factory Log is a read-only view of the Manager's per-Site Job/Receipt truth.
   const loggedRecords = useRef(new Map<string, string>());
   const managedStartLock = useRef(false);
+  const managedContinueLock = useRef(false);
 
   const logSequence = useRef(0);
   const activityReleaseRef = useRef<(() => void) | null>(null);
@@ -557,7 +570,7 @@ export default function FactoryConsoleV2() {
     if (terminalBatchRef.current === snapshot.batch_id) return;
     terminalBatchRef.current = snapshot.batch_id;
     pollGenerationRef.current += 1;
-    const terminal = `[BAT] TERMINAL · ${snapshot.state.toUpperCase()} · PASS ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.completed_rounds), 0)} · FAIL ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0)} · ERROR ${snapshot.site_counts.error ?? 0} · CANCELLED ${snapshot.site_counts.cancelled ?? 0}`;
+    const terminal = `[BAT] TERMINAL · ${snapshot.state.toUpperCase()} · PASS ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.pass_rounds ?? site.completed_rounds), 0)} · FAIL ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0)} · ERROR ${snapshot.site_counts.error ?? 0} · CANCELLED ${snapshot.site_counts.cancelled ?? 0}`;
     const level = snapshot.state === "error" ? "ERROR" : snapshot.state === "cancelled" || snapshot.state === "partial" ? "WARN" : "INFO";
     // The terminal snapshot is applied just before its Site lines are logged in
     // the same handler; wait (one microtask, then any run_id reads) so the
@@ -1015,17 +1028,23 @@ export default function FactoryConsoleV2() {
 
   const manufacturing = useMemo(() => {
     if (!batchSnapshot) return { pass: 0, fail: 0, total: 0, yieldPercent: 0 };
-    const pass = batchSnapshot.sites.reduce((total, site) => total + Math.max(0, site.completed_rounds), 0);
+    // completed_rounds counts settled rounds/Cycles; PASS is reported on its own when known.
+    const pass = batchSnapshot.sites.reduce((total, site) => total + Math.max(0, site.pass_rounds ?? site.completed_rounds), 0);
     const fail = batchSnapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0);
     const total = pass + fail;
     return { pass, fail, total, yieldPercent: total > 0 ? pass / total * 100 : 0 };
   }, [batchSnapshot]);
 
   const repeatValue = parsePositiveInt(repeatCount);
+  const waitingSites = managed ? batchSnapshot?.awaiting_continue ?? [] : [];
+  const continuingSites = sitesToContinue(
+    waitingSites.map(site => ({ ...site, alias: site.ppu_id, siteId: site.site_id, continueSeq: site.continue_seq })),
+    batchSnapshot?.sites.length ?? 0, replacedMarks);
   const retryValue = parseNonNegativeInt(siteRetryLimit);
   const thresholdValue = failedSiteThreshold === "" ? null : parsePositiveInt(failedSiteThreshold);
   const policyValid = managed
-    ? retryValue !== null && retryValue <= 5
+    ? repeatValue !== null && repeatValue <= 10_000
+      && retryValue !== null && retryValue <= 5
       && (failedSiteThreshold === "" || (thresholdValue !== null && thresholdValue <= Math.max(1, batchCounts.sites)))
     : repeatValue !== null && repeatValue <= 10_000
       && retryValue !== null && retryValue <= 20
@@ -1153,8 +1172,11 @@ export default function FactoryConsoleV2() {
 
   const plannedIcCount = batchSnapshot
     ? batchSnapshot.sites.length * batchSnapshot.execution_policy.repeat_count
-    : batchCounts.sites * (managed ? 1 : repeatValue ?? 0);
+    : batchCounts.sites * (repeatValue ?? 0);
 
+  // Same-IC Debug repeats one IC per Site: its Cycles are never IC output.
+  const sameIcDebug = batchSnapshot?.execution_policy.replace_ic_before_next_cycle === false;
+  const roundUnit = sameIcDebug ? "CYCLE" : "IC";
   const kpis = [
     { key: "production-sites", label: "SITES", value: batchSnapshot?.sites.length ?? batchCounts.sites },
     { key: "total-ic", label: "TOTAL IC", value: plannedIcCount },
@@ -1163,7 +1185,8 @@ export default function FactoryConsoleV2() {
     { key: "fail", label: "FAIL", value: manufacturing.fail, tone: "fail" as const },
     { key: "yield", label: "YIELD", value: manufacturing.total > 0 ? `${manufacturing.yieldPercent.toFixed(1)}%` : "—", tone: "info" as const },
     { key: "batch-time", label: "BATCH TIME", value: formatBatchTime(batchSnapshot, clockNow) },
-  ];
+  ].map(kpi => sameIcDebug && kpi.key in SAME_IC_DEBUG_KPI_LABELS
+    ? { ...kpi, label: SAME_IC_DEBUG_KPI_LABELS[kpi.key] } : kpi);
 
   function productionTreeSiteIds(facilityId: string, ppuId: string): number[] {
     return draftSelection[facilityId]?.[ppuId] ?? [];
@@ -1302,7 +1325,7 @@ export default function FactoryConsoleV2() {
       ? {
         alias: primary.ppu_alias, siteIds: primary.site_ids, targets,
         icpn, operations: managedChosen, source: programmingSource, file: managedFile,
-        retryLimit: retryValue ?? 0,
+        retryLimit: retryValue ?? 0, repeat: repeatValue ?? 1, replaceIc,
         stopPolicy: thresholdValue == null ? { kind: "never" as const }
           : { kind: "failed_sites" as const, threshold: thresholdValue },
       }
@@ -1310,7 +1333,7 @@ export default function FactoryConsoleV2() {
         alias: primary.ppu_alias, siteIds: primary.site_ids, targets,
         icpn, operations: ["erase"] as const, source: programmingSource, file: null,
         range: { address: managedRoute.flash_base, length: managedRoute.flash_size },
-        retryLimit: retryValue ?? 0,
+        retryLimit: retryValue ?? 0, repeat: repeatValue ?? 1, replaceIc,
         stopPolicy: thresholdValue == null ? { kind: "never" as const }
           : { kind: "failed_sites" as const, threshold: thresholdValue },
       };
@@ -1321,7 +1344,7 @@ export default function FactoryConsoleV2() {
     setBatchObservationState("connected");
     loggedRecords.current.clear();
     beginActivity();
-    appendLog(`[BAT] START MANAGER · ${targets.length} PPUs · ${batchCounts.sites} Sites · ${managedChosen.join(" → ").toUpperCase()} · ${icpn} · Retry ${retryValue ?? 0} · Stop ${thresholdValue ?? "never"} · Repeat 1`);
+    appendLog(`[BAT] START MANAGER · ${targets.length} PPUs · ${batchCounts.sites} Sites · ${managedChosen.join(" → ").toUpperCase()} · ${icpn} · Retry ${retryValue ?? 0} · Stop ${thresholdValue ?? "never"} · Repeat ${repeatValue ?? 1} Cycle(s)/Site · ${replaceIc ? "replace IC each Cycle" : "same-IC Debug"}`);
     try {
       await runManagedBatch(request, {
         onStartId: startId => {
@@ -1428,7 +1451,37 @@ export default function FactoryConsoleV2() {
     }
   }
 
+  // Manual Repeat: START pressed while Sites wait continues ONLY the Sites
+  // the operator marked "IC replaced" on their tile (a one-Site Session needs
+  // no mark). The Manager dispatches each next Cycle itself.
+  async function continueManagedSites() {
+    const batchId = batchSnapshot?.batch_id;
+    const chosen = continuingSites;
+    if (!batchId || !chosen.length || managedContinueLock.current) return;
+    managedContinueLock.current = true;
+    try {
+      for (const site of chosen) {
+        try {
+          const answer = await continueProgrammingBatch(batchId, {
+            ppu_alias: site.ppu_id, site_id: site.site_id, continue_seq: site.continue_seq,
+          });
+          appendLog(`[BAT] CONTINUE · ${site.ppu_id} Site ${site.site_id} · IC replaced${answer.duplicate ? " · already accepted" : ""}`);
+          if (catalog) applyBatchSnapshot(managedProductionSnapshot(answer.batch, managedTopology), catalog);
+        } catch (error) {
+          appendLog(`[BAT] CONTINUE REFUSED · ${site.ppu_id} Site ${site.site_id} · ${error instanceof Error ? error.message : "request failed"} · nothing was started`, "WARN");
+        }
+      }
+    } finally {
+      setReplacedMarks(new Set());
+      managedContinueLock.current = false;
+    }
+  }
+
   async function executeBatch() {
+    if (waitingSites.length) {
+      await continueManagedSites();
+      return;
+    }
     if (managed) {
       await executeManagedBatch();
       return;
@@ -1725,16 +1778,23 @@ export default function FactoryConsoleV2() {
               policyLabel={text.batchPolicy}
               policy={{
                 repeatLabel: text.repeat,
-                repeatValue: managed ? "1" : repeatCount,
-                repeatDisabled: managed || batchRunning,
+                repeatValue: repeatCount,
+                repeatDisabled: batchRunning,
                 repeatAriaLabel: "Repeat Count",
                 onRepeatChange: setRepeatCount,
+                ...(managed ? { replaceIc: {
+                  label: "Replace IC each Cycle",
+                  checked: replaceIc,
+                  disabled: batchRunning,
+                  ariaLabel: "Replace IC before next Cycle",
+                  onChange: setReplaceIc,
+                } } : {}),
                 retryLabel: text.retry,
                 retryValue: siteRetryLimit,
                 retryMax: managed ? 5 : 20,
                 retryDisabled: batchRunning,
                 note: managed
-                  ? "Manager-owned Batch · Repeat 1 · Retry 0–5 only for definite eligible FAIL (never OUTCOME UNKNOWN) · ABORT stops pending submissions but never cancels an accepted Job."
+                  ? `Manager-owned Batch · Repeat 1–10000 Cycles per Site (a FAIL settles one Cycle; Retries never add one) · Retry 0–5 only for definite eligible FAIL (never OUTCOME UNKNOWN) · ABORT stops pending submissions but never cancels an accepted Job.${batchSnapshot?.awaiting_continue?.length ? ` · WAITING: ${batchSnapshot.awaiting_continue.map(site => `${site.ppu_id} Site ${site.site_id} — ${site.detail}`).join(" | ")} — replace the IC, tick that Site as replaced${(batchSnapshot?.sites.length ?? 0) > 1 ? "" : " (one-Site Session: not needed)"} and press START. Unmarked Sites keep waiting.` : ""}`
                   : undefined,
                 retryAriaLabel: "Site Retry Limit",
                 onRetryChange: setSiteRetryLimit,
@@ -1748,8 +1808,11 @@ export default function FactoryConsoleV2() {
                 ],
                 onStopChange: setFailedSiteThreshold,
               }}
-              startLabel={text.start}
-              startDisabled={!batchReadiness.ready || !policyValid}
+              startLabel={waitingSites.length
+                ? continuingSites.length ? `${text.start} · CONTINUE ${continuingSites.map(site => `${site.ppu_id} ${siteLabel(site.site_id)}`).join(", ")}`
+                  : `${text.start} · MARK THE REPLACED SITE(S)`
+                : text.start}
+              startDisabled={waitingSites.length ? !continuingSites.length : !batchReadiness.ready || !policyValid}
               onStart={executeBatch}
               statusLabel={text.batchStatus}
               statusValue={batchStatusLabel}
@@ -1842,31 +1905,50 @@ export default function FactoryConsoleV2() {
                                 {(runtime?.sites ?? active.siteIds.map(id => ({ id, enabled: true, state: "ready", progress: 0, currentRound: 0, completedRounds: 0, attempts: 0, retries: 0, finalFailures: 0 } satisfies SiteRuntime))).map(site => {
                                   const selected = selectedSet.has(site.id);
                                   const displayState = site.enabled ? site.state : "disabled";
+                                  const pause = (batchSnapshot?.sites.length ?? 0) > 1
+                                    ? waitingSites.find(item => item.ppu_id === active.target.ppu_id && item.site_id === site.id) : undefined;
+                                  const waitingMark = pause ? continueMarkKey(pause.ppu_id, pause.site_id, pause.continue_seq) : null;
                                   return (
                                     <article
                                       className={`factorySiteLedCard state-${displayState} ${selected ? "batch-selected" : "batch-excluded"}`}
                                       data-production-site={site.id}
                                       data-site-state={displayState}
                                       data-batch-selected={selected ? "true" : "false"}
-                                      aria-label={`${active.target.display_name} ${siteLabel(site.id)} ${stateText(site)}${site.currentRound ? ` IC ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : ""} ${selected ? "selected for Batch" : "excluded from Batch"}`}
-                                      title={`${group.facility.display_name} / ${active.target.display_name} / ${siteLabel(site.id)} · ${stateText(site)}${site.currentRound ? ` · IC ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : ""}${site.operation ? ` · ${operationCodes[site.operation]} ${site.progress}%` : ""}`}
+                                      aria-label={`${active.target.display_name} ${siteLabel(site.id)} ${stateText(site)}${site.currentRound ? ` ${roundUnit} ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : ""} ${selected ? "selected for Batch" : "excluded from Batch"}`}
+                                      title={`${group.facility.display_name} / ${active.target.display_name} / ${siteLabel(site.id)} · ${stateText(site)}${site.currentRound ? ` · ${roundUnit} ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : ""}${site.operation ? ` · ${operationCodes[site.operation]} ${site.progress}%` : ""}`}
                                       key={site.id}
                                     >
                                       <div className="factorySiteLedCardTop">
-                                        <input
-                                          type="checkbox"
-                                          aria-label={`Batch select ${active.target.display_name} ${siteLabel(site.id)}`}
-                                          checked={selected}
-                                          disabled={batchRunning || !site.enabled}
-                                          onChange={() => toggleBatchSite(active, site.id)}
-                                        />
+                                        {waitingMark ? (
+                                          // While THIS Site waits, its checkbox is the operator's
+                                          // "IC replaced" mark for this pause only.
+                                          <input
+                                            type="checkbox"
+                                            aria-label={`${active.target.display_name} ${siteLabel(site.id)} IC replaced`}
+                                            data-site-replaced={`${active.target.ppu_id}:${site.id}`}
+                                            checked={replacedMarks.has(waitingMark)}
+                                            onChange={() => setReplacedMarks(current => {
+                                              const next = new Set(current);
+                                              if (next.has(waitingMark)) next.delete(waitingMark); else next.add(waitingMark);
+                                              return next;
+                                            })}
+                                          />
+                                        ) : (
+                                          <input
+                                            type="checkbox"
+                                            aria-label={`Batch select ${active.target.display_name} ${siteLabel(site.id)}`}
+                                            checked={selected}
+                                            disabled={batchRunning || !site.enabled}
+                                            onChange={() => toggleBatchSite(active, site.id)}
+                                          />
+                                        )}
                                         <b>{siteLabel(site.id)}</b>
                                       </div>
                                       <div className="factorySiteLed" data-state={displayState}><i /></div>
                                       <small>{site.communicationState === "reconnecting"
                                         ? `RETRY ${site.communicationAttempt ?? 1}`
                                         : displayState === "running" && site.currentRound
-                                          ? `IC ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}`
+                                          ? `${roundUnit} ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}`
                                           : stateText(site)}</small>
                                     </article>
                                   );

@@ -25,6 +25,8 @@ export type BatchExecutionPolicy = {
   repeat_count: number;
   site_retry_limit: number;
   failed_site_stop_threshold: number | null;
+  /** Manager Manual Repeat: false = same-IC Debug (Cycles are not distinct ICs). */
+  replace_ic_before_next_cycle?: boolean;
 };
 
 export type BatchTargetDeviceSnapshot = {
@@ -61,7 +63,10 @@ export type BatchSiteSnapshot = {
   key: string;
   state: ServerBatchSiteState;
   current_round: number;
+  /** Settled rounds; for a Manager Repeat Site, settled Cycles (PASS + FAIL). */
   completed_rounds: number;
+  /** Manager Repeat only: PASS Cycles of this Site (absent: completed_rounds are PASS rounds). */
+  pass_rounds?: number;
   current_operation: Operation | null;
   current_job_id: string | null;
   progress_percent: number;
@@ -77,7 +82,18 @@ export type BatchSiteSnapshot = {
   operation_statistics: Partial<Record<Operation, BatchOperationStatistics>>;
 };
 
+/** Managed Manual Repeat: one Site waiting for the operator's Continue. */
+export type AwaitingContinueSite = {
+  ppu_id: string;
+  site_id: number;
+  continue_seq: number;
+  /** Why it waits, plus the system's own FAIL evidence when a Cycle failed. */
+  detail: string;
+};
+
 export type ServerBatchSnapshot = {
+  /** Managed mode only (Manual Repeat); absent for the Standalone runtime. */
+  awaiting_continue?: AwaitingContinueSite[];
   batch_id: string;
   state: ServerBatchState;
   created_at: string;

@@ -378,7 +378,8 @@ Manager reads it as a PPU that matches nothing, which is the only safe reading a
 
 | Field | Default | Range |
 | --- | --- | --- |
-| `repeat` | `1` | `1` only; anything else is `400 repeat_not_supported` |
+| `repeat` | `1` | Cycles per selected Site, `1..10000` (Manual Repeat v1, WP-02); otherwise `400 invalid_request` |
+| `replace_ic_before_next_cycle` | `true` | `true`: each next Cycle waits for the operator's Continue; `false`: same-IC Debug (a PASS proceeds by itself, a FAIL still pauses) |
 | `retry_limit` | `0` | `0..5` |
 | `stop_policy` | `{"kind": "never"}` | `never`, or `{"kind": "failed_sites", "threshold": 1..N}` where N is the Batch's Site count |
 

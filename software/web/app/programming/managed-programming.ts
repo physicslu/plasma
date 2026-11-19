@@ -9,6 +9,7 @@
 
 import { getManagerPpuBootstrap, sha256Hex, type ManagerBootstrapStatus } from "../engineering/ppu-bootstrap-api";
 import {
+  continueProgrammingBatch,
   getProgrammingBatch,
   getProgrammingRoutes,
   getProgrammingRun,
@@ -539,7 +540,9 @@ type WithoutSite<T> = T extends unknown ? Omit<T, "siteId"> : never;
 export type ManagedBatchRequest =
   WithoutSite<Extract<ManagedRunRequest, { operations: readonly SequenceOperation[] }>>
   & { siteIds: readonly number[]; targets?: readonly ProgrammingBatchTarget[];
-    retryLimit: number; stopPolicy: StopPolicy };
+    retryLimit: number; stopPolicy: StopPolicy;
+    /** Manual Repeat: Cycles per Site (default 1) and replace-IC pause (default true). */
+    repeat?: number; replaceIc?: boolean };
 
 export type ManagedBatchEvents = {
   onLocked?: (input: LockedInput) => void;
@@ -574,6 +577,7 @@ export async function runManagedBatch(
   const common = {
     icpn: request.icpn, alias: request.alias, siteIds: [...request.siteIds],
     retryLimit: request.retryLimit, stopPolicy: request.stopPolicy,
+    repeat: request.repeat ?? 1, replaceIc: request.replaceIc ?? true,
     ...(request.targets ? { targets: request.targets } : {}),
   };
   const input: BatchInput = request.file === null
@@ -631,6 +635,85 @@ export async function runManagedBatch(
     }
   }
   return batch;
+}
+
+/** Sites of a running Manual Session that wait for the operator's Continue. */
+export function awaitingUnits(batch: ProgrammingBatch | null): ProgrammingBatchUnit[] {
+  if (!batch || batch.outcome != null) return [];
+  return batch.units.filter(unit => unit.cycle?.state === "AWAITING_CONTINUE");
+}
+
+/** Identity of one operator "IC replaced" mark: valid for exactly one pause. */
+export function continueMarkKey(alias: string, siteId: number, continueSeq: number): string {
+  return `${alias}:${siteId}:${continueSeq}`;
+}
+
+/**
+ * Which waiting Sites one START continues. Only Sites the operator marked
+ * "IC replaced" for their CURRENT pause; a Session of one Site is
+ * unambiguous, so START alone continues it. A waiting Site that is not
+ * marked is never treated as replaced.
+ */
+export function sitesToContinue<T extends { alias: string; siteId: number; continueSeq: number }>(
+  waiting: readonly T[], sessionSites: number, marked: ReadonlySet<string>,
+): T[] {
+  if (sessionSites === 1) return [...waiting];
+  return waiting.filter(site => marked.has(continueMarkKey(site.alias, site.siteId, site.continueSeq)));
+}
+
+/**
+ * The existing Start, pressed while Sites wait: one Continue per Site the
+ * operator marked as replaced, each echoing the pause it answers. The
+ * Browser schedules nothing; a refused or lost Continue is reported and
+ * never retried here.
+ */
+export async function continueAwaitingSites(
+  batch: ProgrammingBatch, marked: ReadonlySet<string>,
+): Promise<{ batch: ProgrammingBatch; continued: ProgrammingBatchUnit[]; errors: string[] }> {
+  let latest = batch;
+  const continued: ProgrammingBatchUnit[] = [];
+  const errors: string[] = [];
+  const chosen = sitesToContinue(
+    awaitingUnits(batch).map(unit => ({ unit, alias: unit.ppu_alias, siteId: unit.site_id,
+      continueSeq: unit.cycle!.continue_seq })),
+    batch.units.length, marked);
+  for (const { unit } of chosen) {
+    try {
+      const answer = await continueProgrammingBatch(batch.batch_id, {
+        ppu_alias: unit.ppu_alias, site_id: unit.site_id, continue_seq: unit.cycle!.continue_seq,
+      });
+      latest = answer.batch;
+      if (!answer.duplicate) continued.push(unit);
+    } catch (reason) {
+      errors.push(`${unit.ppu_alias} Site ${unit.site_id}: ${errorParts(reason).message}`);
+    }
+  }
+  return { batch: latest, continued, errors };
+}
+
+/** One Site's Cycle progress for display; null before WP-02 Managers. */
+export function unitCycleLabel(unit: ProgrammingBatchUnit): string | null {
+  const cycle = unit.cycle;
+  if (!cycle || cycle.planned <= 1) return null;
+  const state = cycle.state === "AWAITING_CONTINUE"
+    ? (cycle.wait_reason === "REPLACE_IC" ? "REPLACE IC · press Start"
+      : cycle.wait_reason === "FAIL_REVIEW" ? "FAIL · replace IC · press Start"
+      : `WAITING · ${cycle.wait_reason ?? ""} · press Start`)
+    : cycle.state === "ENDED" ? (cycle.disposition ?? "ENDED") : "RUNNING";
+  return `Cycle ${Math.min(cycle.index, cycle.planned)}/${cycle.planned} · PASS ${cycle.pass} · FAIL ${cycle.fail}`
+    + ` · Retry ${cycle.retry_attempts} · Remaining ${cycle.remaining} · ${state}`;
+}
+
+/** The system's own FAIL evidence for a paused Site (no operator free text). */
+export function unitFailDetail(unit: ProgrammingBatchUnit): string | null {
+  const last = unit.cycle?.last;
+  if (!last || last.outcome !== "FAIL") return null;
+  const receipt = last.receipt;
+  return [`Cycle ${last.cycle_index} FAIL`, last.reason, receipt?.job_id ? `Job ${receipt.job_id}` : null,
+    receipt?.job_state ? `state ${receipt.job_state}` : null,
+    receipt?.flash_result ? `result ${receipt.flash_result}` : null,
+    `SAFE_OFF ${receipt?.safe_off === true ? "verified" : "NOT verified"}`,
+    `${last.attempts} attempt${last.attempts === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
 }
 
 export type BatchVerdict = RunVerdict | "PARTIAL" | "STOPPED";
@@ -836,7 +919,8 @@ const BLOCK_GUIDANCE: Record<string, string> = {
   programming_outcome_unknown_unresolved: "An earlier run on this PPU ended OUTCOME UNKNOWN. Reconcile and acknowledge it before programming again.",
   programming_run_in_progress: "Another programming run is in progress on this PPU.",
   programming_batch_in_progress: "Another programming Batch is in progress on this PPU.",
-  repeat_not_supported: "Repeat is not implemented; it stays 1.",
+  programming_continue_stale: "That Site is no longer waiting for this Continue; the view was refreshed and nothing was started.",
+  programming_batch_stopping: "Stop Queuing was requested; nothing was started.",
   ppu_resource_identity_unknown: "The PPU Resource identity could not be read; nothing was changed.",
   ppu_runtime_resource_identity_unsupported: "The PPU Runtime does not report a verified Resource identity.",
   maintenance_authorization_required: "This Control Station session is not authorized for PPU writes.",

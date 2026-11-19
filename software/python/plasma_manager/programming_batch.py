@@ -3,8 +3,22 @@
 One Batch = an ordered Target Set (``[{ppu_alias, site_ids}]``) spanning one
 or more PPUs, one programming Job specification (an ordered erase / program /
 verify ``operations`` list with its Programming Image or Bundle) and a policy
-``{repeat: 1, retry_limit, stop_policy}``. ICPN and Image are Batch-level and
-never vary per Site.
+``{repeat, replace_ic_before_next_cycle, retry_limit, stop_policy}``. ICPN and
+Image are Batch-level and never vary per Site.
+
+Manual Repeat (WP-02): ``repeat`` (1..10000) is the number of logical Cycles
+EACH selected Site runs in this one Batch (the Manual Session). A Cycle is one
+ordered E/P/V flow on one IC placement; its Retry Attempts stay inside it and
+never consume another Cycle. A definite PASS or definite FAIL settles exactly
+one Cycle; ``BLOCKED`` (nothing submitted) and ``OUTCOME_UNKNOWN`` never do.
+After a settled Cycle the Site lane pauses for the operator's Continue (the
+existing Start action, which attests the IC was replaced) - except a PASS in
+same-IC Debug mode (``replace_ic_before_next_cycle=false``), which proceeds
+through the same admission gates by itself. Every Cycle is a fresh plan, run
+and PPU Job on the same lane; there is no second scheduler. Settled Cycles are
+appended to the Batch's cycle segment of this journal so a 10000-Cycle session
+keeps its evidence while the main record holds only counters and the current
+Cycle.
 
 The coordinator only decides WHETHER ANOTHER ATTEMPT IS SUBMITTED. Every
 attempt is an ordinary ``BundleProgrammingWorkflow`` plan + run: a new plan, a
@@ -12,7 +26,7 @@ new run and a new PPU Job (new Job ID; the Job Binding is re-derived and
 re-verified by the PPU for that Job) with ``auto_retry = DISABLED``. There is
 no second programming engine, no Gateway batch runtime and no Repeat
 scheduler here. Bounded Site lanes advance independently through the same
-workflow, with at most one in-flight run per Site.
+workflow, with at most one in-flight run per Site and one active Cycle per Site.
 
 Admission separates validity from readiness. A malformed request, or an
 unknown or unauthorised Target, refuses the whole Batch and does not consume
@@ -86,6 +100,15 @@ JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v2"
 LEGACY_BATCH_SCHEMA = "plasma.manager.programming-batch.v1"
 LEGACY_JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v1"
 MAX_RETRY_LIMIT = 5
+#: Manual Repeat: Cycles per selected Site in one Manual Session (WP-02).
+MAX_REPEAT = 10000
+#: After a settled Cycle the PPU may not have released the Site yet. The next
+#: Cycle re-reads readiness for at most this long before it pauses for the
+#: operator. Only re-checks: no gate is skipped or relaxed while waiting.
+RELEASE_WAIT_S = 15.0
+RELEASE_RECHECK_S = 0.5
+#: The one readiness verdict that is transient right after a terminal Job.
+RELEASE_PENDING_REASON = "SITE_NOT_READY_OR_BUSY"
 MAX_TARGETS = 32
 MAX_SITES_PER_BATCH = 64
 STOP_TOKEN = "STOP_QUEUING"
@@ -93,11 +116,17 @@ MAX_BATCHES_RETAINED = 32
 BATCH_TERMINAL = frozenset({"PASS", "FAIL", "PARTIAL", "OUTCOME_UNKNOWN", "BLOCKED"})
 # A Target counts as executed only when a Job was submitted for it.
 EXECUTED_OUTCOMES = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN"})
+SETTLED_UNIT_OUTCOMES = EXECUTED_OUTCOMES | {"PARTIAL"}
 PLAN_KEYS = frozenset({"icpn", "operations", "image_base64", "image_filename",
                        "bundle_base64", "address", "length"})
 TARGET_KEY = "targets"
-POLICY_KEYS = frozenset({"retry_limit", "stop_policy", "repeat"})
+POLICY_KEYS = frozenset({"retry_limit", "stop_policy", "repeat", "replace_ic_before_next_cycle"})
 START_KEYS = frozenset({"start_id"})
+CONTINUE_KEYS = frozenset({"ppu_alias", "site_id", "continue_seq"})
+#: Set by the authenticating front (the Control Station BFF), never by a browser.
+ACTOR_KEY = "actor"
+#: A Site lane waiting for the operator's Continue (replace IC / review FAIL).
+AWAITING_CONTINUE = "AWAITING_CONTINUE"
 
 
 class _SharedControlFailure(RuntimeError):
@@ -158,15 +187,22 @@ def site_count(targets) -> int:
 
 
 def parse_policy(body: Mapping[str, Any], sites: int = 1) -> dict[str, Any]:
-    """Validated ``{repeat, retry_limit, stop_policy}``; Repeat is fixed at 1.
+    """Validated ``{repeat, replace_ic_before_next_cycle, retry_limit, stop_policy}``.
 
-    ``sites`` is the Batch's Site count, which bounds a ``failed_sites``
-    threshold at 1..N: a threshold no Batch could ever reach would be a policy
-    that silently means "never".
+    ``repeat`` is the Cycle count of EACH selected Site (1..10000), not a PASS
+    quota and not a Batch total. ``sites`` is the Batch's Site count, which
+    bounds a ``failed_sites`` threshold at 1..N: a threshold no Batch could
+    ever reach would be a policy that silently means "never".
     """
-    if body.get("repeat", 1) != 1 or type(body.get("repeat", 1)) is not int:
-        raise ProgrammingError(400, "repeat_not_supported",
-                               "Repeat is not implemented; repeat must be 1")
+    repeat = body.get("repeat", 1)
+    if type(repeat) is not int or not 1 <= repeat <= MAX_REPEAT:
+        raise ProgrammingError(400, "invalid_request",
+                               f"repeat must be an integer from 1 to {MAX_REPEAT} "
+                               "(Cycles per selected Site)")
+    replace = body.get("replace_ic_before_next_cycle", True)
+    if type(replace) is not bool:
+        raise ProgrammingError(400, "invalid_request",
+                               "replace_ic_before_next_cycle must be true or false")
     retry = body.get("retry_limit", 0)
     if type(retry) is not int or not 0 <= retry <= MAX_RETRY_LIMIT:
         raise ProgrammingError(400, "invalid_request",
@@ -184,7 +220,8 @@ def parse_policy(body: Mapping[str, Any], sites: int = 1) -> dict[str, Any]:
             400, "invalid_request",
             'stop_policy must be {"kind": "never"} or {"kind": "failed_sites", '
             f'"threshold": 1..{sites}}}')
-    return {"repeat": 1, "retry_limit": retry, "stop_policy": dict(stop)}
+    return {"repeat": repeat, "replace_ic_before_next_cycle": replace,
+            "retry_limit": retry, "stop_policy": dict(stop)}
 
 
 def aggregate_outcome(units) -> str:
@@ -201,10 +238,11 @@ def aggregate_outcome(units) -> str:
         return "OUTCOME_UNKNOWN"
     if "FAIL" in outcomes:
         return "FAIL"
-    executed = [outcome for outcome in outcomes if outcome in EXECUTED_OUTCOMES]
+    # A Site that settled some, not all, of its Repeat Cycles is PARTIAL.
+    executed = [outcome for outcome in outcomes if outcome in SETTLED_UNIT_OUTCOMES]
     if not executed:
         return "BLOCKED"
-    if len(executed) != len(outcomes):
+    if len(executed) != len(outcomes) or "PARTIAL" in outcomes:
         return "PARTIAL"
     return "PASS"
 
@@ -213,6 +251,18 @@ def retry_eligibility(run: Mapping[str, Any]) -> tuple[bool, str]:
     """Is this finished run a definite FAIL that a new attempt may follow?"""
     if run.get("outcome") != "FAIL":
         return False, f"OUTCOME_{run.get('outcome')}_IS_NOT_A_DEFINITE_FAIL"
+    trusted, why = terminal_evidence(run)
+    return (True, "DEFINITE_FAIL_SAFE_OFF_VERIFIED") if trusted else (False, why)
+
+
+def terminal_evidence(run: Mapping[str, Any] | None) -> tuple[bool, str]:
+    """Did this run end in a trusted terminal state with SAFE_OFF verified?
+
+    The release condition every next submission on the Site needs, whether
+    it is a Retry of the same Cycle or the next Repeat Cycle.
+    """
+    if not isinstance(run, Mapping):
+        return False, "NO_TRUSTED_TERMINAL_JOB_STATE"
     receipt = run.get("receipt")
     if not isinstance(receipt, dict):
         return False, "NO_TRUSTED_TERMINAL_JOB_STATE"
@@ -227,7 +277,7 @@ def retry_eligibility(run: Mapping[str, Any]) -> tuple[bool, str]:
             != receipt.get("expected_resource_set_sha256")):
         # The PPU did not prove it ran the Job that was planned.
         return False, "JOB_IDENTITY_NOT_CONFIRMED"
-    return True, "DEFINITE_FAIL_SAFE_OFF_VERIFIED"
+    return True, "TERMINAL_SAFE_OFF_VERIFIED"
 
 
 def batch_reason(units, outcome: str, fallback: str | None = None) -> str | None:
@@ -260,11 +310,65 @@ def _source_of(body: Mapping[str, Any]) -> str:
 
 
 def _unit_status(outcome: str | None, *, stopped: bool = False) -> str:
-    if outcome in EXECUTED_OUTCOMES:
+    if outcome in SETTLED_UNIT_OUTCOMES:
         return "FINISHED"
     if outcome == "BLOCKED":
         return "BLOCKED"
     return "SKIPPED" if stopped else "NOT_RUN"
+
+
+def new_cycle(planned: int) -> dict[str, Any]:
+    """Per-Site Repeat accounting: counters plus the one current Cycle."""
+    return {"planned": planned, "index": 1, "cycle_id": secrets.token_hex(16),
+            "state": "ACTIVE", "disposition": None,
+            "settled": 0, "pass": 0, "fail": 0, "retry_attempts": 0,
+            "continue_seq": 0, "continued_seq": 0, "wait_reason": None,
+            "last": None, "last_continue": None}
+
+
+def ensure_cycle(batch: dict[str, Any]) -> None:
+    """A record journalled before Manual Repeat reads as a one-Cycle session."""
+    policy = batch.get("policy")
+    if isinstance(policy, dict):
+        policy.setdefault("replace_ic_before_next_cycle", True)
+    for unit in batch.get("units") or []:
+        if isinstance(unit.get("cycle"), dict):
+            continue
+        cycle = new_cycle(1)
+        outcome = unit.get("outcome")
+        attempts = unit.get("attempts") or []
+        cycle["cycle_id"] = None
+        if outcome in ("PASS", "FAIL"):
+            cycle.update(settled=1, state="ENDED", disposition="COMPLETED" if outcome == "PASS"
+                         else "COMPLETED_WITH_FAILURES",
+                         retry_attempts=max(0, len(attempts) - 1),
+                         **{outcome.lower(): 1})
+        elif outcome is not None:
+            cycle.update(state="ENDED", disposition=outcome)
+        unit["cycle"] = cycle
+
+
+def _receipt_summary(run: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The PPU evidence an operator sees for a settled Cycle (no free text)."""
+    if not isinstance(run, Mapping):
+        return None
+    receipt = run.get("receipt") if isinstance(run.get("receipt"), dict) else {}
+    return {
+        "run_id": run.get("run_id"), "outcome": run.get("outcome"), "reason": run.get("reason"),
+        "job_id": receipt.get("job_id"), "job_state": receipt.get("job_state"),
+        "flash_result": receipt.get("flash_result"), "safe_off": receipt.get("safe_off"),
+        "safe_off_source": receipt.get("safe_off_source"),
+        "job_binding_confirmed": (receipt.get("observed_job_binding_sha256") is not None
+                                  and receipt.get("observed_job_binding_sha256")
+                                  == receipt.get("expected_job_binding_sha256")),
+        "elapsed_ms": receipt.get("elapsed_ms"),
+    }
+
+
+def _site_failed(unit: Mapping[str, Any]) -> bool:
+    """A Site counts toward ``failed_sites`` once, by any failed Cycle."""
+    cycle = unit.get("cycle") or {}
+    return unit.get("outcome") == "FAIL" or cycle.get("fail", 0) > 0
 
 
 def migrate_batch_record(batch: Mapping[str, Any]) -> dict[str, Any]:
@@ -318,7 +422,9 @@ class ProgrammingBatchCoordinator:
                  shared_control_gate: Callable[[], tuple[str, str] | None] | None = None,
                  sleep: Callable[[float], None] = time.sleep,
                  spawn: Callable[[Callable[[], None]], None] | None = None,
-                 poll_interval_s: float = 0.1) -> None:
+                 poll_interval_s: float = 0.1,
+                 monotonic: Callable[[], float] = time.monotonic,
+                 release_wait_s: float = RELEASE_WAIT_S) -> None:
         self.workflow = workflow
         self.journal_path = journal_path
         # The Manager's Platform maintenance gate, evaluated per Target PPU at
@@ -331,6 +437,8 @@ class ProgrammingBatchCoordinator:
         self.spawn = spawn or (lambda target: threading.Thread(
             target=target, name="plasma-programming-batch", daemon=True).start())
         self.poll_interval_s = poll_interval_s
+        self.monotonic = monotonic
+        self.release_wait_s = release_wait_s
         self._lock = threading.RLock()
         self._batches: dict[str, dict[str, Any]] = {}
         self._control_failure: str | None = None
@@ -343,6 +451,8 @@ class ProgrammingBatchCoordinator:
         #: are never copied into the v2 file, so the v1 journal remains the
         #: one and only record of its own Batches.
         self._legacy_ids: set[str] = set()
+        #: Cycle segments when no journal file is configured (Host tests).
+        self._memory_ledger: dict[str, list[dict[str, Any]]] = {}
         self._load_journal()
 
     # ------------------------------------------------------------------ journal
@@ -468,6 +578,7 @@ class ProgrammingBatchCoordinator:
         # Old journals have no authoritative timing; never infer it from updates.
         batch.setdefault("started_at", None)
         batch.setdefault("finished_at", None)
+        ensure_cycle(batch)
         if batch.get("outcome") is None:
             self._close_interrupted(batch)
         self._batches[batch["batch_id"]] = batch
@@ -478,7 +589,20 @@ class ProgrammingBatchCoordinator:
         for unit in batch["units"]:
             if unit.get("outcome") is not None:
                 continue
+            cycle = unit["cycle"]
             attempts = unit.get("attempts") or []
+            settled_now = (cycle["last"] is not None
+                           and cycle["last"].get("cycle_id") == cycle["cycle_id"])
+            if (cycle["state"] == AWAITING_CONTINUE or (cycle["settled"] and not attempts)
+                    or (settled_now and cycle["disposition"] != "OUTCOME_UNKNOWN")):
+                # Paused between Cycles, or the next Cycle never got an
+                # attempt: nothing is in flight. The session ends here; the
+                # plan bytes are not journalled, so it is never resumed.
+                outcome, reason = self._conclude(unit, None, "MANAGER_RESTARTED_SESSION_ENDED")
+                unit.update(status=_unit_status(outcome, stopped=True), outcome=outcome,
+                            reason=reason)
+                cycle["state"] = "ENDED"
+                continue
             last = attempts[-1] if attempts else None
             run = self._run_of(unit["ppu_alias"], last) if last else None
             if last is None or (last.get("run_id") is None and run is None
@@ -498,7 +622,18 @@ class ProgrammingBatchCoordinator:
                 if run is not None:
                     self._record_attempt(last, run)
                 outcome, reason = "OUTCOME_UNKNOWN", "MANAGER_RESTARTED_DURING_ATTEMPT"
-            unit.update(status=_unit_status(outcome), outcome=outcome, reason=reason)
+            if outcome in ("PASS", "FAIL"):
+                # The interrupted Cycle did settle: account it exactly once.
+                self._settle_cycle(batch, unit, outcome, reason, run, persist=False)
+                outcome = None if cycle["settled"] < cycle["planned"] else outcome
+                if outcome is None:
+                    reason = "MANAGER_RESTARTED_SESSION_ENDED"
+            elif outcome == "BLOCKED" and cycle["settled"]:
+                outcome, reason = None, "MANAGER_RESTARTED_SESSION_ENDED"
+            outcome, reason = self._conclude(unit, outcome, reason)
+            unit.update(status=_unit_status(outcome, stopped=outcome is None),
+                        outcome=outcome, reason=reason)
+            cycle["state"] = "ENDED"
         outcome = aggregate_outcome(batch["units"])
         batch.update(state="finished", outcome=outcome,
                      execution_status="STOPPED" if batch.get("stop_requested") else "COMPLETED",
@@ -538,6 +673,12 @@ class ProgrammingBatchCoordinator:
             with self.workflow._lock:
                 self.workflow.pruned_batch_ids |= pruned
                 self.workflow._persist_locked()
+        for batch_id in pruned:
+            # A cycle segment shares its Batch's retention, never outlives it.
+            self._memory_ledger.pop(batch_id, None)
+            segment = self._ledger_path(batch_id)
+            if segment is not None:
+                segment.unlink(missing_ok=True)
         payload = {"schema": JOURNAL_SCHEMA, "batches": kept}
         parent = self._v2_path.parent
         parent.mkdir(parents=True, exist_ok=True)
@@ -558,6 +699,125 @@ class ProgrammingBatchCoordinator:
             batch.update(changes)
             batch["updated_at"] = _now()
             self._persist_locked()
+
+    # ------------------------------------------------------------ cycle segment
+    def _ledger_path(self, batch_id: str) -> Path | None:
+        """The append-only cycle segment of this journal for one Batch.
+
+        It is part of the one Batch journal, not a second ledger: the main
+        record holds the authoritative counters and the current Cycle; the
+        segment holds each settled Cycle and operator Continue, so 10000
+        Cycles never bloat the record that is rewritten on every change.
+        """
+        if self._v2_path is None:
+            return None
+        return self._v2_path.with_name(self._v2_path.name + ".cycles") / f"{batch_id}.jsonl"
+
+    def _ledger_append_locked(self, batch_id: str, record: Mapping[str, Any]) -> None:
+        """Durably append one record BEFORE the main journal reflects it."""
+        try:
+            path = self._ledger_path(batch_id)
+            if path is None:
+                self._memory_ledger.setdefault(batch_id, []).append(dict(record))
+                return
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+            with os.fdopen(fd, "a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, sort_keys=True) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        except Exception as exc:
+            self._control_failure = f"BATCH_CYCLE_JOURNAL_{type(exc).__name__}"
+            with self.workflow._lock:
+                self.workflow._control_failure = self._control_failure
+            raise
+
+    def _ledger_records(self, batch_id: str) -> list[dict[str, Any]]:
+        path = self._ledger_path(batch_id)
+        if path is None:
+            return [dict(r) for r in self._memory_ledger.get(batch_id, [])]
+        if not path.exists():
+            return []
+        records = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                records.append(json.loads(line))
+            except ValueError:
+                # A torn final line from a crash mid-append is not a record.
+                continue
+        return records
+
+    def _settle_cycle(self, batch: dict[str, Any], unit: dict[str, Any], outcome: str,
+                      reason: str | None, run: Mapping[str, Any] | None, *,
+                      persist: bool = True) -> None:
+        """One definite PASS or FAIL settles exactly one Cycle, once.
+
+        Retry Attempts inside it are counted separately and never consume
+        another Cycle. The segment record is written first; a crash between
+        the two writes is recognised on restart by the Cycle ID and never
+        counted twice.
+        """
+        with self._lock:
+            cycle = unit["cycle"]
+            if (cycle["cycle_id"] is not None and cycle["last"] is not None
+                    and cycle["last"].get("cycle_id") == cycle["cycle_id"]):
+                return  # this Cycle is already accounted
+            attempts = [dict(a) for a in unit.get("attempts") or []]
+            summary = _receipt_summary(run)
+            record = {"type": "cycle", "batch_id": batch["batch_id"],
+                      "ppu_alias": unit["ppu_alias"], "site_id": unit["site_id"],
+                      "cycle_index": cycle["index"], "cycle_id": cycle["cycle_id"],
+                      "outcome": outcome, "reason": reason, "attempts": attempts,
+                      "receipt": summary,
+                      "replace_ic_before_next_cycle":
+                          batch["policy"].get("replace_ic_before_next_cycle", True),
+                      "settled_at": _now()}
+            already = (not persist and cycle["cycle_id"] is not None and any(
+                r.get("type") == "cycle" and r.get("cycle_id") == cycle["cycle_id"]
+                and r.get("site_id") == unit["site_id"]
+                and r.get("ppu_alias") == unit["ppu_alias"]
+                for r in self._ledger_records(batch["batch_id"])))
+            if not already:
+                self._ledger_append_locked(batch["batch_id"], record)
+            cycle["settled"] += 1
+            cycle["pass" if outcome == "PASS" else "fail"] += 1
+            cycle["retry_attempts"] += max(0, len(attempts) - 1)
+            cycle["last"] = {"cycle_index": cycle["index"], "cycle_id": cycle["cycle_id"],
+                             "outcome": outcome, "reason": reason,
+                             "attempts": len(attempts), "receipt": summary,
+                             "settled_at": record["settled_at"]}
+            batch["updated_at"] = _now()
+            if persist:
+                self._persist_locked()
+
+    @staticmethod
+    def _conclude(unit: dict[str, Any], outcome: str | None,
+                  reason: str | None) -> tuple[str | None, str | None]:
+        """The Site's final outcome from its settled Cycles.
+
+        A one-Cycle Site reports exactly its Cycle, as before Repeat existed.
+        A Site that settled at least one Cycle is FAIL when any Cycle failed,
+        PARTIAL when Cycles remain, else PASS; an unknown always wins.
+        """
+        cycle = unit["cycle"]
+        settled, planned = cycle["settled"], cycle["planned"]
+        if outcome == "OUTCOME_UNKNOWN":
+            disposition = "OUTCOME_UNKNOWN"
+        elif not settled:
+            disposition = "BLOCKED" if outcome == "BLOCKED" else "STOPPED"
+        else:
+            outcome = ("FAIL" if cycle["fail"] else "PARTIAL" if settled < planned else "PASS")
+            if settled >= planned:
+                disposition = "COMPLETED_WITH_FAILURES" if cycle["fail"] else "COMPLETED"
+                if planned > 1:
+                    reason = disposition
+            elif reason is not None and reason.startswith("CYCLE_NOT_RELEASED_"):
+                disposition = "SAFETY_BLOCKED"
+            else:
+                disposition = "STOPPED"
+        # The state turns ENDED only where the Site outcome is recorded.
+        cycle.update(disposition=disposition, wait_reason=None)
+        return outcome, reason
 
     # ------------------------------------------------------------------ helpers
     def _run_of(self, alias: str, attempt: Mapping[str, Any] | None) -> dict[str, Any] | None:
@@ -623,8 +883,14 @@ class ProgrammingBatchCoordinator:
         truth: they are derived here and never stored or judged separately.
         """
         units = [{**unit, "attempts": [dict(a) for a in unit.get("attempts") or []],
+                  "cycle": {**unit["cycle"], "remaining":
+                            unit["cycle"]["planned"] - unit["cycle"]["settled"]},
                   "progress": self._unit_progress(unit)}
                  for unit in batch["units"]]
+        cycles = {key: sum(unit["cycle"][key] for unit in units)
+                  for key in ("planned", "settled", "pass", "fail", "retry_attempts", "remaining")}
+        cycles["awaiting_continue"] = sum(
+            unit["cycle"]["state"] == AWAITING_CONTINUE for unit in units)
         attempts = [attempt for unit in units for attempt in unit["attempts"]]
         outcomes = [unit.get("outcome") for unit in units]
         view = {**batch, "units": units, "attempts": attempts,
@@ -634,6 +900,9 @@ class ProgrammingBatchCoordinator:
                            "blocked": outcomes.count("BLOCKED"),
                            "unknown": outcomes.count("OUTCOME_UNKNOWN"),
                            "sites": len(units), "attempts": len(attempts)},
+                # Cycle accounting (Manual Repeat). Same-IC Debug PASS Cycles
+                # are Cycles, never distinct physical good units.
+                "cycles": cycles,
                 "auto_retry": "DISABLED"}
         if len(units) == 1:
             view["ppu_alias"] = units[0]["ppu_alias"]
@@ -718,7 +987,8 @@ class ProgrammingBatchCoordinator:
             # proceed through the same canonical plan/Start/Run lifecycle.
             units = [{"ppu_alias": target["ppu_alias"], "site_id": site,
                       "status": "NOT_RUN", "outcome": None, "reason": None,
-                      "failure_domain": None, "attempts": []}
+                      "failure_domain": None, "attempts": [],
+                      "cycle": new_cycle(policy["repeat"])}
                      for target in targets for site in target["site_ids"]]
             accepted_at = _now()
             batch = {
@@ -839,6 +1109,87 @@ class ProgrammingBatchCoordinator:
                 self._persist_locked()
             return {"ok": True, "batch": self._view(batch)}
 
+    def continue_site(self, batch_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
+        """The operator's Continue for ONE paused Site lane (Manual Repeat).
+
+        It is the existing Start action: it attests the IC was replaced (or a
+        FAIL reviewed) and nothing else. It never rewrites a FAIL, UNKNOWN or
+        SAFE_OFF result and never submits a Job itself - the lane does, after
+        the same dispatch and admission gates as every other attempt.
+
+        ``continue_seq`` is the pause the operator saw. Repeating an accepted
+        one is answered idempotently and changes nothing; any other value is
+        stale and refused, so a double click, a reloaded tab or an old tab can
+        never dispatch a second Cycle.
+        """
+        if (not isinstance(body, Mapping) or not CONTINUE_KEYS <= set(body)
+                or set(body) - CONTINUE_KEYS - {ACTOR_KEY}):
+            raise ProgrammingError(400, "invalid_request",
+                                   "continue requires ppu_alias, site_id and continue_seq")
+        alias, site, seq = body["ppu_alias"], body["site_id"], body["continue_seq"]
+        actor = body.get(ACTOR_KEY, "manager-api")
+        if (type(alias) is not str or type(site) is not int or isinstance(site, bool)
+                or type(seq) is not int or isinstance(seq, bool) or seq < 1
+                or type(actor) is not str or not 0 < len(actor) <= 128
+                or not actor.isprintable()):
+            raise ProgrammingError(400, "invalid_request",
+                                   "continue fields are invalid")
+        with self._lock:
+            batch = self._get(batch_id)
+            unit = next((u for u in batch["units"]
+                         if u["ppu_alias"] == alias and u["site_id"] == site), None)
+            if unit is None:
+                raise ProgrammingError(404, "programming_batch_site_not_found",
+                                       "this Batch does not cover that PPU Site")
+            cycle = unit["cycle"]
+            if seq == cycle["continued_seq"]:
+                # Already accepted: the same action, answered again.
+                return {"ok": True, "duplicate": True, "batch": self._view(batch)}
+            if (batch["outcome"] is not None or cycle["state"] != AWAITING_CONTINUE
+                    or seq != cycle["continue_seq"]):
+                raise ProgrammingError(409, "programming_continue_stale",
+                                       "this Site is not waiting for that Continue; reload "
+                                       "the Batch - nothing was started")
+            if batch["stop_requested"]:
+                raise ProgrammingError(409, "programming_batch_stopping",
+                                       "Stop Queuing was requested; nothing was started")
+            failure = (self._shared_block() or self._control_failure
+                       or self.workflow._control_failure or self.workflow._journal_failure)
+            if failure is not None:
+                raise ProgrammingError(503, "manager_shared_control_failure", failure)
+            last = cycle["last"] or {}
+            event = {"type": "continue", "batch_id": batch_id, "ppu_alias": alias,
+                     "site_id": site, "continue_seq": seq, "actor": actor, "at": _now(),
+                     "wait_reason": cycle["wait_reason"],
+                     "after_cycle_index": last.get("cycle_index"),
+                     "after_cycle_id": last.get("cycle_id"),
+                     "after_outcome": last.get("outcome")}
+            # Intent is durable before the lane may act on it. A journal that
+            # cannot take it refuses the Continue; nothing is started.
+            previous = (cycle["continued_seq"], cycle["last_continue"])
+            try:
+                self._ledger_append_locked(batch_id, event)
+                cycle.update(continued_seq=seq, last_continue=event)
+                batch["updated_at"] = _now()
+                self._persist_locked()
+            except Exception as exc:  # noqa: BLE001 - reported as a refusal
+                cycle["continued_seq"], cycle["last_continue"] = previous
+                raise ProgrammingError(503, "manager_shared_control_failure",
+                                       self._control_failure
+                                       or f"BATCH_JOURNAL_{type(exc).__name__}") from exc
+            return {"ok": True, "duplicate": False, "batch": self._view(batch)}
+
+    def cycle_records(self, batch_id: str, offset: int = 0, limit: int = 100) -> dict[str, Any]:
+        """Read-only page of a Batch's settled Cycles and Continue events."""
+        if not 0 <= offset or not 1 <= limit <= 1000:
+            raise ProgrammingError(400, "invalid_request",
+                                   "offset must be >= 0 and limit 1..1000")
+        with self._lock:
+            self._get(batch_id)
+            records = self._ledger_records(batch_id)
+        return {"ok": True, "batch_id": batch_id, "total": len(records),
+                "offset": offset, "records": records[offset:offset + limit]}
+
     # ---------------------------------------------------------------- execution
     def _execute(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
         try:
@@ -878,7 +1229,10 @@ class ProgrammingBatchCoordinator:
                 except Exception:
                     run = None
             with self._lock:
-                if run is not None:
+                cycle = unit["cycle"]
+                if cycle["state"] == AWAITING_CONTINUE:
+                    outcome = None  # paused between Cycles: nothing in flight
+                elif run is not None:
                     self._record_attempt(last, run)
                     outcome = run["outcome"]
                     if (run.get("reason") == "manager_shared_control_failure"
@@ -887,6 +1241,18 @@ class ProgrammingBatchCoordinator:
                 else:
                     possible = last is not None and last.get("state") not in ("planned", "finished")
                     outcome = "OUTCOME_UNKNOWN" if possible else None
+                if outcome in ("PASS", "FAIL"):
+                    try:
+                        self._settle_cycle(batch, unit, outcome, run.get("reason"), run,
+                                           persist=False)
+                    except Exception:  # noqa: BLE001 - the final write reports it
+                        cycle["ledger_incomplete"] = True
+                    if cycle["settled"] < cycle["planned"]:
+                        outcome = None
+                elif outcome == "BLOCKED" and cycle["settled"]:
+                    outcome = None
+                outcome, _why = self._conclude(unit, outcome, None)
+                cycle["state"] = "ENDED"
                 unit.update(status=_unit_status(outcome, stopped=outcome is None),
                             outcome=outcome, reason=f"SHARED_CONTROL_FAILURE_{reason}",
                             failure_domain=SHARED_CONTROL_FAILURE)
@@ -952,7 +1318,7 @@ class ProgrammingBatchCoordinator:
                 return f"PPU_LATCHED_{unit.get('reason') or 'OUTCOME_UNKNOWN'}"
         stop = batch["policy"]["stop_policy"]
         if (stop["kind"] == "failed_sites" and
-                sum(u.get("outcome") == "FAIL" for u in batch["units"]) >= stop["threshold"]):
+                sum(map(_site_failed, batch["units"])) >= stop["threshold"]):
             return "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED"
         return None
 
@@ -973,6 +1339,7 @@ class ProgrammingBatchCoordinator:
                         raise _SharedControlFailure(self._control_failure or self.workflow._control_failure)
                     unit.update(status=_unit_status(outcome, stopped=outcome is None),
                                 outcome=outcome, reason=reason)
+                    unit["cycle"]["state"] = "ENDED"
                     if outcome == "BLOCKED" and unit["failure_domain"] is None:
                         unit["failure_domain"] = TARGET_NOT_READY
                     elif outcome == "OUTCOME_UNKNOWN":
@@ -1007,7 +1374,7 @@ class ProgrammingBatchCoordinator:
             alias = unit["ppu_alias"]
             leader = alias not in platforms
             future = platforms.setdefault(alias, Future())
-            lanes.append((unit, self._run_attempts(
+            lanes.append((unit, self._run_lane(
                 batch, unit, plan_body, future, leader)))
         failure = None
         if lanes:
@@ -1036,33 +1403,128 @@ class ProgrammingBatchCoordinator:
             raise _SharedControlFailure(failure)
         self._finish(batch, None)
 
-    def _run_attempts(self, batch: dict[str, Any], unit: dict[str, Any],
-                      plan_body: Mapping[str, Any], platform: Future,
-                      platform_leader: bool) -> Generator[
-                          None, None, tuple[str | None, str | None]]:
-        """Every attempt for ONE Site. Returns that Site's outcome and reason."""
+    def _run_lane(self, batch: dict[str, Any], unit: dict[str, Any],
+                  plan_body: Mapping[str, Any], platform: Future,
+                  platform_leader: bool) -> Generator[
+                      None, None, tuple[str | None, str | None]]:
+        """Every Cycle of ONE Site lane. Returns that Site's outcome and reason.
+
+        Each Cycle runs the existing attempt loop (fresh plan, run and Job
+        per attempt). Between Cycles the lane either waits for the operator's
+        Continue or, for a same-IC Debug PASS, proceeds by itself - always
+        through the same dispatch and admission gates, never around them.
+        """
+        alias, cycle, policy = unit["ppu_alias"], unit["cycle"], batch["policy"]
+        first = True
+        while True:
+            outcome, reason = yield from self._run_cycle(
+                batch, unit, plan_body, platform, platform_leader, first)
+            first = False
+            if outcome in ("PASS", "FAIL"):
+                attempts = unit.get("attempts") or []
+                run = self._run_of(alias, attempts[-1]) if attempts else None
+                self._settle_cycle(batch, unit, outcome, reason, run)
+                if cycle["settled"] >= cycle["planned"]:
+                    return self._conclude(unit, None, reason)
+                released, why = terminal_evidence(run)
+                if not released:
+                    # Counted, but the Site is never released without a
+                    # trusted terminal state and verified SAFE_OFF.
+                    return self._conclude(unit, None, f"CYCLE_NOT_RELEASED_{why}")
+                if outcome == "PASS" and not policy["replace_ic_before_next_cycle"]:
+                    stopped = None   # same-IC Debug: the next Cycle needs no operator
+                else:
+                    stopped = yield from self._await_continue(
+                        batch, unit, "REPLACE_IC" if outcome == "PASS" else "FAIL_REVIEW")
+                if stopped is not None:
+                    return self._conclude(unit, None, stopped)
+                self._begin_next_cycle(batch, unit)
+                continue
+            if outcome == "BLOCKED" and cycle["settled"]:
+                # The next Cycle was not submitted. It is neither failed nor
+                # skipped: it waits, with its reason, for the operator.
+                self._record_blocked_dispatch(batch, unit, reason)
+                stopped = yield from self._await_continue(batch, unit, f"NEXT_CYCLE_{reason}")
+                if stopped is not None:
+                    return self._conclude(unit, None, stopped)
+                continue
+            return self._conclude(unit, outcome, reason)
+
+    def _await_continue(self, batch: dict[str, Any], unit: dict[str, Any],
+                        why: str) -> Generator[None, None, str | None]:
+        """Pause this lane only. None: continued; else why the session ended."""
+        alias, cycle = unit["ppu_alias"], unit["cycle"]
+        with self._lock:
+            cycle.update(state=AWAITING_CONTINUE, wait_reason=why,
+                         continue_seq=cycle["continue_seq"] + 1)
+            unit["status"] = AWAITING_CONTINUE
+            batch["updated_at"] = _now()
+            self._persist_locked()
+        while True:
+            with self._lock:
+                block = self._dispatch_block(batch, alias)
+                if block is None and cycle["continued_seq"] == cycle["continue_seq"]:
+                    cycle.update(state="ACTIVE", wait_reason=None)
+                    unit["status"] = "RUNNING"
+                    batch["updated_at"] = _now()
+                    self._persist_locked()
+                    return None
+            if block is not None:
+                return block
+            yield
+
+    def _begin_next_cycle(self, batch: dict[str, Any], unit: dict[str, Any]) -> None:
+        with self._lock:
+            cycle = unit["cycle"]
+            cycle.update(index=cycle["index"] + 1, cycle_id=secrets.token_hex(16))
+            # The previous Cycle's attempts live in its segment record.
+            unit["attempts"] = []
+            batch["updated_at"] = _now()
+            self._persist_locked()
+
+    def _record_blocked_dispatch(self, batch: dict[str, Any], unit: dict[str, Any],
+                                 reason: str | None) -> None:
+        with self._lock:
+            attempts = unit.get("attempts") or []
+            if attempts:
+                self._ledger_append_locked(batch["batch_id"], {
+                    "type": "blocked_dispatch", "batch_id": batch["batch_id"],
+                    "ppu_alias": unit["ppu_alias"], "site_id": unit["site_id"],
+                    "cycle_index": unit["cycle"]["index"], "cycle_id": unit["cycle"]["cycle_id"],
+                    "reason": reason, "attempts": [dict(a) for a in attempts], "at": _now()})
+            unit["attempts"] = []
+            batch["updated_at"] = _now()
+            self._persist_locked()
+
+    def _run_cycle(self, batch: dict[str, Any], unit: dict[str, Any],
+                   plan_body: Mapping[str, Any], platform: Future,
+                   platform_leader: bool, first: bool) -> Generator[
+                       None, None, tuple[str | None, str | None]]:
+        """Every attempt of ONE Cycle of one Site. Returns its outcome and reason."""
         alias, site, policy = unit["ppu_alias"], unit["site_id"], batch["policy"]
         site_body = {**plan_body, "site_id": site}
         plan: Mapping[str, Any] | None = None
-        if platform_leader:
-            platform.set_result(self._platform_block(alias))
-        verdict = platform.result()
-        with self._lock:
-            self._dispatch_block(batch, alias)
-        if verdict is None:
-            verdict = self._site_block(alias, site)
-        if verdict is not None:
-            domain, reason = verdict
-            if domain == SHARED_CONTROL_FAILURE:
-                raise _SharedControlFailure(reason)
-            with self._lock:
-                unit["failure_domain"] = domain
-            return "BLOCKED", f"ADMISSION_{reason}"
-        # The Site verdict above was read by this lane with no yield since.
+        # The Site verdict below was read by this lane with no yield since.
         # Re-reading it immediately would ask the PPU the same question twice
         # (Asset Set + Site readiness); the Platform gate is still re-read, and
         # every later pass (after any yield, retry or planning gap) re-reads both.
-        site_verdict_fresh = True
+        site_verdict_fresh = first
+        release_deadline: float | None = None
+        if first:
+            if platform_leader:
+                platform.set_result(self._platform_block(alias))
+            verdict = platform.result()
+            with self._lock:
+                self._dispatch_block(batch, alias)
+            if verdict is None:
+                verdict = self._site_block(alias, site)
+            if verdict is not None:
+                domain, reason = verdict
+                if domain == SHARED_CONTROL_FAILURE:
+                    raise _SharedControlFailure(reason)
+                with self._lock:
+                    unit["failure_domain"] = domain
+                return "BLOCKED", f"ADMISSION_{reason}"
         for number in range(1, policy["retry_limit"] + 2):
             # Recheck after every yield, including the planning/Start gap.
             while True:
@@ -1080,6 +1542,18 @@ class ProgrammingBatchCoordinator:
                 domain, reason = verdict
                 if domain == SHARED_CONTROL_FAILURE:
                     raise _SharedControlFailure(reason)
+                # A later Cycle may find the PPU still releasing the Site it
+                # just finished. Bounded re-check of the same gates, then the
+                # normal BLOCKED pause: never a submission without release.
+                if not first and number == 1 and reason == RELEASE_PENDING_REASON:
+                    now = self.monotonic()
+                    if release_deadline is None:
+                        release_deadline = now + self.release_wait_s
+                    if now < release_deadline:
+                        recheck = min(release_deadline, now + RELEASE_RECHECK_S)
+                        while self.monotonic() < recheck:
+                            yield
+                        continue
                 # An exclusive activation must finish before peer planning.
                 # It is a wait, never a fabricated blocked Site or a reload.
                 if reason == "RUN_IN_PROGRESS" and any(
@@ -1100,9 +1574,12 @@ class ProgrammingBatchCoordinator:
                         return "BLOCKED", exc.code
                     # The earlier FAIL stands; the retry could not be planned.
                     return "FAIL", f"RETRY_PLAN_REFUSED_{exc.code}"
-            attempt = {"attempt": number,
+            cycle = unit["cycle"]
+            attempt = {"attempt": number, "cycle_index": cycle["index"],
+                       "cycle_id": cycle["cycle_id"],
                        "job_key": {"batch_id": batch["batch_id"], "ppu_alias": alias,
-                                   "site_id": site, "attempt": number},
+                                   "site_id": site, "cycle": cycle["index"],
+                                   "attempt": number},
                        "plan_id": plan["plan_id"], "run_id": None,
                        "job_binding_sha256": plan["job_binding_sha256"], "job_id": None,
                        "state": "planned", "outcome": None, "reason": None,
@@ -1171,7 +1648,7 @@ class ProgrammingBatchCoordinator:
                 final = "RETRY_LIMIT_EXHAUSTED" if policy["retry_limit"] else None
             elif not eligible:
                 final = f"RETRY_NOT_ELIGIBLE_{why}"
-            elif self._stop_policy_reached(batch):
+            elif self._stop_policy_reached(batch, unit):
                 final = "STOP_POLICY_FAILED_SITES_THRESHOLD_REACHED"
             elif batch["stop_requested"]:
                 final = "STOP_REQUESTED_NO_FURTHER_ATTEMPT"
@@ -1191,11 +1668,11 @@ class ProgrammingBatchCoordinator:
             plan = None  # a retry always gets a new plan, run and Job
         return "FAIL", final_reason
 
-    def _stop_policy_reached(self, batch: Mapping[str, Any]) -> bool:
+    def _stop_policy_reached(self, batch: Mapping[str, Any], unit: Mapping[str, Any]) -> bool:
         stop = batch["policy"]["stop_policy"]
         if stop["kind"] != "failed_sites":
             return False
-        failed = sum(1 for unit in batch["units"] if unit.get("outcome") == "FAIL")
+        failed = sum(1 for other in batch["units"] if other is not unit and _site_failed(other))
         # The Site being judged has not been recorded yet; it is the one that
-        # just failed, so it counts here.
+        # just failed, so it counts here (once, however many Cycles failed).
         return failed + 1 >= stop["threshold"]

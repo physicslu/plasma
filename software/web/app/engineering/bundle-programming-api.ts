@@ -305,17 +305,60 @@ export async function getReadOutput(alias: string, runId: string): Promise<Uint8
 // attempt is submitted; every attempt is its own plan, run and PPU Job.
 export const PROGRAMMING_STOP_TOKEN = "STOP_QUEUING";
 export const MAX_RETRY_LIMIT = 5;
+/** Manual Repeat: Cycles per selected Site in one Manual Session (WP-02). */
+export const MAX_REPEAT = 10000;
 
 export type StopPolicy = { kind: "never" } | { kind: "failed_sites"; threshold: number };
-export type BatchPolicy = { repeat: 1; retry_limit: number; stop_policy: StopPolicy };
+export type BatchPolicy = {
+  repeat: number;
+  /** true (default): each next Cycle waits for the operator's Continue. */
+  replace_ic_before_next_cycle: boolean;
+  retry_limit: number;
+  stop_policy: StopPolicy;
+};
+
+/**
+ * One Site's Manual Repeat accounting. A Cycle is one E/P/V flow on one IC
+ * placement; its Retry Attempts never consume another Cycle.
+ */
+export type ProgrammingBatchCycle = {
+  planned: number;
+  index: number;
+  cycle_id: string | null;
+  state: "ACTIVE" | "AWAITING_CONTINUE" | "ENDED";
+  disposition: string | null;
+  settled: number;
+  pass: number;
+  fail: number;
+  retry_attempts: number;
+  remaining: number;
+  /** The pause the operator answers; echo it in the Continue. */
+  continue_seq: number;
+  continued_seq: number;
+  wait_reason: string | null;
+  last: {
+    cycle_index: number;
+    cycle_id: string | null;
+    outcome: "PASS" | "FAIL";
+    reason: string | null;
+    attempts: number;
+    receipt: {
+      run_id: string | null; job_id: string | null; job_state: string | null;
+      flash_result: string | null; safe_off: boolean | null;
+      job_binding_confirmed: boolean; reason: string | null;
+    } | null;
+  } | null;
+};
 // A Batch spans Sites, so it has outcomes a single run cannot have:
 // PARTIAL (some Sites passed) and BLOCKED (nothing was submitted).
 export type ProgrammingBatchOutcome = ProgrammingRunOutcome | "PARTIAL" | "STOPPED";
 
 export type ProgrammingBatchAttempt = {
   attempt: number;
+  /** The Repeat Cycle this attempt belongs to (absent before WP-02). */
+  cycle_index?: number;
   /** The Manager's identity for this attempt: which PPU, Site and try it was. */
-  job_key: { batch_id: string; ppu_alias: string; site_id: number; attempt: number };
+  job_key: { batch_id: string; ppu_alias: string; site_id: number; cycle?: number; attempt: number };
   plan_id: string;
   run_id: string | null;
   job_id: string | null;
@@ -350,6 +393,8 @@ export type ProgrammingBatchUnit = {
    * Absent from Managers older than this field.
    */
   progress?: ProgrammingBatchUnitProgress | null;
+  /** Manual Repeat accounting; absent from Managers older than WP-02. */
+  cycle?: ProgrammingBatchCycle;
 };
 
 export type ProgrammingBatchUnitProgress = {
@@ -397,6 +442,11 @@ export type ProgrammingBatch = {
     pass: number; fail: number; blocked: number; unknown: number;
     sites: number; attempts: number;
   };
+  /** Cycle totals over every Site (Manual Repeat); absent before WP-02. */
+  cycles?: {
+    planned: number; settled: number; pass: number; fail: number;
+    retry_attempts: number; remaining: number; awaiting_continue: number;
+  };
   auto_retry: "DISABLED";
 };
 
@@ -411,6 +461,10 @@ export type BatchInput = (
   targets?: readonly ProgrammingBatchTarget[];
   retryLimit: number;
   stopPolicy: StopPolicy;
+  /** Cycles per Site (1..10000); 1 when absent. */
+  repeat?: number;
+  /** Wait for the operator after each Cycle; true when absent. */
+  replaceIc?: boolean;
 };
 
 /**
@@ -427,7 +481,8 @@ export async function startProgrammingBatch(
       ? input.targets.map(target => ({ ppu_alias: target.ppu_alias, site_ids: [...target.site_ids] }))
       : [{ ppu_alias: input.alias, site_ids: [...input.siteIds] }],
     operations: [...input.operations],
-    retry_limit: input.retryLimit, stop_policy: input.stopPolicy, repeat: 1,
+    retry_limit: input.retryLimit, stop_policy: input.stopPolicy,
+    repeat: input.repeat ?? 1, replace_ic_before_next_cycle: input.replaceIc ?? true,
     // Manager-issued: admits at most one Batch and can be reconciled later.
     start_id: startId,
   };
@@ -455,6 +510,26 @@ export async function stopProgrammingBatch(batchId: string): Promise<Programming
     body: JSON.stringify({ stop: PROGRAMMING_STOP_TOKEN }),
   });
   return payload.batch;
+}
+
+/**
+ * Manual Repeat: the operator's Continue of ONE paused Site. It is the
+ * existing Start action (IC replaced / FAIL reviewed); the Manager submits the
+ * next Cycle through its own gates. `continue_seq` is the pause shown, so a
+ * double click or reloaded tab is answered idempotently and never dispatches
+ * twice. The operator identity is added by the BFF, never by the Browser.
+ */
+export async function continueProgrammingBatch(
+  batchId: string, unit: { ppu_alias: string; site_id: number; continue_seq: number },
+): Promise<{ batch: ProgrammingBatch; duplicate: boolean }> {
+  const payload = await request<{ ok: true; batch: ProgrammingBatch; duplicate: boolean }>(
+    `${PROGRAMMING}/batches/${batchId}/continue`, {
+      method: "POST",
+      body: JSON.stringify({
+        ppu_alias: unit.ppu_alias, site_id: unit.site_id, continue_seq: unit.continue_seq,
+      }),
+    });
+  return { batch: payload.batch, duplicate: payload.duplicate };
 }
 
 // ------------------------------------------------ Start Outcome Reconciliation

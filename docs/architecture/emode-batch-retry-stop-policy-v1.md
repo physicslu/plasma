@@ -9,7 +9,7 @@ One Batch = one PPU, one Site, one programming Job specification (an ordered era
 verify `operations` list with its Programming Image, Bundle or erase range) and a policy
 `{repeat: 1, retry_limit, stop_policy}`.
 
-* **Repeat is not implemented.** `repeat` must be 1; anything else is `400 repeat_not_supported`.
+* **Repeat (Manual Repeat v1, WP-02).** `repeat` is the Cycle count of each selected Site (1..10000, default 1) with `replace_ic_before_next_cycle` (default `true`); anything else is `400 invalid_request`. Retry stays inside one Cycle and never consumes another. See [Unified 8-Site Scheduler / Repeat contract](unified-8site-scheduler-repeat-work-order-v1.md) §4.
   There is no Repeat scheduler, IC / cycle model or fixture exchange here.
 * Read Memory is never part of a Batch.
 * This is not the PMode durable multi-PPU production scheduler and not a Gateway batch runtime.

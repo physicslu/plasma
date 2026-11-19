@@ -392,8 +392,6 @@ class BundleProgrammingWorkflow:
             raise
 
     def _write_journal_locked(self) -> None:
-        if self.journal_path is None:
-            return
         protected = [r for r in self._runs.values() if r.outcome is None
                      or r.outcome == "OUTCOME_UNKNOWN"]
         terminal = sorted((r for r in self._runs.values() if r not in protected),
@@ -416,6 +414,9 @@ class BundleProgrammingWorkflow:
             # A dropped record is never read as "not accepted": an unrecorded
             # start_id reconciles to OUTCOME_UNKNOWN.
             del self._starts[stale["start_id"]]
+        if self.journal_path is None:
+            self._forget_unretained_runs_locked(retained_runs)
+            return
         payload = {"schema": "plasma.manager.bundle-programming-journal.v1",
                    "runs": [r.as_dict() for r in runs],
                    "starts": [_journal_start(s) for s in starts[-MAX_STARTS_RETAINED:]]}
@@ -432,6 +433,18 @@ class BundleProgrammingWorkflow:
         except BaseException:
             Path(name).unlink(missing_ok=True)
             raise
+        self._forget_unretained_runs_locked(retained_runs)
+
+    def _forget_unretained_runs_locked(self, retained: set[str]) -> None:
+        """Memory keeps what the journal keeps (Manual Repeat, WP-02).
+
+        A long Repeat session creates one terminal run per attempt; keeping
+        every one in memory would grow without bound and make each readiness
+        scan linear in the session length. Active and OUTCOME_UNKNOWN runs
+        are always retained, so no latch or in-flight evidence is dropped.
+        """
+        for run_id in [r for r in self._runs if r not in retained]:
+            del self._runs[run_id]
 
     def _update(self, run: _Run, **changes: Any) -> None:
         with self._lock:

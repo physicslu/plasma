@@ -254,9 +254,12 @@ def test_two_ppus_each_run_their_own_sites(tmp_path):
     # Each Site is its own Job on its own PPU; nothing is shared but the Image.
     assert len(gateways["z2"].posts) == 2 and len(gateways["z2b"].posts) == 1
     keys = [a["job_key"] for u in batch["units"] for a in u["attempts"]]
-    assert keys == [{"batch_id": batch["batch_id"], "ppu_alias": "z2", "site_id": 2, "attempt": 1},
-                    {"batch_id": batch["batch_id"], "ppu_alias": "z2", "site_id": 3, "attempt": 1},
-                    {"batch_id": batch["batch_id"], "ppu_alias": "z2b", "site_id": 2, "attempt": 1}]
+    assert keys == [{"batch_id": batch["batch_id"], "ppu_alias": "z2", "site_id": 2, "cycle": 1,
+                     "attempt": 1},
+                    {"batch_id": batch["batch_id"], "ppu_alias": "z2", "site_id": 3, "cycle": 1,
+                     "attempt": 1},
+                    {"batch_id": batch["batch_id"], "ppu_alias": "z2b", "site_id": 2, "cycle": 1,
+                     "attempt": 1}]
 
 
 def test_a_failing_ppu_does_not_stop_an_unrelated_one(tmp_path):
