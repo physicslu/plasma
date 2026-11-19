@@ -278,15 +278,47 @@ def cooperating_site_owners(*, release, admitting_site: int, boot_id: str,
     return owners
 
 
+#: Site admission only (2-Site HIL 2026-11-19): a PID proven to have exited
+#: during the census held nothing any more and is skipped. FPGA Manager
+#: download/test/restore keep the strict bounded full rescan ("rescan").
+VANISHED_PID_POLICIES = ("rescan", "skip")
+
+
+def _pid_start_time(item: Path) -> str | None:
+    """Kernel start time of the process now at this PID (``stat`` field 22).
+
+    A different value before and after reading a PID's fds and VMAs means
+    the PID was reused by another process mid-read. Raises FileNotFoundError
+    when the PID is gone; ``None`` only for a fixture without ``stat`` (a real
+    procfs always has it for a live PID).
+    """
+    try:
+        raw = (item / "stat").read_text()
+    except FileNotFoundError:
+        item.stat()  # FileNotFoundError here: the PID itself is gone
+        return None
+    fields = raw.rsplit(")", 1)[-1].split()
+    need(len(fields) >= 20 and fields[19].isdecimal(), "MALFORMED_PROC_STAT")
+    return fields[19]
+
+
 def scan_proc_consumers(*, procroot: Path, release,
                         diagnostic: dict | None = None,
                         cooperating=None,
+                        vanished_pids: str = "rescan",
                         ) -> tuple[bool, list[str]]:
-    """Fail-closed /proc owner census; retry only a confirmed vanished PID.
+    """Fail-closed /proc owner census.
 
-    A vanished process invalidates that snapshot. We restart the *whole*
-    read-only census, never just skip that PID. Existing conflicts, denied
-    visibility or still-live but unreadable PIDs are not retryable.
+    ``vanished_pids="rescan"`` (default; FPGA Manager download/test/restore):
+    a vanished process invalidates that snapshot, so the *whole* read-only
+    census restarts, at most three times. ``"skip"`` (Site admission only): a
+    PID whose exit is CONFIRMED (its /proc entry is gone) holds no device and
+    no mapping any more, so it is counted and skipped without a rescan; under
+    concurrent Sites the peer's short-lived processes would otherwise exhaust
+    the bounded rescans. Neither policy relaxes anything else: enumeration
+    failure, a live but unreadable PID, malformed data and every conflict
+    still fail closed. A PID reused by another process while it is read is
+    re-examined once and refused if it changes again.
 
     ``cooperating`` (Site admission only) is a callable returning the PIDs
     proven by ``cooperating_site_owners`` right now. It is evaluated AFTER a
@@ -296,8 +328,9 @@ def scan_proc_consumers(*, procroot: Path, release,
     scan would miss an owner that attached during it. Such a PID may hold
     ``/dev/mem`` and map exactly inside its own Site page, nothing else.
     """
+    need(vanished_pids in VANISHED_PID_POLICIES, "INVALID_VANISHED_PID_POLICY")
     for attempt in range(1, 4):
-        conflicts, observed = [], 0
+        conflicts, observed, skipped = [], 0, 0
         try:
             processes = sorted(procroot.iterdir())
         except (OSError, ValueError) as exc:
@@ -309,18 +342,28 @@ def scan_proc_consumers(*, procroot: Path, release,
         for item in processes:
             if not item.name.isdecimal():
                 continue
-            phase = "FD"
+            phase = "STAT"
             try:
-                targets = []
-                for fd in (item / "fd").iterdir():
-                    try:
-                        targets.append(os.readlink(fd))
-                    except FileNotFoundError:
-                        # A closed file descriptor is no longer an owner;
-                        # the subsequent full process VMA check is mandatory.
-                        continue
-                phase = "MAPS"
-                maps = (item / "maps").read_text()
+                for look in (1, 2):
+                    phase = "STAT"
+                    born = _pid_start_time(item)
+                    phase = "FD"
+                    targets = []
+                    for fd in (item / "fd").iterdir():
+                        try:
+                            targets.append(os.readlink(fd))
+                        except FileNotFoundError:
+                            # A closed file descriptor is no longer an owner;
+                            # the subsequent full process VMA check is mandatory.
+                            continue
+                    phase = "MAPS"
+                    maps = (item / "maps").read_text()
+                    phase = "STAT"
+                    if _pid_start_time(item) == born:
+                        break
+                    # Another process took this PID mid-read: the evidence
+                    # mixes two processes. Read the new one once more.
+                    need(look == 1, "PID_REUSED_DURING_SCAN")
                 observed += 1
                 hard = devmem_fd = False
                 devmem_maps: list[tuple[int, int]] = []
@@ -357,9 +400,8 @@ def scan_proc_consumers(*, procroot: Path, release,
                                                for offset, size in devmem_maps):
                         conflicts.append(item.name)
             except (FileNotFoundError, PermissionError, OSError, ValueError) as exc:
-                # Never retry a known conflict even if another process vanished.
                 # Check for ENOENT explicitly; an inaccessible PID is NOT
-                # a confirmed exit and must never qualify for a rescan.
+                # a confirmed exit and must never be skipped or rescanned.
                 vanished = False
                 if isinstance(exc, FileNotFoundError):
                     try:
@@ -368,12 +410,20 @@ def scan_proc_consumers(*, procroot: Path, release,
                         vanished = True
                     except OSError:
                         pass
+                if vanished and vanished_pids == "skip":
+                    # Exited: it holds no fd and no mapping any more. Any
+                    # conflict already found still refuses at the end.
+                    skipped += 1
+                    continue
+                # Never retry a known conflict even if another process vanished.
                 if vanished and not conflicts and attempt < 3:
                     retry_pid = item.name
                     break
+                reused = isinstance(exc, TargetSafetyDenied) and str(exc) == "PID_REUSED_DURING_SCAN"
                 if diagnostic is not None:
                     diagnostic.update(
                         status=("PROC_CONFLICT_AND_INCOMPLETE" if conflicts else
+                                "PID_REUSED_DURING_SCAN" if reused else
                                 "VANISHED_PID_RESCAN_EXHAUSTED" if vanished else
                                 "PROC_VISIBILITY_DENIED"),
                         pid=item.name, phase=phase,
@@ -387,13 +437,15 @@ def scan_proc_consumers(*, procroot: Path, release,
                 status=("PROC_CONFLICT" if conflicts else
                         "COMPLETE" if observed > 0 else "NO_PROCESS_OBSERVED"),
                 attempt=attempt, observed=observed,
-                conflicts=len(set(conflicts)), rescans=attempt - 1)
+                conflicts=len(set(conflicts)), rescans=attempt - 1,
+                vanished_skipped=skipped)
         return observed > 0, sorted(set(conflicts))
     raise AssertionError("unreachable bounded process scan")
 
 
 def read_live_z2_facts(*, release, runtime_program_session: bool = False,
-                       cooperating=None, timing_ms: dict[str, float] | None = None) -> dict:
+                       cooperating=None, timing_ms: dict[str, float] | None = None,
+                       vanished_pids: str = "rescan") -> dict:
     """Keep kernel/image guards; runtime WordPort does not census all PIDs.
 
     Runtime call requires the same protected FPGA lock and is NOT a safe
@@ -431,7 +483,7 @@ def read_live_z2_facts(*, release, runtime_program_session: bool = False,
         proc_diagnostic = {}
         complete, conflicts = scan_proc_consumers(
             procroot=PROC, release=release, diagnostic=proc_diagnostic,
-            cooperating=cooperating)
+            cooperating=cooperating, vanished_pids=vanished_pids)
     if timing_ms is not None:
         timing_ms["process_census"] = round((time.monotonic_ns() - proc_start_ns) / 1e6, 3)
     boot_after = (PROC / "sys/kernel/random/boot_id").read_text().strip()
@@ -575,9 +627,12 @@ class RootZ2TargetPort:
                     boot_id=boot_id, session_id=session_id)
             else:
                 cooperating = dict  # unbound Site admission exempts nothing
+        # Only Site admission skips a confirmed-exited PID; the Root
+        # reload/test/restore owner (site None) keeps the strict rescan.
         return read_live_z2_facts(
             release=self.release, cooperating=cooperating,
-            timing_ms=self.admission_timing_ms if self._site is not None else None)
+            timing_ms=self.admission_timing_ms if self._site is not None else None,
+            vanished_pids="skip" if self._site is not None else "rescan")
 
     def runtime_program_facts(self) -> dict:
         """Read-only program admission, never FPGA reconfiguration authority."""

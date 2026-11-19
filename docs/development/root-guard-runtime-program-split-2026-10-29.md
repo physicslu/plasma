@@ -75,3 +75,47 @@ engine must also use mutually compatible reviewed SHA-pinned source.
 
 **NOT_RUN**: Z2 HIL, protected Root install, DUT re-flash, 200-attempt
 burn-in continuation, and Gate 2 merge.
+
+## 2026-11-19 — ABI-v5 Site admission: confirmed-exited PIDs (WO-1)
+
+**Trigger.** Concurrent 2-Site Manual Repeat on Z2 (evidence
+`plasma-evidence/repeat100-2site-repro-20261119`): after 93 and 79 PASS
+Cycles, Site 1 and Site 2 were each refused **before OpenOCD** with
+`PROC_SCAN_INCOMPLETE:VANISHED_PID_RESCAN_EXHAUSTED:<pid>:FD:FileNotFoundError`.
+The ABI-v5 Site admission (`live_site_admission_report`, #1326 / ADR-0007)
+still runs the whole census per Job, with the peer-Site exemption, because it
+holds only supervisor/fence **SH** and must tell the peer's `/dev/mem` owner
+from an uncooperative one. The strict "restart the whole census on a vanished
+PID, at most three times" rule cannot finish while the peer Site's
+short-lived processes keep exiting.
+
+**Change.** `scan_proc_consumers(vanished_pids=...)`:
+
+- `"rescan"` (default) — unchanged strict behaviour. `RootZ2TargetPort` with
+  `site=None` (FPGA Manager download/test/restore, `live_report`) always uses it.
+- `"skip"` — used only by Site admission (`current_facts()` with a Site). A PID
+  whose exit is **confirmed** (`/proc/<pid>` itself is gone) holds no fd and no
+  mapping any more: it is counted (`vanished_skipped`) and skipped, no rescan.
+- Both policies: a PID whose kernel start time (`/proc/<pid>/stat` field 22)
+  changes while its fds/VMAs are read was reused by another process; it is
+  re-read once and refused (`PID_REUSED_DURING_SCAN`) if it changes again.
+
+Unchanged and still fail-closed: `/proc` enumeration failure, a live but
+unreadable PID, malformed fd/VMA data, every `/dev/uio*`, `/dev/xdevcfg`,
+`/dev/fpga0` holder, every `/dev/mem` holder that is not the proven peer
+Site owner mapping only its own page, the Site lock / PPU reload fence,
+the Root journal and boot identity, the admission record, SAFE_OFF and
+OUTCOME_UNKNOWN sealing. This is not a retry increase and not a census
+removal.
+
+**Limit (unchanged by this change).** The census is a point-in-time detection
+of pre-existing uncooperative owners, not prevention: a process created after
+the `/proc` listing — including a child that inherited `/dev/mem` from a parent
+that then exits — is not seen by either policy; a child listed with its parent
+still is. Prevention needs the long-term Hardware Broker / device DAC design.
+
+Host-only proof: `scripts/tests/test_fpga_image_root.py`
+(`SiteAdmissionVanishedPidPolicyTests`, `SiteAdmissionPolicyWiringTests`).
+This changes **protected Root executable bytes**: a separately authorized
+protected Root deployment and 2-Site HIL are required before any hardware
+claim. **NOT_RUN** here: protected Root install, Z2 HIL.

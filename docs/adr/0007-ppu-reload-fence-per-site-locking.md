@@ -83,6 +83,11 @@ currently installed Z2 Root Guard.
 - Source-locked OpenOCD native C build and existing Python/RTL
   regression still pass on the exact Draft PR HEAD.
 
+**Implementation note (2026-11-19).** Concurrent Site admission skips a
+`/proc` census PID only when its exit is confirmed (`vanished_pids="skip"`);
+Root reload/test/restore keep the strict rescan. See
+[Root Guard program/configuration split](../development/root-guard-runtime-program-split-2026-10-29.md#2026-11-19--abi-v5-site-admission-confirmed-exited-pids-wo-1).
+
 **Not yet qualified:** actual ARMv7/RAM/device-width barrier, FPGA
 HWH/BIT/Timing, two simultaneous real DUTs, Root lock file DAC on Z2,
 full PS Owner/Provider connection, or eight-Site physical throughput.
