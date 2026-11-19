@@ -179,7 +179,7 @@ def parse_profile_v2(raw: Mapping[str, Any] | bytes | str) -> Snapshot:
     hardware = data.get("hardware", {"power_source": "external"})
     _exact(hardware, {"power_source"}, "PROFILE_HARDWARE_INVALID")
     _need(type(hardware["power_source"]) is str and hardware["power_source"]
-          in ("external", "programmer", "fixture"), "POWER_SOURCE_INVALID")
+          in ("external", "ppu", "fixture"), "POWER_SOURCE_INVALID")
     flow = _exact(data["workflow"], {"steps"}, "WORKFLOW_INVALID")
     steps = flow["steps"]
     _need(type(steps) is list and 0 < len(steps) <= MAX_STEPS, "WORKFLOW_LENGTH_INVALID")
@@ -268,12 +268,21 @@ def build_execution_plan(
     _need(type(site_id) is int and 1 <= site_id <= 8, "SITE_ID_INVALID")
     _sha(job_binding_sha256, "JOB_BINDING_SHA_INVALID")
     _sha(asset_set_sha256, "ASSET_SET_SHA_INVALID")
-    profile_obj = parse_profile_v2(profile.canonical_json).data
-    caps = parse_provider_execution_capabilities(provider_capabilities.canonical_json).data
+    verified_profile = parse_profile_v2(profile.canonical_json)
+    verified_caps = parse_provider_execution_capabilities(provider_capabilities.canonical_json)
+    _need(verified_profile.sha256 == profile.sha256, "PROFILE_SNAPSHOT_CHANGED")
+    _need(verified_caps.sha256 == provider_capabilities.sha256,
+          "CAPABILITIES_SNAPSHOT_CHANGED")
+    profile_obj = verified_profile.data
+    caps = verified_caps.data
     _need(caps["provider_id"] == profile_obj["provider"]["id"], "PROVIDER_ID_MISMATCH")
     procs = {p["id"]: p for p in caps["procedures"]}
-    hardware = (parse_hardware_action_capabilities(hardware_capabilities.canonical_json).data
-                if hardware_capabilities is not None else None)
+    verified_hw = (parse_hardware_action_capabilities(hardware_capabilities.canonical_json)
+                   if hardware_capabilities is not None else None)
+    if verified_hw is not None:
+        _need(verified_hw.sha256 == hardware_capabilities.sha256,
+              "HARDWARE_SNAPSHOT_CHANGED")
+    hardware = verified_hw.data if verified_hw is not None else None
     steps = profile_obj["workflow"]["steps"]
     provider_steps = [s for s in steps if s["type"] == "provider.execute"]
     if len(provider_steps) > 1:
