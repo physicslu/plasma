@@ -14,3 +14,9 @@
 .managementList button{display:flex;justify-content:space-between;gap:10px}.managementList em{color:#f0b76e;font-style:normal}
 .managementMessage{padding:12px;border-left:3px solid var(--cyan,#36d4e3);background:var(--panel,#17262e)}
 .icManagement details{margin:12px 0}.icManagement summary{cursor:pointer}.icManagement code{overflow-wrap:anywhere}
+
+.icManagement .managementCollision{border:2px solid var(--cyan,#36d4e3);background:var(--panel);color:var(--text)}
+.icManagement .managementCollision h2{color:var(--text)}
+.managementCollisionList{display:grid;gap:10px;max-height:360px;overflow:auto}
+.managementCollisionList>div{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--panel-2);color:var(--text)}
+.managementCollisionList span{color:var(--muted)}
