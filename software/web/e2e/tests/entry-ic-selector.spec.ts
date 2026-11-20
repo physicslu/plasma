@@ -327,5 +327,5 @@ test("IC Management local save survives reload and appears only in Selector look
   });
   await page.getByRole("link", { name: "Open IC Selector" }).click();
   await page.getByRole("textbox", { name: "Search admitted ICPN" }).fill("LOCAL123");
-  await expect(page.getByText("CUSTOMER · UNVERIFIED · r1")).toBeVisible();
+  await expect(page.getByText(/^(CUSTOMER · UNVERIFIED|客戶自建 · 未驗證) · r1$/)).toBeVisible();
 });
