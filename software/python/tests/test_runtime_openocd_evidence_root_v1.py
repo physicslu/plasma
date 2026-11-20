@@ -11,7 +11,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from plasma_web.device_catalog import DeviceCatalogIntegrityError
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.device_catalog import DeviceCatalogIntegrityError, default_catalog_manifest_path
 from plasma_web.legacy_device_selector import _device_search_payload
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.backend_candidate_registry import (
@@ -48,6 +49,18 @@ class OpenOCDEvidenceRootTests(unittest.TestCase):
         self.assertNotIn("site-packages", str(root))
 
     def test_all_source_only_providers_available_without_upgrading_backend(self) -> None:
+        # Installed-wheel regression explicitly provisions an OFFLINE SQLite
+        # snapshot; source-only evidence is metadata, never a runtime fallback.
+        temporary = tempfile.TemporaryDirectory(prefix="plasma-source-only-sqlite-")
+        self.addCleanup(temporary.cleanup)
+        database = Path(temporary.name) / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
+        environment = patch.dict(os.environ, {"PLASMA_CATALOG_SQLITE_DB": str(database)})
+        environment.start()
+        self.addCleanup(environment.stop)
         candidates = get_default_backend_candidate_registry()
         providers = get_default_openocd_provider_registry()
         upstream = default_pinned_upstream()
