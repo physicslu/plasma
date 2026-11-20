@@ -145,7 +145,7 @@ function ManagementContent() {
     </section>
     <section><h2>Official IC with Customer Profile <small>OFFICIAL IC · CUSTOMER PROFILE</small></h2>
       <p>IC identity and Qualification belong to the Official Catalog. Linked customer Profiles remain CUSTOMER / UNVERIFIED, not Job authorization.</p>
-      <div className="managementList" aria-label="Customer Profiles linked to Official ICs">{linkedProfiles.map(item => <p key={`${item.record.vendor}:${item.record.identifier}`}>
+      <div className="managementList" role="list" aria-label="Customer Profiles linked to Official ICs">{linkedProfiles.map(item => <p role="listitem" key={`${item.record.vendor}:${item.record.identifier}`}>
         <b>{item.record.identifier}</b> · {item.record.vendor} · <strong>{item.link_status === "ACTIVE" ? "OFFICIAL IC" : "CUSTOMER IC · OFFICIAL PENDING"}</strong> · CUSTOMER PROFILE <code>{String(item.profile.profile_id ?? "—")}</code> · r{item.revision} · UNVERIFIED
       </p>)}</div>
     </section>
