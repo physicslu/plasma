@@ -1,0 +1,46 @@
+def t: if . == null then null else (sub("\\+00:00$";"") | capture("^(?<s>[^.]+)(?<f>\\.[0-9]+)?$") | ((.s+"Z")|fromdateiso8601) + ((.f // "0")|tonumber)) end;
+def r3: (.*1000|round)/1000;
+def stats: sort as $v | ($v|length) as $n | if $n==0 then null else {n:$n, mean:(add/$n|r3), p50:($v[(($n-1)*0.5|round)]|r3), p95:($v[(($n-1)*0.95|round)]|r3), max:($v[-1]|r3), min:($v[0]|r3)} end;
+($ppu[0] | map({key:.job_id, value:.}) | from_entries) as $P
+| ($runs[0] | map({key:.run_id, value:.}) | from_entries) as $RU
+| [ $cyc[0].records[] | . as $r | .attempts[] | . as $a | $P[$a.job_id] as $j | $RU[$a.run_id] as $ru
+    | {site:$r.site_id, cycle:$r.cycle_index, job_id:$a.job_id, run_id:$a.run_id, plan_id:$a.plan_id,
+       outcome:$r.outcome, safe_off:$a.safe_off, receipt_safe_off:$r.receipt.safe_off, job_state:$j.state,
+       ops:$j.result.details.programming.operations,
+       readback_ok:($j.result.details.programming.steps.verify.readback_sha256=="e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c"),
+       attempt_at:($a.started_at|t), mgr_finished:($a.finished_at|t), settled:($r.settled_at|t),
+       preflight:(if $ru then ([$ru.steps[]|select(.step=="PREFLIGHT")][0].at|t) else null end),
+       submit_step:(if $ru then ([$ru.steps[]|select(.step=="PROGRAMMING_SUBMIT")][0].at|t) else null end),
+       created:($j.created_at|t), started:($j.started_at|t), end:($j.updated_at|t)} ] as $rows
+| ($rows|map(select(.site==1))|sort_by(.cycle)) as $s1 | ($rows|map(select(.site==2))|sort_by(.cycle)) as $s2
+| def peer_active($peer; $x): any($peer[]; .created <= $x and $x < .end);
+  def nexts($mine; $peer): [range(1; $mine|length) as $i | $mine[$i-1] as $p | $mine[$i] as $n |
+     {site:$n.site, cycle:$n.cycle,
+      terminal_to_mgr_observed:($p.mgr_finished-$p.end), terminal_to_settled:($p.settled-$p.end),
+      terminal_to_next_attempt:($n.attempt_at-$p.end),
+      next_attempt_to_preflight_pass:(if $n.preflight then $n.preflight-$n.attempt_at else null end),
+      next_attempt_to_ppu_accepted:($n.created-$n.attempt_at),
+      dispatch_latency:($n.created-$p.end), gap_start_basis:($n.started-$p.end),
+      released_while_peer_running:peer_active($peer; $p.end),
+      submitted_while_peer_running:peer_active($peer; $n.created)}];
+  (nexts($s1;$s2) + nexts($s2;$s1)) as $N
+| ([ $s1[] as $a | $s2[] | [0, ([$a.end,.end]|min) - ([$a.created,.created]|max)] | max ] | add) as $ov_total
+| ([ $s1[] as $a | ($s2[]|select(.cycle==$a.cycle)) | [0, ([$a.end,.end]|min) - ([$a.created,.created]|max)] | max ]) as $ov_c
+| { jobs: ($rows|length),
+    distinct: {job:($rows|map(.job_id)|unique|length), run:($rows|map(.run_id)|unique|length), plan:($rows|map(.plan_id)|unique|length)},
+    all_pass_success_safeoff_epv_readback: ($rows|all(.outcome=="PASS" and .job_state=="success" and .safe_off==true and .receipt_safe_off==true and .ops==["erase","program","verify"] and .readback_ok)),
+    run_step_coverage: ($rows|map(select(.preflight!=null))|length),
+    span_s: (($rows|map(.end)|max) - ($rows|map(.created)|min) | r3),
+    throughput_jobs_per_min: (($rows|length) / (($rows|map(.end)|max) - ($rows|map(.started)|min)) * 60 | r3),
+    per_site: ([ $s1, $s2 ] | map({site:.[0].site, s_per_cycle:(((.[-1].end - .[0].created)/length)|r3), job_duration:(map(.end-.started)|stats)})),
+    next_cycle: { dispatch_latency:($N|map(.dispatch_latency)|stats), gap_start_basis:($N|map(.gap_start_basis)|stats),
+      terminal_to_mgr_observed:($N|map(.terminal_to_mgr_observed)|stats), terminal_to_settled:($N|map(.terminal_to_settled)|stats),
+      terminal_to_next_attempt:($N|map(.terminal_to_next_attempt)|stats),
+      next_attempt_to_preflight_pass:($N|map(select(.next_attempt_to_preflight_pass!=null)|.next_attempt_to_preflight_pass)|stats),
+      next_attempt_to_ppu_accepted:($N|map(.next_attempt_to_ppu_accepted)|stats) },
+    independence: { next_cycles:($N|length),
+      scenarioA_site2_submitted_while_site1_running: ($N|map(select(.site==2 and .submitted_while_peer_running))|length),
+      scenarioB_site1_submitted_while_site2_running: ($N|map(select(.site==1 and .submitted_while_peer_running))|length),
+      released_while_peer_running_then_submitted_while_peer_running: ($N|map(select(.released_while_peer_running and .submitted_while_peer_running))|length),
+      cycles_2_100_with_overlap: ($ov_c[1:]|map(select(.>0))|length), overlap_same_index:($ov_c|stats), overlap_total_s:($ov_total|r3) },
+    rows: $rows, next_rows: $N }

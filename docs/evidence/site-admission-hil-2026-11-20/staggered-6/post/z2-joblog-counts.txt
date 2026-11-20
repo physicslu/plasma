@@ -1,0 +1,8 @@
+ 
+***
+cd /var/log/plasma; files=$(ls 2026-11-20/SITE*/job-20261120-041[12]*.log 2>/dev/null); echo "job_logs $(echo "$files" | grep -c log)"; for k in ADMISSION_DENIED PROC_SCAN_INCOMPLETE job_error stage_failed; do echo "$k $(grep -l $k $files | wc -l)"; done
+job_logs 6
+ADMISSION_DENIED 0
+PROC_SCAN_INCOMPLETE 0
+job_error 0
+stage_failed 0

@@ -1,0 +1,4 @@
+exit 0
+verify1 exit 0
+restart exit 0
+verify2 exit 0
