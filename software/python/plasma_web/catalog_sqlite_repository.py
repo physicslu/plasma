@@ -1004,9 +1004,18 @@ class CatalogSqliteShadowRepository:
             rows = conn.execute("SELECT profile_json FROM controller_overlays WHERE namespace='user_catalog' ORDER BY vendor_key,icpn_key").fetchall()
         return [json.loads(row[0]) for row in rows]
 
-    def linked_customer_profiles(self) -> list[dict[str, Any]]:
-        """Read customer-owned Profiles bound to Official identities; never Job authority."""
-        snapshot = self.read_active()
+    def linked_customer_profiles(
+        self, official_keys: set[tuple[str, str]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Read customer-owned links without granting Job authority.
+
+        An optional caller-owned snapshot keyset keeps Selector origin labels
+        consistent with the exact Catalog revision searched, without a second
+        full SQLite Catalog scan.
+        """
+        if official_keys is None:
+            snapshot = self.read_active()
+            official_keys = {_identity(row) for row in snapshot.catalog.records}
         with sqlite3.connect(self.path) as conn:
             self._init_schema(conn)
             rows = conn.execute(
@@ -1017,12 +1026,12 @@ class CatalogSqliteShadowRepository:
         for (payload,) in rows:
             entry = json.loads(payload)
             identity = entry["record"]
-            official = snapshot.catalog.resolve(identity["vendor"], identity["identifier"])
+            is_official = (identity["vendor"].casefold(), identity["identifier"].casefold()) in official_keys
             linked.append({
                 **entry,
-                "ic_origin": "OFFICIAL" if official is not None else "CUSTOMER",
+                "ic_origin": "OFFICIAL" if is_official else "CUSTOMER",
                 "profile_origin": "CUSTOMER",
-                "link_status": "ACTIVE" if official is not None else "PENDING_OFFICIAL",
+                "link_status": "ACTIVE" if is_official else "PENDING_OFFICIAL",
                 "verification": "UNVERIFIED",
             })
         return linked
