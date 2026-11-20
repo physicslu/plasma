@@ -160,7 +160,7 @@ function ManagementContent() {
     {collision && <section role="alert" aria-label="Catalog identity conflict" className="managementCollision">
       <h2>Official Catalog update blocked: {collision.total} customer part number conflict(s)</h2>
       <p>Official and LOCAL records have the same manufacturer and exact ICPN. Your local IC and custom Profile are unchanged. No Official revision was activated.</p>
-      <p><strong>Resolve manually:</strong> Export your Local Catalog JSON as a backup. Open each local record, use "Copy as new" to save a customer-specific identifier, verify the copied Profile, and only then explicitly delete the old local entry. Retry Official validation after every conflict has been resolved. Nothing is automatically renamed, deleted, or promoted.</p>
+      <p><strong>Resolve manually:</strong> Export your Local Catalog JSON as a backup. Open each local record, use &quot;Copy as new&quot; to save a customer-specific identifier, verify the copied Profile, and only then explicitly delete the old local entry. Retry Official validation after every conflict has been resolved. Nothing is automatically renamed, deleted, or promoted.</p>
       <div className="managementActions">
         <button type="button" disabled={busy} onClick={() => void run(async () => {
           const latest = await api<{ local: LocalEntry[] }>();
