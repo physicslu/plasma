@@ -966,9 +966,10 @@ class SiteWorkerClient:
         self.socket_path = Path(socket_path)
         self.timeout_s = timeout_s
 
-    def call(self, op: str, **fields: Any) -> dict[str, Any]:
+    def call(self, op: str, *, _socket_timeout_s: float | None = None,
+             **fields: Any) -> dict[str, Any]:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.settimeout(self.timeout_s)
+            sock.settimeout(self.timeout_s if _socket_timeout_s is None else _socket_timeout_s)
             sock.connect(str(self.socket_path))
             sock.sendall((json.dumps({"protocol": PROTOCOL, "op": op, **fields}) + "\n").encode())
             data = b""
