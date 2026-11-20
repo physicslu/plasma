@@ -463,9 +463,14 @@ class SiteManager:
         lease = self._execution_lease
         return lease is not None and bool(record["job_ids"] & lease.job_ids)
 
-    def _settle_reservation(self, record: dict[str, Any], reason: str) -> dict[str, Any] | None:
-        """No reserved Job active: safe release only with SAFE_OFF proof for each."""
+    def _settle_reservation(self, record: dict[str, Any], cause: str) -> dict[str, Any] | None:
+        """No reserved Job active: safe release only with SAFE_OFF proof for each.
+
+        ``cause`` is RELEASE or RESERVATION_EXPIRED; the logged and recorded
+        reason states whether the proof held.
+        """
         unproven = sorted(job for job in record["job_ids"] if not self._job_safe_off_proven(job))
+        reason = cause + ("_SAFE_OFF_NOT_PROVEN" if unproven else "_SAFE_OFF_PROVEN")
         if unproven:
             self._reservation = self._recovery_record(record, reason, unproven)
         else:
@@ -488,7 +493,7 @@ class SiteManager:
             record["state"] = "EXPIRED"
             self._persist_reservation(record)
         if record["state"] == "EXPIRED" and not self._reserved_jobs_active(record):
-            return self._settle_reservation(record, "RESERVATION_EXPIRED_SAFE_OFF_NOT_PROVEN")
+            return self._settle_reservation(record, "RESERVATION_EXPIRED")
         return record
 
     def _reservation_busy(self, message: str, record: dict[str, Any]) -> PlasmaError:
@@ -560,7 +565,7 @@ class SiteManager:
                     lease = self._execution_lease
                     if lease is not None and lease.job_ids:
                         raise PlasmaError(ErrorCode.PPU_BUSY, "active Jobs prevent reservation release")
-                    settled = self._settle_reservation(current, "RELEASE_SAFE_OFF_NOT_PROVEN")
+                    settled = self._settle_reservation(current, "RELEASE")
                     if settled is not None:
                         raise self._reservation_busy("SAFE_OFF not proven; recovery required",
                                                      settled)
