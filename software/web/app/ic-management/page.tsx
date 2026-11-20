@@ -145,10 +145,10 @@ function ManagementContent() {
     setOfficialBatch([]);
     setBatch(entries); setPreview([]); setMessage(`${entries.length} rows loaded. Validate before saving.`);
   }
-  function download(format: "json" | "csv") {
-    const payload = format === "json" ? JSON.stringify({ local }, null, 2) : [
+  function download(format: "json" | "csv", records: LocalEntry[] = local) {
+    const payload = format === "json" ? JSON.stringify({ local: records }, null, 2) : [
       "vendor,identifier,family,package,flash_size,profile_id,provider_id,operations",
-      ...local.map(item => [item.record.vendor, item.record.identifier, item.record.family, item.record.package, item.record.flash_size, String(item.profile.profile_id ?? ""), String(item.profile.provider_id ?? ""), Array.isArray(item.profile.operations) ? item.profile.operations.join("|") : ""].map(value => `"${value.replaceAll('"', '""')}"`).join(",")),
+      ...records.map(item => [item.record.vendor, item.record.identifier, item.record.family, item.record.package, item.record.flash_size, String(item.profile.profile_id ?? ""), String(item.profile.provider_id ?? ""), Array.isArray(item.profile.operations) ? item.profile.operations.join("|") : ""].map(value => `"${value.replaceAll('"', '""')}"`).join(",")),
     ].join("\n");
     const url = URL.createObjectURL(new Blob([payload], { type: format === "json" ? "application/json" : "text/csv" }));
     const anchor = document.createElement("a"); anchor.href = url; anchor.download = `plasma-local-catalog.${format}`; anchor.click();
@@ -162,7 +162,12 @@ function ManagementContent() {
       <p>Official and LOCAL records have the same manufacturer and exact ICPN. Your local IC and custom Profile are unchanged. No Official revision was activated.</p>
       <p><strong>Resolve manually:</strong> Export your Local Catalog JSON as a backup. Open each local record, use "Copy as new" to save a customer-specific identifier, verify the copied Profile, and only then explicitly delete the old local entry. Retry Official validation after every conflict has been resolved. Nothing is automatically renamed, deleted, or promoted.</p>
       <div className="managementActions">
-        <button type="button" onClick={() => download("json")}>Export Local Catalog JSON</button>
+        <button type="button" disabled={busy} onClick={() => void run(async () => {
+          const latest = await api<{ local: LocalEntry[] }>();
+          setLocal(latest.local);
+          download("json", latest.local);
+          setMessage("Downloaded current Local Catalog JSON backup. Keep it safe before changing customer part numbers.");
+        })}>Export Local Catalog JSON</button>
         <button type="button" onClick={() => setCollision(null)}>Dismiss conflict notice</button>
       </div>
       <div className="managementCollisionList">
