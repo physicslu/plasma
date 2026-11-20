@@ -698,6 +698,58 @@ def test_readers_observe_complete_revision_during_publish(tmp_path: Path) -> Non
     assert set(observed) <= {(initial, repo.read_active().size - 1), (published, repo.read_active().size)}
 
 
+def test_customer_local_icpns_survive_official_updates_and_conflicting_revisions_fail_closed(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    repo, initial, future_official_record, l1, _ = _publisher_fixture(tmp_path)
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
+    # Customer-owned entries and profiles belong to the Controller namespace,
+    # not to a replaceable Official Catalog revision.
+    entries = [
+        {"record": {"vendor": "LocalVendor", "identifier": "CUSTOM-A"},
+         "profile": {"profile_id": "customer-profile-a", "operations": ["program"]}},
+        {"record": {"vendor": "LocalVendor", "identifier": "CUSTOM-B"},
+         "profile": {"profile_id": "customer-profile-b", "operations": ["erase", "verify"]}},
+    ]
+    repo.save_local_records(entries, actor="customer")
+    before = repo.local_records()
+    assert len(before) == 2
+    assert all(item["origin"] == "LOCAL" and item["verification"] == "UNVERIFIED" for item in before)
+
+    change = [{"record": asdict(future_official_record), "qualification": l1}]
+    published = repo.publish_staged(repo.stage_revision(change, actor="publisher"), actor="publisher")
+    assert published != initial
+    assert repo.local_records() == before
+    assert CatalogSqliteShadowRepository(repo.path).local_records() == before  # reopen/upgrade
+    assert selector.search_response("q=CUSTOM-A")[1]["local_results"][0]["profile"]["profile_id"] == "customer-profile-a"
+    assert selector.search_response("q=CUSTOM-A")[1]["results"] == []
+
+    repo.rollback(initial, actor="publisher")
+    assert repo.local_records() == before
+
+    # A later official release must not silently shadow a customer ICPN.
+    # This was a new Official identity in the published revision, but is absent
+    # after rollback, so the customer can legitimately own it locally.
+    colliding = {
+        "record": {"vendor": future_official_record.vendor,
+                   "identifier": future_official_record.identifier},
+        "profile": {"profile_id": "customer-owned-before-official-import"},
+    }
+    repo.save_local_records([colliding], actor="customer")
+    preserved = repo.local_records()
+    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN"):
+        repo.rollback(published, actor="publisher")
+    assert repo.read_active().revision_sha256 == initial
+    assert repo.local_records() == preserved
+
+    stage = repo.stage_revision(change, actor="publisher")
+    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN"):
+        repo.publish_staged(stage, actor="publisher")
+    assert repo.read_active().revision_sha256 == initial
+    assert repo.local_records() == preserved
+    assert all(item["revision"] == 1 for item in preserved)
+
+
 def test_management_local_batch_atomic_preview_and_selector_refresh(tmp_path: Path, monkeypatch) -> None:
     repo, initial, official_record, l1, _ = _publisher_fixture(tmp_path)
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
