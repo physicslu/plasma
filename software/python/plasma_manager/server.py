@@ -813,7 +813,6 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 result = {"link": repo.link_local_to_official(
                     body.get("vendor", ""), body.get("icpn", ""),
                     expected_local_revision=body.get("expected_local_revision"),
-                    official_candidate=body.get("official_candidate"),
                     confirmed_same_ic=body.get("confirmed_same_ic"),
                     actor=actor,
                 )}
