@@ -635,6 +635,7 @@ class SiteManager:
         Job. The same lock protects reservation, Job lease and B3 quiesce;
         holding it through chronyc closes the check-to-adjust race.
         """
+        started = time.monotonic()
         self._validate_execution_owner(owner_id, "owner_id")
         if type(threshold_ms) is not int or not 1 <= threshold_ms <= 1000:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid time sync threshold")
@@ -675,7 +676,8 @@ class SiteManager:
                         "source": "chronyd", "service": "chrony",
                         "before_offset_ms": None, "after_offset_ms": None,
                         "uncertainty_ms": None, "adjustment_performed": False,
-                        "warning_code": "PPU_BUSY_OR_ROOT_OWNERSHIP_UNVERIFIED", "elapsed_ms": 0.0,
+                        "warning_code": "PPU_BUSY_OR_ROOT_OWNERSHIP_UNVERIFIED",
+                        "elapsed_ms": round((time.monotonic() - started) * 1000, 3),
                         "observed_at_utc": iso_now()}
             result = self._time_sync.execute(ppu_id=self.config.ppu.id,
                                              threshold_ms=threshold_ms,

@@ -188,6 +188,7 @@ def test_root_site_worker_ownership_prevents_clock_step(tmp_path: Path, worker):
     result = manager.pre_start_time_sync(owner_id="run-1", token=None,
                                          threshold_ms=100, budget_ms=1000)
     assert result["status"] == "SKIPPED_BUSY"
+    assert result["elapsed_ms"] > 0
 
 
 def test_idle_root_site_worker_allows_bounded_clock_check(tmp_path: Path):
