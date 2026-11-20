@@ -18,7 +18,7 @@ import pytest
 
 from plasma_manager import server as manager_server
 from plasma_web import legacy_device_selector as selector
-from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository, CatalogLocalIdentityConflict
 from plasma_web.catalog_sqlite_selector import read_selector_view
 from plasma_web.device_catalog import DeviceCatalog, DeviceCatalogIntegrityError, default_catalog_manifest_path, get_default_device_catalog
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
@@ -317,3 +317,47 @@ def test_local_ic_survives_manager_http_restart(tmp_path: Path, monkeypatch: pyt
         assert status == 200 and management["local"][0]["revision"] == 1
     finally:
         restarted.shutdown(); restarted.server_close(); restarted_thread.join(timeout=2)
+
+
+@pytest.mark.parametrize("action,payload,method", [
+    ("validate-official", {"changes": []}, "validate_changes"),
+    ("stage", {"changes": []}, "stage_revision"),
+    ("publish", {"stage_id": "test-stage"}, "publish_staged"),
+    ("rollback", {"revision": "test-revision"}, "rollback"),
+])
+def test_manager_official_conflict_http_409_exposes_customer_resolution_details(
+    manager_port: int, monkeypatch: pytest.MonkeyPatch,
+    action: str, payload: dict, method: str,
+) -> None:
+    """Official updates fail closed with actionable details, never auto-delete Local."""
+    monkeypatch.setenv("PLASMA_CATALOG_PUBLISH_TOKEN", "test-publisher-secret")
+    expected = [{
+        "manufacturer": "LocalVendor",
+        "exact_icpn": "LOCAL123",
+        "local_revision": 3,
+        "local_profile_id": "custom-v3",
+    }]
+
+    def conflict(*args, **kwargs):
+        raise CatalogLocalIdentityConflict(expected, count=1)
+
+    monkeypatch.setattr(CatalogSqliteShadowRepository, method, conflict)
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{manager_port}/api/catalog/management/{action}",
+        data=json.dumps(payload).encode(), method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "X-Plasma-Catalog-Publisher": "test-publisher-secret",
+        },
+    )
+    with pytest.raises(urllib.error.HTTPError) as raised:
+        urllib.request.urlopen(request, timeout=30)
+    response = raised.value
+    assert response.code == 409
+    body = json.loads(response.read())
+    assert body["ok"] is False
+    assert body["error"]["code"] == "CATALOG_LOCAL_IDENTITY_CONFLICT"
+    assert body["error"]["conflicts"] == expected
+    assert body["error"]["conflict_count"] == 1
+    assert body["error"]["truncated"] is False
+    assert "resolve" in body["error"]["message"]
