@@ -232,6 +232,20 @@ class CatalogSqliteShadowRepository:
         )
         return CatalogShadowSnapshot(revision, catalog, qualifications)
 
+    @staticmethod
+    def _reject_local_catalog_collisions(
+        conn: sqlite3.Connection, official_keys: set[tuple[str, str]],
+    ) -> None:
+        """Official revisions cannot silently shadow customer-owned exact ICPNs."""
+        rows = conn.execute(
+            "SELECT vendor_key, icpn_key FROM controller_overlays "
+            "WHERE namespace='user_catalog'"
+        ).fetchall()
+        if official_keys.intersection(rows):
+            raise DeviceCatalogIntegrityError(
+                "official Catalog conflicts with customer-owned local exact ICPN"
+            )
+
     def import_verified_manifest(
         self,
         manifest_path: Path,
@@ -250,6 +264,9 @@ class CatalogSqliteShadowRepository:
             self._init_schema(conn)
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute("BEGIN IMMEDIATE")
+            self._reject_local_catalog_collisions(
+                conn, {(row[0], row[1]) for row in rows}
+            )
             active = conn.execute("SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1").fetchone()
             if (active is not None and conn.execute(
                 "SELECT 1 FROM catalog_audit_events WHERE action='PUBLISH' LIMIT 1"
@@ -922,6 +939,7 @@ class CatalogSqliteShadowRepository:
                 records[key], qualifications[key] = replace(
                     record, catalog_revision_sha256=source_revision
                 ), q
+            self._reject_local_catalog_collisions(conn, set(records))
             ordered = sorted(records.values(), key=lambda r: _identity(r))
             catalog = DeviceCatalog(ordered, catalog_id=parent.catalog.catalog_id,
                                     catalog_version=parent.catalog.catalog_version,
@@ -961,6 +979,7 @@ class CatalogSqliteShadowRepository:
             self._verify_snapshot_evidence(target, strict=True)
             current_records = {_identity(row): row for row in current.catalog.records}
             target_records = {_identity(row): row for row in target.catalog.records}
+            self._reject_local_catalog_collisions(conn, set(target_records))
             if any(
                 target.qualifications.get(key) != qualification
                 or target_records.get(key) != current_records.get(key)
