@@ -804,6 +804,8 @@ def test_customer_profile_links_to_existing_official_ic_without_identity_or_qual
         "link_status": "ACTIVE", "local_revision": 1, "profile_id": "customer-f1-profile",
     }
     assert repo.local_records() == []
+    with pytest.raises(DeviceCatalogIntegrityError, match="already linked to Official IC"):
+        repo.save_local_records([customer], actor="owner")
     retained = CatalogSqliteShadowRepository(repo.path).linked_customer_profiles()[0]
     assert retained["record"] == original["record"]
     assert retained["profile"] == original["profile"]
