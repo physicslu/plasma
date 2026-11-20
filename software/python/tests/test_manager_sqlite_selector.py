@@ -361,3 +361,62 @@ def test_manager_official_conflict_http_409_exposes_customer_resolution_details(
     assert body["error"]["conflict_count"] == 1
     assert body["error"]["truncated"] is False
     assert "resolve" in body["error"]["message"]
+
+
+def test_manager_customer_official_link_api_preserves_both_provenances(
+    manager_port: int, source_qualified_database: Path, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = tmp_path / "link-manager.sqlite3"
+    with sqlite3.connect(source_qualified_database) as src, sqlite3.connect(database) as dst:
+        src.backup(dst)
+    repo = CatalogSqliteShadowRepository(database)
+    monkeypatch.setenv("PLASMA_CATALOG_SQLITE_DB", str(database))
+    monkeypatch.setenv("PLASMA_CATALOG_PUBLISH_TOKEN", "link-test-publisher")
+
+    record = {"vendor": "STMicroelectronics", "identifier": "STM32F103C8T6",
+              "family": "Customer STM32F1", "package": "LQFP48", "flash_size": "64 KiB"}
+    original = {"record": record, "profile": {
+        "profile_id": "customer-owned-f1", "provider_id": "customer-provider",
+        "operations": ["erase", "program"], "source_evidence": ["owner-verified-custom"]}}
+    repo.save_local_records([original], actor="owner")
+    def post(token: str, confirmation: bool, revision: int) -> tuple[int, dict]:
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{manager_port}/api/catalog/management/link-local-official",
+            data=json.dumps({
+                "vendor": record["vendor"], "icpn": record["identifier"],
+                "expected_local_revision": revision, "confirmed_same_ic": confirmation,
+            }).encode(), method="POST",
+            headers={"Content-Type": "application/json", "X-Plasma-Catalog-Publisher": token},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as exc:
+            return exc.code, json.loads(exc.read())
+
+    assert post("wrong", True, 1)[0] == 403
+    assert post("link-test-publisher", False, 1)[0] == 400
+    assert post("link-test-publisher", True, 2)[0] == 400
+    assert len(repo.local_records()) == 1
+    status, result = post("link-test-publisher", True, 1)
+    assert status == 200
+    assert result["link"]["ic_origin"] == "OFFICIAL"
+    assert result["link"]["profile_origin"] == "CUSTOMER"
+    assert result["link"]["profile_id"] == "customer-owned-f1"
+    assert repo.local_records() == []
+
+    status, manager = _get(manager_port, "/api/catalog/management")
+    assert status == 200
+    assert manager["local"] == []
+    assert len(manager["linked_profiles"]) == 1
+    assert manager["linked_profiles"][0]["profile"]["profile_id"] == "customer-owned-f1"
+    assert manager["linked_profiles"][0]["verification"] == "UNVERIFIED"
+    assert manager["linked_profiles"][0]["link_status"] == "ACTIVE"
+    status, search = _get(manager_port, "/api/devices/search?q=STM32F103C8T6&limit=1")
+    assert status == 200
+    assert search["results"][0]["ic_origin"] == "OFFICIAL"
+    assert search["results"][0]["linked_customer_profile"]["origin"] == "CUSTOMER"
+    assert search["results"][0]["linked_customer_profile"]["verification"] == "UNVERIFIED"
+    assert post("link-test-publisher", True, 1)[0] == 400
+    assert [event["action"] for event in repo.history()["audit"]].count("LOCAL_LINK_OFFICIAL") == 1
