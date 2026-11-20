@@ -374,6 +374,9 @@ class BundleProgrammingWorkflow:
         self.job_poll_interval_s = (poll_interval_s if job_poll_interval_s is None
                                     else job_poll_interval_s)
         self._lock = threading.RLock()
+        # Volatile by design: a restarted Manager ends the Batch from its
+        # journal; it never trusts or resumes an old Runtime reservation.
+        self._batch_resources: dict[tuple[str, str], dict[str, Any]] = {}
         self._journal_failure: str | None = None
         self._control_failure: str | None = None
         self.shared_control_gate = None
@@ -576,10 +579,10 @@ class BundleProgrammingWorkflow:
         return value
 
     def _readiness(self, client: Any, site: int, site_interface: str | None,
-                   execution_owner_id: str | None = None) -> dict[str, Any]:
+                   execution_owner_id: str | None = None, alias: str | None = None) -> dict[str, Any]:
         started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
         try:
-            return self._readiness_checked(client, site, site_interface, execution_owner_id)
+            return self._readiness_checked(client, site, site_interface, execution_owner_id, alias)
         finally:
             if started is not None:
                 _m0_timing("manager_readiness", site_id=site,
@@ -587,7 +590,7 @@ class BundleProgrammingWorkflow:
                            duration_ms=round((self.monotonic() - started) * 1000, 3))
 
     def _readiness_checked(self, client: Any, site: int, site_interface: str | None,
-                           execution_owner_id: str | None) -> dict[str, Any]:
+                           execution_owner_id: str | None, alias: str | None) -> dict[str, Any]:
         get_started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
         try:
             health = self._gateway_get(client, "/api/health/ready")
@@ -603,6 +606,14 @@ class BundleProgrammingWorkflow:
                 _m0_timing("manager_readiness_http", site_id=site, endpoint="site_status",
                            duration_ms=round((self.monotonic() - get_started) * 1000, 3))
         ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
+        session = self._batch_session(alias, execution_owner_id) if alias else None
+        if session is not None:
+            reservation = ppu.get("resource_reservation")
+            if (not isinstance(reservation, dict)
+                    or any(reservation.get(key) != session["reservation"].get(key)
+                           for key in ("state", "ppu_id", "owner_id", "epoch",
+                                       "asset_set_sha256", "generation", "resource_set_sha256"))):
+                raise _StepFailure("RESOURCE_RESERVATION_CHANGED", outcome="BLOCKED")
         lease = ppu.get("execution") if isinstance(ppu.get("execution"), dict) else {}
         activation = ppu.get("runtime_activation")
         sites = status.get("sites")
@@ -662,6 +673,79 @@ class BundleProgrammingWorkflow:
                 _m0_timing("manager_bootstrap_read", ppu_alias=alias, operation=operation,
                            duration_ms=round((self.monotonic() - started) * 1000, 3))
 
+    def _batch_session(self, alias: str, owner_id: str | None) -> dict[str, Any] | None:
+        if owner_id is None:
+            return None
+        return self._batch_resources.get((owner_id, alias))
+
+    def _reservation_write(self, alias: str, body: dict[str, Any]) -> dict[str, Any]:
+        record = self._record(alias)
+        client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
+        signer = getattr(self.coordinator, "gateway_signer", None)
+        if signer is not None and hasattr(client, "write_signer"):
+            client.write_signer = signer(alias)
+        status, _headers, payload = client.relay(
+            "POST", "/api/resource-reservations",
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            body=json.dumps(body, sort_keys=True).encode(), timeout_s=self.request_timeout_s,
+            max_response_bytes=65536)
+        try:
+            answer = json.loads(payload)
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise ProgrammingError(503, "resource_reservation_untrusted", "PPU reservation response invalid") from exc
+        reservation = answer.get("reservation") if status == 200 and isinstance(answer, dict) else None
+        if not isinstance(reservation, dict):
+            raise ProgrammingError(409, "resource_reservation_refused", "PPU refused Resource Reservation")
+        return reservation
+
+    def begin_batch_resource(self, alias: str, owner_id: str,
+                             resource_sha: str, site: int) -> None:
+        """One Bootstrap asset read, then atomic PPU reservation on that identity."""
+        active = self._timed_bootstrap_read(alias, self.coordinator.assets, "assets")
+        if active.get("state") == "RECOVERY_REQUIRED":
+            raise _StepFailure("PPU_RECOVERY_REQUIRED", outcome="BLOCKED")
+        record = self._record(alias)
+        client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
+        status = self._gateway_get(client, f"/api/status?site={site}")
+        ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
+        ppu_id, report = self._resource_report(ppu.get("ppu_id"), ppu.get("active_resources"))
+        expected = {"ppu_id": ppu_id, "asset_set_sha256": active.get("asset_set_sha256"),
+                    "generation": report.get("generation"),
+                    "resource_set_sha256": resource_sha}
+        if (active.get("state") != "ACTIVE" or report.get("state") != "VERIFIED"
+                or report.get("asset_set_sha256") != expected["asset_set_sha256"]
+                or report.get("resource_set_sha256") != resource_sha):
+            raise ProgrammingError(409, "resource_reservation_requires_active_set",
+                                   "Batch Resource identity is not Active and verified")
+        reservation = self._reservation_write(alias, {"action": "acquire", "owner_id": owner_id,
+                                                  "expected": expected})
+        if (reservation.get("state") != "ACTIVE" or
+                any(reservation.get(key) != value for key, value in expected.items()) or
+                reservation.get("owner_id") != owner_id or
+                type(reservation.get("token")) is not str or
+                type(reservation.get("epoch")) is not str):
+            raise ProgrammingError(503, "resource_reservation_untrusted", "PPU reservation identity invalid")
+        self._batch_resources[(owner_id, alias)] = {"assets": active, "reservation": reservation}
+
+    def renew_batch_resource(self, alias: str, owner_id: str) -> None:
+        session = self._batch_session(alias, owner_id)
+        if session is None:
+            raise ProgrammingError(409, "resource_reservation_missing", "Batch Resource Reservation is absent")
+        original = session["reservation"]
+        renewed = self._reservation_write(alias, {"action": "check", "owner_id": owner_id,
+                                                  "token": original["token"]})
+        if any(renewed.get(key) != original.get(key) for key in
+               ("state", "ppu_id", "owner_id", "token", "epoch", "asset_set_sha256",
+                "generation", "resource_set_sha256")):
+            self._batch_resources.pop((owner_id, alias), None)
+            raise ProgrammingError(409, "resource_reservation_changed", "Batch Resource changed")
+
+    def end_batch_resource(self, alias: str, owner_id: str) -> None:
+        session = self._batch_resources.pop((owner_id, alias), None)
+        if session is not None:
+            self._reservation_write(alias, {"action": "release", "owner_id": owner_id,
+                                            "token": session["reservation"]["token"]})
+
     def target_block(self, alias: str, site: int, *,
                      execution_owner_id: str | None = None,
                      evidence: dict[str, Any] | None = None) -> tuple[str, str] | None:
@@ -701,12 +785,14 @@ class BundleProgrammingWorkflow:
         if getattr(record, "lifecycle", None) != "commissioned":
             return TARGET_NOT_READY, "PPU_NOT_ENABLED"
         try:
-            active = self._timed_bootstrap_read(alias, self.coordinator.assets, "assets")
+            session = self._batch_session(alias, execution_owner_id)
+            active = (session["assets"] if session is not None else
+                      self._timed_bootstrap_read(alias, self.coordinator.assets, "assets"))
             if active.get("state") == "RECOVERY_REQUIRED":
                 return TARGET_NOT_READY, "PPU_RECOVERY_REQUIRED"
             with shared_boundary("GATEWAY_CLIENT_CONFIGURATION"):
                 client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
-            ready = self._readiness(client, site, None, owner)
+            ready = self._readiness(client, site, None, owner, alias)
         except _StepFailure as exc:
             return exc.failure_domain, exc.reason
         except (BootstrapManagerError, PPUHTTPError) as exc:
@@ -714,7 +800,7 @@ class BundleProgrammingWorkflow:
         except Exception as exc:
             return SHARED_CONTROL_FAILURE, f"SITE_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}"
         if evidence is not None:
-            evidence.update(alias=alias, site=site, at=self.monotonic(),
+            evidence.update(alias=alias, site=site, owner_id=owner, at=self.monotonic(),
                             assets=active, ready=ready)
         return None
 
@@ -996,7 +1082,8 @@ class BundleProgrammingWorkflow:
                  and 0 <= self.monotonic() - evidence["at"] <= PLAN_EVIDENCE_MAX_AGE_S
                  and isinstance(evidence.get("assets"), dict)
                  and isinstance(evidence.get("ready"), dict))
-        active = (evidence["assets"] if reuse else
+        session = self._batch_session(alias, evidence.get("owner_id") if evidence else None)
+        active = (evidence["assets"] if reuse else session["assets"] if session else
                   self._timed_bootstrap_read(alias, self.coordinator.assets, "assets"))
         if active.get("state") == "RECOVERY_REQUIRED":
             raise ProgrammingError(409, "ppu_recovery_required",
@@ -1420,7 +1507,7 @@ class BundleProgrammingWorkflow:
             started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
             try:
                 self._readiness(client, run.site, plan.route.site_interface,
-                                plan.payload.get("execution_owner_id"))
+                                plan.payload.get("execution_owner_id"), run.alias)
             finally:
                 if started is not None:
                     _m0_timing("manager_preflight", run_id=run.run_id, plan_id=plan.plan_id,
@@ -1430,7 +1517,9 @@ class BundleProgrammingWorkflow:
             activated = plan.payload["activation_required"]
             if activated:
                 self._activate(run, plan)
-            active = self._timed_bootstrap_read(run.alias, self.coordinator.assets, "assets")
+            session = self._batch_session(run.alias, plan.payload.get("execution_owner_id"))
+            active = (session["assets"] if session is not None else
+                      self._timed_bootstrap_read(run.alias, self.coordinator.assets, "assets"))
             expected_set = (plan.bundle.archive_sha256 if activated
                             else plan.payload["active_asset_set"]["asset_set_sha256"])
             if not (active.get("state") == "ACTIVE"
@@ -1441,7 +1530,7 @@ class BundleProgrammingWorkflow:
             started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
             try:
                 ready = self._readiness(client, run.site, plan.route.site_interface,
-                                plan.payload.get("execution_owner_id"))
+                                plan.payload.get("execution_owner_id"), run.alias)
             finally:
                 if started is not None:
                     _m0_timing("manager_presubmit_readiness", run_id=run.run_id,
@@ -1579,6 +1668,9 @@ class BundleProgrammingWorkflow:
         }
         if plan.payload.get("execution_owner_id") is not None:
             payload["execution_owner_id"] = plan.payload["execution_owner_id"]
+            session = self._batch_session(run.alias, plan.payload["execution_owner_id"])
+            if session is not None:
+                payload["resource_reservation_token"] = session["reservation"]["token"]
         if plan.image is not None:
             payload["image_asset"] = plan.image_asset
             payload["asset_base64"] = base64.b64encode(plan.image).decode("ascii")

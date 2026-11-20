@@ -291,6 +291,11 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
         if normalized.get("target") is not None:
             normalized["target"] = _validated_target_claim(normalized["target"], label="target")
         execution_owner_id = self._validated_rest_owner(normalized.pop("execution_owner_id", None))
+        reservation_token = normalized.pop("resource_reservation_token", None)
+        if reservation_token is not None and (execution_owner_id is None
+                or type(reservation_token) is not str
+                or re.fullmatch(r"[0-9a-f]{32}", reservation_token) is None):
+            raise ValueError("resource_reservation_token requires a valid execution owner")
         request = super()._job_request(
             normalized,
             client_id=client_id,
@@ -307,6 +312,9 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                     "execution_owner_id": execution_owner_id,
                 },
             )
+        if reservation_token is not None:
+            request = replace(request, metadata={**request.metadata,
+                                                 "resource_reservation_token": reservation_token})
         if raw_target_device is None:
             return request
         if client_id != "plasma-web-engineering":
@@ -577,6 +585,17 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/api/resource-reservations":
+            try:
+                body = self._body()
+                base._require_declared_keys(body, allowed={"action", "owner_id", "token", "expected"},
+                                            required={"action", "owner_id"}, label="Resource Reservation")
+                result = base._run(self.client_factory().resource_reservation(
+                    body["action"], body["owner_id"], body.get("token"), body.get("expected")))
+                self._json(HTTPStatus.OK, {"ok": True, "reservation": result})
+            except Exception as exc:
+                self._error(exc)
+            return
         if self._is_gateway_settings_path(parsed.path):
             try:
                 self._json(

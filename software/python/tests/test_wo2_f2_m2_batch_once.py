@@ -113,30 +113,15 @@ def test_immutable_preparation_runs_once_per_batch_not_per_cycle(tmp_path, repea
 
 @pytest.mark.parametrize("repeat", [3, 20])
 def test_per_cycle_call_counts_before_and_after(tmp_path, repeat):
-    """The measured regression: counts per Cycle, before (pre-M2 call shape)
-    and after. Mock sleeps are not shortened; only calls disappear."""
-    before = Counted(tmp_path / "before", repeat=repeat, legacy=True)
-    after = Counted(tmp_path / "after", repeat=repeat)
-    assert before.run()["outcome"] == after.run()["outcome"] == "PASS"
-    per_cycle = {}
-    for name, b in (("before", before), ("after", after)):
-        calls = b.bootstrap_calls()
-        per_cycle[name] = {
-            "site_status": b.http["GET /api/status?site"] / repeat,
-            "health": b.http["GET /api/health/ready"] / repeat,
-            "bootstrap_status": calls["status"] / repeat,
-            "bootstrap_assets": calls["assets"] / repeat,
-            "route_loads": b.local["routes"],
-            "image_decodes": b.local["_parse_request"],
-        }
-    assert per_cycle["before"] == {
-        "site_status": 4, "health": 3, "bootstrap_status": 1, "bootstrap_assets": 3,
-        "route_loads": repeat, "image_decodes": 1 + repeat}
-    # Plan reuses the admission's Active Set + Site status read; PREFLIGHT,
-    # the pre-submit Active Set and the pre-submit readiness all remain.
-    assert per_cycle["after"] == {
-        "site_status": 3, "health": 3, "bootstrap_status": 1, "bootstrap_assets": 2,
-        "route_loads": 1, "image_decodes": 2}
+    """M3: one assets read and one reservation pair per PPU/Batch."""
+    b = Counted(tmp_path / "after", repeat=repeat)
+    assert b.run()["outcome"] == "PASS"
+    calls = b.bootstrap_calls()
+    assert calls["assets"] == 1 and calls["status"] == repeat
+    assert b.http["GET /api/status?site"] == 3 * repeat + 1
+    assert b.http["GET /api/health/ready"] == 3 * repeat
+    assert b.http["POST /api/resource-reservations"] == 2
+    assert b.local["routes"] == 1 and b.local["_parse_request"] == 2
 
 
 def test_two_sites_share_one_preparation_with_their_own_bindings(tmp_path):

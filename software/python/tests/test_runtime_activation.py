@@ -18,6 +18,7 @@ from plasma_server.site_manager import PPUExecutionLease, SiteManager
 from plasma_server.runtime_control import RuntimeControlServer
 from plasma_web.runtime_activation import RuntimeActivationError, SiteRuntimeActivationController, desired_runtime_revision
 from plasma_web.runtime_activation_helper import RuntimeActivationExecutor, RuntimeActivationHelperError
+from tests.helpers import make_config
 
 
 def config(tmp_path: Path) -> PlasmaConfig:
@@ -59,6 +60,106 @@ def test_quiesce_is_bounded_and_expires(tmp_path: Path) -> None:
     manager.acquire_runtime_quiesce(2)
     manager._runtime_quiesce._deadline_monotonic = time.monotonic() - 1
     assert manager.runtime_quiesce_snapshot()["active"] is False
+
+
+def test_batch_reservation_excludes_b3_across_idle_cycles_and_preserves_site_jobs(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        manager = SiteManager(config(tmp_path))
+        identity = {"state": "VERIFIED", "asset_set_sha256": "a" * 64,
+                    "generation": 3, "resource_set_sha256": "b" * 64}
+        manager._resolve_active_resources = lambda: dict(identity)
+        await manager.start()
+        expected = {"ppu_id": "ppu-a", "asset_set_sha256": "a" * 64,
+                    "generation": 3, "resource_set_sha256": "b" * 64}
+        try:
+            reservation = manager.resource_reservation("acquire", owner_id="batch-1",
+                                                       expected=expected)
+            assert reservation["epoch"] and reservation["state"] == "ACTIVE"
+            with pytest.raises(PlasmaError) as b3:
+                manager.acquire_asset_set_quiesce()
+            assert b3.value.code is ErrorCode.PPU_BUSY
+            foreign = JobRequest(site_id=1, operation=Operation.READ, job_id="foreign-job",
+                                 metadata={"execution_owner_kind": "rest_client",
+                                           "execution_owner_id": "batch-2"})
+            with pytest.raises(PlasmaError) as denied:
+                manager.enqueue(foreign)
+            assert denied.value.code is ErrorCode.PPU_BUSY
+            own = JobRequest(site_id=1, operation=Operation.READ, job_id="own-job",
+                             metadata={"execution_owner_kind": "rest_client",
+                                       "execution_owner_id": "batch-1",
+                                       "resource_reservation_token": reservation["token"]})
+            future = manager.enqueue(own)
+            with pytest.raises(PlasmaError):
+                manager.resource_reservation("release", owner_id="batch-1",
+                                             token=reservation["token"])
+            await future
+            renewed = manager.resource_reservation("check", owner_id="batch-1",
+                                                   token=reservation["token"])
+            assert renewed["epoch"] == reservation["epoch"]
+            manager.resource_reservation("release", owner_id="batch-1",
+                                         token=reservation["token"])
+            lease = manager.acquire_asset_set_quiesce()
+            manager.release_runtime_quiesce(lease["token"])
+            second = manager.resource_reservation("acquire", owner_id="batch-1",
+                                                  expected=expected)
+            identity["generation"] = 4
+            with pytest.raises(PlasmaError) as drift:
+                manager.resource_reservation("check", owner_id="batch-1",
+                                             token=second["token"])
+            assert drift.value.code is ErrorCode.PPU_BUSY
+            assert manager.resource_reservation_snapshot()["state"] == "NONE"
+            identity["generation"] = 3
+            expiring = manager.resource_reservation("acquire", owner_id="batch-1",
+                                                    expected=expected)
+            manager._reservation["deadline"] = time.monotonic() - 1
+            assert manager.resource_reservation_snapshot()["state"] == "NONE"
+            with pytest.raises(PlasmaError):
+                manager.resource_reservation("check", owner_id="batch-1",
+                                             token=expiring["token"])
+            with pytest.raises(PlasmaError) as stale_job:
+                manager.enqueue(JobRequest(
+                    site_id=1, operation=Operation.READ, job_id="stale-batch-job",
+                    metadata={"execution_owner_kind": "rest_client",
+                              "execution_owner_id": "batch-1",
+                              "resource_reservation_token": expiring["token"]}))
+            assert stale_job.value.code is ErrorCode.PPU_BUSY
+            restarted = SiteManager(config(tmp_path / "restart"))
+            assert restarted.resource_reservation_snapshot()["epoch"] != reservation["epoch"]
+        finally:
+            await manager.shutdown()
+
+    asyncio.run(scenario())
+
+
+def test_eight_sites_share_one_batch_reservation_without_cycle_barrier(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        manager = SiteManager(make_config(
+            tmp_path, enabled_sites=8, max_concurrent_jobs=8,
+            site_options={site: {"mock": {"default_delay_s": 0.15}}
+                          for site in range(1, 9)}))
+        manager._resolve_active_resources = lambda: {
+            "asset_set_sha256": "a" * 64, "generation": 1,
+            "resource_set_sha256": "b" * 64}
+        await manager.start()
+        try:
+            reservation = manager.resource_reservation(
+                "acquire", owner_id="batch-8",
+                expected={"ppu_id": manager.config.ppu.id,
+                          "asset_set_sha256": "a" * 64, "generation": 1,
+                          "resource_set_sha256": "b" * 64})
+            futures = [manager.enqueue(JobRequest(
+                site_id=site, operation=Operation.READ, job_id=f"batch-site-{site}",
+                metadata={"execution_owner_kind": "rest_client",
+                          "execution_owner_id": "batch-8",
+                          "resource_reservation_token": reservation["token"]}))
+                       for site in range(1, 9)]
+            assert manager.execution_lease_snapshot()["active_job_count"] == 8
+            await asyncio.gather(*futures)
+            assert manager.resource_reservation_snapshot()["state"] == "ACTIVE"
+        finally:
+            await manager.shutdown()
+
+    asyncio.run(scenario())
 
 
 def test_p4_asset_pin_uses_configured_runtime_root_not_host_path(tmp_path):

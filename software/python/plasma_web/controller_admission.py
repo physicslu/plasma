@@ -105,6 +105,8 @@ class ControllerWriteAdmissionMixin:
             return "ppu.settings.write"
         if normalized == "/api/jobs":
             return "site.job.submit"
+        if normalized == "/api/resource-reservations":
+            return "site.job.submit"
         if re.fullmatch(rf"/api/jobs/{_SEGMENT}/cancel", path):
             return "site.job.cancel"
         if normalized in {"/api/engineering/diagnostics/loopback",

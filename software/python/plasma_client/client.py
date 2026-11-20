@@ -271,6 +271,15 @@ class PlasmaClient:
             )
         )
 
+    async def resource_reservation(self, action: str, owner_id: str,
+                                   token: str | None = None,
+                                   expected: dict[str, Any] | None = None) -> dict[str, Any]:
+        return await self.send(Frame(metadata={
+            "protocol_version": self.protocol_version,
+            "message_type": "resource_reservation", "action": action,
+            "owner_id": owner_id, "token": token, "expected": expected,
+        }))
+
 
 def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()

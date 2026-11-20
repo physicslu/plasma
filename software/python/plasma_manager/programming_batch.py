@@ -95,6 +95,8 @@ from .programming import (
     TARGET_TRANSACTION_UNKNOWN, BatchPreparation, BundleProgrammingWorkflow, JOB_TERMINAL,
     ProgrammingError, _m0_timing,
 )
+from .bootstrap import BootstrapManagerError
+from .client import PPUHTTPError
 
 BATCH_SCHEMA = "plasma.manager.programming-batch.v2"
 JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v2"
@@ -445,6 +447,7 @@ class ProgrammingBatchCoordinator:
         self.release_wait_s = release_wait_s
         self._lock = threading.RLock()
         self._batches: dict[str, dict[str, Any]] = {}
+        self._reservation_blocks: dict[str, dict[str, tuple[str, str]]] = {}
         self._control_failure: str | None = None
         #: Where a journal of the previous schema lives, if one does. It is
         #: opened, never written: not overwritten, truncated, deleted or
@@ -1034,6 +1037,10 @@ class ProgrammingBatchCoordinator:
         """Whether this PPU may be mutated at all. PPU-scoped: one verdict
         covers every Site of that PPU, and asking it once per PPU is also
         what keeps a Batch from reading the same Platform state N times."""
+        failure = next((blocks[alias] for blocks in self._reservation_blocks.values()
+                        if alias in blocks), None)
+        if failure is not None:
+            return failure
         if self.platform_gate is None:
             return None
         try:
@@ -1336,6 +1343,9 @@ class ProgrammingBatchCoordinator:
             raise _SharedControlFailure(self._control_failure)
         if batch["stop_requested"]:
             return "STOP_REQUESTED_NOTHING_SUBMITTED"
+        reservation_failure = self._reservation_blocks.get(batch["batch_id"], {}).get(alias)
+        if reservation_failure is not None:
+            return reservation_failure[1]
         for unit in batch["units"]:
             if unit["ppu_alias"] == alias and unit.get("outcome") == "OUTCOME_UNKNOWN":
                 return f"PPU_LATCHED_{unit.get('reason') or 'OUTCOME_UNKNOWN'}"
@@ -1396,6 +1406,39 @@ class ProgrammingBatchCoordinator:
         # Batch-once immutable preparation (WO-2 F2 M2), shared by every lane
         # of this Batch run and by none other. It carries no PPU state.
         preparation = BatchPreparation()
+        owner_id = batch["batch_id"]
+        blocks: dict[str, tuple[str, str]] = {}
+        self._reservation_blocks[owner_id] = blocks
+        prepared = self.workflow._prepared_for(preparation, {**plan_body, "site_id": 1})
+        resource_sha = prepared.resources[1]
+        reserved: list[str] = []
+        for target in batch["targets"]:
+            alias = target["ppu_alias"]
+            try:
+                if self.workflow._unknown_latched(alias) is not None:
+                    blocks[alias] = (TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED")
+                    continue
+                self.workflow.begin_batch_resource(alias, owner_id, resource_sha,
+                                                   target["site_ids"][0])
+                reserved.append(alias)
+            except Exception as exc:
+                if hasattr(exc, "failure_domain") and hasattr(exc, "reason"):
+                    blocks[alias] = (exc.failure_domain, exc.reason)
+                elif isinstance(exc, ProgrammingError):
+                    blocks[alias] = (TARGET_NOT_READY, exc.code.upper())
+                elif isinstance(exc, (BootstrapManagerError, PPUHTTPError,
+                                      TimeoutError, ConnectionError)):
+                    blocks[alias] = (TARGET_STATE_UNAVAILABLE,
+                                     f"PPU_STATE_UNREADABLE_{type(exc).__name__}")
+                else:
+                    for held_alias in reserved:
+                        try:
+                            self.workflow.end_batch_resource(held_alias, owner_id)
+                        except Exception:
+                            pass
+                    self._reservation_blocks.pop(owner_id, None)
+                    raise _SharedControlFailure(
+                        f"SITE_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}") from exc
         for unit in batch["units"]:
             if unit["outcome"] is not None:
                 continue
@@ -1410,8 +1453,18 @@ class ProgrammingBatchCoordinator:
                                     thread_name_prefix="plasma-batch-lane") as pool:
                 try:
                     pending = {pool.submit(advance, *lane): lane for lane in lanes}
+                    next_renew = time.monotonic() + 30
                     while pending:
-                        ready, _ = wait(pending, return_when=FIRST_COMPLETED)
+                        ready, _ = wait(pending, timeout=max(0, next_renew - time.monotonic()),
+                                        return_when=FIRST_COMPLETED)
+                        if time.monotonic() >= next_renew:
+                            for alias in reserved:
+                                if alias not in blocks:
+                                    try:
+                                        self.workflow.renew_batch_resource(alias, owner_id)
+                                    except Exception:
+                                        blocks[alias] = (TARGET_NOT_READY, "RESOURCE_RESERVATION_LOST")
+                            next_renew = time.monotonic() + 30
                         for future in ready:
                             lane = pending.pop(future)
                             try:
@@ -1427,6 +1480,23 @@ class ProgrammingBatchCoordinator:
                     # Publish scheduler failures before pool shutdown waits on
                     # slow remote calls; they cannot admit further dispatches.
                     raise _SharedControlFailure(latch(exc)) from exc
+        for alias in reserved:
+            units = [unit for unit in batch["units"] if unit["ppu_alias"] == alias]
+            if any(unit.get("outcome") == "OUTCOME_UNKNOWN"
+                   or str(unit.get("reason") or "").startswith("CYCLE_NOT_RELEASED_")
+                   or (unit["cycle"].get("last") is not None
+                       and (unit["cycle"]["last"].get("receipt") or {}).get("safe_off") is not True)
+                   for unit in units):
+                # An unproven Site is never explicitly released. The PPU's
+                # bounded TTL and existing Site recovery guards govern it.
+                continue
+            try:
+                self.workflow.end_batch_resource(alias, owner_id)
+            except Exception:
+                # A lost Release acknowledgement is left to the PPU TTL;
+                # never claim that a possibly active Job was released.
+                pass
+        self._reservation_blocks.pop(owner_id, None)
         if failure is not None:
             raise _SharedControlFailure(failure)
         self._finish(batch, None)

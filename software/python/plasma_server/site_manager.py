@@ -7,6 +7,7 @@ import re
 import sys
 import threading
 import time
+import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
@@ -102,6 +103,8 @@ class SiteManager:
         self.workers: dict[int, SiteWorker] = {}
         self._execution_lock = threading.RLock()
         self._execution_lease: PPUExecutionLease | None = None
+        self._reservation: dict[str, Any] | None = None
+        self._runtime_epoch = uuid.uuid4().hex
         self._delegated_package_jobs: set[str] = set()
         self._runtime_quiesce = RuntimeQuiesceGate()
         self._started = False
@@ -224,6 +227,15 @@ class SiteManager:
         acquired = False
         conflict: PPUExecutionLease | None = None
         with self._execution_lock:
+            reservation = self._live_reservation()
+            token = request.metadata.get("resource_reservation_token")
+            if token is not None and reservation is None:
+                raise PlasmaError(ErrorCode.PPU_BUSY, "PPU Resource Reservation expired")
+            if reservation is not None:
+                if ((owner_kind, owner_id) != ("rest_client", reservation["owner_id"])
+                        or token != reservation["token"]):
+                    raise PlasmaError(ErrorCode.PPU_BUSY,
+                                      "PPU Resource Reservation belongs to another execution")
             if self._runtime_quiesce.active():
                 raise PlasmaError(
                     ErrorCode.PPU_BUSY,
@@ -284,12 +296,14 @@ class SiteManager:
 
     def acquire_runtime_quiesce(self, ttl_s: int) -> dict[str, Any]:
         with self._execution_lock:
-            if self._execution_lease is not None:
+            if self._execution_lease is not None or self._live_reservation() is not None:
                 raise PlasmaError(
                     ErrorCode.PPU_BUSY,
                     "PPU execution is active; runtime activation cannot quiesce",
                     recoverable=True,
-                    context={"execution": self._execution_lease.snapshot()},
+                    context={"execution": (self._execution_lease.snapshot()
+                                             if self._execution_lease else None),
+                             "resource_reservation": self.resource_reservation_snapshot()},
                 )
             lease = self._runtime_quiesce.acquire(ttl_s)
             self.server_log.event(
@@ -312,12 +326,14 @@ class SiteManager:
         quiesce transition, including queued and cancelling jobs.
         """
         with self._execution_lock:
-            if self._execution_lease is not None:
+            if self._execution_lease is not None or self._live_reservation() is not None:
                 raise PlasmaError(
                     ErrorCode.PPU_BUSY,
                     "PPU execution active; cannot hold Asset Set activation",
                     recoverable=True,
-                    context={"execution": self._execution_lease.snapshot()},
+                    context={"execution": (self._execution_lease.snapshot()
+                                             if self._execution_lease else None),
+                             "resource_reservation": self.resource_reservation_snapshot()},
                 )
             lease = self._runtime_quiesce.acquire_held()
             self.server_log.event(
@@ -349,6 +365,80 @@ class SiteManager:
                 "ppu_id": self.config.ppu.id,
                 "facility_id": self.config.ppu.facility_id,
             }
+
+    def _live_reservation(self) -> dict[str, Any] | None:
+        """Only called under _execution_lock. Expiry never releases a Job lease."""
+        record = self._reservation
+        if record is not None and time.monotonic() >= record["deadline"]:
+            self._reservation = None
+            return None
+        return record
+
+    def resource_reservation(self, action: str, *, owner_id: str, token: str | None = None,
+                             expected: dict[str, Any] | None = None) -> dict[str, Any]:
+        """PPU authority shared with Job admission and B3 Runtime quiesce."""
+        self._validate_execution_owner(owner_id, "owner_id")
+        if action not in {"acquire", "check", "release"}:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid reservation action")
+        with self._execution_lock:
+            current = self._live_reservation()
+            if action == "acquire":
+                if current is not None or self._runtime_quiesce.active():
+                    raise PlasmaError(ErrorCode.PPU_BUSY, "PPU Resource Reservation unavailable")
+                lease = self._execution_lease
+                if lease is not None and (lease.owner_kind, lease.owner_id) != ("rest_client", owner_id):
+                    raise PlasmaError(ErrorCode.PPU_BUSY, "PPU has another execution owner")
+                if type(expected) is not dict or set(expected) != {
+                    "ppu_id", "asset_set_sha256", "generation", "resource_set_sha256"}:
+                    raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "reservation identity is invalid")
+                identity = self._resolve_active_resources()  # full content verification stays PPU-owned
+                observed = {"ppu_id": self.config.ppu.id,
+                            "asset_set_sha256": identity["asset_set_sha256"],
+                            "generation": identity["generation"],
+                            "resource_set_sha256": identity["resource_set_sha256"]}
+                if observed != expected:
+                    raise PlasmaError(ErrorCode.PPU_BUSY, "reservation Resource identity changed")
+                current = {**observed, "owner_id": owner_id,
+                           "token": uuid.uuid4().hex, "epoch": self._runtime_epoch,
+                           "deadline": time.monotonic() + 90}
+                self._reservation = current
+            else:
+                if (current is None or current["owner_id"] != owner_id
+                        or type(token) is not str or token != current["token"]):
+                    raise PlasmaError(ErrorCode.PPU_BUSY, "reservation expired or owner/token changed")
+                if action == "release":
+                    lease = self._execution_lease
+                    if lease is not None and lease.job_ids:
+                        raise PlasmaError(ErrorCode.PPU_BUSY, "active Jobs prevent reservation release")
+                    self._reservation = None
+                    return {"state": "RELEASED", "ppu_id": self.config.ppu.id,
+                            "epoch": self._runtime_epoch}
+                identity = self._resolve_active_resources()
+                if (identity["asset_set_sha256"] != current["asset_set_sha256"]
+                        or identity["generation"] != current["generation"]
+                        or identity["resource_set_sha256"] != current["resource_set_sha256"]):
+                    self._reservation = None
+                    raise PlasmaError(ErrorCode.PPU_BUSY, "reserved Resource identity changed")
+                current["deadline"] = time.monotonic() + 90
+            return {"state": "ACTIVE", "ppu_id": current["ppu_id"],
+                    "owner_id": current["owner_id"], "token": current["token"],
+                    "epoch": current["epoch"], "asset_set_sha256": current["asset_set_sha256"],
+                    "generation": current["generation"],
+                    "resource_set_sha256": current["resource_set_sha256"],
+                    "ttl_s": 90}
+
+    def resource_reservation_snapshot(self) -> dict[str, Any]:
+        with self._execution_lock:
+            record = self._live_reservation()
+            if record is None:
+                return {"state": "NONE", "ppu_id": self.config.ppu.id,
+                        "epoch": self._runtime_epoch}
+            return {"state": "ACTIVE", "ppu_id": record["ppu_id"],
+                    "owner_id": record["owner_id"], "epoch": record["epoch"],
+                    "asset_set_sha256": record["asset_set_sha256"],
+                    "generation": record["generation"],
+                    "resource_set_sha256": record["resource_set_sha256"],
+                    "ttl_remaining_s": max(0.0, record["deadline"] - time.monotonic())}
 
     def _release_execution_job(self, job_id: str) -> None:
         released: tuple[str, str] | None = None
@@ -728,6 +818,7 @@ class SiteManager:
             "site_count": self.config.site_count,
             "enabled_site_count": self.config.enabled_site_count,
             "execution": self.execution_lease_snapshot(),
+            "resource_reservation": self.resource_reservation_snapshot(),
             "runtime_activation": self.runtime_quiesce_snapshot(),
             "capabilities": {
                 "max_supported_sites": self.config.server.max_supported_sites,

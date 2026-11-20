@@ -18,13 +18,14 @@ from plasma_manager.programming_batch import (
 from .test_bundle_programming_workflow import (
     ALIAS, FakeCoordinator, FakeGateway, OPS_RESOURCE_SHA, image, make, ops_body,
 )
+from .test_programming_batch_targets import MultiplexGateway
 
 FULL = ["erase", "program", "verify"]
 
 
 def rig(tmp_path, *, spawn_batch=None, **gateway_kw):
     coord = FakeCoordinator(active_sha="e" * 64)
-    gateway = FakeGateway(image=image(), coordinator=coord,
+    gateway = MultiplexGateway(image=image(), coordinator=coord,
                           resource_for=lambda _a: OPS_RESOURCE_SHA, **gateway_kw)
     workflow, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway)
     batches = ProgrammingBatchCoordinator(
