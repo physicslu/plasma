@@ -1524,20 +1524,30 @@ class ProgrammingBatchCoordinator:
         site_verdict_fresh = first
         release_deadline: float | None = None
         if first:
-            if platform_leader:
-                platform.set_result(self._platform_block(alias))
-            verdict = platform.result()
-            with self._lock:
-                self._dispatch_block(batch, alias)
-            if verdict is None:
-                verdict = self._site_block(alias, site)
-            if verdict is not None:
-                domain, reason = verdict
-                if domain == SHARED_CONTROL_FAILURE:
-                    raise _SharedControlFailure(reason)
+            initial_started = (self.monotonic()
+                               if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
+            try:
+                if platform_leader:
+                    platform.set_result(self._platform_block(alias))
+                verdict = platform.result()
                 with self._lock:
-                    unit["failure_domain"] = domain
-                return "BLOCKED", f"ADMISSION_{reason}"
+                    self._dispatch_block(batch, alias)
+                if verdict is None:
+                    verdict = self._site_block(alias, site)
+                if verdict is not None:
+                    domain, reason = verdict
+                    if domain == SHARED_CONTROL_FAILURE:
+                        raise _SharedControlFailure(reason)
+                    with self._lock:
+                        unit["failure_domain"] = domain
+                    return "BLOCKED", f"ADMISSION_{reason}"
+            finally:
+                if initial_started is not None:
+                    _m0_timing("manager_initial_admission",
+                               batch_id=batch["batch_id"], cycle_id=unit["cycle"]["cycle_id"],
+                               ppu_alias=alias, site_id=site, attempt=1,
+                               platform_leader=platform_leader,
+                               duration_ms=round((self.monotonic() - initial_started) * 1000, 3))
         for number in range(1, policy["retry_limit"] + 2):
             # Recheck after every yield, including the planning/Start gap.
             while True:

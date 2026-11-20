@@ -521,8 +521,31 @@ class BundleProgrammingWorkflow:
 
     def _readiness(self, client: Any, site: int, site_interface: str | None,
                    execution_owner_id: str | None = None) -> dict[str, Any]:
-        health = self._gateway_get(client, "/api/health/ready")
-        status = self._gateway_get(client, f"/api/status?site={site}")
+        started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
+        try:
+            return self._readiness_checked(client, site, site_interface, execution_owner_id)
+        finally:
+            if started is not None:
+                _m0_timing("manager_readiness", site_id=site,
+                           execution_owner_id=execution_owner_id,
+                           duration_ms=round((self.monotonic() - started) * 1000, 3))
+
+    def _readiness_checked(self, client: Any, site: int, site_interface: str | None,
+                           execution_owner_id: str | None) -> dict[str, Any]:
+        get_started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
+        try:
+            health = self._gateway_get(client, "/api/health/ready")
+        finally:
+            if get_started is not None:
+                _m0_timing("manager_readiness_http", site_id=site, endpoint="health_ready",
+                           duration_ms=round((self.monotonic() - get_started) * 1000, 3))
+        get_started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
+        try:
+            status = self._gateway_get(client, f"/api/status?site={site}")
+        finally:
+            if get_started is not None:
+                _m0_timing("manager_readiness_http", site_id=site, endpoint="site_status",
+                           duration_ms=round((self.monotonic() - get_started) * 1000, 3))
         ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
         lease = ppu.get("execution") if isinstance(ppu.get("execution"), dict) else {}
         activation = ppu.get("runtime_activation")
@@ -572,6 +595,17 @@ class BundleProgrammingWorkflow:
                 return run
         return None
 
+    def _timed_bootstrap_read(self, alias: str, reader: Callable[[str], dict[str, Any]],
+                              operation: str) -> dict[str, Any]:
+        """Observe Bootstrap status/assets without modifying their verdict."""
+        started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
+        try:
+            return reader(alias)
+        finally:
+            if started is not None:
+                _m0_timing("manager_bootstrap_read", ppu_alias=alias, operation=operation,
+                           duration_ms=round((self.monotonic() - started) * 1000, 3))
+
     def target_block(self, alias: str, site: int, *,
                      execution_owner_id: str | None = None) -> tuple[str, str] | None:
         """Why this Target may not be operated now, and WHOSE failure it is.
@@ -604,7 +638,7 @@ class BundleProgrammingWorkflow:
         if getattr(record, "lifecycle", None) != "commissioned":
             return TARGET_NOT_READY, "PPU_NOT_ENABLED"
         try:
-            if self.coordinator.assets(alias).get("state") == "RECOVERY_REQUIRED":
+            if self._timed_bootstrap_read(alias, self.coordinator.assets, "assets").get("state") == "RECOVERY_REQUIRED":
                 return TARGET_NOT_READY, "PPU_RECOVERY_REQUIRED"
             with shared_boundary("GATEWAY_CLIENT_CONFIGURATION"):
                 client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
@@ -819,7 +853,7 @@ class BundleProgrammingWorkflow:
             code = ("bundle_resource_not_qualified"
                     if str(exc) == "BUNDLE_RESOURCE_NOT_ROUTE" else "bundle_incompatible")
             raise ProgrammingError(422, code, str(exc)) from exc
-        platform = self.coordinator.status(alias)
+        platform = self._timed_bootstrap_read(alias, self.coordinator.status, "status")
         pairing = platform.get("pairing") or {}
         if pairing.get("paired") is not True or pairing.get("device_match") is not True:
             raise ProgrammingError(409, "bootstrap_pairing_required",
@@ -827,7 +861,7 @@ class BundleProgrammingWorkflow:
         runtime = (platform.get("bootstrap") or {}).get("runtime") or {}
         if runtime.get("state") != "runtime_active":
             raise ProgrammingError(409, "ppu_runtime_not_active", "PPU Runtime is not active")
-        active = self.coordinator.assets(alias)
+        active = self._timed_bootstrap_read(alias, self.coordinator.assets, "assets")
         if active.get("state") == "RECOVERY_REQUIRED":
             raise ProgrammingError(409, "ppu_recovery_required",
                                    "PPU Active Asset Set requires explicit recovery")
@@ -1245,13 +1279,20 @@ class BundleProgrammingWorkflow:
             if signer is not None and hasattr(client, "write_signer"):
                 client.write_signer = signer(run.alias)
             self._update(run, state="preflight")
-            self._readiness(client, run.site, plan.route.site_interface,
-                            plan.payload.get("execution_owner_id"))
+            started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
+            try:
+                self._readiness(client, run.site, plan.route.site_interface,
+                                plan.payload.get("execution_owner_id"))
+            finally:
+                if started is not None:
+                    _m0_timing("manager_preflight", run_id=run.run_id, plan_id=plan.plan_id,
+                               ppu_alias=run.alias, site_id=run.site,
+                               duration_ms=round((self.monotonic() - started) * 1000, 3))
             self._step(run, "PREFLIGHT", "PASS")
             activated = plan.payload["activation_required"]
             if activated:
                 self._activate(run, plan)
-            active = self.coordinator.assets(run.alias)
+            active = self._timed_bootstrap_read(run.alias, self.coordinator.assets, "assets")
             expected_set = (plan.bundle.archive_sha256 if activated
                             else plan.payload["active_asset_set"]["asset_set_sha256"])
             if not (active.get("state") == "ACTIVE"
@@ -1259,8 +1300,15 @@ class BundleProgrammingWorkflow:
                 raise _StepFailure("ACTIVE_SET_MISMATCH_AFTER_ACTIVATION" if activated
                                    else "ACTIVE_SET_CHANGED_SINCE_PLAN")
             self._update(run, state="submitting")
-            ready = self._readiness(client, run.site, plan.route.site_interface,
-                            plan.payload.get("execution_owner_id"))
+            started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
+            try:
+                ready = self._readiness(client, run.site, plan.route.site_interface,
+                                plan.payload.get("execution_owner_id"))
+            finally:
+                if started is not None:
+                    _m0_timing("manager_presubmit_readiness", run_id=run.run_id,
+                               plan_id=plan.plan_id, ppu_alias=run.alias, site_id=run.site,
+                               duration_ms=round((self.monotonic() - started) * 1000, 3))
             # The PPU itself must prove the Resources the Job is bound to.
             report = ready.get("active_resources")
             if not (isinstance(report, dict) and report.get("state") == "VERIFIED"
@@ -1359,7 +1407,7 @@ class BundleProgrammingWorkflow:
         deadline = self.monotonic() + self.deployment_deadline_s
         while True:
             try:
-                deployment = ((self.coordinator.status(alias).get("bootstrap") or {})
+                deployment = ((self._timed_bootstrap_read(alias, self.coordinator.status, "status").get("bootstrap") or {})
                               .get("deployment") or {})
             except Exception as exc:
                 raise _OutcomeUnknown("B3_STATE_UNKNOWN_DO_NOT_RESUBMIT") from exc
