@@ -136,3 +136,73 @@ test("IC Management input fields retain readable Light and Dark text, placeholde
   await theme.getByRole("button", { name: "Light", exact: true }).click();
   await assertPalette("rgb(247, 250, 251)", "rgb(17, 38, 49)", "rgb(95, 116, 130)");
 });
+
+
+test("IC Management explains Official versus Local ICPN conflicts without deleting customer data", async ({ page }) => {
+  const mutatingRequests: string[] = [];
+  const local = {
+    record: { vendor: "LocalVendor", identifier: "CUSTOM-A", family: "Demo", package: "QFN", flash_size: "64 KB" },
+    profile: { profile_id: "custom-v3", operations: ["program"] },
+    revision: 3, origin: "LOCAL", verification: "UNVERIFIED",
+  };
+  await page.route("**/api/manager/catalog/management**", async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const action = url.pathname.split("/").at(-1);
+    const response = (status: number, body: object) => route.fulfill({
+      status, contentType: "application/json", body: JSON.stringify(body),
+    });
+    if (request.method() === "GET" && action === "management") {
+      return response(200, {
+        ok: true, local: [local], evidence: [],
+        history: { active_revision: "previous-revision", revisions: [], audit: [] },
+      });
+    }
+    if (request.method() === "GET" && action === "official") {
+      return response(200, {
+        ok: true, record: { vendor: "LocalVendor", identifier: "CUSTOM-A" },
+        qualification: { catalog_level: 1 }, revision: "previous-revision",
+      });
+    }
+    if (request.method() === "POST" && action === "validate-official") {
+      return response(409, {
+        ok: false, error: {
+          code: "CATALOG_LOCAL_IDENTITY_CONFLICT",
+          message: "Official Catalog update blocked: 1 customer-owned local exact ICPN conflict(s); resolve the local identities explicitly before retrying",
+          conflict_count: 1, truncated: false,
+          conflicts: [{
+            manufacturer: "LocalVendor", exact_icpn: "CUSTOM-A",
+            local_revision: 3, local_profile_id: "custom-v3",
+          }],
+        },
+      });
+    }
+    if (request.method() === "POST") mutatingRequests.push(url.pathname);
+    return response(500, { ok: false, error: { message: "Unexpected test request" } });
+  });
+
+  await page.goto("/ic-management");
+  await expect(page.getByRole("heading", { name: "IC Management" })).toBeVisible();
+  const official = page.locator(".icManagement section").filter({
+    has: page.getByRole("heading", { name: "Official Catalog · Validate / Stage / Publish" }),
+  });
+  await official.getByRole("textbox", { name: "Manufacturer" }).fill("LocalVendor");
+  await official.getByRole("textbox", { name: "Exact ICPN" }).fill("CUSTOM-A");
+  await official.getByRole("button", { name: "Load official record" }).click();
+  await expect(official.getByText("Editing candidate from revision")).toBeVisible();
+  await official.getByRole("button", { name: "Validate", exact: true }).click();
+
+  const alert = page.getByRole("alert", { name: "Catalog identity conflict" });
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText("1 customer part number conflict(s)");
+  await expect(alert).toContainText("LocalVendor · CUSTOM-A");
+  await expect(alert).toContainText("LOCAL r3 · Profile custom-v3");
+  await expect(alert).toContainText("Nothing is automatically renamed, deleted, or promoted.");
+  await expect(alert.getByRole("button", { name: "Export Local Catalog JSON" })).toBeVisible();
+  await alert.getByRole("button", { name: "View customer IC" }).click();
+  const editor = page.locator("#local-ic-editor");
+  await expect(editor.getByRole("textbox", { name: "identifier" })).toHaveValue("CUSTOM-A");
+  await expect(editor.getByRole("textbox", { name: "Profile ID" })).toHaveValue("custom-v3");
+  await expect(official.getByRole("button", { name: "Stage" })).toBeDisabled();
+  expect(mutatingRequests).toEqual([]);
+});
