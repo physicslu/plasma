@@ -72,6 +72,10 @@ def test_batch_reservation_excludes_b3_across_idle_cycles_and_preserves_site_job
         expected = {"ppu_id": "ppu-a", "asset_set_sha256": "a" * 64,
                     "generation": 3, "resource_set_sha256": "b" * 64}
         try:
+            with pytest.raises(PlasmaError) as malformed:
+                manager.resource_reservation("acquire", owner_id="batch-1",
+                                             expected={**expected, "generation": True})
+            assert malformed.value.code is ErrorCode.INVALID_ARGUMENT
             reservation = manager.resource_reservation("acquire", owner_id="batch-1",
                                                        expected=expected)
             assert reservation["epoch"] and reservation["state"] == "ACTIVE"

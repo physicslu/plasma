@@ -378,7 +378,7 @@ class SiteManager:
                              expected: dict[str, Any] | None = None) -> dict[str, Any]:
         """PPU authority shared with Job admission and B3 Runtime quiesce."""
         self._validate_execution_owner(owner_id, "owner_id")
-        if action not in {"acquire", "check", "release"}:
+        if type(action) is not str or action not in {"acquire", "check", "release"}:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid reservation action")
         with self._execution_lock:
             current = self._live_reservation()
@@ -390,6 +390,13 @@ class SiteManager:
                     raise PlasmaError(ErrorCode.PPU_BUSY, "PPU has another execution owner")
                 if type(expected) is not dict or set(expected) != {
                     "ppu_id", "asset_set_sha256", "generation", "resource_set_sha256"}:
+                    raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "reservation identity is invalid")
+                if (type(expected["ppu_id"]) is not str or not expected["ppu_id"]
+                        or type(expected["generation"]) is not int
+                        or expected["generation"] < 0
+                        or any(type(expected[key]) is not str or
+                               re.fullmatch(r"[0-9a-f]{64}", expected[key]) is None
+                               for key in ("asset_set_sha256", "resource_set_sha256"))):
                     raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "reservation identity is invalid")
                 identity = self._resolve_active_resources()  # full content verification stays PPU-owned
                 observed = {"ppu_id": self.config.ppu.id,
