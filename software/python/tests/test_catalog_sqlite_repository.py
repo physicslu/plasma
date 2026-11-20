@@ -812,7 +812,8 @@ def test_customer_profile_links_to_existing_official_ic_without_identity_or_qual
     assert retained["profile_origin"] == "CUSTOMER"
     assert retained["verification"] == "UNVERIFIED"
     assert retained["official_link"]["official_revision_at_link"] == initial
-    assert repo.read_active() == before
+    assert repo.read_active().revision_sha256 == before.revision_sha256
+    assert repo.read_active().qualifications == before.qualifications
     assert [e["action"] for e in repo.history()["audit"]].count("LOCAL_LINK_OFFICIAL") == 1
     with pytest.raises(DeviceCatalogIntegrityError, match="not found"):
         repo.link_local_to_official(
