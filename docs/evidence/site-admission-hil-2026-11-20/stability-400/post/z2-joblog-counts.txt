@@ -1,0 +1,8 @@
+ 
+***
+cd /var/log/plasma; files=$(ls 2026-11-20/SITE*/job-20261120-0[345]*.log 2>/dev/null | grep -E "job-20261120-(0309|03[1-5][0-9])"); echo "job_logs $(echo "$files" | grep -c log)"; echo "admission_denied $(grep -l ADMISSION_DENIED $files | wc -l)"; echo "job_error $(grep -l job_error $files | wc -l)"; echo "stage_failed $(grep -l stage_failed $files | wc -l)"; echo "proc_scan_incomplete $(grep -l PROC_SCAN_INCOMPLETE $files | wc -l)"
+job_logs 402
+admission_denied 0
+job_error 0
+stage_failed 0
+proc_scan_incomplete 0

@@ -1,0 +1,17 @@
+ 
+***
+date -u; readlink /opt/plasma/current; echo "root_manifest $(S sha256sum /opt/plasma/privileged/fpga-root/.plasma-privileged-code.json | cut -c1-64)"; echo "root_guard $(S sha256sum /opt/plasma/privileged/fpga-root/pl/hil/fpga_image_guard.py | cut -c1-64)"; echo "journal $(S sha256sum /var/lib/plasma-privileged/fpga-deployment-state.json | cut -c1-64)"; echo "fpga_manager $(cat /sys/class/fpga_manager/fpga0/state)"; pgrep -a openocd || echo no-openocd; echo "admission_records $(S ls /run/plasma-z2-swd05/ | grep -c admission)"; S cat /opt/plasma/assets/active.json | python3 -c "import json,sys;d=json.load(sys.stdin);print(\"active\",d[\"asset_set_sha256\"],\"gen\",d[\"generation\"])"; S grep -h max_concurrent /etc/plasma/ppu.yaml; systemctl is-active plasma-server plasma-site-worker plasma-bootstrap plasma-web
+Fri Nov 20 03:07:34 AM UTC 2026
+/opt/plasma/releases/0.2.1-acdfd7403058
+root_manifest 9bd9ba304e38fc6863d26cf17b107cc947695e4edc4a2a3d3e868a74836256c3
+root_guard f4dfb55e2317db6a25a5c64be8975effccf27da1af7570eeb35ba91a5368edde
+journal 986446e768a38ab19dab6b9dd9d521b880dcd72412a07ab4d90631795adafb0e
+fpga_manager operating
+no-openocd
+admission_records 0
+active 957ac4e62d23507fd577300c3dc827777fa1ccddb0fffdb13911dc9e8b8d8d83 gen 25
+  max_concurrent_jobs: 2
+active
+active
+active
+active

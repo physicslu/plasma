@@ -1,0 +1,20 @@
+def t: if . == null then null elif type == "number" then . else (sub("\\+00:00$";"") | capture("^(?<s>[^.]+)(?<f>\\.[0-9]+)?$") | ((.s+"Z")|fromdateiso8601) + ((.f // "0")|tonumber)) end;
+def r3: (.*1000|round)/1000;
+def stats: sort as $v | ($v|length) as $n | {n:$n, mean:(add/$n|r3), p50:($v[(($n-1)*0.5|round)]|r3), p95:($v[(($n-1)*0.95|round)]|r3), max:($v[-1]|r3)};
+map({site, cycle, s:.start|t, e:.end|t}) as $J
+| ($J|map(select(.site==1))|sort_by(.cycle)) as $a | ($J|map(select(.site==2))|sort_by(.cycle)) as $b
+| def act($p; $x): any($p[]; .s <= $x and $x < .e);
+  def holder($p; $x): [$p[] | select(.s <= $x and $x < .e)][0];
+  def nx($m; $p): [range(1; $m|length) as $i | holder($p; $m[$i-1].e) as $h |
+    {site:$m[$i].site, gap:($m[$i].s-$m[$i-1].e), started_while_peer_running:act($p; $m[$i].s), released_while_peer_running:($h != null),
+     started_before_that_peer_job_ended:($h != null and $m[$i].s < $h.e),
+     start_minus_that_peer_job_end:(if $h then $m[$i].s - $h.e else null end)}];
+  (nx($a;$b)+nx($b;$a)) as $N
+| {jobs:($J|length), span_s:((($J|map(.e)|max)-($J|map(.s)|min))|r3), throughput_jobs_per_min:(($J|length)/(($J|map(.e)|max)-($J|map(.s)|min))*60|r3),
+   s_per_cycle:([$a,$b]|map(((.[-1].e-.[0].s)/length)|r3)),
+   gap_start_basis:($N|map(.gap)|stats),
+   site2_started_while_site1_running:($N|map(select(.site==2 and .started_while_peer_running))|length),
+   site1_started_while_site2_running:($N|map(select(.site==1 and .started_while_peer_running))|length),
+   released_while_peer_running:($N|map(select(.released_while_peer_running))|length),
+   no_barrier_events:{site2:($N|map(select(.site==2 and .started_before_that_peer_job_ended))|length), site1:($N|map(select(.site==1 and .started_before_that_peer_job_ended))|length)},
+   start_minus_holding_peer_job_end:($N|map(select(.start_minus_that_peer_job_end != null)|.start_minus_that_peer_job_end)|stats)}

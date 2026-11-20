@@ -1,0 +1,112 @@
+{
+  "jobs": 200,
+  "distinct": {
+    "job": 200,
+    "run": 200,
+    "plan": 200
+  },
+  "all_pass_success_safeoff_epv_readback": true,
+  "run_step_coverage": 200,
+  "span_s": 1241.114,
+  "throughput_jobs_per_min": 9.671,
+  "per_site": [
+    {
+      "site": 1,
+      "s_per_cycle": 12.406,
+      "job_duration": {
+        "n": 100,
+        "mean": 9.644,
+        "p50": 9.548,
+        "p95": 10.007,
+        "max": 10.186,
+        "min": 9.266
+      }
+    },
+    {
+      "site": 2,
+      "s_per_cycle": 12.411,
+      "job_duration": {
+        "n": 100,
+        "mean": 9.71,
+        "p50": 9.74,
+        "p95": 10.056,
+        "max": 10.443,
+        "min": 9.263
+      }
+    }
+  ],
+  "next_cycle": {
+    "dispatch_latency": {
+      "n": 198,
+      "mean": 2.397,
+      "p50": 2.354,
+      "p95": 2.802,
+      "max": 3.348,
+      "min": 1.973
+    },
+    "gap_start_basis": {
+      "n": 198,
+      "mean": 2.755,
+      "p50": 2.714,
+      "p95": 3.198,
+      "max": 3.745,
+      "min": 2.316
+    },
+    "terminal_to_mgr_observed": {
+      "n": 198,
+      "mean": 0.183,
+      "p50": 0.169,
+      "p95": 0.321,
+      "max": 0.48,
+      "min": 0.066
+    },
+    "terminal_to_settled": {
+      "n": 198,
+      "mean": 0.231,
+      "p50": 0.218,
+      "p95": 0.368,
+      "max": 0.513,
+      "min": 0.093
+    },
+    "terminal_to_next_attempt": {
+      "n": 198,
+      "mean": 1.323,
+      "p50": 1.309,
+      "p95": 1.597,
+      "max": 1.766,
+      "min": 1.006
+    },
+    "next_attempt_to_preflight_pass": {
+      "n": 198,
+      "mean": 0.331,
+      "p50": 0.336,
+      "p95": 0.375,
+      "max": 0.391,
+      "min": 0.279
+    },
+    "next_attempt_to_ppu_accepted": {
+      "n": 198,
+      "mean": 1.074,
+      "p50": 1.132,
+      "p95": 1.237,
+      "max": 1.589,
+      "min": 0.881
+    }
+  },
+  "independence": {
+    "next_cycles": 198,
+    "scenarioA_site2_submitted_while_site1_running": 41,
+    "scenarioB_site1_submitted_while_site2_running": 58,
+    "released_while_peer_running_then_submitted_while_peer_running": 27,
+    "cycles_2_100_with_overlap": 99,
+    "overlap_same_index": {
+      "n": 100,
+      "mean": 9.747,
+      "p50": 9.758,
+      "p95": 9.91,
+      "max": 10.035,
+      "min": 9.43
+    },
+    "overlap_total_s": 974.655
+  }
+}

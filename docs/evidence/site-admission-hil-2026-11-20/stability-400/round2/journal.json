@@ -1,0 +1,39 @@
+{
+  "batch_id": "ef273ba5c1d3f5b666392d055800ecb6",
+  "batch_post_count": 1,
+  "icpn": "STM32F103C8T6",
+  "manager_url": "http://127.0.0.1:18280",
+  "operations": [
+    "erase",
+    "program",
+    "verify"
+  ],
+  "policy": {
+    "repeat": 100,
+    "replace_ic_before_next_cycle": false,
+    "retry_limit": 0,
+    "stop_policy": {
+      "kind": "never"
+    }
+  },
+  "reason": null,
+  "schema": "plasma.utility.program-journal.v1",
+  "source": {
+    "kind": "image",
+    "name": "plasma-blue-pill-cdc-v0.2.bin",
+    "sha256": "e691ab23b835bfe0b4ec5e2ae6f8ddb913d84be502c4065e985c5ad2ba72682c",
+    "size": 62800
+  },
+  "start_id": "d7a1cfa3e2480e78b97157ee33c0c46f",
+  "start_post_count": 1,
+  "submission": "ACCEPTED",
+  "targets": [
+    {
+      "ppu_alias": "z2",
+      "site_ids": [
+        1,
+        2
+      ]
+    }
+  ]
+}

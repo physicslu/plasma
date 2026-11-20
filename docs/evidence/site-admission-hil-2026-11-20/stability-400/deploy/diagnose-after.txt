@@ -1,0 +1,1 @@
+{"status":"OBSERVED","execution_ready":true,"sites":[{"site_id":1,"state":"idle","current_job_id":null},{"site_id":2,"state":"idle","current_job_id":null}]}
