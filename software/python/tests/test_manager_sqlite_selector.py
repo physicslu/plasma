@@ -7,8 +7,10 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import time
 import urllib.error
 import urllib.request
+from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import patch
 
@@ -204,6 +206,48 @@ def test_catalog_management_local_round_trip_and_publisher_boundary(
     official = json.loads(json.dumps(entry))
     official["record"].update(vendor="STMicroelectronics", identifier="STM32F103C8T6")
     assert post("local", {"entries": [official]})[0] == 400
+
+
+def test_manager_http_export_reads_one_snapshot_and_preserves_catalog(
+    tmp_path: Path, source_qualified_database: Path, manager_port: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = tmp_path / "export.db"
+    with sqlite3.connect(source_qualified_database) as source, sqlite3.connect(database) as target:
+        source.backup(target)
+    repo = CatalogSqliteShadowRepository(database)
+    repo.save_local_records([{
+        "record": {"vendor": "LocalVendor", "identifier": "EXPORT123"},
+        "profile": {"profile_id": "export-test"},
+    }], actor="test")
+    before = repo.read_active()
+    local = repo.local_records()
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(database))
+    original = CatalogSqliteShadowRepository.read_active
+    reads = 0
+
+    def counted_read_active(self):
+        nonlocal reads
+        reads += 1
+        return original(self)
+
+    monkeypatch.setattr(CatalogSqliteShadowRepository, "read_active", counted_read_active)
+    started = time.monotonic()
+    status, body = _get(manager_port, "/api/catalog/management/export")
+    elapsed = time.monotonic() - started
+    assert status == 200 and body["ok"] is True
+    assert set(body) == {"ok", "local", "official"}
+    assert body["local"] == local
+    expected_official = [
+        {"record": asdict(record), "qualification": before.qualifications.get(
+            (record.vendor.casefold(), record.identifier.casefold()))}
+        for record in before.catalog.records
+    ]
+    assert body["official"] == json.loads(json.dumps(expected_official))
+    assert reads == 1
+    print(f"HTTP export: {len(body['official'])} records, {reads} snapshot read, {elapsed:.3f}s")
+    assert repo.read_active().revision_sha256 == before.revision_sha256
+    assert len(repo.local_records()) == 1
 
 
 def test_local_ic_survives_manager_http_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
