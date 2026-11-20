@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -104,7 +104,7 @@ class Path2OperatorCLI(unittest.TestCase):
 
 
     def test_canonical_plasmactl_runs_via_bash_without_shell(self):
-        # These are pure executor mocks: no Control Station is deployed.
+        # Pure executor mocks: no Control Station deployment or sudo.
         commands = (
             ["status", "local-control-station"],
             ["verify", "local-control-station"],
@@ -124,18 +124,80 @@ class Path2OperatorCLI(unittest.TestCase):
                     source = Path(td) / "scripts/plasmactl"
                     source.parent.mkdir(parents=True)
                     source.write_text("#!/usr/bin/env bash\nexit 0\n")
-                    executor = Mock(return_value=subprocess.CompletedProcess(
-                        args=[], returncode=0, stdout=b"mock\n", stderr=b""))
-                    result = dispatch.run_task(
-                        task, workspace=Path(td), approval=approval,
-                        executor=executor, sandbox=False)
+                    owner_command = len(argv) >= 2 and argv[1] == "local-control-station"
+                    if owner_command and argv[0] == "install":
+                        with patch.object(dispatch, "LOCAL_CS_OWNER_REPO", Path(td)):
+                            executor = Mock()
+                            with self.assertRaisesRegex(dispatch.Denied,
+                                                        "LOCAL_CS_OWNER_OPERATION_DENIED"):
+                                dispatch.run_task(task, workspace=Path(td), approval=approval,
+                                                  executor=executor, sandbox=False)
+                            executor.assert_not_called()
+                        continue
+                    success = subprocess.CompletedProcess(
+                        args=[], returncode=0, stdout=b"mock\n", stderr=b"")
+                    if owner_command:
+                        executor = Mock(side_effect=[
+                            subprocess.CompletedProcess(args=[], returncode=0,
+                                                        stdout=SHA.encode() + b"\n", stderr=b""),
+                            subprocess.CompletedProcess(args=[], returncode=0,
+                                                        stdout=b"", stderr=b""),
+                            success,
+                        ])
+                    else:
+                        executor = Mock(return_value=success)
+                    with patch.object(dispatch, "LOCAL_CS_OWNER_REPO", Path(td)):
+                        result = dispatch.run_task(
+                            task, workspace=Path(td), approval=approval,
+                            executor=executor, sandbox=False)
                 args, kwargs = executor.call_args
-                self.assertEqual(args[0],
-                                 ["/bin/bash", str(source), *argv])
+                if owner_command:
+                    self.assertEqual(len(executor.call_args_list), 3)
+                    self.assertEqual(args[0], [
+                        "sudo", "-n", "-u", "gordon",
+                        "HOME=/home/gordon", "XDG_RUNTIME_DIR=/run/user/1000",
+                        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus",
+                        "/bin/bash", str(source), *argv])
+                else:
+                    self.assertEqual(args[0], ["/bin/bash", str(source), *argv])
                 self.assertEqual(kwargs["timeout"], 1800)
                 self.assertFalse(kwargs.get("shell", False))
                 self.assertEqual(result["status"],
                                  "OPERATOR_CLI_EXIT_ZERO_EVIDENCE_REVIEW_REQUIRED")
+
+    def test_local_station_owner_bridge_fails_closed_before_cli(self):
+        for mode in ("wrong_sha", "dirty", "sudo_denied", "pr", "dev_fresh"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as td:
+                source = Path(td) / "scripts/plasmactl"
+                source.parent.mkdir(parents=True)
+                source.write_text("#!/usr/bin/env bash\nexit 0\n")
+                args = ["deploy", "local-control-station"]
+                if mode == "dev_fresh":
+                    args.append("--dev-fresh-state")
+                task, approval = admitted(work_order(script="scripts/plasmactl", argv=args))
+                if mode == "pr":
+                    approval = dict(approval, pr_number=1, pinned_sha="b" * 40,
+                                    source_sha="b" * 40)
+                first = subprocess.CompletedProcess(
+                    args=[], returncode=77 if mode == "sudo_denied" else 0,
+                    stdout=(b"b" * 40 if mode == "wrong_sha" else SHA.encode()) + b"\n",
+                    stderr=b"")
+                second = subprocess.CompletedProcess(
+                    args=[], returncode=0,
+                    stdout=b"?? untracked\n" if mode == "dirty" else b"", stderr=b"")
+                executor = Mock(side_effect=[first, second])
+                reason = {
+                    "wrong_sha": "LOCAL_CS_OWNER_SOURCE_SHA_DENIED",
+                    "dirty": "LOCAL_CS_OWNER_SOURCE_DIRTY",
+                    "sudo_denied": "LOCAL_CS_OWNER_SOURCE_SHA_DENIED",
+                    "pr": "LOCAL_CS_OWNER_MAIN_ONLY",
+                    "dev_fresh": "LOCAL_CS_OWNER_OPERATION_DENIED",
+                }[mode]
+                with patch.object(dispatch, "LOCAL_CS_OWNER_REPO", Path(td)):
+                    with self.assertRaisesRegex(dispatch.Denied, reason):
+                        dispatch.run_task(task, workspace=Path(td), approval=approval,
+                                          executor=executor, sandbox=False)
+                self.assertLessEqual(executor.call_count, 2)
 
     def test_plasmactl_never_bypasses_signature_or_sandbox_guards(self):
         task, approval = admitted(work_order(
