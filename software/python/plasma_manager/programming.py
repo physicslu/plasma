@@ -48,6 +48,7 @@ import binascii
 import json
 import os
 import secrets
+import sys
 import tempfile
 import threading
 import time
@@ -157,6 +158,21 @@ def default_routes_root() -> Path | None:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _m0_timing(event: str, **fields: Any) -> None:
+    """Opt-in local diagnostics; failure must never affect Job outcomes."""
+    if os.environ.get("PLASMA_M0_TIMING") != "1":
+        return
+    try:
+        sys.stderr.write("PLASMA_M0 " + json.dumps(
+            {"event": event, "pid": os.getpid(),
+             "thread_id": threading.get_ident(), "monotonic_ns": time.monotonic_ns(),
+             **fields},
+            sort_keys=True, separators=(",", ":"),
+        ) + "\n")
+    except (OSError, TypeError, ValueError):
+        pass  # no diagnostic may change a programming decision
 
 
 def _journal_start(record: Mapping[str, Any]) -> dict[str, Any]:
@@ -1390,6 +1406,8 @@ class BundleProgrammingWorkflow:
                 # Submission commits under the same lock as the global latch.
                 # After this durable point it is possibly sent, never resent.
                 self._update(run, job_submission_count=1)
+            submit_started = (self.monotonic()
+                              if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
             try:
                 status, _headers, body = client.relay(
                     "POST", "/api/jobs",
@@ -1398,6 +1416,11 @@ class BundleProgrammingWorkflow:
                     timeout_s=max(self.request_timeout_s, 18.0), max_response_bytes=65536)
             except Exception as exc:
                 raise _OutcomeUnknown("JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT") from exc
+            finally:
+                if submit_started is not None:
+                    _m0_timing("manager_submit_http", run_id=run.run_id,
+                               plan_id=plan.plan_id, ppu_alias=run.alias, site_id=run.site,
+                               duration_ms=round((self.monotonic() - submit_started) * 1000, 3))
         finally:
             self.gate.end_managed_write(run.alias)
         if status != 202:
@@ -1411,6 +1434,9 @@ class BundleProgrammingWorkflow:
                 raise ValueError
         except Exception as exc:
             raise _OutcomeUnknown("JOB_ID_UNKNOWN_DO_NOT_RESUBMIT") from exc
+        _m0_timing("manager_submit_ack", run_id=run.run_id,
+                   plan_id=plan.plan_id, job_id=job_id,
+                   ppu_alias=run.alias, site_id=run.site)
         self._update(run, job={"job_id": job_id, "state": job.get("state")})
         self._step(run, f"{plan.operation.upper()}_SUBMIT", "ACCEPTED", job_id=job_id)
         return job_id
