@@ -46,7 +46,7 @@ test("IC Management fields use theme tokens and never fall back to dark surfaces
   ]) {
     assert.ok(rule, "both Light and Dark palettes must exist");
     for (const token of ["--panel-2", "--text", "--muted"]) {
-      assert.match(rule, new RegExp(`\\b${token}:\\s*#[0-9a-f]{3,8}`, "i"));
+      assert.match(rule, new RegExp(`(?:^|\\s)${token}:\\s*#[0-9a-f]{3,8}`, "i"));
     }
   }
 });
