@@ -366,6 +366,38 @@ def test_tamper_with_same_size_and_mtime_fails_after_a_hit(staged):
         assets.read_active_resource_identity(root)
 
 
+def test_m3_reservation_check_catches_same_size_mtime_tamper_and_isolates(staged, tmp_path):
+    """M3 P1-10: a reserved Batch reuses no stat identity; each PPU Check and
+    each Job admission fully verifies, and a tamper isolates the PPU."""
+    from functools import partial
+    from plasma_core.errors import PlasmaError
+    from plasma_server.site_manager import SiteManager
+    from .helpers import make_config
+    root, built = staged
+    manager = SiteManager(make_config(tmp_path / "ppu"))
+    manager._active_resource_resolver = partial(assets.read_active_resource_identity, root)
+    identity = assets.read_active_resource_identity(root)
+    token = manager.resource_reservation("acquire", owner_id="batch-1", expected={
+        "ppu_id": manager.config.ppu.id, "asset_set_sha256": identity["asset_set_sha256"],
+        "generation": identity["generation"],
+        "resource_set_sha256": identity["resource_set_sha256"]})["token"]
+    manager.resource_reservation("check", owner_id="batch-1", token=token)  # Snapshot hit
+    stage = root / "assets/staged" / built.archive_sha256
+    victim = next(p for p in (stage / "payload/packages").rglob("*.json"))
+    info = victim.stat()
+    raw = bytearray(victim.read_bytes())
+    raw[-2] = ord(" ") if raw[-2] != ord(" ") else ord("\t")
+    victim.write_bytes(bytes(raw))
+    os.utime(victim, ns=(info.st_atime_ns, info.st_mtime_ns))
+    with pytest.raises(PlasmaError):
+        manager.resource_reservation("check", owner_id="batch-1", token=token)
+    snap = manager.resource_reservation_snapshot()
+    assert (snap["state"], snap["reason"]) == (
+        "RECOVERY_REQUIRED", "RESERVED_RESOURCE_IDENTITY_UNVERIFIABLE")
+    with pytest.raises(PlasmaError):
+        manager.acquire_asset_set_quiesce()
+
+
 @pytest.mark.parametrize("target", ["file", "staged_dir"])
 def test_symlink_or_path_replacement_fails_after_a_hit(staged, tmp_path_factory, target):
     root, built = staged

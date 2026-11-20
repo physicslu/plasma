@@ -1481,20 +1481,13 @@ class ProgrammingBatchCoordinator:
                     # slow remote calls; they cannot admit further dispatches.
                     raise _SharedControlFailure(latch(exc)) from exc
         for alias in reserved:
-            units = [unit for unit in batch["units"] if unit["ppu_alias"] == alias]
-            if any(unit.get("outcome") == "OUTCOME_UNKNOWN"
-                   or str(unit.get("reason") or "").startswith("CYCLE_NOT_RELEASED_")
-                   or (unit["cycle"].get("last") is not None
-                       and (unit["cycle"]["last"].get("receipt") or {}).get("safe_off") is not True)
-                   for unit in units):
-                # An unproven Site is never explicitly released. The PPU's
-                # bounded TTL and existing Site recovery guards govern it.
-                continue
+            # The PPU decides: it releases only with its own SAFE_OFF proof
+            # for every reserved Job and otherwise isolates the PPU as
+            # RECOVERY_REQUIRED (also when this request is lost and the TTL
+            # ends). The Manager never claims a release it did not receive.
             try:
                 self.workflow.end_batch_resource(alias, owner_id)
             except Exception:
-                # A lost Release acknowledgement is left to the PPU TTL;
-                # never claim that a possibly active Job was released.
                 pass
         self._reservation_blocks.pop(owner_id, None)
         if failure is not None:

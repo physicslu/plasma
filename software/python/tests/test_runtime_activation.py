@@ -62,15 +62,89 @@ def test_quiesce_is_bounded_and_expires(tmp_path: Path) -> None:
     assert manager.runtime_quiesce_snapshot()["active"] is False
 
 
-def test_batch_reservation_excludes_b3_across_idle_cycles_and_preserves_site_jobs(tmp_path: Path) -> None:
+# --- WO-2 F2 M3 Batch Resource Reservation (PPU authority) ---------------
+# Real SiteManager + Mock ``operations[]`` Jobs (their evidence carries
+# ``safe_off``). Hazard outcomes are injected as this PPU's own terminal Job
+# results; TTL is expired by moving the monotonic deadline (no sleeps).
+
+def _m3_manager(tmp_path: Path, sites=(1, 2), root: str = "out"):
+    from plasma_server import mock_resources
+    from .test_mock_programming_operations import mock_config
+    cfg = mock_config(tmp_path, site_ids=sites)
+    cfg.server.output_root = tmp_path / root
+    manager = SiteManager(cfg)
+    identity = mock_resources.install_mock_resources(manager)
+    expected = {"ppu_id": manager.config.ppu.id,
+                "asset_set_sha256": identity["asset_set_sha256"],
+                "generation": identity["generation"],
+                "resource_set_sha256": identity["resource_set_sha256"]}
+    return manager, identity, expected
+
+
+def _m3_job(identity, site, owner="batch-1", token=None):
+    from dataclasses import replace
+    from .test_mock_programming_operations import IMAGE_A, programming_request
+    request = programming_request(identity, ("erase", "program", "verify"), IMAGE_A,
+                                  site_id=site)
+    metadata = {**request.metadata, "execution_owner_kind": "rest_client",
+                "execution_owner_id": owner}
+    if token is not None:
+        metadata["resource_reservation_token"] = token
+    return replace(request, metadata=metadata)
+
+
+def _m3_outcome(manager, job_id, kind, *, active=False):
+    """Record ``job_id`` as a reserved Job of this PPU with a given outcome."""
+    from types import SimpleNamespace
+    from plasma_core.enums import JobState
+    from plasma_core.models import ErrorDetail, JobResult
+    details, context, state, attempt = {}, None, JobState.FAILED, 1
+    if kind == "pass_safe":
+        details, state = {"programming": {"result": "PASS", "safe_off": True}}, JobState.SUCCESS
+    elif kind == "pass_no_evidence":
+        state = JobState.SUCCESS
+    elif kind == "fail_safe":
+        context = {"site_worker_result": {"result": "FAIL", "safe_off": True}}
+    elif kind == "fail_safe_off_false":
+        context = {"safe_off": False}
+    elif kind in ("transport_denied", "operation_failed_safe", "site_sealed"):
+        code = {"transport_denied": "TRANSPORT_DENIED:ADMISSION_DENIED:X",
+                "operation_failed_safe": "OPERATION_FAILED_SAFE:VERIFY",
+                "site_sealed": "OUTCOME_UNKNOWN_SITE_SEALED:X"}[kind]
+        context = {"site_worker_code": code, "outcome_unknown": kind == "site_sealed"}
+    elif kind == "outcome_unknown":
+        context = {"site_worker_result": {"safe_off": True}, "outcome_unknown": True}
+    elif kind == "cancelled_before_start":
+        state, attempt = JobState.CANCELLED, 0
+    error = (ErrorDetail(error_code="E", error_type="T", message="m", recoverable=False,
+                         context=context) if context is not None else None)
+    result = JobResult(job_id=job_id, site_id=1, operation=Operation.PROGRAMMING,
+                       state=state, error=error, details=details)
+    manager.registry._jobs[job_id] = SimpleNamespace(
+        state=JobState.RUNNING if active else state,
+        result=None if active else result, attempt=attempt)
+    manager._reservation["job_ids"].add(job_id)
+    if active:
+        lease = manager._execution_lease or PPUExecutionLease("rest_client", "batch-1")
+        lease.job_ids.add(job_id)
+        manager._execution_lease = lease
+
+
+def _m3_b3_refused(manager) -> bool:
+    try:
+        lease = manager.acquire_asset_set_quiesce()
+    except PlasmaError as exc:
+        assert exc.code is ErrorCode.PPU_BUSY
+        return True
+    manager.release_runtime_quiesce(lease["token"])
+    return False
+
+
+def test_batch_reservation_spans_idle_cycles_and_releases_only_with_ppu_safe_off(tmp_path: Path) -> None:
+    """P1-9 / P1-7 / P1-12: real Jobs, safe release, identity anomaly, recovery, re-acquire."""
     async def scenario() -> None:
-        manager = SiteManager(config(tmp_path))
-        identity = {"state": "VERIFIED", "asset_set_sha256": "a" * 64,
-                    "generation": 3, "resource_set_sha256": "b" * 64}
-        manager._resolve_active_resources = lambda: dict(identity)
+        manager, identity, expected = _m3_manager(tmp_path)
         await manager.start()
-        expected = {"ppu_id": "ppu-a", "asset_set_sha256": "a" * 64,
-                    "generation": 3, "resource_set_sha256": "b" * 64}
         try:
             with pytest.raises(PlasmaError) as malformed:
                 manager.resource_reservation("acquire", owner_id="batch-1",
@@ -78,57 +152,210 @@ def test_batch_reservation_excludes_b3_across_idle_cycles_and_preserves_site_job
             assert malformed.value.code is ErrorCode.INVALID_ARGUMENT
             reservation = manager.resource_reservation("acquire", owner_id="batch-1",
                                                        expected=expected)
+            token = reservation["token"]
             assert reservation["epoch"] and reservation["state"] == "ACTIVE"
-            with pytest.raises(PlasmaError) as b3:
-                manager.acquire_asset_set_quiesce()
-            assert b3.value.code is ErrorCode.PPU_BUSY
-            foreign = JobRequest(site_id=1, operation=Operation.READ, job_id="foreign-job",
-                                 metadata={"execution_owner_kind": "rest_client",
-                                           "execution_owner_id": "batch-2"})
-            with pytest.raises(PlasmaError) as denied:
-                manager.enqueue(foreign)
-            assert denied.value.code is ErrorCode.PPU_BUSY
-            own = JobRequest(site_id=1, operation=Operation.READ, job_id="own-job",
-                             metadata={"execution_owner_kind": "rest_client",
-                                       "execution_owner_id": "batch-1",
-                                       "resource_reservation_token": reservation["token"]})
-            future = manager.enqueue(own)
-            with pytest.raises(PlasmaError):
-                manager.resource_reservation("release", owner_id="batch-1",
-                                             token=reservation["token"])
-            await future
-            renewed = manager.resource_reservation("check", owner_id="batch-1",
-                                                   token=reservation["token"])
-            assert renewed["epoch"] == reservation["epoch"]
-            manager.resource_reservation("release", owner_id="batch-1",
-                                         token=reservation["token"])
-            lease = manager.acquire_asset_set_quiesce()
-            manager.release_runtime_quiesce(lease["token"])
-            second = manager.resource_reservation("acquire", owner_id="batch-1",
-                                                  expected=expected)
-            identity["generation"] = 4
+            assert _m3_b3_refused(manager)  # no Job active: still reserved
+            with pytest.raises(PlasmaError) as foreign:
+                manager.enqueue(_m3_job(identity, 1, owner="batch-2"))
+            assert foreign.value.code is ErrorCode.PPU_BUSY
+            first = manager.enqueue(_m3_job(identity, 1, token=token))
+            second = manager.enqueue(_m3_job(identity, 2, token=token))
+            with pytest.raises(PlasmaError, match="active Jobs"):
+                manager.resource_reservation("release", owner_id="batch-1", token=token)
+            assert {(await first).state.value, (await second).state.value} == {"success"}
+            assert _m3_b3_refused(manager)  # Batch idle between Cycles
+            third = await manager.enqueue(_m3_job(identity, 1, token=token))  # same owner, next Cycle
+            assert third.state.value == "success"
+            assert manager.resource_reservation("check", owner_id="batch-1",
+                                                token=token)["epoch"] == reservation["epoch"]
+            assert manager.resource_reservation(
+                "release", owner_id="batch-1", token=token)["state"] == "RELEASED"
+            assert not (tmp_path / "out" / "ppu-resource-reservation.json").exists()
+            assert not _m3_b3_refused(manager)
+
+            # P1-7: identity anomaly under a Reservation isolates the PPU.
+            second_res = manager.resource_reservation("acquire", owner_id="batch-1",
+                                                      expected=expected)
+            resolver = manager._active_resource_resolver
+            manager._active_resource_resolver = lambda: {**resolver(), "generation": 9}
             with pytest.raises(PlasmaError) as drift:
                 manager.resource_reservation("check", owner_id="batch-1",
-                                             token=second["token"])
+                                             token=second_res["token"])
             assert drift.value.code is ErrorCode.PPU_BUSY
-            assert manager.resource_reservation_snapshot()["state"] == "NONE"
-            identity["generation"] = 3
-            expiring = manager.resource_reservation("acquire", owner_id="batch-1",
-                                                    expected=expected)
-            manager._reservation["deadline"] = time.monotonic() - 1
-            assert manager.resource_reservation_snapshot()["state"] == "NONE"
+            snap = manager.resource_reservation_snapshot()
+            assert (snap["state"], snap["reason"]) == (
+                "RECOVERY_REQUIRED", "RESERVED_RESOURCE_IDENTITY_CHANGED")
+            manager._active_resource_resolver = resolver
+            assert _m3_b3_refused(manager)
             with pytest.raises(PlasmaError):
-                manager.resource_reservation("check", owner_id="batch-1",
-                                             token=expiring["token"])
-            with pytest.raises(PlasmaError) as stale_job:
-                manager.enqueue(JobRequest(
-                    site_id=1, operation=Operation.READ, job_id="stale-batch-job",
-                    metadata={"execution_owner_kind": "rest_client",
-                              "execution_owner_id": "batch-1",
-                              "resource_reservation_token": expiring["token"]}))
-            assert stale_job.value.code is ErrorCode.PPU_BUSY
-            restarted = SiteManager(config(tmp_path / "restart"))
-            assert restarted.resource_reservation_snapshot()["epoch"] != reservation["epoch"]
+                manager.resource_reservation("acquire", owner_id="batch-3", expected=expected)
+            with pytest.raises(PlasmaError):
+                manager.enqueue(_m3_job(identity, 1, owner="batch-3"))
+            with pytest.raises(PlasmaError, match="no matching"):
+                manager.recover_resource_reservation("0" * 32)
+            # P1-12: explicit recovery, then a new Batch reserves again.
+            assert manager.recover_resource_reservation(snap["recovery_id"])["state"] == "NONE"
+            assert manager.resource_reservation(
+                "acquire", owner_id="batch-3", expected=expected)["state"] == "ACTIVE"
+        finally:
+            await manager.shutdown()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("kind,proven", [
+    ("pass_safe", True), ("fail_safe", True), ("transport_denied", True),
+    ("operation_failed_safe", True), ("cancelled_before_start", True),
+    ("pass_no_evidence", False), ("fail_safe_off_false", False),
+    ("site_sealed", False), ("outcome_unknown", False),
+])
+def test_safe_off_proof_comes_only_from_this_ppu_job_result(tmp_path: Path, kind, proven) -> None:
+    manager, _identity, expected = _m3_manager(tmp_path)
+    manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)
+    _m3_outcome(manager, "job-x", kind)
+    assert manager._job_safe_off_proven("job-x") is proven
+    assert manager._job_safe_off_proven("job-unknown-to-this-ppu") is False
+
+
+def test_ttl_expiry_with_an_active_job_keeps_every_exclusion(tmp_path: Path) -> None:
+    """P1-4: TTL ends the owner's claim only; B3, Package Actions and Jobs stay refused."""
+    manager, identity, expected = _m3_manager(tmp_path)
+    token = manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)["token"]
+    _m3_outcome(manager, "job-run", "pass_safe", active=True)
+    manager._reservation["deadline"] = time.monotonic() - 1
+    assert manager.resource_reservation_snapshot()["state"] == "EXPIRED"
+    assert _m3_b3_refused(manager)
+    with pytest.raises(PlasmaError, match="EXPIRED"):
+        manager.resource_reservation("check", owner_id="batch-1", token=token)
+    with pytest.raises(PlasmaError, match="EXPIRED"):
+        manager._reserve_execution_job(_m3_job(identity, 1, token=token))
+    with pytest.raises(PlasmaError, match="EXPIRED"):
+        manager.resource_reservation("acquire", owner_id="batch-2", expected=expected)
+    manager._started = True
+    with pytest.raises(PlasmaError, match="EXPIRED"):
+        with manager.package_action_scope("a" * 32):
+            pass
+    # The Job ends with SAFE_OFF proven by its own result: expiry settles safely.
+    _m3_outcome(manager, "job-run", "pass_safe")
+    manager._release_execution_job("job-run")
+    assert manager.resource_reservation_snapshot()["state"] == "NONE"
+    assert not _m3_b3_refused(manager)
+
+
+@pytest.mark.parametrize("kind", ["fail_safe_off_false", "outcome_unknown", "site_sealed",
+                                  "pass_no_evidence"])
+def test_ttl_expiry_or_manager_crash_without_safe_off_requires_recovery(tmp_path: Path, kind) -> None:
+    """P1-5 / P1-2: the Manager stops renewing (crash); TTL is not SAFE_OFF evidence."""
+    manager, _identity, expected = _m3_manager(tmp_path)
+    manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)
+    _m3_outcome(manager, "job-safe", "pass_safe")
+    _m3_outcome(manager, "job-bad", kind)
+    manager._reservation["deadline"] = time.monotonic() - 1
+    snap = manager.resource_reservation_snapshot()
+    assert snap["state"] == "RECOVERY_REQUIRED"
+    assert snap["reason"] == "RESERVATION_EXPIRED_SAFE_OFF_NOT_PROVEN"
+    assert snap["unproven_job_ids"] == ["job-bad"]
+    assert _m3_b3_refused(manager)
+    # A restarted Manager (new Batch owner) cannot take the PPU either.
+    with pytest.raises(PlasmaError, match="RECOVERY_REQUIRED"):
+        manager.resource_reservation("acquire", owner_id="batch-after-crash", expected=expected)
+    # Durable: a Runtime restart keeps the isolation (new epoch, same reason).
+    restarted, _, _ = _m3_manager(tmp_path)
+    again = restarted.resource_reservation_snapshot()
+    assert again["state"] == "RECOVERY_REQUIRED" and again["epoch"] != snap["epoch"]
+    assert again["reason"] == snap["reason"] and again["unproven_job_ids"] == ["job-bad"]
+    assert _m3_b3_refused(restarted)
+    restarted.recover_resource_reservation(again["recovery_id"])
+    assert not _m3_b3_refused(restarted)
+
+
+def test_outcome_unknown_release_is_refused_and_isolates(tmp_path: Path) -> None:
+    """P1-6: an owner Release cannot claim safety the PPU cannot prove."""
+    manager, _identity, expected = _m3_manager(tmp_path)
+    token = manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)["token"]
+    _m3_outcome(manager, "job-ok", "pass_safe")
+    _m3_outcome(manager, "job-unknown", "outcome_unknown")
+    with pytest.raises(PlasmaError, match="recovery required"):
+        manager.resource_reservation("release", owner_id="batch-1", token=token)
+    snap = manager.resource_reservation_snapshot()
+    assert (snap["state"], snap["reason"], snap["unproven_job_ids"]) == (
+        "RECOVERY_REQUIRED", "RELEASE_SAFE_OFF_NOT_PROVEN", ["job-unknown"])
+    assert _m3_b3_refused(manager)
+    # Recovery is refused while anything executes; it never claims SAFE_OFF.
+    manager._execution_lease = PPUExecutionLease("rest_client", "batch-1", {"job-late"})
+    with pytest.raises(PlasmaError, match="execution is active"):
+        manager.recover_resource_reservation(snap["recovery_id"])
+    manager._execution_lease = None
+    manager.recover_resource_reservation(snap["recovery_id"])
+    assert not _m3_b3_refused(manager)
+
+
+def test_partial_fail_cancel_and_denial_still_release_when_each_site_is_safe(tmp_path: Path) -> None:
+    """P1-8: one Site FAIL (SAFE_OFF verified), one refused pre-I/O, one cancelled before start."""
+    manager, _identity, expected = _m3_manager(tmp_path)
+    token = manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)["token"]
+    for job, kind in (("j-pass", "pass_safe"), ("j-fail", "fail_safe"),
+                      ("j-denied", "transport_denied"), ("j-cancel", "cancelled_before_start")):
+        _m3_outcome(manager, job, kind)
+    assert manager.resource_reservation("release", owner_id="batch-1",
+                                        token=token)["state"] == "RELEASED"
+    assert not _m3_b3_refused(manager)
+
+
+@pytest.mark.parametrize("content", ["active", "corrupt"])
+def test_runtime_restart_never_forgets_a_reservation(tmp_path: Path, content) -> None:
+    """P1-3: epoch fencing plus a durable record; restart -> RECOVERY_REQUIRED."""
+    manager, _identity, expected = _m3_manager(tmp_path)
+    old = manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)
+    if content == "corrupt":
+        (tmp_path / "out" / "ppu-resource-reservation.json").write_text("{not json")
+    restarted, _, _ = _m3_manager(tmp_path)
+    snap = restarted.resource_reservation_snapshot()
+    assert snap["state"] == "RECOVERY_REQUIRED" and snap["epoch"] != old["epoch"]
+    assert snap["reason"] == ("RUNTIME_RESTARTED" if content == "active"
+                              else "RESERVATION_STATE_UNREADABLE")
+    with pytest.raises(PlasmaError):
+        restarted.resource_reservation("check", owner_id="batch-1", token=old["token"])
+    assert _m3_b3_refused(restarted)
+    assert "token" not in (tmp_path / "out" / "ppu-resource-reservation.json").read_text()
+    restarted.recover_resource_reservation(snap["recovery_id"])
+    assert restarted.resource_reservation(
+        "acquire", owner_id="batch-2", expected=expected)["state"] == "ACTIVE"
+
+
+def test_multiple_ppus_hold_independent_reservations(tmp_path: Path) -> None:
+    """P1-1: each PPU is its own authority; isolation of one never blocks another."""
+    a, _ia, ea = _m3_manager(tmp_path, root="ppu-a")
+    b, _ib, eb = _m3_manager(tmp_path, root="ppu-b")
+    ta = a.resource_reservation("acquire", owner_id="batch-1", expected=ea)["token"]
+    tb = b.resource_reservation("acquire", owner_id="batch-1", expected=eb)["token"]
+    assert ta != tb
+    with pytest.raises(PlasmaError):
+        a.resource_reservation("check", owner_id="batch-1", token=tb)
+    _m3_outcome(a, "a-unknown", "outcome_unknown")
+    with pytest.raises(PlasmaError):
+        a.resource_reservation("release", owner_id="batch-1", token=ta)
+    assert b.resource_reservation("release", owner_id="batch-1", token=tb)["state"] == "RELEASED"
+    assert _m3_b3_refused(a) and not _m3_b3_refused(b)
+    assert b.resource_reservation("acquire", owner_id="batch-2", expected=eb)["state"] == "ACTIVE"
+
+
+def test_eight_sites_share_one_reservation_without_a_barrier(tmp_path: Path) -> None:
+    """P1-11: 8 Site Jobs of one Batch are all admitted at once under one token."""
+    async def scenario() -> None:
+        manager, identity, expected = _m3_manager(tmp_path, sites=tuple(range(1, 9)))
+        await manager.start()
+        try:
+            token = manager.resource_reservation("acquire", owner_id="batch-1",
+                                                 expected=expected)["token"]
+            futures = [manager.enqueue(_m3_job(identity, site, token=token))
+                       for site in range(1, 9)]
+            assert manager.execution_lease_snapshot()["active_job_count"] == 8
+            results = await asyncio.gather(*futures)
+            assert {result.state.value for result in results} == {"success"}
+            assert len(manager._reservation["job_ids"]) == 8
+            assert manager.resource_reservation("release", owner_id="batch-1",
+                                                token=token)["state"] == "RELEASED"
         finally:
             await manager.shutdown()
 
@@ -433,6 +660,61 @@ def test_asset_set_cross_process_held_lease_blocks_new_jobs_until_socket_eof(tmp
             released.set()
             if worker is not None:
                 await worker
+            await control.close()
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_b3_held_lease_refused_while_recovery_required_until_socket_recovery(tmp_path: Path) -> None:
+    """B3 exclusion end to end: the real Bootstrap helper B3 uses cannot take
+    the Runtime quiesce over an isolated PPU; only the local recovery op clears it."""
+    import json
+    import socket
+
+    async def scenario() -> None:
+        manager, _identity, expected = _m3_manager(tmp_path)
+        await manager.start()
+        directory = tmp_path / "runtime-control"
+        directory.mkdir(mode=0o700)
+        socket_path = directory / "control.sock"
+        control = RuntimeControlServer(manager, socket_path)
+        await control.start()
+        helper = _asset_helper()
+
+        def b3_hold() -> str:
+            try:
+                with helper.held_runtime_asset_lease(socket_path):
+                    return "GRANTED"
+            except helper.AssetSetError as exc:
+                return str(exc)
+
+        def control_call(request: dict) -> dict:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                sock.connect(str(socket_path))
+                sock.sendall((json.dumps(request) + "\n").encode())
+                return json.loads(sock.makefile().readline())
+
+        try:
+            token = manager.resource_reservation("acquire", owner_id="batch-1",
+                                                 expected=expected)["token"]
+            assert await asyncio.to_thread(b3_hold) == "ASSET_SET_QUIESCE_NOT_GRANTED"
+            _m3_outcome(manager, "job-unknown", "outcome_unknown")
+            with pytest.raises(PlasmaError):
+                manager.resource_reservation("release", owner_id="batch-1", token=token)
+            recovery_id = manager.resource_reservation_snapshot()["recovery_id"]
+            assert await asyncio.to_thread(b3_hold) == "ASSET_SET_QUIESCE_NOT_GRANTED"
+            stale = await asyncio.to_thread(control_call, {
+                "operation": "recover_resource_reservation", "recovery_id": "f" * 32})
+            assert stale["ok"] is False
+            extra = await asyncio.to_thread(control_call, {
+                "operation": "recover_resource_reservation", "recovery_id": recovery_id,
+                "force": True})
+            assert extra["ok"] is False
+            done = await asyncio.to_thread(control_call, {
+                "operation": "recover_resource_reservation", "recovery_id": recovery_id})
+            assert done["ok"] is True and done["result"]["state"] == "NONE"
+            assert await asyncio.to_thread(b3_hold) == "GRANTED"
+        finally:
             await control.close()
             await manager.shutdown()
     asyncio.run(scenario())
