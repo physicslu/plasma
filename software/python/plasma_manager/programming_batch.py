@@ -324,12 +324,48 @@ def _unit_status(outcome: str | None, *, stopped: bool = False) -> str:
 
 
 def new_cycle(planned: int) -> dict[str, Any]:
-    """Per-Site Repeat accounting: counters plus the one current Cycle."""
+    """Per-Site Repeat accounting: counters plus the one current Cycle.
+
+    ``attempts_archived`` counts the attempt records already moved out of
+    ``unit["attempts"]`` into this Batch's cycle segment. Every attempt record
+    is therefore counted in exactly one place - the archive counter or the
+    current list - so the Site's cumulative attempts are their sum, read
+    without the segment (Batch Statistics v1).
+    """
     return {"planned": planned, "index": 1, "cycle_id": secrets.token_hex(16),
             "state": "ACTIVE", "disposition": None,
             "settled": 0, "pass": 0, "fail": 0, "retry_attempts": 0,
+            "attempts_archived": 0,
             "continue_seq": 0, "continued_seq": 0, "wait_reason": None,
             "last": None, "last_continue": None}
+
+
+def _current_cycle_settled(cycle: Mapping[str, Any]) -> bool:
+    """Whether the attempts still held for the current Cycle are already
+    accounted in its settled counters (``retry_attempts``)."""
+    if cycle.get("cycle_id") is None:
+        # Journalled before Manual Repeat: settled as its one Cycle on load.
+        return bool(cycle.get("settled"))
+    last = cycle.get("last")
+    return isinstance(last, Mapping) and last.get("cycle_id") == cycle["cycle_id"]
+
+
+def unit_statistics(unit: Mapping[str, Any]) -> dict[str, int]:
+    """Cumulative attempt counters of one Site, from O(1) journal state.
+
+    ``attempts``: every attempt record of every Cycle of this Site (one
+    Manager-planned Job attempt each, Retries included). ``retry_attempts``:
+    those beyond the first attempt of their Cycle - the settled Cycles'
+    counter plus the Retries of a Cycle that is still running or ended
+    unsettled (``OUTCOME_UNKNOWN`` / ``BLOCKED`` / stopped).
+    """
+    cycle = unit["cycle"]
+    current = unit.get("attempts") or []
+    retries = cycle.get("retry_attempts", 0)
+    if not _current_cycle_settled(cycle):
+        retries += sum(1 for attempt in current if (attempt.get("attempt") or 1) > 1)
+    return {"attempts": cycle.get("attempts_archived", 0) + len(current),
+            "retry_attempts": retries}
 
 
 def ensure_cycle(batch: dict[str, Any]) -> None:
@@ -367,6 +403,10 @@ def _receipt_summary(run: Mapping[str, Any] | None) -> dict[str, Any] | None:
         "job_binding_confirmed": (receipt.get("observed_job_binding_sha256") is not None
                                   and receipt.get("observed_job_binding_sha256")
                                   == receipt.get("expected_job_binding_sha256")),
+        "job_binding_sha256": receipt.get("observed_job_binding_sha256"),
+        "resource_set_sha256": receipt.get("observed_resource_set_sha256"),
+        "readback_sha256": receipt.get("readback_sha256"),
+        "bytes_verified": receipt.get("bytes_verified"),
         "elapsed_ms": receipt.get("elapsed_ms"),
     }
 
@@ -460,6 +500,10 @@ class ProgrammingBatchCoordinator:
         self._legacy_ids: set[str] = set()
         #: Cycle segments when no journal file is configured (Host tests).
         self._memory_ledger: dict[str, list[dict[str, Any]]] = {}
+        #: Byte offset of each complete record line of a file-backed cycle
+        #: segment, built once on first read and extended on append, so a
+        #: history page is a bounded seek + read - never the whole segment.
+        self._ledger_index: dict[str, list[int]] = {}
         self._load_journal()
 
     # ------------------------------------------------------------------ journal
@@ -586,9 +630,31 @@ class ProgrammingBatchCoordinator:
         batch.setdefault("started_at", None)
         batch.setdefault("finished_at", None)
         ensure_cycle(batch)
+        self._restore_attempt_counters(batch)
         if batch.get("outcome") is None:
             self._close_interrupted(batch)
         self._batches[batch["batch_id"]] = batch
+
+    def _restore_attempt_counters(self, batch: dict[str, Any]) -> None:
+        """A record journalled before Batch Statistics v1 has no
+        ``attempts_archived``: count it once, at load, from its own cycle
+        segment. Archived attempts are those of every ``blocked_dispatch``
+        record and of every settled Cycle other than the current one (whose
+        attempts are still held in the unit). Never repeated per read."""
+        units = [unit for unit in batch.get("units") or []
+                 if "attempts_archived" not in unit["cycle"]]
+        if not units:
+            return
+        records = self._ledger_records(batch["batch_id"])
+        for unit in units:
+            cycle = unit["cycle"]
+            cycle["attempts_archived"] = sum(
+                len(record.get("attempts") or []) for record in records
+                if record.get("ppu_alias") == unit["ppu_alias"]
+                and record.get("site_id") == unit["site_id"]
+                and (record.get("type") == "blocked_dispatch"
+                     or (record.get("type") == "cycle"
+                         and record.get("cycle_id") != cycle.get("cycle_id"))))
 
     def _close_interrupted(self, batch: dict[str, Any]) -> None:
         """A Batch the Manager was stopped in: decide from the run journal,
@@ -683,6 +749,7 @@ class ProgrammingBatchCoordinator:
         for batch_id in pruned:
             # A cycle segment shares its Batch's retention, never outlives it.
             self._memory_ledger.pop(batch_id, None)
+            self._ledger_index.pop(batch_id, None)
             segment = self._ledger_path(batch_id)
             if segment is not None:
                 segment.unlink(missing_ok=True)
@@ -728,16 +795,76 @@ class ProgrammingBatchCoordinator:
                 self._memory_ledger.setdefault(batch_id, []).append(dict(record))
                 return
             path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-            fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
-            with os.fdopen(fd, "a", encoding="utf-8") as stream:
-                stream.write(json.dumps(record, sort_keys=True) + "\n")
+            index = self._ledger_offsets(batch_id, path)
+            fd = os.open(path, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o600)
+            with os.fdopen(fd, "r+b") as stream:
+                end = os.fstat(stream.fileno()).st_size
+                line = json.dumps(record, sort_keys=True).encode("utf-8") + b"\n"
+                torn = bool(end) and os.pread(stream.fileno(), 1, end - 1) != b"\n"
+                if torn:
+                    # A torn final line (crash mid-append) ends here, so it
+                    # never swallows this record; it stays unreadable.
+                    line = b"\n" + line
+                stream.write(line)
                 stream.flush()
                 os.fsync(stream.fileno())
+            if torn:
+                # The torn line is a complete (unreadable) line now: rescan
+                # once so its ``seq`` is the same as after a restart.
+                self._ledger_index.pop(batch_id, None)
+            else:
+                index.append(end)
         except Exception as exc:
             self._control_failure = f"BATCH_CYCLE_JOURNAL_{type(exc).__name__}"
             with self.workflow._lock:
                 self.workflow._control_failure = self._control_failure
             raise
+
+    def _ledger_offsets(self, batch_id: str, path: Path) -> list[int]:
+        """Start offsets of the segment's complete lines (scanned once)."""
+        index = self._ledger_index.get(batch_id)
+        if index is None:
+            index = []
+            if path.exists():
+                position = 0
+                with path.open("rb") as stream:
+                    for line in stream:
+                        if line.endswith(b"\n"):
+                            index.append(position)
+                        position += len(line)
+            self._ledger_index[batch_id] = index
+        return index
+
+    def _ledger_page(self, batch_id: str, offset: int,
+                     limit: int) -> tuple[int, list[tuple[int, dict[str, Any] | None]]]:
+        """``(total, [(seq, record), ...])`` for ``seq`` in ``offset..+limit``.
+
+        ``seq`` is the record's position in the append-only segment: stable,
+        gap-free and never reused while the Batch is retained. A torn line
+        keeps its ``seq`` with record ``None``, so a cursor never stalls.
+        """
+        path = self._ledger_path(batch_id)
+        if path is None:
+            records = self._memory_ledger.get(batch_id, [])
+            return len(records), [(seq, dict(records[seq]))
+                                  for seq in range(offset, min(len(records), offset + limit))]
+        index = self._ledger_offsets(batch_id, path)
+        total = len(index)
+        if offset >= total:
+            return total, []
+        end = min(total, offset + limit)
+        with path.open("rb") as stream:
+            stream.seek(index[offset])
+            stop = index[end] if end < total else None
+            blob = stream.read() if stop is None else stream.read(stop - index[offset])
+        page: list[tuple[int, dict[str, Any] | None]] = []
+        for seq, line in zip(range(offset, end), blob.split(b"\n")):
+            try:
+                record = json.loads(line)
+            except ValueError:
+                record = None
+            page.append((seq, record if isinstance(record, dict) else None))
+        return total, page
 
     def _ledger_records(self, batch_id: str) -> list[dict[str, Any]]:
         path = self._ledger_path(batch_id)
@@ -894,22 +1021,35 @@ class ProgrammingBatchCoordinator:
         """
         units = [{**unit, "attempts": [dict(a) for a in unit.get("attempts") or []],
                   "cycle": {**unit["cycle"], "remaining":
-                            unit["cycle"]["planned"] - unit["cycle"]["settled"]},
+                            unit["cycle"]["planned"] - unit["cycle"]["settled"],
+                            # Cumulative over every Cycle of this Site, not
+                            # the current Cycle's list (Batch Statistics v1).
+                            **unit_statistics(unit)},
                   "progress": self._unit_progress(unit)}
                  for unit in batch["units"]]
         cycles = {key: sum(unit["cycle"][key] for unit in units)
-                  for key in ("planned", "settled", "pass", "fail", "retry_attempts", "remaining")}
+                  for key in ("planned", "settled", "pass", "fail", "retry_attempts",
+                              "remaining", "attempts")}
         cycles["awaiting_continue"] = sum(
             unit["cycle"]["state"] == AWAITING_CONTINUE for unit in units)
+        # A Site is fully completed when every planned Cycle settled.
+        cycles["sites_completed"] = sum(
+            unit["cycle"]["settled"] >= unit["cycle"]["planned"] for unit in units)
         attempts = [attempt for unit in units for attempt in unit["attempts"]]
         outcomes = [unit.get("outcome") for unit in units]
-        view = {**batch, "units": units, "attempts": attempts,
+        view = {**batch, "units": units,
+                # The CURRENT Cycle's attempts of every Site (live detail);
+                # settled Cycles are in the Cycle History (``/cycles``).
+                "attempts": attempts,
                 "current_run": self._current_run(batch),
-                # One Site is one IC: counted once, by its final outcome only.
+                # Site final outcomes: one per Site, never a Cycle count.
                 "counts": {"pass": outcomes.count("PASS"), "fail": outcomes.count("FAIL"),
+                           "partial": outcomes.count("PARTIAL"),
                            "blocked": outcomes.count("BLOCKED"),
                            "unknown": outcomes.count("OUTCOME_UNKNOWN"),
-                           "sites": len(units), "attempts": len(attempts)},
+                           "sites": len(units),
+                           # Cumulative Job attempts of the whole Batch.
+                           "attempts": cycles["attempts"]},
                 # Cycle accounting (Manual Repeat). Same-IC Debug PASS Cycles
                 # are Cycles, never distinct physical good units.
                 "cycles": cycles,
@@ -1210,15 +1350,25 @@ class ProgrammingBatchCoordinator:
             return {"ok": True, "duplicate": False, "batch": self._view(batch)}
 
     def cycle_records(self, batch_id: str, offset: int = 0, limit: int = 100) -> dict[str, Any]:
-        """Read-only page of a Batch's settled Cycles and Continue events."""
+        """Read-only Cycle History page: settled Cycles, blocked dispatches
+        and Continue events of one Batch, in append order.
+
+        ``offset`` is a cursor over the append-only segment: every record
+        carries its ``seq`` and the answer ``next_offset``, so a reader that
+        missed polls, reconnected or reloaded resumes at its cursor with no
+        gap and no duplicate. A page is bounded (``limit`` <= 1000) and read
+        by seek, never by re-reading the whole history. Records live exactly
+        as long as their Batch (same retention), and survive a restart.
+        """
         if not 0 <= offset or not 1 <= limit <= 1000:
             raise ProgrammingError(400, "invalid_request",
                                    "offset must be >= 0 and limit 1..1000")
         with self._lock:
             self._get(batch_id)
-            records = self._ledger_records(batch_id)
-        return {"ok": True, "batch_id": batch_id, "total": len(records),
-                "offset": offset, "records": records[offset:offset + limit]}
+            total, page = self._ledger_page(batch_id, offset, limit)
+        records = [{**record, "seq": seq} for seq, record in page if record is not None]
+        return {"ok": True, "batch_id": batch_id, "total": total, "offset": offset,
+                "next_offset": offset + len(page), "records": records}
 
     # ---------------------------------------------------------------- execution
     def _execute(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
@@ -1569,7 +1719,10 @@ class ProgrammingBatchCoordinator:
         with self._lock:
             cycle = unit["cycle"]
             cycle.update(index=cycle["index"] + 1, cycle_id=secrets.token_hex(16))
-            # The previous Cycle's attempts live in its segment record.
+            # The previous Cycle's attempts live in its segment record; the
+            # counter moves with them in the same journal write.
+            cycle["attempts_archived"] = (cycle.get("attempts_archived", 0)
+                                          + len(unit.get("attempts") or []))
             unit["attempts"] = []
             batch["updated_at"] = _now()
             self._persist_locked()
@@ -1584,6 +1737,8 @@ class ProgrammingBatchCoordinator:
                     "ppu_alias": unit["ppu_alias"], "site_id": unit["site_id"],
                     "cycle_index": unit["cycle"]["index"], "cycle_id": unit["cycle"]["cycle_id"],
                     "reason": reason, "attempts": [dict(a) for a in attempts], "at": _now()})
+            unit["cycle"]["attempts_archived"] = (
+                unit["cycle"].get("attempts_archived", 0) + len(attempts))
             unit["attempts"] = []
             batch["updated_at"] = _now()
             self._persist_locked()

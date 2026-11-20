@@ -1,4 +1,5 @@
 import { BootstrapApiError } from "./ppu-bootstrap-api";
+import type { CycleHistoryPage } from "../programming/batch-statistics";
 
 // Console-driven Bundle programming (owner Gate 1, 2026-11-09; OFE-1B).
 // Browser -> same-origin BFF -> Manager. The Manager resolves the
@@ -341,7 +342,10 @@ export type ProgrammingBatchCycle = {
   settled: number;
   pass: number;
   fail: number;
+  /** Cumulative Retry attempts of this Site over every Cycle. */
   retry_attempts: number;
+  /** Cumulative Job attempts of this Site over every Cycle (Batch Statistics v1). */
+  attempts?: number;
   remaining: number;
   /** The pause the operator answers; echo it in the Continue. */
   continue_seq: number;
@@ -447,19 +451,24 @@ export type ProgrammingBatch = {
   reason: string | null;
   failure_domain: string | null;
   stop_requested: boolean;
-  /** Every attempt of every Site, in order. */
+  /**
+   * The CURRENT Cycle's attempts of every Site (live detail). Settled Cycles
+   * are in the Cycle History; never count Batch attempts from this list.
+   */
   attempts: ProgrammingBatchAttempt[];
   /** The run of the latest attempt (same record as a single run). */
   current_run: ProgrammingRun | null;
-  /** One Site is one IC: counted once, by its final outcome. */
+  /** Site final outcomes, one per Site; `attempts` is the cumulative Batch total. */
   counts: {
     pass: number; fail: number; blocked: number; unknown: number;
-    sites: number; attempts: number;
+    partial?: number; sites: number; attempts: number;
   };
   /** Cycle totals over every Site (Manual Repeat); absent before WP-02. */
   cycles?: {
     planned: number; settled: number; pass: number; fail: number;
     retry_attempts: number; remaining: number; awaiting_continue: number;
+    /** Batch Statistics v1: cumulative Job attempts and fully completed Sites. */
+    attempts?: number; sites_completed?: number;
   };
   auto_retry: "DISABLED";
 };
@@ -515,6 +524,17 @@ export async function startProgrammingBatch(
 export async function getProgrammingBatch(batchId: string): Promise<ProgrammingBatch> {
   const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${PROGRAMMING}/batches/${batchId}`);
   return payload.batch;
+}
+
+/**
+ * One cursor page of a Batch's Cycle History (settled Cycles, blocked
+ * dispatches, Continue events). Read-only; `next_offset` is the next cursor.
+ */
+export async function getProgrammingBatchCycles(
+  batchId: string, offset: number, limit: number,
+): Promise<CycleHistoryPage> {
+  return request<CycleHistoryPage & { ok: true }>(
+    `${PROGRAMMING}/batches/${batchId}/cycles?offset=${offset}&limit=${limit}`);
 }
 
 /** Stop queuing: no further attempt is submitted. Never cancels a submitted Job. */
