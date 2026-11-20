@@ -30,5 +30,9 @@ if [ ! -f "$CONFIG_PATH" ]; then
 fi
 
 mkdir -p "$USER_DATA_ROOT/state" "$LOG_ROOT"
+# The Manager reads a persistent, explicitly provisioned SQLite Catalog.
+# Missing/unqualified data produces Selector HTTP 503, never source fallback.
+: "${PLASMA_CATALOG_SQLITE_DB:=$USER_DATA_ROOT/state/catalog.sqlite3}"
+export PLASMA_CATALOG_SQLITE_DB
 exec "$PYTHON_PATH" "$CURRENT_ROOT/runtime/manager/manager.pyz" \
   --config "$CONFIG_PATH" >>"$LOG_PATH" 2>&1
