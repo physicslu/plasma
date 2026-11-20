@@ -903,8 +903,12 @@ def test_management_local_batch_atomic_preview_and_selector_refresh(tmp_path: Pa
         repo.save_local_records([entry, forged], actor="test")
     assert len(repo.local_records()) == 1
     official = json.loads(json.dumps(entry)); official["record"].update(vendor="STMicroelectronics", identifier="STM32F103C8T6")
-    with pytest.raises(DeviceCatalogIntegrityError):
-        repo.save_local_records([official], actor="test")
+    coexistence = repo.save_local_records([official], actor="test", dry_run=True)
+    assert coexistence[0]["change"] == "ADDED"
+    assert coexistence[0]["origin"] == "LOCAL"
+    assert coexistence[0]["verification"] == "UNVERIFIED"
+    assert len(repo.local_records()) == 1
+    assert repo.read_active().revision_sha256 == initial
     official_changes = [{"record": asdict(official_record), "qualification": l1}]
     assert repo.validate_changes(official_changes)[0]["status"] == "ADDED"
     assert repo.read_active().revision_sha256 == initial
