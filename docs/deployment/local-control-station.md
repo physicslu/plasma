@@ -144,8 +144,17 @@ copy over, delete, or reinitialize that file with a prebuilt Official-only DB.
 Before and after a data update, validate exact local record/profile content,
 record counts, revisions, and visibility independently from Official row counts.
 An Official revision or rollback that collides with a customer-owned
-`(manufacturer, exact_icpn)` must fail closed without deleting either record;
-conflict resolution requires a separate, explicitly authorized local action.
+`(manufacturer, exact_icpn)` must fail closed without deleting either record.
+For Official validate, stage, publish and rollback, Manager returns **HTTP 409**
+with `error.code=CATALOG_LOCAL_IDENTITY_CONFLICT`,
+`conflict_count`, `conflicts` (manufacturer, Exact ICPN, local revision and
+Profile ID; first 100 when there are more), and `truncated`. IC Management
+shows an actionable notice, links each conflicting row to its Local editor,
+and offers Local JSON backup. The user must explicitly copy to a new
+customer-specific identifier, verify it, and separately delete the old Local
+row before revalidating the Official revision. **No automatic rename, delete,
+merge, or promotion is permitted.** Collisions are checked again atomically
+inside Publish/Rollback to prevent a race after a successful preflight.
 Use SQLite online backup or equivalent consistent snapshot for recovery;
 copying just the live `.sqlite3` file without its WAL is not safe.
 
