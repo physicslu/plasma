@@ -17,29 +17,6 @@ type OfficialEntry = { record: Record<string, unknown>; qualification: Record<st
 type Evidence = { evidence_id: string; authority: string; reference: string; source_revision: string; acquired_at: string };
 type DiffEntry = { vendor: string; identifier: string; status: string; before?: { record: Record<string, unknown>; qualification: Record<string, unknown> }; after?: { record: Record<string, unknown>; qualification: Record<string, unknown> } };
 type OfficialSummary = { vendor: string; identifier: string; family: string; source: string; level: number };
-type CatalogIdentityCollision = {
-  manufacturer: string;
-  exact_icpn: string;
-  local_revision: number | null;
-  local_profile_id: string | null;
-};
-type CatalogApiErrorBody = {
-  code?: string; message?: string; conflicts?: CatalogIdentityCollision[];
-  conflict_count?: number; truncated?: boolean;
-};
-class CatalogIdentityCollisionError extends Error {
-  readonly code = "CATALOG_LOCAL_IDENTITY_CONFLICT";
-  readonly conflicts: CatalogIdentityCollision[];
-  readonly total: number;
-  readonly truncated: boolean;
-  constructor(error: CatalogApiErrorBody) {
-    super(error.message ?? "Official Catalog update blocked by customer-owned part numbers");
-    this.name = "CatalogIdentityCollisionError";
-    this.conflicts = error.conflicts ?? [];
-    this.total = error.conflict_count ?? this.conflicts.length;
-    this.truncated = Boolean(error.truncated);
-  }
-}
 const base = "/api/manager/catalog/management";
 const empty: LocalEntry = { record: { vendor: "", identifier: "", family: "", package: "", flash_size: "" }, profile: { profile_id: "", provider_id: "", operations: [] } };
 
@@ -49,10 +26,7 @@ async function api<T>(action = "", body?: object, query = ""): Promise<T> {
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const result = await response.json() as T & { error?: CatalogApiErrorBody };
-  if (!response.ok && response.status === 409 && result.error?.code === "CATALOG_LOCAL_IDENTITY_CONFLICT") {
-    throw new CatalogIdentityCollisionError(result.error);
-  }
+  const result = await response.json() as T & { error?: { message?: string } };
   if (!response.ok) throw new Error(result.error?.message ?? `Catalog HTTP ${response.status}`);
   return result;
 }
@@ -101,7 +75,6 @@ function ManagementContent() {
   const [officialValidated, setOfficialValidated] = useState(false);
   const [diff, setDiff] = useState<DiffEntry[]>([]);
   const [message, setMessage] = useState("");
-  const [collision, setCollision] = useState<CatalogIdentityCollisionError | null>(null);
   const [busy, setBusy] = useState(false);
   const reload = useCallback(async () => {
     const result = await api<{ local: LocalEntry[]; history: History; evidence: Evidence[] }>();
@@ -115,14 +88,7 @@ function ManagementContent() {
   async function run(task: () => Promise<void>) {
     setBusy(true); setMessage("");
     try { await task(); }
-    catch (error) {
-      if (error instanceof CatalogIdentityCollisionError) {
-        setCollision(error);
-        setOfficialValidated(false);
-        setStageId("");
-      }
-      setMessage(error instanceof Error ? error.message : String(error));
-    }
+    catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
     finally { setBusy(false); }
   }
   const setRecord = (key: keyof LocalEntry["record"], value: string) => { setPreview([]); setForm(current => ({ ...current, record: { ...current.record, [key]: value } })); };
@@ -156,34 +122,7 @@ function ManagementContent() {
   }
   return <main className="icManagement">
     <ThemeSwitch />
-    <header><div><p>ICPN CATALOG · CONTROL STATION</p><h1>IC Management</h1><span>Official revisions and Controller-local records are stored separately.</span></div><Link href="/devices">Open IC Selector →</Link></header>
-    {collision && <section role="alert" aria-label="Catalog identity conflict" className="managementCollision">
-      <h2>Official Catalog update blocked: {collision.total} customer part number conflict(s)</h2>
-      <p>Official and LOCAL records have the same manufacturer and exact ICPN. Your local IC and custom Profile are unchanged. No Official revision was activated.</p>
-      <p><strong>Resolve manually:</strong> Export the current Local Catalog JSON, then inspect each conflict. If the Local record and Official record identify the <strong>same physical IC</strong>, do not invent a different Exact ICPN: ask an authorized Catalog administrator to preserve/rebind its custom Profile to the Official identity through an explicitly reviewed migration before retiring the Local entry. If the Local identity was incorrect, verify the manufacturer and true Exact ICPN first; only then use &quot;Copy as new&quot;, preserve and verify its Profile, and separately retire the mistaken record. Retry Official validation only after all conflicts are resolved. Nothing is automatically renamed, deleted, merged, or promoted.</p>
-      <div className="managementActions">
-        <button type="button" disabled={busy} onClick={() => void run(async () => {
-          const latest = await api<{ local: LocalEntry[] }>();
-          setLocal(latest.local);
-          download("json", latest.local);
-          setMessage("Downloaded current Local Catalog JSON backup. Keep it safe before changing customer part numbers.");
-        })}>Export Local Catalog JSON</button>
-        <button type="button" onClick={() => setCollision(null)}>Dismiss conflict notice</button>
-      </div>
-      <div className="managementCollisionList">
-        {collision.conflicts.map(item => <div key={`${item.manufacturer}:${item.exact_icpn}`}>
-          <strong>{item.manufacturer} · {item.exact_icpn}</strong>
-          <span>LOCAL r{item.local_revision ?? "?"} · Profile {item.local_profile_id ?? "—"}</span>
-          <button type="button" onClick={() => {
-            const match = local.find(entry => entry.record.vendor.toLowerCase() === item.manufacturer.toLowerCase() && entry.record.identifier.toLowerCase() === item.exact_icpn.toLowerCase());
-            if (!match) { setMessage("Local record not loaded. Reload IC Management before resolving."); return; }
-            setForm(match); setBatch([]); setPreview([]); setSearch(match.record.identifier);
-            document.getElementById("local-ic-editor")?.scrollIntoView({ behavior: "smooth" });
-          }}>View customer IC</button>
-        </div>)}
-      </div>
-      {collision.truncated && <p>Only the first {collision.conflicts.length} conflicts are shown. Resolve these and revalidate to identify remaining conflicts.</p>}
-    </section>}
+    <header><div><p>ICPN CATALOG · CONTROL STATION</p><h1>IC Management</h1><span>Official revisions and Controller-local records are stored separately. The same Manufacturer and Exact ICPN may exist in both, with independent Profiles and qualification.</span></div><Link href="/devices">Open IC Selector →</Link></header>
     {message && <p role="status" className="managementMessage">{message}</p>}
     <section><h2>Controller-local ICs <small>LOCAL / UNVERIFIED</small></h2>
       <input aria-label="Search local ICs" placeholder="Search vendor or ICPN" value={search} onChange={event => setSearch(event.target.value)} />
@@ -215,7 +154,7 @@ function ManagementContent() {
         })}>Export official JSON</button></div>
       {preview.length > 0 && <div className="managementList" aria-label="Changes preview">{preview.map((item, index) => <p key={index}>{item.change} · {item.record.vendor} {item.record.identifier} · r{item.revision}</p>)}</div>}
       {officialBatch.length > 0 && <div className="managementList" aria-label="Official changes preview">{officialBatch.map((item, index) => <p key={index}>OFFICIAL CANDIDATE · {String(item.record.vendor)} {String(item.record.identifier)}</p>)}
-        <button disabled={busy} onClick={() => void run(async () => { await api("validate-official", { changes: officialBatch }); setCollision(null); setOfficialValidated(true); setMessage("Official batch validated. Review the candidates before staging."); })}>Validate official batch</button>
+        <button disabled={busy} onClick={() => void run(async () => { await api("validate-official", { changes: officialBatch }); setOfficialValidated(true); setMessage("Official batch validated. Review the candidates before staging."); })}>Validate official batch</button>
         <button disabled={busy || !officialValidated} onClick={() => void run(async () => { const result = await api<{ stage_id: string }>("stage", { changes: officialBatch }); setStageId(result.stage_id); setMessage("Official batch staged atomically."); })}>Stage official batch</button>
         <button disabled={busy || !stageId} onClick={() => void run(async () => { const result = await api<{ revision: string }>("publish", { stage_id: stageId }); setStageId(""); setOfficialBatch([]); await reload(); setMessage(`Published ${result.revision}`); })}>Publish official batch</button></div>}
     </section>
@@ -234,7 +173,7 @@ function ManagementContent() {
         <button disabled={busy || !sourceRevision} onClick={() => void run(async () => { const result = await api<{ evidence_id: string }>("evidence", { record: official.record, kind: sourceKind, source_revision: sourceRevision }); await reload(); setMessage(`Evidence ${result.evidence_id} acquired or reused from local store.`); })}>Acquire / reuse Source Evidence</button>
         <div className="managementGrid">{(["family", "package", "flash_size", "source_reference"] as const).map(key => <label key={key}>{key.replace("_", " ")}<input value={String(official.record[key] ?? "")} onChange={event => { setStageId(""); setOfficialValidated(false); setOfficial({ ...official, record: { ...official.record, [key]: event.target.value } }); }} /></label>)}</div>
         <details><summary>Advanced official fields and Evidence</summary><textarea aria-label="Official candidate JSON" defaultValue={JSON.stringify({ record: official.record, qualification: official.qualification }, null, 2)} onBlur={event => { try { const value = JSON.parse(event.target.value); setStageId(""); setOfficialValidated(false); setOfficial({ ...official, record: value.record, qualification: value.qualification }); } catch { setMessage("Invalid candidate JSON"); } }} /></details>
-        <div className="managementActions"><button disabled={busy} onClick={() => void run(async () => { await api("validate-official", { changes: [{ record: official.record, qualification: official.qualification }] }); setCollision(null); setOfficialValidated(true); setMessage("Official candidate validated."); })}>Validate</button>
+        <div className="managementActions"><button disabled={busy} onClick={() => void run(async () => { await api("validate-official", { changes: [{ record: official.record, qualification: official.qualification }] }); setOfficialValidated(true); setMessage("Official candidate validated."); })}>Validate</button>
           <button disabled={busy || !officialValidated} onClick={() => void run(async () => { const result = await api<{ stage_id: string }>("stage", { changes: [{ record: official.record, qualification: official.qualification }] }); setStageId(result.stage_id); setMessage("Official candidate staged."); })}>Stage</button>
           <button disabled={busy || !stageId} onClick={() => void run(async () => { const result = await api<{ revision: string }>("publish", { stage_id: stageId }); setStageId(""); await reload(); setMessage(`Published ${result.revision}. IC Selector reads the active revision immediately.`); })}>Publish</button></div></>}
     </section>
