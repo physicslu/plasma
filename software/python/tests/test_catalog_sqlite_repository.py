@@ -740,14 +740,27 @@ def test_customer_local_icpns_survive_official_updates_and_conflicting_revisions
                    "identifier": future_official_record.identifier},
         "profile": {"profile_id": "customer-owned-before-official-import"},
     }
+    # Stage before customer creates the colliding local entry. Publish must
+    # re-check inside its transaction, even when prior validation succeeded.
+    stage = repo.stage_revision(change, actor="publisher")
     repo.save_local_records([colliding], actor="customer")
     preserved = repo.local_records()
-    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN"):
+    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN") as err:
         repo.rollback(published, actor="publisher")
+    assert err.value.conflict_count == 1
+    assert err.value.conflicts == [{
+        "manufacturer": future_official_record.vendor,
+        "exact_icpn": future_official_record.identifier,
+        "local_revision": 1,
+        "local_profile_id": "customer-owned-before-official-import",
+    }]
     assert repo.read_active().revision_sha256 == initial
     assert repo.local_records() == preserved
 
-    stage = repo.stage_revision(change, actor="publisher")
+    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN"):
+        repo.validate_changes(change)
+    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN"):
+        repo.stage_revision(change, actor="publisher")
     with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN"):
         repo.publish_staged(stage, actor="publisher")
     assert repo.read_active().revision_sha256 == initial
