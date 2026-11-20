@@ -698,13 +698,12 @@ def test_readers_observe_complete_revision_during_publish(tmp_path: Path) -> Non
     assert set(observed) <= {(initial, repo.read_active().size - 1), (published, repo.read_active().size)}
 
 
-def test_customer_local_icpns_survive_official_updates_and_conflicting_revisions_fail_closed(
+def test_customer_and_official_same_exact_icpn_coexist_across_publish_rollback(
     tmp_path: Path, monkeypatch,
 ) -> None:
+    """Official and LOCAL are independent namespaces, not identity conflicts."""
     repo, initial, future_official_record, l1, _ = _publisher_fixture(tmp_path)
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
-    # Customer-owned entries and profiles belong to the Controller namespace,
-    # not to a replaceable Official Catalog revision.
     entries = [
         {"record": {"vendor": "LocalVendor", "identifier": "CUSTOM-A"},
          "profile": {"profile_id": "customer-profile-a", "operations": ["program"]}},
@@ -714,58 +713,56 @@ def test_customer_local_icpns_survive_official_updates_and_conflicting_revisions
     repo.save_local_records(entries, actor="customer")
     before = repo.local_records()
     assert len(before) == 2
-    assert all(item["origin"] == "LOCAL" and item["verification"] == "UNVERIFIED" for item in before)
+    assert all(row["origin"] == "LOCAL" and row["verification"] == "UNVERIFIED" for row in before)
     assert repo.import_verified_manifest(
         default_catalog_manifest_path(),
         qualification_registry=get_default_programming_qualification_registry(),
-    ) == initial  # same-source importer must never reset user_catalog
+    ) == initial
     assert repo.local_records() == before
 
     change = [{"record": asdict(future_official_record), "qualification": l1}]
-    published = repo.publish_staged(repo.stage_revision(change, actor="publisher"), actor="publisher")
-    assert published != initial
-    assert repo.local_records() == before
-    assert CatalogSqliteShadowRepository(repo.path).local_records() == before  # reopen/upgrade
-    assert selector.search_response("q=CUSTOM-A")[1]["local_results"][0]["profile"]["profile_id"] == "customer-profile-a"
-    assert selector.search_response("q=CUSTOM-A")[1]["results"] == []
-
-    repo.rollback(initial, actor="publisher")
-    assert repo.local_records() == before
-
-    # A later official release must not silently shadow a customer ICPN.
-    # This was a new Official identity in the published revision, but is absent
-    # after rollback, so the customer can legitimately own it locally.
-    colliding = {
+    # Create the LOCAL identity after validation/staging to also prove that
+    # an Official release can proceed if customers create matching ICPNs later.
+    assert repo.validate_changes(change)[0]["status"] == "ADDED"
+    stage = repo.stage_revision(change, actor="publisher")
+    local_same_key = {
         "record": {"vendor": future_official_record.vendor,
                    "identifier": future_official_record.identifier},
-        "profile": {"profile_id": "customer-owned-before-official-import"},
+        "profile": {"profile_id": "customer-custom-profile", "operations": ["program"]},
     }
-    # Stage before customer creates the colliding local entry. Publish must
-    # re-check inside its transaction, even when prior validation succeeded.
-    stage = repo.stage_revision(change, actor="publisher")
-    repo.save_local_records([colliding], actor="customer")
+    local_save = repo.save_local_records([local_same_key], actor="customer")
+    assert local_save[0]["revision"] == 1
     preserved = repo.local_records()
-    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN") as err:
-        repo.rollback(published, actor="publisher")
-    assert err.value.conflict_count == 1
-    assert err.value.conflicts == [{
-        "manufacturer": future_official_record.vendor,
-        "exact_icpn": future_official_record.identifier,
-        "local_revision": 1,
-        "local_profile_id": "customer-owned-before-official-import",
-    }]
-    assert repo.read_active().revision_sha256 == initial
+    published = repo.publish_staged(stage, actor="publisher")
+    assert published != initial
+    assert repo.local_records() == preserved
+    assert CatalogSqliteShadowRepository(repo.path).local_records() == preserved
+
+    same_key = future_official_record.identifier
+    status, payload = selector.search_response(f"q={same_key}")
+    assert status == 200, payload
+    official = next(row for row in payload["results"] if row["icpn"] == same_key)
+    customer = next(row for row in payload["local_results"] if row["record"]["identifier"] == same_key)
+    assert official["catalog_level"] == 1
+    assert official["job_selectable"] is False
+    assert customer["origin"] == "LOCAL"
+    assert customer["verification"] == "UNVERIFIED"
+    assert customer["profile"]["profile_id"] == "customer-custom-profile"
+    assert all(row["origin"] == "LOCAL" for row in preserved)
+
+    # Repeat LOCAL save on an already-Official identity: both must remain intact.
+    assert repo.save_local_records([local_same_key], actor="customer")[0]["change"] == "UNCHANGED"
+    assert repo.read_active().revision_sha256 == published
     assert repo.local_records() == preserved
 
-    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN"):
-        repo.validate_changes(change)
-    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN"):
-        repo.stage_revision(change, actor="publisher")
-    with pytest.raises(DeviceCatalogIntegrityError, match="customer-owned local exact ICPN"):
-        repo.publish_staged(stage, actor="publisher")
-    assert repo.read_active().revision_sha256 == initial
+    repo.rollback(initial, actor="publisher")
     assert repo.local_records() == preserved
-    assert all(item["revision"] == 1 for item in preserved)
+    assert repo.read_active().revision_sha256 == initial
+    # Re-publishing a previously staged Official snapshot must still be legal.
+    second = repo.publish_staged(repo.stage_revision(change, actor="publisher"), actor="publisher")
+    assert second == published
+    assert repo.local_records() == preserved
+    assert selector.search_response(f"q={same_key}")[0] == 200
 
 
 def test_management_local_batch_atomic_preview_and_selector_refresh(tmp_path: Path, monkeypatch) -> None:
