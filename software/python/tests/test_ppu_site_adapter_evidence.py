@@ -232,6 +232,10 @@ def _deny_with(tmp_path, receipt):
      "ADMISSION_DENIED:PROC_SCAN_INCOMPLETE:PROC_VISIBILITY_DENIED:UNKNOWN:MAPS:PermissionError"),
     ({"result": "DENIED", "error": "ValueError", "code": "PROC_RESOURCE_OWNER_CONFLICT"},
      "ADMISSION_DENIED:PROC_RESOURCE_OWNER_CONFLICT"),
+    # Census conflict detail (2-Site HIL 2026-11-20 C98 left no PID behind).
+    ({"result": "DENIED", "error": "ValueError",
+      "code": "PROC_RESOURCE_OWNER_CONFLICT:4242:913377:DEVMEM:OWNER_UNPROVEN:LOCK:STILL_HELD"},
+     "ADMISSION_DENIED:PROC_RESOURCE_OWNER_CONFLICT:4242:913377:DEVMEM:OWNER_UNPROVEN:LOCK:STILL_HELD"),
     # Unstructured fields: keep the token, withhold the rest.
     ({"result": "DENIED", "error": "ValueError",
       "code": "PROC_SCAN_INCOMPLETE:/proc/42/fd: some text"},

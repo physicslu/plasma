@@ -302,6 +302,75 @@ def _pid_start_time(item: Path) -> str | None:
     return fields[19]
 
 
+_HARD_DEVICES = {"/dev/xdevcfg": "XDEVCFG", "/dev/fpga0": "FPGA0"}
+
+
+def _read_pid(item: Path, where: list[str], prefix: str = "") -> tuple[str | None, list[str], str]:
+    """One self-consistent read of a PID: (start time, fd targets, VMAs).
+
+    ``where[0]`` names the phase being read for the denial diagnostic.
+    """
+    for look in (1, 2):
+        where[0] = prefix + "STAT"
+        born = _pid_start_time(item)
+        where[0] = prefix + "FD"
+        targets = []
+        for fd in (item / "fd").iterdir():
+            try:
+                targets.append(os.readlink(fd))
+            except FileNotFoundError:
+                # A closed file descriptor is no longer an owner;
+                # the subsequent full process VMA check is mandatory.
+                continue
+        where[0] = prefix + "MAPS"
+        maps = (item / "maps").read_text()
+        where[0] = prefix + "STAT"
+        if _pid_start_time(item) == born:
+            return born, targets, maps
+        # Another process took this PID mid-read: the evidence
+        # mixes two processes. Read the new one once more.
+        need(look == 1, "PID_REUSED_DURING_SCAN")
+    raise AssertionError("unreachable bounded PID read")
+
+
+def _holdings(targets: list[str], maps: str, release):
+    """(hard device class and stage | None, holds /dev/mem fd, owner-window /dev/mem VMAs)."""
+    hard = None
+    devmem_fd = False
+    devmem_maps: list[tuple[int, int]] = []
+    for target in targets:
+        need(bool(target) and target != "UNKNOWN", "INCOMPLETE_FD_OBSERVATION")
+        name = target.split(" (deleted)")[0]
+        if target.startswith("/dev/uio") or name in _HARD_DEVICES:
+            hard = hard or (_HARD_DEVICES.get(name, "UIO"), "FD")
+        elif name == "/dev/mem":
+            devmem_fd = True
+    for line in maps.splitlines():
+        fields = line.split()
+        need(len(fields) >= 5, "MALFORMED_PROC_VMA")
+        if len(fields) < 6:
+            continue
+        device = fields[5]
+        if device.startswith("/dev/uio") or device in _HARD_DEVICES:
+            hard = hard or (_HARD_DEVICES.get(device, "UIO"), "MAPS")
+        elif device == "/dev/mem":
+            lo, hi = (int(x, 16) for x in fields[0].split("-"))
+            offset = int(fields[2], 16)
+            if overlaps(offset, hi - lo, release.owner_base, release.owner_bytes):
+                devmem_maps.append((offset, hi - lo))
+    return hard, devmem_fd, devmem_maps
+
+
+def _devmem_unproven(pid: str, devmem_maps, owners: dict, release) -> tuple[str, str] | None:
+    """None when ``pid`` is a proven other-Site owner mapping only its page."""
+    if pid not in owners:
+        return "OWNER_UNPROVEN", "LOCK"
+    low, high = site_page(release, owners[pid])
+    if not all(low <= offset and offset + size <= high for offset, size in devmem_maps):
+        return "MAPPING_OUTSIDE_SITE_PAGE", "MAPS"
+    return None
+
+
 def scan_proc_consumers(*, procroot: Path, release,
                         diagnostic: dict | None = None,
                         cooperating=None,
@@ -322,15 +391,26 @@ def scan_proc_consumers(*, procroot: Path, release,
 
     ``cooperating`` (Site admission only) is a callable returning the PIDs
     proven by ``cooperating_site_owners`` right now. It is evaluated AFTER a
-    PID's fds and VMAs were read: the native owner takes its Site lock before
-    opening /dev/mem and drops it only after closing it, so an owner seen
-    holding /dev/mem is provable at that moment. A snapshot taken before the
-    scan would miss an owner that attached during it. Such a PID may hold
-    ``/dev/mem`` and map exactly inside its own Site page, nothing else.
+    PID's fds and VMAs were read, so an owner that attached during the scan
+    is proven at observation. Such a PID may hold ``/dev/mem`` and map
+    exactly inside its own Site page, nothing else.
+
+    The proof is necessarily taken a little later than the fd/VMA read, and
+    the native owner closes ``/dev/mem`` *before* dropping its locks; an owner
+    exiting in that gap is seen holding ``/dev/mem`` but is no longer provable
+    (2-Site HIL 2026-11-20, Site 1 Cycle 98). So, with ``cooperating`` only,
+    an unproven ``/dev/mem`` holder is read ONCE more (same start time, fds,
+    VMAs) and judged on that fresh read: exited or no longer holding
+    ``/dev/mem`` -> no conflict; still holding -> proven again or a conflict;
+    a reused PID, a missing start time or an unreadable live PID fails closed.
+    Hard devices (``/dev/uio*``, ``xdevcfg``, ``fpga0``) are never revalidated.
+    A conflict is described in ``diagnostic["conflict"]`` with numeric PID,
+    start time and fixed tokens only, never command lines or environment.
     """
     need(vanished_pids in VANISHED_PID_POLICIES, "INVALID_VANISHED_PID_POLICY")
     for attempt in range(1, 4):
         conflicts, observed, skipped = [], 0, 0
+        detail: dict | None = None
         try:
             processes = sorted(procroot.iterdir())
         except (OSError, ValueError) as exc:
@@ -342,63 +422,43 @@ def scan_proc_consumers(*, procroot: Path, release,
         for item in processes:
             if not item.name.isdecimal():
                 continue
-            phase = "STAT"
+            where = ["STAT"]
             try:
-                for look in (1, 2):
-                    phase = "STAT"
-                    born = _pid_start_time(item)
-                    phase = "FD"
-                    targets = []
-                    for fd in (item / "fd").iterdir():
-                        try:
-                            targets.append(os.readlink(fd))
-                        except FileNotFoundError:
-                            # A closed file descriptor is no longer an owner;
-                            # the subsequent full process VMA check is mandatory.
-                            continue
-                    phase = "MAPS"
-                    maps = (item / "maps").read_text()
-                    phase = "STAT"
-                    if _pid_start_time(item) == born:
-                        break
-                    # Another process took this PID mid-read: the evidence
-                    # mixes two processes. Read the new one once more.
-                    need(look == 1, "PID_REUSED_DURING_SCAN")
+                born, targets, maps = _read_pid(item, where)
                 observed += 1
-                hard = devmem_fd = False
-                devmem_maps: list[tuple[int, int]] = []
-                for target in targets:
-                    need(bool(target) and target != "UNKNOWN",
-                         "INCOMPLETE_FD_OBSERVATION")
-                    name = target.split(" (deleted)")[0]
-                    if target.startswith("/dev/uio") or name in ("/dev/xdevcfg", "/dev/fpga0"):
-                        hard = True
-                    elif name == "/dev/mem":
-                        devmem_fd = True
-                for line in maps.splitlines():
-                    fields = line.split()
-                    need(len(fields) >= 5, "MALFORMED_PROC_VMA")
-                    if len(fields) < 6:
-                        continue
-                    device = fields[5]
-                    if device.startswith("/dev/uio") or device in (
-                            "/dev/xdevcfg", "/dev/fpga0"):
-                        hard = True
-                    elif device == "/dev/mem":
-                        lo, hi = (int(x, 16) for x in fields[0].split("-"))
-                        offset = int(fields[2], 16)
-                        if overlaps(offset, hi - lo, release.owner_base,
-                                    release.owner_bytes):
-                            devmem_maps.append((offset, hi - lo))
+                hard, devmem_fd, devmem_maps = _holdings(targets, maps, release)
+                revalidation = "NOT_RUN"
                 if hard:
-                    conflicts.append(item.name)
+                    device, (reason, stage) = hard[0], ("HARD_DEVICE", hard[1])
                 elif devmem_fd or devmem_maps:
+                    device = "DEVMEM"
                     owners = cooperating() if cooperating is not None else {}
-                    page = (site_page(release, owners[item.name])
-                            if item.name in owners else None)
-                    if page is None or not all(page[0] <= offset and offset + size <= page[1]
-                                               for offset, size in devmem_maps):
-                        conflicts.append(item.name)
+                    unproven = _devmem_unproven(item.name, devmem_maps, owners, release)
+                    if unproven is not None and cooperating is not None:
+                        # Bounded fresh revalidation of THIS PID, once. An
+                        # exit raises FileNotFoundError: confirmed below.
+                        again, targets, maps = _read_pid(item, where, "REVALIDATE_")
+                        need(born is not None, "PID_START_TIME_UNAVAILABLE")
+                        need(again == born, "PID_REUSED_DURING_SCAN")
+                        hard, devmem_fd, devmem_maps = _holdings(targets, maps, release)
+                        revalidation = "STILL_HELD"
+                        if hard:
+                            device, unproven = hard[0], ("HARD_DEVICE", hard[1])
+                        elif devmem_fd or devmem_maps:
+                            unproven = _devmem_unproven(
+                                item.name, devmem_maps, cooperating(), release)
+                        else:
+                            unproven = None  # closed and unmapped: holds nothing
+                    if unproven is None:
+                        continue
+                    reason, stage = unproven
+                else:
+                    continue
+                conflicts.append(item.name)
+                if detail is None:
+                    detail = {"pid": item.name, "start_time": born or "UNKNOWN",
+                              "device": device, "reason": reason, "stage": stage,
+                              "revalidation": revalidation}
             except (FileNotFoundError, PermissionError, OSError, ValueError) as exc:
                 # Check for ENOENT explicitly; an inaccessible PID is NOT
                 # a confirmed exit and must never be skipped or rescanned.
@@ -410,7 +470,8 @@ def scan_proc_consumers(*, procroot: Path, release,
                         vanished = True
                     except OSError:
                         pass
-                if vanished and vanished_pids == "skip":
+                if vanished and (vanished_pids == "skip" or
+                                 where[0].startswith("REVALIDATE_")):
                     # Exited: it holds no fd and no mapping any more. Any
                     # conflict already found still refuses at the end.
                     skipped += 1
@@ -426,7 +487,7 @@ def scan_proc_consumers(*, procroot: Path, release,
                                 "PID_REUSED_DURING_SCAN" if reused else
                                 "VANISHED_PID_RESCAN_EXHAUSTED" if vanished else
                                 "PROC_VISIBILITY_DENIED"),
-                        pid=item.name, phase=phase,
+                        pid=item.name, phase=where[0],
                         error=type(exc).__name__, attempt=attempt)
                 return False, sorted(set([*conflicts, item.name]))
         if retry_pid is not None:
@@ -439,6 +500,8 @@ def scan_proc_consumers(*, procroot: Path, release,
                 attempt=attempt, observed=observed,
                 conflicts=len(set(conflicts)), rescans=attempt - 1,
                 vanished_skipped=skipped)
+            if detail is not None:
+                diagnostic["conflict"] = detail
         return observed > 0, sorted(set(conflicts))
     raise AssertionError("unreachable bounded process scan")
 

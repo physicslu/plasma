@@ -59,8 +59,13 @@ def check_exact(*, release, passive: dict, uio: dict,
                           for key in ("status", "pid", "phase", "error"))
         need(passive.get("proc_complete") is True,
              "PROC_SCAN_INCOMPLETE:" + detail)
+        # Same code; the census conflict detail (numeric PID and start time,
+        # fixed tokens) makes the refused owner attributable after the fact.
+        conflict = scan.get("conflict") if type(scan.get("conflict")) is dict else {}
+        detail = ":".join(str(conflict.get(key, "UNKNOWN"))[:40] for key in (
+            "pid", "start_time", "device", "reason", "stage", "revalidation"))
         need(passive.get("proc_conflicts") == [],
-             "PROC_RESOURCE_OWNER_CONFLICT")
+             "PROC_RESOURCE_OWNER_CONFLICT:" + detail)
     if require_mmio:
         owner = release.expected_uio
         if "platform_node" in owner:
