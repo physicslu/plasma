@@ -630,3 +630,307 @@ def test_only_the_sites_own_release_is_waited_for():
     from plasma_manager.programming_batch import RELEASE_PENDING_REASONS, RELEASE_WAIT_S
     # One E/P/V Job ~12.5 s on Z2 (2026-11-19); the bound is unchanged.
     assert RELEASE_WAIT_S >= 30 and RELEASE_PENDING_REASONS == {"SITE_NOT_READY_OR_BUSY"}
+
+
+# ------------------------------------------------- Batch Statistics v1 (T01-T21)
+# Host-only: one statistics contract for EMode and PMode, read from the
+# Manager's own counters and its append-only Cycle History. No PPU/FPGA/DUT.
+
+def drive_continues(s, sites, cycles):
+    """Replace-IC: answer every pause of every Site until the Batch ends."""
+    deadline = time.monotonic() + WAIT * 4
+    while time.monotonic() < deadline:
+        batch = s.view()
+        if batch["outcome"] is not None:
+            return s.done()
+        for unit in batch["units"]:
+            if unit["cycle"]["state"] == AWAITING_CONTINUE:
+                s.cont(unit["site_id"], unit["cycle"]["continue_seq"])
+        time.sleep(0.005)
+    raise AssertionError(f"replace-IC session did not finish: {s.view()}")
+
+
+def history(batches, batch_id, limit=7):
+    """Every History record, read the way a Console does: by cursor pages."""
+    cursor, seen = 0, []
+    while True:
+        page = batches.cycle_records(batch_id, cursor, limit)
+        seen += page["records"]
+        assert page["next_offset"] >= cursor
+        if page["next_offset"] == cursor:
+            return seen, page["total"]
+        cursor = page["next_offset"]
+
+
+def assert_all_pass_statistics(batch, sites, repeat):
+    cycles, counts = batch["cycles"], batch["counts"]
+    total = sites * repeat
+    assert (cycles["planned"], cycles["settled"], cycles["pass"], cycles["fail"],
+            cycles["remaining"]) == (total, total, total, 0, 0)
+    # Job attempts are cumulative over every Cycle; no Retry happened.
+    assert cycles["attempts"] == counts["attempts"] == total
+    assert cycles["retry_attempts"] == 0
+    assert cycles["sites_completed"] == sites
+    # Site final outcomes stay one per Site, never a Cycle count.
+    assert counts["sites"] == sites and counts["pass"] == sites
+    for unit in batch["units"]:
+        assert unit["cycle"]["attempts"] == repeat and unit["cycle"]["retry_attempts"] == 0
+        assert len(unit["attempts"]) == 1  # the live list is the current Cycle only
+
+
+def assert_history_complete(s, sites, repeat):
+    records, total = history(s.batches, s.batch_id)
+    seqs = [r["seq"] for r in records]
+    assert seqs == list(range(total))  # ordered, gap-free, no duplicate
+    cycles = [r for r in records if r["type"] == "cycle"]
+    assert len(cycles) == sites * repeat
+    for site in sites_of(sites):
+        mine = [r for r in cycles if r["site_id"] == site]
+        assert [r["cycle_index"] for r in mine] == list(range(1, repeat + 1))
+    for record in cycles:
+        receipt = record["receipt"]
+        assert receipt["run_id"] and receipt["job_id"] and receipt["safe_off"] is True
+        assert receipt["job_binding_confirmed"] is True
+        for key in ("readback_sha256", "job_binding_sha256", "resource_set_sha256"):
+            assert key in receipt
+        attempt = record["attempts"][-1]
+        assert attempt["run_id"] == receipt["run_id"] and attempt["job_id"] == receipt["job_id"]
+    assert len(set(job_ids(cycles))) == sites * repeat
+    return records
+
+
+def sites_of(count):
+    return tuple(range(1, count + 1))
+
+
+def test_t01_replace_ic_two_sites_repeat_10(tmp_path):
+    s = Session(tmp_path, sites=(1, 2), repeat=10)
+    batch = drive_continues(s, (1, 2), 10)
+    assert batch["outcome"] == "PASS" and batch["policy"]["replace_ic_before_next_cycle"]
+    assert_all_pass_statistics(batch, 2, 10)
+    assert_history_complete(s, 2, 10)
+    assert len(s.ledger("continue")) == 18 and len(s.gateway.posts) == 20
+
+
+def test_t02_same_ic_debug_two_sites_repeat_10(tmp_path):
+    s = Session(tmp_path, sites=(1, 2), repeat=10, replace_ic_before_next_cycle=False)
+    batch = s.done()
+    assert batch["outcome"] == "PASS" and not batch["policy"]["replace_ic_before_next_cycle"]
+    assert_all_pass_statistics(batch, 2, 10)
+    assert_history_complete(s, 2, 10)
+    assert s.ledger("continue") == [] and len(s.gateway.posts) == 20
+
+
+def test_t03_repeat_1_statistics_are_one_cycle_one_attempt(tmp_path):
+    s = Session(tmp_path)
+    batch = s.done()
+    assert_all_pass_statistics(batch, 1, 1)
+    page = s.batches.cycle_records(s.batch_id)
+    assert page["total"] == 1 and page["next_offset"] == 1 and page["records"][0]["seq"] == 0
+
+
+def test_t04_repeat_100_accumulates_every_cycle(tmp_path):
+    s = Session(tmp_path, sites=(1, 2), repeat=100, replace_ic_before_next_cycle=False)
+    batch = s.done(wait=120)
+    assert_all_pass_statistics(batch, 2, 100)
+    assert_history_complete(s, 2, 100)
+
+
+def test_t05_retry_makes_attempts_exceed_cycles(tmp_path):
+    # Cycle 1: FAIL then Retry PASS. Cycles 2, 3: PASS. Same-IC Debug.
+    s = Session(tmp_path, {1: ["failed", "success"]}, repeat=3, retry_limit=1,
+                replace_ic_before_next_cycle=False)
+    batch = s.done()
+    cycles = batch["cycles"]
+    assert (cycles["settled"], cycles["pass"], cycles["fail"]) == (3, 3, 0)
+    assert cycles["attempts"] == batch["counts"]["attempts"] == 4
+    assert cycles["retry_attempts"] == 1 and len(s.gateway.posts) == 4
+    first = s.ledger("cycle")[0]
+    assert [a["attempt"] for a in first["attempts"]] == [1, 2]
+    assert first["attempts"][0]["retry"]["decision"] == "RETRY"
+
+
+def test_t06_t07_stop_after_first_cycle_keeps_pass_cycles_as_partial(tmp_path):
+    s = Session(tmp_path, sites=(1, 2), repeat=10)
+    s.awaiting(1)
+    s.awaiting(2)
+    s.batches.request_stop_batch(s.batch_id, {"stop": "STOP_QUEUING"})
+    batch = s.done()
+    cycles, counts = batch["cycles"], batch["counts"]
+    assert batch["outcome"] == "PARTIAL" and batch["execution_status"] == "STOPPED"
+    assert cycles["sites_completed"] == 0 and len(batch["units"]) == 2
+    assert (cycles["pass"], cycles["settled"], cycles["planned"], cycles["remaining"]) == (2, 2, 20, 18)
+    # Site final PASS 0 is not Cycle PASS 0: both are reported, separately.
+    assert counts["pass"] == 0 and counts["partial"] == 2
+    assert cycles["attempts"] == 2 and cycles["retry_attempts"] == 0
+    assert len(s.ledger("cycle")) == 2 and len(s.gateway.posts) == 2
+
+
+def test_t08_fail_cycles_are_counted_once_each(tmp_path):
+    s = Session(tmp_path, {1: ["success", "failed", "success", "failed"]}, repeat=4)
+    batch = drive_continues(s, (1,), 4)
+    cycles = batch["cycles"]
+    assert (cycles["settled"], cycles["pass"], cycles["fail"]) == (4, 2, 2)
+    assert cycles["attempts"] == 4 and cycles["retry_attempts"] == 0
+    assert batch["outcome"] == "FAIL" and batch["counts"]["fail"] == 1
+    assert [r["outcome"] for r in s.ledger("cycle")] == ["PASS", "FAIL", "PASS", "FAIL"]
+
+
+def test_t09_outcome_unknown_is_never_counted_as_pass(tmp_path):
+    s = Session(tmp_path, {1: ["success", "lost"]}, repeat=3,
+                replace_ic_before_next_cycle=False)
+    batch = s.done()
+    cycles, counts = batch["cycles"], batch["counts"]
+    assert batch["outcome"] == "OUTCOME_UNKNOWN"
+    assert (cycles["settled"], cycles["pass"], cycles["fail"]) == (1, 1, 0)
+    assert counts["pass"] == 0 and counts["unknown"] == 1
+    # The unknown attempt is an attempt, held live (never settled, never resent).
+    assert cycles["attempts"] == 2 and len(s.gateway.posts) == 2
+    assert [r["cycle_index"] for r in s.ledger("cycle")] == [1]
+    assert batch["units"][0]["attempts"][-1]["cycle_index"] == 2
+
+
+def test_t10_t11_t12_history_cursor_survives_missed_polls_reload_and_repeats(tmp_path):
+    s = Session(tmp_path, sites=(1, 2), repeat=6)
+    s.awaiting(1)
+    s.awaiting(2)
+    # A Console that saw only the first poll, then missed every later one.
+    first = s.batches.cycle_records(s.batch_id, 0, 1000)
+    cursor = first["next_offset"]
+    assert cursor == 2 and [r["seq"] for r in first["records"]] == [0, 1]
+    batch = drive_continues(s, (1, 2), 6)
+    assert batch["outcome"] == "PASS"
+    late = s.batches.cycle_records(s.batch_id, cursor, 1000)
+    records = first["records"] + late["records"]
+    assert [r["seq"] for r in records] == list(range(late["total"]))
+    assert len([r for r in records if r["type"] == "cycle"]) == 12
+    # The same cursor read twice returns the same records, never new ones.
+    again = s.batches.cycle_records(s.batch_id, cursor, 1000)
+    assert again["records"] == late["records"]
+    # A reloaded Browser starts from 0 and gets exactly the same history.
+    reloaded, total = history(s.batches, s.batch_id, limit=5)
+    assert reloaded == records and total == late["total"]
+    # A cursor past the end is empty and stays put.
+    end = s.batches.cycle_records(s.batch_id, total, 10)
+    assert end["records"] == [] and end["next_offset"] == total
+
+
+def test_t13_restart_keeps_cumulative_attempts_and_history(tmp_path):
+    s = Session(tmp_path, {1: ["failed", "success"]}, sites=(1, 2), repeat=5, retry_limit=1,
+                replace_ic_before_next_cycle=False)
+    batch = s.done()
+    before, history_before = batch["cycles"], history(s.batches, s.batch_id)
+    assert before["attempts"] == 11 and before["retry_attempts"] == 1
+    restarted = reload(s)
+    after = restarted.status_batch(s.batch_id)["batch"]["cycles"]
+    assert after == before
+    assert history(restarted, s.batch_id) == history_before
+    # A journal written before Batch Statistics v1 has no archive counter:
+    # it is rebuilt once, at load, from the Batch's own Cycle History.
+    path = tmp_path / "batches.json"
+    data = json.loads(path.read_text())
+    for unit in next(b for b in data["batches"] if b["batch_id"] == s.batch_id)["units"]:
+        del unit["cycle"]["attempts_archived"]
+    path.write_text(json.dumps(data))
+    migrated = reload(s).status_batch(s.batch_id)["batch"]
+    assert migrated["cycles"] == before
+    assert [u["cycle"]["attempts"] for u in migrated["units"]] == [6, 5]
+
+
+def test_restart_mid_session_counts_archived_and_live_attempts_once(tmp_path):
+    s = Session(tmp_path, sites=(1,), repeat=4)
+    s.awaiting()
+    s.cont()
+    s.awaiting(seq=2)
+    restarted = reload(s)
+    batch = restarted.status_batch(s.batch_id)["batch"]
+    # Cycle 1 archived, Cycle 2 settled and still held: 2 attempts, not 3.
+    assert batch["cycles"]["attempts"] == 2 and batch["cycles"]["settled"] == 2
+    assert batch["outcome"] == "PARTIAL" and batch["cycles"]["remaining"] == 2
+    s.batches.request_stop_batch(s.batch_id, {"stop": "STOP_QUEUING"})
+    s.done()
+
+
+def test_t14_parallel_sites_never_overwrite_each_others_statistics(tmp_path):
+    s = Session(tmp_path, {1: ["success", "failed", "success"]}, sites=(1, 2), repeat=3,
+                replace_ic_before_next_cycle=False)
+    s.awaiting(1)            # Site 1 paused on its FAIL; Site 2 keeps running
+    s.until(lambda b: next(u for u in b["units"] if u["site_id"] == 2)["outcome"] == "PASS",
+            "Site 2 finished")
+    s.cont(1)
+    batch = s.done()
+    units = {u["site_id"]: u["cycle"] for u in batch["units"]}
+    assert (units[1]["pass"], units[1]["fail"], units[1]["attempts"]) == (2, 1, 3)
+    assert (units[2]["pass"], units[2]["fail"], units[2]["attempts"]) == (3, 0, 3)
+    records = s.ledger("cycle")
+    for site in (1, 2):
+        assert [r["cycle_index"] for r in records if r["site_id"] == site] == [1, 2, 3]
+
+
+def test_t15_two_ppus_keep_separate_statistics_and_history(tmp_path):
+    pending = []
+    batches, workflow, gateways, _ = rig(tmp_path, aliases=("z2", "z3"), sites=(1, 2),
+                                         spawn_batch=pending.append)
+    batches.sleep = lambda _s: time.sleep(0.002)
+    started = batches.start_batch(with_start(
+        workflow, [{"ppu_alias": "z2", "site_ids": [1, 2]}, {"ppu_alias": "z3", "site_ids": [1]}],
+        repeat=3, replace_ic_before_next_cycle=False))
+    batch_id = started["batch"]["batch_id"]
+    pending.pop()()
+    batch = batches.status_batch(batch_id)["batch"]
+    assert batch["outcome"] == "PASS"
+    assert batch["cycles"]["settled"] == 9 and batch["cycles"]["attempts"] == 9
+    by_unit = {(u["ppu_alias"], u["site_id"]): u["cycle"]["attempts"] for u in batch["units"]}
+    assert by_unit == {("z2", 1): 3, ("z2", 2): 3, ("z3", 1): 3}
+    records, _ = history(batches, batch_id)
+    keys = [(r["ppu_alias"], r["site_id"], r["cycle_index"]) for r in records]
+    assert sorted(keys) == sorted((a, s, c) for a, s in by_unit for c in (1, 2, 3))
+    assert len(gateways["z2"].posts) == 6 and len(gateways["z3"].posts) == 3
+
+
+def test_t21_status_and_history_reads_stay_bounded(tmp_path, monkeypatch):
+    cycles = 300
+    s = Session(tmp_path, sites=(1, 2), repeat=cycles, replace_ic_before_next_cycle=False)
+    batch = s.done(wait=300)
+    assert_all_pass_statistics(batch, 2, cycles)
+    restarted = reload(s)
+
+    def full_read(*_a, **_k):
+        raise AssertionError("a poll must not re-read the whole Cycle History")
+    monkeypatch.setattr(restarted, "_ledger_records", full_read)
+    began = time.monotonic()
+    for _ in range(50):
+        view = restarted.status_batch(s.batch_id)["batch"]
+    status_s = time.monotonic() - began
+    assert view["cycles"]["attempts"] == 2 * cycles
+    # The index is built once; every later page is a bounded seek + read.
+    first = restarted.cycle_records(s.batch_id, 0, 100)
+    reads = []
+    real_open = Path.open
+
+    def counting_open(self, *a, **k):
+        reads.append(self)
+        return real_open(self, *a, **k)
+    monkeypatch.setattr(Path, "open", counting_open)
+    began = time.monotonic()
+    tail = restarted.cycle_records(s.batch_id, 2 * cycles - 10, 1000)
+    page_s = time.monotonic() - began
+    assert len(reads) == 1 and len(tail["records"]) == 10
+    assert tail["records"][-1]["seq"] == 2 * cycles - 1 and tail["next_offset"] == 2 * cycles
+    assert len(first["records"]) == 100 and first["next_offset"] == 100
+    assert status_s < 5 and page_s < 1
+
+
+def test_torn_history_line_keeps_a_stable_cursor(tmp_path):
+    s = Session(tmp_path, repeat=3, replace_ic_before_next_cycle=False)
+    s.done()
+    segment = s.batches._ledger_path(s.batch_id)
+    with segment.open("ab") as stream:
+        stream.write(b'{"type": "cycle", "torn')   # crash mid-append
+    restarted = reload(s)
+    restarted._ledger_append_locked(s.batch_id, {"type": "probe", "batch_id": s.batch_id})
+    live = restarted.cycle_records(s.batch_id, 0, 100)
+    assert [r["seq"] for r in live["records"]] == [0, 1, 2, 4] and live["total"] == 5
+    assert live["records"][-1]["type"] == "probe"
+    again = reload(s).cycle_records(s.batch_id, 0, 100)
+    assert again["records"] == live["records"] and again["total"] == 5

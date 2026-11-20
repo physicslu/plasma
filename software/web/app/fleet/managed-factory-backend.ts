@@ -8,6 +8,7 @@ import {
   unitProgressPercent, type ManagedTopology, type ProgrammingRoute,
 } from "../programming/managed-programming";
 import type { ProgrammingBatch, ProgrammingBatchUnit } from "../engineering/bundle-programming-api";
+import { unitCycleTally } from "../programming/batch-statistics";
 import type { ProgrammingCapabilityCatalog } from "../programming-capabilities";
 import type { BatchSiteSnapshot, ServerBatchSiteState, ServerBatchSnapshot, ServerBatchState } from "../server-batch-api";
 
@@ -109,8 +110,12 @@ export function managedProductionSnapshot(
     const judged = batchSiteVerdict(batch, unit, runOfUnit(batch, unit));
     if (judged.verdict === "PASS") return "success";
     if (judged.verdict === "FAIL") return "faulted";
-    if (unit.outcome === "STOPPED"
-        || (unit.outcome === "BLOCKED" && /STOP_|STOP_POLICY|PPU_LATCHED/.test(unit.reason ?? ""))) return "stopped";
+    // An operator Stop / Stop Policy ends a Site as STOPPED, or PARTIAL when
+    // it had settled Cycles: a stop, never an equipment error.
+    const outcome: string | null = unit.outcome;
+    if (outcome === "STOPPED"
+        || ((outcome === "BLOCKED" || outcome === "PARTIAL")
+          && /STOP_|STOP_POLICY|PPU_LATCHED/.test(unit.reason ?? ""))) return "stopped";
     if (unit.outcome != null) return "error";
     if (unit.attempts.some(item => item.outcome == null)) return "running";
     return batch.stop_requested ? "stopped" : "ready";
@@ -122,6 +127,8 @@ export function managedProductionSnapshot(
     const current = runOfUnit(batch, unit);
     const judged = batchSiteVerdict(batch, unit, current);
     const passed = state === "success";
+    // Batch Statistics v1: the same per-Site Cycle tally EMode uses.
+    const tally = unitCycleTally(unit.cycle, judged.verdict);
     return {
       facility_id: ppu?.facilityId ?? "unassigned",
       ppu_id: unit.ppu_alias, site_id: unit.site_id,
@@ -131,16 +138,16 @@ export function managedProductionSnapshot(
       current_round: unit.cycle && unit.cycle.planned > 1
         ? Math.min(unit.cycle.index, unit.cycle.planned) : unit.attempts.length ? 1 : 0,
       // Settled Cycles (PASS + FAIL); PASS, FAIL and Retry stay separate below.
-      completed_rounds: unit.cycle && unit.cycle.planned > 1 ? unit.cycle.settled : passed ? 1 : 0,
-      pass_rounds: unit.cycle && unit.cycle.planned > 1 ? unit.cycle.pass : passed ? 1 : 0,
+      completed_rounds: tally.settled,
+      pass_rounds: tally.pass,
       current_operation: null, current_job_id: last?.job_id ?? null,
       // Each Site's own progress: lanes run concurrently, current_run is one Site.
       progress_percent: passed ? 100 : unitProgressPercent(batch, unit) ?? 0,
-      total_attempts: unit.attempts.length,
-      retry_count: unit.cycle && unit.cycle.planned > 1
-        ? unit.cycle.retry_attempts : Math.max(0, unit.attempts.length - 1),
-      final_failures: unit.cycle && unit.cycle.planned > 1
-        ? unit.cycle.fail : state === "faulted" ? 1 : 0,
+      // Cumulative over every Cycle (Manager counter), never the current
+      // Cycle's attempt list.
+      total_attempts: unit.cycle?.attempts ?? unit.attempts.length,
+      retry_count: unit.cycle?.retry_attempts ?? Math.max(0, unit.attempts.length - 1),
+      final_failures: tally.fail,
       faulted_round: state === "faulted" ? 1 : null,
       faulted_operation: null,
       last_failure_source: state === "faulted" || state === "error" ? unit.failure_domain ?? "manager_programming_run" : null,
@@ -159,7 +166,9 @@ export function managedProductionSnapshot(
     ? batch.stop_requested ? "stopping" : "running"
     : batch.outcome === "PASS" && allSitesVerified ? "success"
     : batch.outcome === "STOPPED" ? "cancelled"
-    : site_counts.success > 0 && (site_counts.faulted > 0 || site_counts.error > 0 || batch.outcome === "PARTIAL")
+    // PARTIAL is its own terminal state, whatever the Site count that passed.
+    : batch.outcome === "PARTIAL" ? "partial"
+    : site_counts.success > 0 && (site_counts.faulted > 0 || site_counts.error > 0)
       ? "partial"
     : "error";
   return {

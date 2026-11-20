@@ -56,8 +56,27 @@ const PROGRAMMING_POST_RESOURCES = [
 ];
 const PROGRAMMING_GET_RESOURCES = [
   new RegExp(`^batches/${RUN_ID}$`),
+  // Cycle History of one Batch: read-only, cursor-paged (Batch Statistics v1).
+  new RegExp(`^batches/${RUN_ID}/cycles$`),
   new RegExp(`^starts/${RUN_ID}$`),
 ];
+const CYCLE_HISTORY_RESOURCE = new RegExp(`^batches/${RUN_ID}/cycles$`);
+
+/**
+ * The only query a programming read forwards: the Cycle History cursor, as
+ * plain decimal integers. Anything else is dropped, never passed through.
+ */
+function programmingReadQuery(request: Request, resource: string): string {
+  if (request.method !== "GET" || !CYCLE_HISTORY_RESOURCE.test(resource)) return "";
+  const params = new URL(request.url).searchParams;
+  const kept = new URLSearchParams();
+  for (const name of ["offset", "limit"]) {
+    const value = params.get(name);
+    if (value != null && /^\d{1,9}$/.test(value)) kept.set(name, value);
+  }
+  const query = kept.toString();
+  return query ? `?${query}` : "";
+}
 
 function json(status: number, payload: object): Response {
   return Response.json(payload, {
@@ -414,7 +433,8 @@ export async function relayManagerProgrammingRequest(
         },
       });
     }
-    const response = await fetch(`${managerApiBase()}/api/programming/${normalizedResource}`, {
+    const query = programmingReadQuery(request, normalizedResource);
+    const response = await fetch(`${managerApiBase()}/api/programming/${normalizedResource}${query}`, {
       method: request.method,
       headers: {
         Accept: "application/json",
