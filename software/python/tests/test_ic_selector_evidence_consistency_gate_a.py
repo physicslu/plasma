@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import tempfile
 import unittest
 
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.device_catalog import default_catalog_manifest_path
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.device_catalog import DeviceCatalogIntegrityError, get_default_device_catalog
 from plasma_web.legacy_device_selector import _device_search_payload, _microchip_ic_information
 from plasma_web.microchip_upstream_openocd_evidence import microchip_upstream_openocd_evidence
@@ -16,6 +20,17 @@ class ICSelectorEvidenceConsistencyTests(unittest.TestCase):
         cls.catalog = get_default_device_catalog()
         cls.qualification = get_default_programming_qualification_registry()
         cls.microchip = [r for r in cls.catalog.records if r.vendor == "Microchip"]
+        # Offline test fixture: runtime Selector always consumes a qualified SQLite revision.
+        cls._sqlite_temporary = tempfile.TemporaryDirectory(prefix="plasma-selector-regression-")
+        cls.addClassCleanup(cls._sqlite_temporary.cleanup)
+        database = Path(cls._sqlite_temporary.name) / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
+        cls._sqlite_environment = patch.dict(os.environ, {"PLASMA_CATALOG_SQLITE_DB": str(database)})
+        cls._sqlite_environment.start()
+        cls.addClassCleanup(cls._sqlite_environment.stop)
 
     def test_all_1015_read_only_upstream_evidence_and_job_denied(self):
         self.assertEqual(len(self.microchip), 1015)
