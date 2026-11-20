@@ -125,20 +125,21 @@ class PackageActionRuntime:
                     reference.execute_runtime_flash, product_root=self.product_root)
                 interface.opf_flash_preflight = partial(
                     reference.preflight_runtime_flash, product_root=self.product_root)
+        # One loaded helper serves both readers (and holds the Verified
+        # Resource Snapshot): reloading it per Job only re-executed the module.
+        asset_helper = _load(control_plane, "ppu_asset_set.py")
         # Pin the configured Asset Set at Job admission. Never infer a product
         # directory from the host or re-check PL hardware for ordinary Jobs.
         if (hasattr(site_manager, "_active_asset_set_reader")
                 and site_manager._active_asset_set_reader is None):
-            site_manager._active_asset_set_reader = (
-                lambda: _load(control_plane, "ppu_asset_set.py").read_active(self.product_root)
-            )
+            site_manager._active_asset_set_reader = partial(
+                asset_helper.read_active, self.product_root)
         # OFE-1B: PPU-derived Resource identity of the pinned Active Set, used by
         # SiteManager Job Binding admission under the same Job lease.
         if (hasattr(site_manager, "_active_resource_resolver")
                 and site_manager._active_resource_resolver is None):
-            resource_helper = _load(control_plane, "ppu_asset_set.py")
             site_manager._active_resource_resolver = partial(
-                resource_helper.read_active_resource_identity, self.product_root)
+                asset_helper.read_active_resource_identity, self.product_root)
         self.state_root = Path(state_root)
         self.owner_credential = owner_credential
         self.spawner = spawner

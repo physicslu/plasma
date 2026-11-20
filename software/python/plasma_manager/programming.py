@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import json
 import os
 import secrets
@@ -90,6 +91,9 @@ MAX_PLANS = 16
 #: Bundle v3 and the Resource Set are pure functions of the Route and the
 #: bytes, so a Batch walking many Sites behind one Route builds them once.
 MAX_BUNDLE_CACHE = 4
+#: A Batch lane hands the plan it makes right after admission the PPU state
+#: that admission just read (no yield in between). Anything older is re-read.
+PLAN_EVIDENCE_MAX_AGE_S = 2.0
 MAX_RUNS_RETAINED = 64
 JOB_TERMINAL = frozenset({"success", "failed", "error", "cancelled", "timeout", "aborted"})
 RUN_TERMINAL = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN", "BLOCKED"})
@@ -211,6 +215,38 @@ class _Plan:
     image_asset: dict[str, Any] | None
     binding: dict[str, Any]
     binding_sha256: str
+
+
+@dataclass(frozen=True)
+class _Prepared:
+    """The immutable part of a plan: the request, its Route and its Resources.
+
+    A pure function of the request bytes and the Route files, so one Batch
+    computes it once (WO-2 F2 M2) instead of once per Cycle: the Image is
+    decoded and hashed once and the Route resolved once. It holds no PPU
+    state and authorizes nothing; every plan still reads its PPU, and every
+    Cycle still gets its own plan, Binding, start, run and Job.
+    """
+    spec: dict[str, Any]
+    parsed: dict[str, Any]
+    routes_fingerprint: str | None
+    route: bundle_v3.ProgrammingRoute
+    resources: tuple
+
+
+class BatchPreparation:
+    """Holds one Batch's ``_Prepared``; lives exactly as long as that Batch run.
+
+    Reused only for the same request while the Route files are byte-identical
+    to the ones it was resolved from; anything else prepares again. Memory
+    only: a restarted Manager never inherits it.
+    """
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.prepared: _Prepared | None = None
+        #: How many times this Batch actually prepared (tests / evidence).
+        self.preparations = 0
 
 
 @dataclass
@@ -489,13 +525,34 @@ class BundleProgrammingWorkflow:
                                    "PPU must complete Validate & Enable before programming")
         return record
 
+    def _routes_dir(self) -> Path:
+        root = self.routes_root if self.routes_root is not None else default_routes_root()
+        if root is None:
+            raise bundle_v3.BundleBuildError("ROUTE_ROOT_UNAVAILABLE")
+        return root
+
     def routes(self) -> tuple[bundle_v3.ProgrammingRoute, ...]:
         try:
-            root = self.routes_root if self.routes_root is not None else default_routes_root()
-            if root is None:
-                raise bundle_v3.BundleBuildError("ROUTE_ROOT_UNAVAILABLE")
-            return bundle_v3.load_routes(root)
+            return bundle_v3.load_routes(self._routes_dir())
         except (bundle_v3.BundleBuildError, ValueError) as exc:
+            raise ProgrammingError(503, "programming_routes_unavailable",
+                                   f"Programming Routes are unavailable: {exc}") from exc
+
+    def _routes_fingerprint(self) -> str:
+        """SHA256 over every Route file's name and bytes (no parsing).
+
+        What a prepared Route was resolved from; any byte changed, added or
+        removed makes a Batch prepare again. Content, never a stat tuple.
+        """
+        try:
+            root = self._routes_dir()
+            digest = hashlib.sha256()
+            for path in sorted(root.glob("*.json")):
+                raw = path.read_bytes()
+                digest.update(path.name.encode("utf-8") + b"\0"
+                              + len(raw).to_bytes(8, "big") + raw)
+            return digest.hexdigest()
+        except (bundle_v3.BundleBuildError, OSError, ValueError) as exc:
             raise ProgrammingError(503, "programming_routes_unavailable",
                                    f"Programming Routes are unavailable: {exc}") from exc
 
@@ -606,7 +663,8 @@ class BundleProgrammingWorkflow:
                            duration_ms=round((self.monotonic() - started) * 1000, 3))
 
     def target_block(self, alias: str, site: int, *,
-                     execution_owner_id: str | None = None) -> tuple[str, str] | None:
+                     execution_owner_id: str | None = None,
+                     evidence: dict[str, Any] | None = None) -> tuple[str, str] | None:
         """Why this Target may not be operated now, and WHOSE failure it is.
 
         Read-only. The PPU must be reachable, its Site idle with no Job and no
@@ -617,7 +675,13 @@ class BundleProgrammingWorkflow:
         Remote unreadiness/transport is local. Shared store/configuration
         failures carry their source boundary through this method; an unknown
         failure origin is shared, never silently downgraded to a PPU fault.
+
+        ``evidence``, when given, is cleared and, only if nothing blocks,
+        filled with the Active Set and Site readiness this call read, so the
+        plan made immediately afterwards need not read them again.
         """
+        if evidence is not None:
+            evidence.clear()
         with self._lock:
             if self._unknown_latched(alias) is not None:
                 return TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED"
@@ -637,17 +701,21 @@ class BundleProgrammingWorkflow:
         if getattr(record, "lifecycle", None) != "commissioned":
             return TARGET_NOT_READY, "PPU_NOT_ENABLED"
         try:
-            if self._timed_bootstrap_read(alias, self.coordinator.assets, "assets").get("state") == "RECOVERY_REQUIRED":
+            active = self._timed_bootstrap_read(alias, self.coordinator.assets, "assets")
+            if active.get("state") == "RECOVERY_REQUIRED":
                 return TARGET_NOT_READY, "PPU_RECOVERY_REQUIRED"
             with shared_boundary("GATEWAY_CLIENT_CONFIGURATION"):
                 client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
-            self._readiness(client, site, None, owner)
+            ready = self._readiness(client, site, None, owner)
         except _StepFailure as exc:
             return exc.failure_domain, exc.reason
         except (BootstrapManagerError, PPUHTTPError) as exc:
             return TARGET_STATE_UNAVAILABLE, f"PPU_STATE_UNREADABLE_{type(exc).__name__}"
         except Exception as exc:
             return SHARED_CONTROL_FAILURE, f"SITE_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}"
+        if evidence is not None:
+            evidence.update(alias=alias, site=site, at=self.monotonic(),
+                            assets=active, ready=ready)
         return None
 
     def retry_block(self, alias: str, site: int) -> str | None:
@@ -672,8 +740,10 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(503, "ppu_resource_identity_unknown",
                                    "PPU Resource identity could not be read; nothing was changed") from exc
         ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
-        report = ppu.get("active_resources")
-        ppu_id = ppu.get("ppu_id")
+        return self._resource_report(ppu.get("ppu_id"), ppu.get("active_resources"))
+
+    @staticmethod
+    def _resource_report(ppu_id: object, report: object) -> tuple[str, dict[str, Any]]:
         if not isinstance(report, dict) or report.get("state") == "UNSUPPORTED":
             raise ProgrammingError(409, "ppu_runtime_resource_identity_unsupported",
                                    "PPU Runtime does not report a verified Resource identity (OFE-1B)")
@@ -767,8 +837,7 @@ class BundleProgrammingWorkflow:
                     f"[\"{operation}\"] instead of a separate operation")
         if type(icpn) is not str or not icpn.strip() or len(icpn) > 96:
             raise ProgrammingError(400, "invalid_request", "icpn is invalid")
-        if type(site) is not int or isinstance(site, bool) or not 1 <= site <= 64:
-            raise ProgrammingError(400, "invalid_request", "site_id is invalid")
+        self._require_site(site)
         # The Operation is the user's choice; the Manager never rewrites it.
         if operations is None and (type(operation) is not str
                                    or operation != "read"):
@@ -810,7 +879,14 @@ class BundleProgrammingWorkflow:
         return {"icpn": icpn, "site": site, "operations": operations,
                 "operation": operation, "image_operation": image_operation,
                 "label": label, "image": image, "archive": archive,
+                "filename": body.get("image_filename"),
                 "address": address, "length": length}
+
+    @staticmethod
+    def _require_site(site: object) -> int:
+        if type(site) is not int or isinstance(site, bool) or not 1 <= site <= 64:
+            raise ProgrammingError(400, "invalid_request", "site_id is invalid")
+        return site
 
     def validate_specification(self, body: Mapping[str, Any]) -> None:
         """Validate a Batch-level programming specification. Touches no PPU.
@@ -821,15 +897,36 @@ class BundleProgrammingWorkflow:
         """
         self._parse_request({**dict(body), "site_id": 1})
 
-    def plan(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
-        parsed = self._parse_request(body)
-        icpn, site = parsed["icpn"], parsed["site"]
-        operations, operation = parsed["operations"], parsed["operation"]
-        label, image, archive = parsed["label"], parsed["image"], parsed["archive"]
-        address, length = parsed["address"], parsed["length"]
-        self._require_commissioned(alias)
+    def prepare(self, body: Mapping[str, Any]) -> _Prepared:
+        """The Batch-once part of a plan. Touches no PPU and authorizes nothing."""
+        if not isinstance(body, Mapping):
+            raise ProgrammingError(400, "invalid_request", "plan body must be an object")
+        spec = {k: v for k, v in body.items() if k != "site_id"}
+        # Fingerprint BEFORE loading: a Route edited in between only makes the
+        # next Cycle prepare again, never reuse what it did not resolve.
+        fingerprint = self._routes_fingerprint()
+        return self._prepare_parsed(spec, self._parse_request({**spec, "site_id": 1}),
+                                    fingerprint)
+
+    def _prepared_for(self, preparation: BatchPreparation,
+                      body: Mapping[str, Any]) -> _Prepared:
+        """This Batch's preparation, prepared again only when it went stale."""
+        spec = {k: v for k, v in body.items() if k != "site_id"}
+        fingerprint = self._routes_fingerprint()
+        with preparation.lock:
+            prepared = preparation.prepared
+            if (prepared is None or prepared.spec != spec
+                    or prepared.routes_fingerprint != fingerprint):
+                prepared = self.prepare(body)
+                preparation.prepared = prepared
+                preparation.preparations += 1
+            return prepared
+
+    def _prepare_parsed(self, spec: dict[str, Any], parsed: dict[str, Any],
+                        fingerprint: str | None) -> _Prepared:
+        icpn, operations = parsed["icpn"], parsed["operations"]
         routes = self.routes()
-        required = operations or [operation]
+        required = operations or [parsed["operation"]]
         if not bundle_v3.resolve_routes(routes, icpn=icpn.strip()):
             raise ProgrammingError(422, "programming_route_not_found",
                                    "no Programming Route declares this IC")
@@ -846,12 +943,45 @@ class BundleProgrammingWorkflow:
                                    "more than one Programming Route matches; refusing to guess")
         route = matches[0]
         try:
-            resource, resource_sha, built, image, image_asset = self._route_resources(
-                route, image=image, archive=archive, filename=body.get("image_filename"))
+            resources = self._route_resources(
+                route, image=parsed["image"], archive=parsed["archive"],
+                filename=parsed["filename"])
         except bundle_v3.BundleBuildError as exc:
             code = ("bundle_resource_not_qualified"
                     if str(exc) == "BUNDLE_RESOURCE_NOT_ROUTE" else "bundle_incompatible")
             raise ProgrammingError(422, code, str(exc)) from exc
+        return _Prepared(spec, parsed, fingerprint, route, resources)
+
+    def plan(self, alias: str, body: Mapping[str, Any], *,
+             preparation: BatchPreparation | None = None,
+             evidence: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        """One fresh plan (and journalled start) for one Site.
+
+        ``preparation``: a Batch's Batch-once ``_Prepared`` is reused instead
+        of re-decoding, re-hashing and re-resolving the same request.
+        ``evidence``: the Active Set and Site readiness the Batch lane's
+        admission read immediately before; used only for this alias / Site
+        and only while younger than ``PLAN_EVIDENCE_MAX_AGE_S``. The Platform
+        status is always read here, and the Run re-reads everything it
+        submits on (PREFLIGHT, Active Set, pre-submit readiness + Resource).
+        """
+        if preparation is None:
+            parsed = self._parse_request(body)
+            site = parsed["site"]
+            self._require_commissioned(alias)
+            prepared = self._prepare_parsed({}, parsed, None)
+        else:
+            if not isinstance(body, Mapping):
+                raise ProgrammingError(400, "invalid_request", "plan body must be an object")
+            site = self._require_site(body.get("site_id"))
+            self._require_commissioned(alias)
+            prepared = self._prepared_for(preparation, body)
+        parsed = prepared.parsed
+        operations, operation = parsed["operations"], parsed["operation"]
+        label, archive = parsed["label"], parsed["archive"]
+        address, length = parsed["address"], parsed["length"]
+        route = prepared.route
+        resource, resource_sha, built, image, image_asset = prepared.resources
         platform = self._timed_bootstrap_read(alias, self.coordinator.status, "status")
         pairing = platform.get("pairing") or {}
         if pairing.get("paired") is not True or pairing.get("device_match") is not True:
@@ -860,11 +990,20 @@ class BundleProgrammingWorkflow:
         runtime = (platform.get("bootstrap") or {}).get("runtime") or {}
         if runtime.get("state") != "runtime_active":
             raise ProgrammingError(409, "ppu_runtime_not_active", "PPU Runtime is not active")
-        active = self._timed_bootstrap_read(alias, self.coordinator.assets, "assets")
+        reuse = (evidence is not None and evidence.get("alias") == alias
+                 and evidence.get("site") == site
+                 and type(evidence.get("at")) in (int, float)
+                 and 0 <= self.monotonic() - evidence["at"] <= PLAN_EVIDENCE_MAX_AGE_S
+                 and isinstance(evidence.get("assets"), dict)
+                 and isinstance(evidence.get("ready"), dict))
+        active = (evidence["assets"] if reuse else
+                  self._timed_bootstrap_read(alias, self.coordinator.assets, "assets"))
         if active.get("state") == "RECOVERY_REQUIRED":
             raise ProgrammingError(409, "ppu_recovery_required",
                                    "PPU Active Asset Set requires explicit recovery")
-        ppu_id, report = self._ppu_resources(alias, site)
+        ppu_id, report = (self._resource_report(evidence["ready"].get("ppu_id"),
+                                                evidence["ready"].get("active_resources"))
+                          if reuse else self._ppu_resources(alias, site))
         if report.get("state") == "VERIFIED":
             if not (active.get("state") == "ACTIVE"
                     and report.get("asset_set_sha256") == active.get("asset_set_sha256")):

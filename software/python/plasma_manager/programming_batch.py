@@ -92,8 +92,8 @@ from typing import Any, Callable, Generator, Mapping
 
 from .programming import (
     SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
-    TARGET_TRANSACTION_UNKNOWN, BundleProgrammingWorkflow, JOB_TERMINAL, ProgrammingError,
-    _m0_timing,
+    TARGET_TRANSACTION_UNKNOWN, BatchPreparation, BundleProgrammingWorkflow, JOB_TERMINAL,
+    ProgrammingError, _m0_timing,
 )
 
 BATCH_SCHEMA = "plasma.manager.programming-batch.v2"
@@ -1044,9 +1044,13 @@ class ProgrammingBatchCoordinator:
         except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
             return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
 
-    def _site_block(self, alias: str, site: int) -> tuple[str, str] | None:
+    def _site_block(self, alias: str, site: int, *,
+                    evidence: dict[str, Any] | None = None) -> tuple[str, str] | None:
         """Whether THIS Site is released. Site-scoped: a verdict about one
-        Site is never read as a verdict about another Site of the same PPU."""
+        Site is never read as a verdict about another Site of the same PPU.
+        ``evidence`` receives what a passing verdict was read from."""
+        if evidence is not None:
+            evidence.clear()
         with self._lock:
             for batch in self._batches.values():
                 for unit in batch["units"]:
@@ -1064,14 +1068,16 @@ class ProgrammingBatchCoordinator:
                           if batch["outcome"] is None and any(
                               t["ppu_alias"] == alias for t in batch["targets"])), None)
         try:
-            return self.workflow.target_block(alias, site, execution_owner_id=owner)
+            return self.workflow.target_block(alias, site, execution_owner_id=owner,
+                                              evidence=evidence)
         except ProgrammingError as exc:
             return (SHARED_CONTROL_FAILURE if exc.code == "manager_shared_control_failure"
                     else TARGET_NOT_READY), exc.code.upper()
         except Exception as exc:  # noqa: BLE001 - an unjudgeable failure is shared
             return SHARED_CONTROL_FAILURE, f"GATE_NOT_EXECUTABLE_{type(exc).__name__}"
 
-    def _admission_block(self, alias: str, site: int) -> tuple[str, str] | None:
+    def _admission_block(self, alias: str, site: int, *,
+                         evidence: dict[str, Any] | None = None) -> tuple[str, str] | None:
         """Both gates for ONE Site, as the executor asks them immediately
         before operating that Site.
 
@@ -1087,9 +1093,12 @@ class ProgrammingBatchCoordinator:
         """
         started = (self.monotonic()
                    if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
+        if evidence is not None:
+            evidence.clear()
         try:
             platform = self._platform_block(alias)
-            return platform if platform is not None else self._site_block(alias, site)
+            return platform if platform is not None else self._site_block(
+                alias, site, evidence=evidence)
         finally:
             if started is not None:
                 _m0_timing("manager_admission", ppu_alias=alias, site_id=site,
@@ -1384,6 +1393,9 @@ class ProgrammingBatchCoordinator:
         # remains independent; no remote call runs under the Journal lock.
         platforms = {}
         lanes = []
+        # Batch-once immutable preparation (WO-2 F2 M2), shared by every lane
+        # of this Batch run and by none other. It carries no PPU state.
+        preparation = BatchPreparation()
         for unit in batch["units"]:
             if unit["outcome"] is not None:
                 continue
@@ -1391,7 +1403,7 @@ class ProgrammingBatchCoordinator:
             leader = alias not in platforms
             future = platforms.setdefault(alias, Future())
             lanes.append((unit, self._run_lane(
-                batch, unit, plan_body, future, leader)))
+                batch, unit, plan_body, future, leader, preparation)))
         failure = None
         if lanes:
             with ThreadPoolExecutor(max_workers=len(lanes),
@@ -1421,7 +1433,8 @@ class ProgrammingBatchCoordinator:
 
     def _run_lane(self, batch: dict[str, Any], unit: dict[str, Any],
                   plan_body: Mapping[str, Any], platform: Future,
-                  platform_leader: bool) -> Generator[
+                  platform_leader: bool,
+                  preparation: BatchPreparation | None = None) -> Generator[
                       None, None, tuple[str | None, str | None]]:
         """Every Cycle of ONE Site lane. Returns that Site's outcome and reason.
 
@@ -1434,7 +1447,7 @@ class ProgrammingBatchCoordinator:
         first = True
         while True:
             outcome, reason = yield from self._run_cycle(
-                batch, unit, plan_body, platform, platform_leader, first)
+                batch, unit, plan_body, platform, platform_leader, first, preparation)
             first = False
             if outcome in ("PASS", "FAIL"):
                 attempts = unit.get("attempts") or []
@@ -1514,7 +1527,8 @@ class ProgrammingBatchCoordinator:
 
     def _run_cycle(self, batch: dict[str, Any], unit: dict[str, Any],
                    plan_body: Mapping[str, Any], platform: Future,
-                   platform_leader: bool, first: bool) -> Generator[
+                   platform_leader: bool, first: bool,
+                   preparation: BatchPreparation | None = None) -> Generator[
                        None, None, tuple[str | None, str | None]]:
         """Every attempt of ONE Cycle of one Site. Returns its outcome and reason."""
         alias, site, policy = unit["ppu_alias"], unit["site_id"], batch["policy"]
@@ -1526,6 +1540,9 @@ class ProgrammingBatchCoordinator:
         # every later pass (after any yield, retry or planning gap) re-reads both.
         site_verdict_fresh = first
         release_deadline: float | None = None
+        # What this lane's last passing Site verdict was read from. Handed
+        # once to the plan made right after it, never to a later one.
+        evidence: dict[str, Any] = {}
         if first:
             initial_started = (self.monotonic()
                                if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
@@ -1536,7 +1553,7 @@ class ProgrammingBatchCoordinator:
                 with self._lock:
                     self._dispatch_block(batch, alias)
                 if verdict is None:
-                    verdict = self._site_block(alias, site)
+                    verdict = self._site_block(alias, site, evidence=evidence)
                 if verdict is not None:
                     domain, reason = verdict
                     if domain == SHARED_CONTROL_FAILURE:
@@ -1565,7 +1582,7 @@ class ProgrammingBatchCoordinator:
                         site_verdict_fresh = False
                         verdict = self._platform_block(alias)
                     else:
-                        verdict = self._admission_block(alias, site)
+                        verdict = self._admission_block(alias, site, evidence=evidence)
                 finally:
                     if admission_started is not None:
                         _m0_timing("manager_cycle_admission",
@@ -1604,7 +1621,8 @@ class ProgrammingBatchCoordinator:
                 plan_started = (self.monotonic()
                                 if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
                 try:
-                    plan = self.workflow.plan(alias, site_body)["plan"]
+                    plan = self.workflow.plan(alias, site_body, preparation=preparation,
+                                              evidence=evidence or None)["plan"]
                 except ProgrammingError as exc:
                     if number == 1:
                         # Nothing was submitted for this Site: provably BLOCKED.
@@ -1612,6 +1630,7 @@ class ProgrammingBatchCoordinator:
                     # The earlier FAIL stands; the retry could not be planned.
                     return "FAIL", f"RETRY_PLAN_REFUSED_{exc.code}"
                 finally:
+                    evidence.clear()
                     if plan_started is not None:
                         _m0_timing("manager_plan", batch_id=batch["batch_id"],
                                    cycle_id=unit["cycle"]["cycle_id"],

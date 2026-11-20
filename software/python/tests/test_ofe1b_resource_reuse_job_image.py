@@ -128,17 +128,18 @@ def test_non_canonical_or_mixed_set_fails_closed(tmp_path):
 def test_generation_change_during_derivation_fails_closed(tmp_path, monkeypatch):
     built = bundle_v3.build_user_image_bundle(route(), FW_A)
     stage_bundle(tmp_path, built)
-    original = assets.read_active
+    original = assets._verified_active
     calls = []
 
     def drifting(product_root):
-        result = original(product_root)
+        result, manifest_sha256 = original(product_root)
         calls.append(1)
         if len(calls) > 1:
             result = {**result, "generation": result["generation"] + 1}
-        return result
+        return result, manifest_sha256
 
-    monkeypatch.setattr(assets, "read_active", drifting)
+    monkeypatch.setattr(assets, "_resource_snapshots", {})
+    monkeypatch.setattr(assets, "_verified_active", drifting)
     with pytest.raises(assets.AssetSetError, match="ACTIVE_SET_CHANGED"):
         assets.read_active_resource_identity(tmp_path)
 

@@ -1,6 +1,6 @@
 # WO-2 F2 M1 — Per-Cycle latency gap audit and Verified Resource Snapshot design (Gate 1)
 
-Status: **DESIGN ONLY / NO CACHE OR SAFETY DECISION CHANGE**  
+Status: §1–§5 **M1 DESIGN** (no cache); §6 **M2 IMPLEMENTED** (Host-only verified, Z2 NOT_RUN)  
 Baseline: `main` `b6a608c770df7959e7bfb395c515c88c021f043b` (includes M0 #1515 `d953506c`).  
 Evidence: M0 merged Host-only instrumentation; owner-supplied Claude Host/Mock validation report (2026-11-20). M0 Mock timings are **not** Z2 timings or measured production savings.
 
@@ -72,3 +72,48 @@ Always preserve: current PPU/Root ownership, Site enabled/idle/queue and route, 
 4. **8-Site concurrency:** per-Site isolation is distinct from shared PPU resource identity, Root/FPGA/Power constraints. Never trade a PPU-wide unsafe side effect for latency.
 
 Acceptance for **M1 only**: Host-only positive/negative test of enabled/disabled timing, first-cycle correlation, Bootstrap and Readiness error paths, required exact-HEAD CI. No claim of measured ~2.4 s improvement, no changes to decisions, caching, wire protocol, deployment, SWPC/Z2, PL or DUT.
+
+## 6. M2 implemented: Batch-once preparation and Verified Resource Snapshot
+
+Status: **Host-only verified; Z2 latency NOT_RUN / NOT_VERIFIED.** No wire, schema, journal or admission-rule change.
+
+### 6.1 Per-Cycle call graph (Cycle ≥ 2, Resource reuse, no retry)
+
+| Step | Before (M1 measured / code) | After (M2) |
+| --- | --- | --- |
+| Admission | Platform gate (Bootstrap `status`) → `target_block`: Bootstrap `assets`, `GET /api/health/ready`, `GET /api/status?site` | unchanged; `target_block` hands its passing `assets` + readiness to the next plan as single-use *evidence* |
+| Plan | parse + base64-decode Image, load/resolve Routes, Image SHA-256 (Bundle cache key), Bootstrap `status` + `assets`, `GET /api/status?site` | Batch-once `_Prepared` (parse, Route, Image SHA, Bundle/Resource Set) reused; Bootstrap `status` still read; `assets` + Site status taken from evidence (same alias/Site, ≤ 2 s, else re-read) |
+| Run | PREFLIGHT readiness, Bootstrap `assets`, pre-submit readiness + Resource identity, `POST /api/jobs` | unchanged |
+| PPU `status?site` | 2 × `read_active` (full `verify_staged`) + derivation | 1 × full `verify_staged` + Snapshot hit |
+| PPU enqueue | module re-exec + `read_active` (pin); 2 × `read_active` + derivation (Binding) | `read_active` (pin, helper loaded once); 1 × full verification + Snapshot hit (Binding) |
+
+Host-only counted per Cycle (`test_per_cycle_call_counts_before_and_after`, Mock, no Platform gate in the rig): `status?site` 4 → 3, Bootstrap `assets` 3 → 2, Bootstrap `status` 1 → 1, health 3 → 3; Route loads `N` → 1 and Image decodes `1+N` → 2 per Batch. On a real Manager each Bootstrap `assets` is ≈ 4 HTTP (challenge, MACed status, challenge, assets), so the M1 18 Bootstrap HTTP/Cycle is expected to become 14 (code-inferred). PPU full Active Set verifications outside Job execution: Runtime 11 → 5 per Cycle (3 status + pin + Binding), Bootstrap 3 → 2 (code-inferred from the M1 model).
+
+### 6.2 Batch-once preparation (Manager)
+
+`BatchPreparation` lives in one Batch run (`_run_units`) and is shared by its lanes only; `_prepared_for` prepares under its lock, so concurrent first Cycles prepare once. It is reused only while the request (minus `site_id`) is equal **and** the SHA-256 over every Route file's name and bytes is unchanged (fingerprinted before loading); otherwise it prepares again. It holds no PPU state and is never persisted (Manager restart → the Batch is interrupted as before). Each Cycle still gets a fresh plan ID, journalled start, Job Binding (with live `ppu_id`), run ID and Job.
+
+### 6.3 Evidence reuse — why each removed call is redundant
+
+* **Plan Bootstrap `assets`**: the same authenticated read was done by `target_block` with no lane yield in between; plan re-applies `RECOVERY_REQUIRED` and Bootstrap↔Runtime Active Set consistency to it. The Run's pre-submit Bootstrap `assets` read is the fresh check and remains.
+* **Plan `GET /api/status?site`**: plan used it only for `ppu_id` and the Resource report, which the admission readiness of the same Site just returned. The pre-submit readiness re-proves Site, lease, activation and `VERIFIED` Resource identity (`RESOURCE_IDENTITY_NOT_CONFIRMED` refuses the POST).
+* **Retained with reasons:** Platform gate (fleet observation + recovery); plan Bootstrap `status` (only plan-time proof of `runtime_active` and MAC-authenticated pairing — the gate admits `runtime_absent`); PREFLIGHT readiness (independent receipt before any B1–B3 mutation); pre-submit Bootstrap `assets` and readiness (fresh pre-POST checks).
+
+### 6.4 PPU Verified Resource Snapshot — trust and invalidation
+
+No existing mutation fence (immutable attribute, fs-verity, read-only mount or a Root-owned write lease visible to the Runtime) proves the staged Set cannot change between Jobs. **Therefore full content verification is NOT cached**: every `status`, pin and Binding admission runs `verify_staged` (every file SHA-256, no symlink, no extra file). The Snapshot caches only the derivation keyed by `(product_root, asset_set_sha256, manifest_sha256)` that the same call verified, so:
+
+| Change | Effect |
+| --- | --- |
+| Active Set switch / B3 activation / recovery | new `asset_set_sha256` or manifest → different key; `generation` always from the fresh read |
+| File content change (even same size/mtime), unauthorised edit | `verify_staged` fails before any lookup |
+| Symlink / path / staged-dir replacement | `verify_staged` / `_root` fail closed |
+| Manifest swapped during a miss | manifest bytes re-hashed against the key; nothing stored |
+| Runtime restart | process memory only; next call derives again |
+| Snapshot vs Job Binding | `_admit_job_binding` still compares Binding, Provider/Profile, ICPN, PPU, Site, Image under the Job lease |
+
+Remaining trust gap: removing the per-call full SHA/tree walk itself needs a storage mutation fence the PPU does not have today; it stays NOT IMPLEMENTED. The Snapshot authorises nothing and never bypasses Job admission.
+
+### 6.5 Unchanged per-Job invariants
+
+Site Ready/Enabled, PPU execution lease/ownership, Root Guard, SAFE_OFF/Seal/recovery, Job Binding verification, full Active Set integrity, fresh Plan/Run/Job identity, durable journals, `OUTCOME_UNKNOWN` no-blind-resend, terminal + SAFE_OFF before the next Cycle, B1/B2/B3 fences; independent Site lanes with no PPU-wide Cycle barrier (8-Site regression test).

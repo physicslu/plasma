@@ -69,7 +69,7 @@ def test_admission_event_occurs_per_invocation(monkeypatch, capsys):
     coordinator = object.__new__(ProgrammingBatchCoordinator)
     coordinator.monotonic = time.monotonic
     coordinator._platform_block = lambda alias: None
-    coordinator._site_block = lambda alias, site: None
+    coordinator._site_block = lambda alias, site, **kw: None
     for _ in range(3):
         assert coordinator._admission_block("ppu", 1) is None
     events = _records(capsys)
@@ -84,7 +84,7 @@ def test_disabled_admission_does_not_advance_fake_clock(monkeypatch, capsys):
     coordinator = object.__new__(ProgrammingBatchCoordinator)
     coordinator.monotonic = lambda: (_ for _ in ()).throw(AssertionError("clock advanced"))
     coordinator._platform_block = lambda alias: None
-    coordinator._site_block = lambda alias, site: None
+    coordinator._site_block = lambda alias, site, **kw: None
     assert coordinator._admission_block("ppu", 1) is None
     assert _records(capsys) == []
 

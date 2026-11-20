@@ -161,7 +161,7 @@ def units_of(batch):
 
 def defer_admission(batches, workflow, predicate, event):
     original = batches._site_block
-    def admission(alias, site):
+    def admission(alias, site, **kw):
         if predicate(alias, site):
             assert event.wait(10)
         return original(alias, site)
