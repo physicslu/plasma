@@ -149,10 +149,24 @@ def main() -> None:
             label="Engineering server-side mock PPU catalog",
         )
 
+        # Provision an isolated, qualified SQLite revision for the Mock CD
+        # Manager, not via a live Selector fallback. PPU gateways remain
+        # Catalog-free and use only their own execution authority.
+        sys.path.insert(0, str(cd.PYTHON_DIR))
+        from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+        from plasma_web.device_catalog import default_catalog_manifest_path
+        from plasma_web.programming_qualification import get_default_programming_qualification_registry
+
+        catalog_database = work / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(catalog_database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
         manager = cd.start_process(
             "manager",
             [sys.executable, "-m", "plasma_manager.server", "--config", str(manager_config)],
             cwd=cd.PYTHON_DIR,
+            env={"PLASMA_CATALOG_SQLITE_DB": str(catalog_database)},
         )
         processes.append(("manager", manager))
         cd.wait_json(
