@@ -197,7 +197,8 @@ test("IC Management explains Official versus Local ICPN conflicts without deleti
   await expect(alert).toContainText("1 customer part number conflict(s)");
   await expect(alert).toContainText("LocalVendor · CUSTOM-A");
   await expect(alert).toContainText("LOCAL r3 · Profile custom-v3");
-  await expect(alert).toContainText("Nothing is automatically renamed, deleted, or promoted.");
+  await expect(alert).toContainText("do not invent a different Exact ICPN");
+  await expect(alert).toContainText("Nothing is automatically renamed, deleted, merged, or promoted.");
   await expect(alert.getByRole("button", { name: "Export Local Catalog JSON" })).toBeVisible();
   await alert.getByRole("button", { name: "View customer IC" }).click();
   const editor = page.locator("#local-ic-editor");
