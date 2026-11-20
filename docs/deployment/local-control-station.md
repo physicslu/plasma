@@ -135,6 +135,20 @@ legacy source-dependent *optional display metadata* for Canonical Catalog
 identity or an admission authority. Selector availability does not decide
 already-admitted PPU Jobs.
 
+**Customer-owned IC preservation is a hard upgrade invariant.**
+Local Exact ICPNs and custom Profiles reside in
+`controller_overlays(namespace='user_catalog')`, outside immutable Official
+Catalog revisions. Official data upgrades must use the existing transactional
+Publisher against the same persistent SQLite file; they must **not** replace,
+copy over, delete, or reinitialize that file with a prebuilt Official-only DB.
+Before and after a data update, validate exact local record/profile content,
+record counts, revisions, and visibility independently from Official row counts.
+An Official revision or rollback that collides with a customer-owned
+`(manufacturer, exact_icpn)` must fail closed without deleting either record;
+conflict resolution requires a separate, explicitly authorized local action.
+Use SQLite online backup or equivalent consistent snapshot for recovery;
+copying just the live `.sqlite3` file without its WAL is not safe.
+
 This Gate 1 changes runtime read semantics and deployment contracts, **not**
 an existing SWPC installation or persistent Catalog. Production cutover must
 first establish the real Manager database path and backup/rollback eligibility;
