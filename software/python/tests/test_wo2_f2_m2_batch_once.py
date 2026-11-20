@@ -201,6 +201,35 @@ def test_resource_change_after_plan_is_refused_before_submit(tmp_path):
     assert batch["units"][0]["reason"] == "RESOURCE_IDENTITY_NOT_CONFIRMED"
 
 
+def test_runtime_epoch_change_refuses_submit_without_bootstrap_reread(tmp_path):
+    b = Counted(tmp_path, repeat=3)
+    plan = b.workflow.plan
+
+    def restart_after_plan(alias, body, **kw):
+        result = plan(alias, body, **kw)
+        b.gateway.resource_reservation["epoch"] = "restarted-runtime"
+        return result
+
+    b.workflow.plan = restart_after_plan
+    batch = b.run()
+    assert batch["outcome"] in ("FAIL", "BLOCKED") and b.gateway.posts == []
+    assert batch["units"][0]["reason"] == "RESOURCE_RESERVATION_CHANGED"
+    assert b.bootstrap_calls()["assets"] == 1
+
+
+def test_heartbeat_detects_changed_reservation_and_invalidates_snapshot(tmp_path):
+    _batches, workflow, gateways, _coordinators = rig(tmp_path, sites=(1,))
+    prepared = workflow.prepare(_plan_body(1))
+    workflow.begin_batch_resource("z2", "batch-a", prepared.resources[1], 1)
+    assert workflow._batch_session("z2", "batch-a") is not None
+    workflow.renew_batch_resource("z2", "batch-a")
+    assert gateways["z2"].reservation_calls == ["acquire", "check"]
+    gateways["z2"].resource_reservation["epoch"] = "other-runtime"
+    with pytest.raises(wf.ProgrammingError, match="Batch Resource changed"):
+        workflow.renew_batch_resource("z2", "batch-a")
+    assert workflow._batch_session("z2", "batch-a") is None
+
+
 def _plan_body(site=1, image=FW_A):
     import base64
     from .test_programming_batch_targets import ICPN, FULL
