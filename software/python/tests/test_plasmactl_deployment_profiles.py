@@ -174,6 +174,71 @@ def test_local_control_station_distinct_interpreters_still_fail_closed(tmp_path:
     assert "multiple Plasma Python runtimes found" in result.stderr
 
 
+def _run_local_node_path_resolver(home: Path, path: str = "/missing-node-tools") -> subprocess.CompletedProcess[str]:
+    """Execute only the backend PATH resolver, never a deployment or service."""
+    source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
+    resolver = (
+        "ensure_nvm_node22_path() {"
+        + source.split("ensure_nvm_node22_path() {", 1)[1]
+        .split("\nprepare_release() {", 1)[0]
+    )
+    harness = (
+        "set -euo pipefail\n"
+        'die() { printf "%s\\n" "$*" >&2; exit 77; }\n'
+        f"{resolver}\n"
+        'ensure_nvm_node22_path\nprintf "%s\\n" "$PATH"\n'
+    )
+    return subprocess.run(
+        ["/bin/bash", "-c", harness],
+        env={"HOME": str(home), "PATH": path},
+        capture_output=True, text=True, check=False, timeout=10,
+    )
+
+
+def test_local_control_station_resolves_single_existing_nvm_node22(tmp_path: Path) -> None:
+    node_bin = tmp_path / ".nvm/versions/node/v22.23.2/bin"
+    node_bin.mkdir(parents=True)
+    for name in ("node", "npm"):
+        tool = node_bin / name
+        tool.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        tool.chmod(0o755)
+    old_bin = tmp_path / ".nvm/versions/node/v20.19.0/bin"
+    old_bin.mkdir(parents=True)
+    (old_bin / "node").write_text("not executable\n")
+
+    result = _run_local_node_path_resolver(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == f"{node_bin}:/missing-node-tools"
+    # A qualified tool pair already on PATH must remain the caller's choice.
+    existing = _run_local_node_path_resolver(tmp_path, str(node_bin))
+    assert existing.returncode == 0, existing.stderr
+    assert existing.stdout.strip() == str(node_bin)
+
+
+def test_local_control_station_nvm_path_fails_closed_on_ambiguity(tmp_path: Path) -> None:
+    for version in ("v22.22.0", "v22.23.2"):
+        bin_dir = tmp_path / ".nvm/versions/node" / version / "bin"
+        bin_dir.mkdir(parents=True)
+        for name in ("node", "npm"):
+            tool = bin_dir / name
+            tool.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            tool.chmod(0o755)
+    result = _run_local_node_path_resolver(tmp_path)
+    assert result.returncode == 77
+    assert "multiple NVM Node.js 22 runtimes found" in result.stderr
+
+
+def test_local_control_station_does_not_select_incomplete_nvm_install(tmp_path: Path) -> None:
+    bin_dir = tmp_path / ".nvm/versions/node/v22.23.2/bin"
+    bin_dir.mkdir(parents=True)
+    tool = bin_dir / "node"
+    tool.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    tool.chmod(0o755)
+    result = _run_local_node_path_resolver(tmp_path)
+    assert result.returncode == 0
+    assert result.stdout.strip() == "/missing-node-tools"
+
+
 def test_local_control_station_is_console_manager_only_and_loopback_bound() -> None:
     source = LOCAL_CONTROL_STATION.read_text(encoding="utf-8")
     assert 'console_host="127.0.0.1"' in source

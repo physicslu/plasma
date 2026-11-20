@@ -256,6 +256,28 @@ PY
   fi
 }
 
+# Sudo's non-login owner context does not load nvm's Node.js PATH.
+# Prefer the caller's PATH; fall back only to one existing Node.js 22 install.
+ensure_nvm_node22_path() {
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    return 0
+  fi
+  local candidate
+  local -a matches=()
+  shopt -s nullglob
+  for candidate in "$HOME"/.nvm/versions/node/v22.*/bin; do
+    [[ -x "$candidate/node" && -x "$candidate/npm" ]] || continue
+    matches+=("$candidate")
+  done
+  shopt -u nullglob
+  if (( ${#matches[@]} > 1 )); then
+    die "multiple NVM Node.js 22 runtimes found; select one in PATH"
+  fi
+  if (( ${#matches[@]} == 1 )); then
+    export PATH="${matches[0]}:$PATH"
+  fi
+}
+
 prepare_release() {
   local sha="$1" release staging npm_bin node_bin
   release="$(release_dir_for_sha "$sha")"
@@ -267,6 +289,7 @@ prepare_release() {
     return 0
   fi
 
+  ensure_nvm_node22_path
   require_command npm
   require_command node
   npm_bin="$(command -v npm)"
