@@ -112,6 +112,13 @@ export type ProgrammingPlan = {
 
 export type ProgrammingRunOutcome = "PASS" | "FAIL" | "OUTCOME_UNKNOWN" | "BLOCKED";
 
+export type ProgrammingStageEvent = {
+  job_id: string; site_id: number; session_id: string; attempt: number;
+  sequence: number; stage: SequenceOperation;
+  state: "started" | "completed" | "failed"; at: string;
+  source?: "runtime_terminal";
+};
+
 export type ProgrammingRun = {
   run_id: string;
   ppu_alias: string;
@@ -127,6 +134,10 @@ export type ProgrammingRun = {
     job_id?: string;
     state?: string;
     stage?: string | null;
+    stage_state?: string | null;
+    stage_states?: Partial<Record<SequenceOperation, string>>;
+    stage_events?: ProgrammingStageEvent[];
+    attempt?: number | null;
     progress_percent?: number | null;
     bytes_done?: number | null;
     bytes_total?: number | null;
@@ -403,6 +414,9 @@ export type ProgrammingBatchUnitProgress = {
   job_id: string | null;
   job_state: string | null;
   stage: string | null;
+  stage_states?: Partial<Record<SequenceOperation, string>>;
+  stage_events?: ProgrammingStageEvent[];
+  job_attempt?: number | null;
   progress_percent: number | null;
 };
 

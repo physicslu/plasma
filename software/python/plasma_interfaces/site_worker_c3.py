@@ -26,7 +26,7 @@ import json
 import os
 import socket
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Awaitable, Callable, Mapping
 
 from plasma_core import job_timing
 from plasma_core.errors import ErrorCode, PlasmaError
@@ -46,19 +46,33 @@ class SiteWorkerControlClient:
         self.socket_path = Path(socket_path)
         self.timeout_s = timeout_s
 
-    def call(self, op: str, *, timeout_s: float | None = None, **fields: Any) -> dict[str, Any]:
+    def call(self, op: str, *, timeout_s: float | None = None,
+             stage_event: Callable[[dict[str, Any]], None] | None = None,
+             **fields: Any) -> dict[str, Any]:
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 sock.settimeout(self.timeout_s if timeout_s is None else timeout_s)
                 sock.connect(str(self.socket_path))
                 sock.sendall((json.dumps({"protocol": PROTOCOL, "op": op, **fields}) + "\n").encode())
                 data = b""
-                while not data.endswith(b"\n"):
+                reply = None
+                while reply is None:
                     chunk = sock.recv(65536)
                     if not chunk:
                         break
                     data += chunk
-            reply = json.loads(data.decode("utf-8"))
+                    while b"\n" in data:
+                        line, data = data.split(b"\n", 1)
+                        item = json.loads(line.decode("utf-8"))
+                        event = item.get("stage_event") if isinstance(item, dict) else None
+                        if event is not None:
+                            if stage_event is not None and isinstance(event, dict):
+                                try:
+                                    stage_event(event)
+                                except Exception:
+                                    pass  # Observation never changes the run result.
+                        else:
+                            reply = item
         except (OSError, ValueError, UnicodeDecodeError) as exc:
             raise SiteWorkerRefused("SITE_WORKER_UNREACHABLE:" + type(exc).__name__) from exc
         if not isinstance(reply, dict):
@@ -174,6 +188,8 @@ async def run_job_operations(
     address: int,
     length: int,
     erase_range: tuple[int, int] | None = None,
+    attempt: int = 1,
+    stage_event: Callable[[str, str, dict[str, Any]], Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     """One ``programming`` Job (ordered erase / program / verify list) or one
     independent ``read`` Job, in ONE C-3 session.
@@ -235,8 +251,32 @@ async def run_job_operations(
                     context={**context, "site_worker_stage": "bind",
                              "site_worker_bind": dict(bound)},
                 )
+            loop = asyncio.get_running_loop()
+            last_sequence = 0
+            def relay(event: dict[str, Any]) -> None:
+                nonlocal last_sequence
+                if stage_event is None:
+                    return
+                sequence = event.get("sequence")
+                if (event.get("job_id") != job_id or event.get("site_id") != site_id
+                        or event.get("session_id") != session_id
+                        or type(sequence) is not int or sequence != last_sequence + 1
+                        or event.get("stage") not in steps
+                        or event.get("state") not in ("started", "completed", "failed")):
+                    return
+                last_sequence = sequence
+                fields = {"job_id": job_id, "site_id": site_id,
+                          "session_id": session_id, "attempt": attempt,
+                          "sequence": sequence}
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        stage_event(event["stage"], event["state"], fields), loop).result()
+                except Exception:
+                    pass  # Observation must not change the Flash outcome.
             result = await job_timing.in_thread(
                 "worker_run", client.call, "run", timeout_s=max_runtime_s + 30.0,
+                **({"stage_event": relay, "observe_stages": True}
+                   if stage_event is not None and opened.get("stage_events") is True else {}),
                 session_id=session_id, site=site_id, operation=operation)
             if isinstance(result.get("timing_ms"), dict):
                 # Site Worker admission / OpenOCD / revoke timing for this run.

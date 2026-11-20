@@ -165,35 +165,46 @@ def test_independent_sites_overlap_and_persist_terminal_updates(tmp_path, count)
     assert len(gateway.posts) == count
 
 
-def test_every_running_site_reports_its_own_progress(tmp_path):
-    """A Batch has one current_run; each unit still carries its own Site's progress."""
-    h = Harness(tmp_path, (1, 2))
+@pytest.mark.parametrize("count", [2, 8])
+def test_every_running_site_reports_its_own_progress(tmp_path, count):
+    """A Batch has one current_run; all Site stages remain independent."""
+    h = Harness(tmp_path, tuple(range(1, count + 1)))
     gateway = h.gateways["z2"]
     h.start()
     try:
-        assert gateway.submitted[1].wait(WAIT) and gateway.submitted[2].wait(WAIT)
+        assert all(gateway.submitted[site].wait(WAIT) for site in range(1, count + 1))
         deadline = time.monotonic() + WAIT
         while not all((r.job or {}).get("job_id") for r in list(h.workflow._runs.values())):
             assert time.monotonic() < deadline, "runs never recorded their Job"
             time.sleep(0.001)
         for run in list(h.workflow._runs.values()):
+            events = [{"job_id": run.job["job_id"], "site_id": run.site,
+                       "session_id": f"session-site-{run.site}", "attempt": 1,
+                       "sequence": sequence, "stage": stage, "state": state}
+                      for sequence, (stage, state) in enumerate(
+                          (("erase", "started"), ("erase", "completed"),
+                           ("program", "started")), 1)]
             h.workflow._update(run, job={**run.job, "state": "running", "stage": "program",
-                                         "progress_percent": 30 + run.site})
+                                         "progress_percent": 30 + run.site,
+                                         "stage_states": {"erase": "completed", "program": "started"},
+                                         "stage_events": events, "attempt": 1})
         live = h.batches.status_batch(h.started["batch"]["batch_id"])["batch"]
-        assert live["current_run"]["site_id"] in (1, 2)
+        assert live["current_run"]["site_id"] in range(1, count + 1)
         for unit in live["units"]:
             attempt = unit["attempts"][-1]
             run = h.workflow._runs[attempt["run_id"]]
             assert run.site == unit["site_id"]
             assert unit["progress"] == {
                 "attempt": 1, "run_id": attempt["run_id"], "job_id": run.job["job_id"],
-                "job_state": "running", "stage": "program", "progress_percent": 30 + unit["site_id"]}
-        assert len({u["progress"]["job_id"] for u in live["units"]}) == 2
+                "job_state": "running", "stage": "program", "progress_percent": 30 + unit["site_id"],
+                "stage_states": {"erase": "completed", "program": "started"},
+                "job_attempt": 1, "stage_events": run.job["stage_events"]}
+        assert len({u["progress"]["job_id"] for u in live["units"]}) == count
         stored = json.loads((tmp_path / "batches.json").read_text())["batches"][0]
         assert all("progress" not in u for u in stored["units"]), "display projection is never journaled"
     finally:
         batch = h.finish()
-    assert [u["outcome"] for u in batch["units"]] == ["PASS", "PASS"]
+        assert [u["outcome"] for u in batch["units"]] == ["PASS"] * count
 
 
 @pytest.mark.parametrize("peer_final", ["success", "failed"])
@@ -667,11 +678,11 @@ def test_first_pass_reads_each_site_verdict_once_and_rereads_after_a_yield(tmp_p
     assert len(platform_calls) == 3                 # leader verdict + one re-read per lane
 
 
-def test_job_status_is_polled_faster_than_b3_deployment(tmp_path):
+def test_job_status_and_b3_deployment_use_one_second_defaults(tmp_path):
     from plasma_manager.programming import BundleProgrammingWorkflow
     import inspect
     defaults = inspect.signature(BundleProgrammingWorkflow.__init__).parameters
     assert defaults["poll_interval_s"].default == 1.0
-    assert defaults["job_poll_interval_s"].default == 0.25
+    assert defaults["job_poll_interval_s"].default == 1.0
     assert inspect.signature(ProgrammingBatchCoordinator.__init__).parameters[
         "poll_interval_s"].default == 0.1

@@ -248,6 +248,8 @@ class SiteWorker:
             "image_sha256": request.image_sha256 if request.has_image else None,
             "stage": runtime.stage,
             "stage_state": runtime.stage_state,
+            "stage_states": dict(runtime.stage_states),
+            "stage_events": [dict(item) for item in runtime.stage_events],
             "stage_progress_percent": runtime.stage_progress_percent,
             "progress_percent": runtime.progress_percent,
             "bytes_done": runtime.bytes_done,
@@ -315,9 +317,35 @@ class SiteWorker:
             cancelled = False
 
             async def stage_callback(name: str, event: str, fields: dict[str, Any]) -> None:
+                if "session_id" in fields:
+                    binding = runtime.job_binding or request.metadata.get("job_binding") or {}
+                    session = fields.get("session_id")
+                    sequence = fields.get("sequence")
+                    if (fields.get("job_id") != request.job_id
+                            or fields.get("site_id") != request.site_id
+                            or fields.get("attempt") != runtime.attempt
+                            or type(session) is not str or not session
+                            or type(sequence) is not int or sequence != runtime.stage_sequence + 1
+                            or name not in binding.get("operations", ())
+                            or event not in ("started", "completed", "failed")
+                            or (runtime.stage_session_id is not None
+                                and runtime.stage_session_id != session)):
+                        return
+                    previous = runtime.stage_states.get(name)
+                    if ((event == "started" and previous is not None)
+                            or (event in ("completed", "failed") and previous != "started")):
+                        return
+                    runtime.stage_session_id = session
+                    runtime.stage_sequence = sequence
+                    runtime.stage_events.append({"job_id": request.job_id,
+                        "site_id": request.site_id, "session_id": session,
+                        "attempt": runtime.attempt, "sequence": sequence,
+                        "stage": name, "state": event, "at": iso_now()})
                 level = "ERROR" if event == "failed" else "INFO"
                 runtime.stage = name
                 runtime.stage_state = event
+                if name in ("erase", "program", "verify"):
+                    runtime.stage_states[name] = event
                 runtime.stage_progress_percent = float(
                     fields.get("stage_progress_percent", runtime.stage_progress_percent)
                 )
@@ -345,6 +373,9 @@ class SiteWorker:
             while attempts <= request.max_retries:
                 attempts += 1
                 runtime.attempt = attempts
+                runtime.stage_states = {}
+                runtime.stage_session_id = None
+                runtime.stage_sequence = 0
                 runtime.updated_at = iso_now()
                 attempt_started_at = iso_now()
                 attempt_started_monotonic = time.monotonic()
@@ -356,6 +387,7 @@ class SiteWorker:
                 selected_interface.bind_runtime_job(RuntimeJobContext(
                     job_id=request.job_id,
                     site_id=request.site_id,
+                    attempt=attempts,
                     deadline_monotonic=job_deadline,
                     active_asset_set=runtime.active_asset_set,
                     admitted_job_binding=runtime.job_binding,
@@ -516,6 +548,19 @@ class SiteWorker:
                 runtime.stage_state = "completed"
                 runtime.stage_progress_percent = 100.0
                 runtime.progress_percent = 100.0
+
+            if (state is not JobState.SUCCESS and runtime.stage_session_id is not None
+                    and runtime.stage in runtime.stage_states
+                    and runtime.stage_states[runtime.stage] == "started"):
+                runtime.stage_states[runtime.stage] = "failed"
+                runtime.stage_state = "failed"
+                if runtime.stage_session_id is not None:
+                    runtime.stage_sequence += 1
+                    runtime.stage_events.append({"job_id": request.job_id,
+                        "site_id": request.site_id, "session_id": runtime.stage_session_id,
+                        "attempt": runtime.attempt, "sequence": runtime.stage_sequence,
+                        "stage": runtime.stage, "state": "failed", "at": iso_now(),
+                        "source": "runtime_terminal"})
 
             error_detail = (
                 ErrorDetail.from_exception(

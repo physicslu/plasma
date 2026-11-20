@@ -73,6 +73,7 @@ class RuntimeJobContext:
     job_id: str
     site_id: int
     deadline_monotonic: float
+    attempt: int = 1
     active_asset_set: Mapping[str, Any] | None = None
     admitted_job_binding: Mapping[str, Any] | None = None
     trusted_provider: Any | None = None
@@ -84,6 +85,9 @@ class RuntimeJobContext:
         if type(self.site_id) is not int or self.site_id < 1:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT,
                               "RUNTIME_CONTEXT_SITE_INVALID")
+        if type(self.attempt) is not int or self.attempt < 1:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT,
+                              "RUNTIME_CONTEXT_ATTEMPT_INVALID")
         if (type(self.deadline_monotonic) not in (int, float)
                 or not math.isfinite(self.deadline_monotonic)):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT,

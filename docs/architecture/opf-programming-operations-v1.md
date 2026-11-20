@@ -83,6 +83,16 @@ Target Finalization is unchanged by retirement: the existing preamble and ending
    erase-only and `read`. One operation guard, one Site lock, SAFE_OFF, FPGA identity checks.
 7. **ABI-v5 adapter**: one admitted OpenOCD session; evidence per step from what actually ran.
 
+The OpenOCD session emits read-only Erase / Program / Verify transitions through the
+existing Site Worker control connection when the Runtime opts into stage events.
+Each event has Job, Site, Session, attempt and sequence identity. The PPU Job retains
+the ordered event history across attempts; Manager copies it into the Run and each
+Batch Site's latest progress projection. E Mode renders the selected stages from
+this history. These events are for display only. The final Receipt, verified
+SAFE_OFF and existing PASS/FAIL checks remain authoritative. Manager polls PPU Job
+status once per second. E Mode UI retains its one-second Batch cadence; P Mode UI
+and polling remain unchanged.
+
 ## Receipts and failure classes
 
 * PPU Job result: `details.programming = {result, operations, steps: {erase, program, verify},

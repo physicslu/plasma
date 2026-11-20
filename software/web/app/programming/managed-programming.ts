@@ -890,6 +890,46 @@ export function unitStageLabel(batch: ProgrammingBatch, unit: ProgrammingBatchUn
   return held && held.outcome == null ? runStageLabel(held) : null;
 }
 
+export type StageStatus = { name: "erase" | "program" | "verify"; state: "pending" | "running" | "completed" | "failed" };
+
+/** Each Site uses only its latest attempt; a terminal PASS comes from its judged Receipt. */
+export function unitStageStatuses(batch: ProgrammingBatch, unit: ProgrammingBatchUnit): StageStatus[] {
+  const own = ownUnitProgress(unit);
+  const held = runOfUnit(batch, unit);
+  const job = own ?? held?.job;
+  const jobId = own?.job_id ?? held?.job?.job_id;
+  const jobAttempt = own?.job_attempt ?? held?.job?.attempt;
+  const events = job?.stage_events ?? [];
+  const states: Partial<Record<StageStatus["name"], string>> = {};
+  let session: string | null = null;
+  let sequence = 0;
+  for (const event of events) {
+    if (event.attempt !== jobAttempt) continue; // PPU retries have separate Sessions.
+    if (event.job_id !== jobId || event.site_id !== unit.site_id
+        || !batch.operations.includes(event.stage)
+        || !event.session_id || (session !== null && session !== event.session_id)
+        || event.sequence !== sequence + 1) break;
+    session = event.session_id;
+    sequence = event.sequence;
+    const previous = states[event.stage];
+    if ((event.state === "started" && previous == null)
+        || (event.state !== "started" && previous === "started")) {
+      states[event.stage] = event.state;
+    } else break;
+  }
+  // Old Manager/PPU snapshots have no event list; their terminal Receipt is
+  // still authoritative and no in-flight stage is invented.
+  const verdict = batchSiteVerdict(batch, unit, held).verdict;
+  return batch.operations.map(name => {
+    const event = states[name];
+    const state = verdict === "PASS" ? "completed"
+      : event === "completed" ? "completed"
+      : event === "failed" ? "failed"
+      : event === "started" ? "running" : "pending";
+    return { name, state };
+  });
+}
+
 function ownUnitProgress(unit: ProgrammingBatchUnit) {
   const last = unit.attempts[unit.attempts.length - 1];
   const own = unit.progress;

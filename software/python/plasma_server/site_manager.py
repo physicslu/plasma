@@ -751,6 +751,7 @@ class SiteManager:
                 "state": runtime.state.value,
                 "stage": runtime.stage,
                 "stage_state": runtime.stage_state,
+                "stage_states": dict(runtime.stage_states),
                 "progress_percent": runtime.progress_percent,
                 "created_at": runtime.created_at,
                 "started_at": runtime.started_at,

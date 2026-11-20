@@ -172,6 +172,9 @@ test("an Operation no Programming Route declares is disabled, not a fake capabil
   await expect(job.getByLabel("Engineering operation erase")).toBeDisabled();
   await expect(job.getByLabel("Engineering operation erase")).not.toBeChecked();
   await expect(job.getByLabel("Engineering operation program")).toBeChecked();
+  const row = workspace.locator("tr", { has: page.getByLabel("Select SITE 2 for programming") });
+  await expect(row.locator(".engineeringStage")).toHaveCount(2);
+  await expect(row.locator('.engineeringStage[data-stage="erase"]')).toHaveCount(0);
   await start.click();
   await expect(jobLog(workspace)).toContainText("[RUN] PASS ·");
   expect(counters.plans[0].body.operations).toEqual(["program", "verify"]);
@@ -1427,7 +1430,7 @@ test("concurrent Site lanes: every Site's attempt and Manager run receipt is log
 
 
 for (const unitProgress of [true, false]) {
-  test(`concurrent Site lanes: LIVE SITE STATUS progress ${unitProgress ? "shows every running Site at once" : "falls back to current_run on an older Manager"}`, async ({ page }) => {
+  test(`concurrent Site lanes: Stage LEDs ${unitProgress ? "show every running Site at once" : "fall back to current_run on an older Manager"}`, async ({ page }) => {
     await mockManager(page, {
       ppus: [{ ...Z2, enabledSites: [2, 3] }],
       routes: [operationsRoute()],
@@ -1444,20 +1447,52 @@ for (const unitProgress of [true, false]) {
     await job.getByRole("button", { name: /START PROGRAMMING/ }).click();
 
     const row = (siteId: number) => workspace.locator("tr", { has: page.getByLabel(`Select SITE ${siteId} for programming`) });
-    const bar = (siteId: number) => row(siteId).locator(".tableProgress b");
+    const stages = (siteId: number) => row(siteId).locator(".engineeringStage");
     if (unitProgress) {
-      await expect(bar(2)).toHaveText("40%", { timeout: 10_000 });
-      await expect(bar(3)).toHaveText("40%");
+      await expect(stages(2).filter({ hasText: "VERIFY" })).toHaveAttribute("data-state", "running", { timeout: 10_000 });
+      await expect(stages(3).filter({ hasText: "VERIFY" })).toHaveAttribute("data-state", "running");
       await expect(row(2).locator(".state")).not.toHaveText(/READY|IDLE/i);
       await expect(row(3).locator(".state")).not.toHaveText(/READY|IDLE/i);
     } else {
-      // Only the Batch's current_run (the last submitted Site) has progress.
-      await expect(bar(3)).toHaveText("40%", { timeout: 10_000 });
-      await expect(bar(2)).toHaveCount(0);
+      // Only the Batch's current_run (the last submitted Site) has event history.
+      await expect(stages(3).filter({ hasText: "VERIFY" })).toHaveAttribute("data-state", "running", { timeout: 10_000 });
+      await expect(stages(2).filter({ hasText: "VERIFY" })).toHaveAttribute("data-state", "pending");
     }
+    await expect(row(2).locator(".tableProgress")).toHaveCount(0);
+    await expect(row(3).locator(".tableProgress")).toHaveCount(0);
     await expect(jobLog(workspace)).toContainText(/\[RESULT\] PASS · Batch/, { timeout: 30_000 });
   });
 }
+
+test("E Mode retains short stage transitions without claiming PASS before the Receipt", async ({ page }) => {
+  await mockManager(page, { routes: [operationsRoute()],
+    script: () => ({ runningPolls: 6, fastStages: true }) });
+  const workspace = await open(page);
+  const job = await selectIc(page);
+  await workspace.getByLabel("Select SITE 2 for programming").check();
+  await job.getByLabel("Engineering Programming Image file").setInputFiles(firmwareFile);
+  await job.getByRole("button", { name: /START PROGRAMMING/ }).click();
+  const row = workspace.locator("tr", { has: page.getByLabel("Select SITE 2 for programming") });
+  await expect(row.locator('.engineeringStage[data-state="completed"]')).toHaveCount(3, { timeout: 10_000 });
+  await expect(row.locator(".engineeringResult")).toHaveText("—");
+  await expect(row.locator(".tableProgress")).toHaveCount(0);
+  await expect(jobLog(workspace)).toContainText(/\[RESULT\] PASS · Batch/, { timeout: 30_000 });
+});
+
+test("E Mode running LED breathes every second and respects reduced motion", async ({ page }) => {
+  await mockManager(page, { routes: [operationsRoute()], script: () => ({ runningPolls: 6 }) });
+  const workspace = await open(page);
+  const job = await selectIc(page);
+  await workspace.getByLabel("Select SITE 2 for programming").check();
+  await job.getByLabel("Engineering Programming Image file").setInputFiles(firmwareFile);
+  await job.getByRole("button", { name: /START PROGRAMMING/ }).click();
+  const led = workspace.locator('.engineeringStage[data-stage="verify"][data-state="running"] i');
+  await expect(led).toBeVisible({ timeout: 10_000 });
+  await expect(led).toHaveCSS("animation-name", "engineeringStagePulse");
+  await expect(led).toHaveCSS("animation-duration", "1s");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(led).toHaveCSS("animation-name", "none");
+});
 
 
 test("Manual Repeat: a paused Site is continued by the same START, once, with its pause identity", async ({ page }) => {

@@ -25,6 +25,10 @@ class JobRuntime:
     result: JobResult | None = None
     stage: str | None = None
     stage_state: str | None = None
+    stage_states: dict[str, str] = field(default_factory=dict)
+    stage_events: list[dict[str, Any]] = field(default_factory=list)
+    stage_session_id: str | None = field(default=None, repr=False)
+    stage_sequence: int = field(default=0, repr=False)
     stage_progress_percent: float = 0.0
     progress_percent: float = 0.0
     bytes_done: int | None = None
@@ -63,6 +67,8 @@ class JobRuntime:
             "cancel_requested": self.cancel_requested,
             "stage": self.stage,
             "stage_state": self.stage_state,
+            "stage_states": dict(self.stage_states),
+            "stage_events": [dict(item) for item in self.stage_events],
             "stage_progress_percent": self.stage_progress_percent,
             "progress_percent": self.progress_percent,
             "bytes_done": self.bytes_done,

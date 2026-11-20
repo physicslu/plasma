@@ -489,6 +489,8 @@ async def execute_reference_flash(
     engine_base: Path = ppu_site_engine.ENGINE_BASE,
     require_root: bool = True,
     operation: str = PROGRAMMING,
+    attempt: int = 1,
+    stage_event=None,
 ) -> dict[str, Any]:
     """Run the *existing* native ABI-v5 flash cycle through C-3; no Provider subprocess.
 
@@ -543,7 +545,7 @@ async def execute_reference_flash(
             client.call("close_session", session_id=bound.session_id)
             raise ReferenceDenied("REFERENCE_ROUTE_CHANGED")
         worker_receipt = bound
-        return {"session_id": bound.session_id}
+        return {"session_id": bound.session_id, "stage_events": bound.stage_events}
 
     result = await run_job_operations(
             client, operation=operation, operations=operations, job_id=job_id,
@@ -554,7 +556,8 @@ async def execute_reference_flash(
             address=window["load_address"] if image_operation else job_range["address"],
             length=len(image) if image_operation else job_range["length"],
             erase_range=((window["load_address"], window["erase_length"])
-                         if image_operation else None))
+                         if image_operation else None), attempt=attempt,
+            stage_event=stage_event)
     _need(worker_receipt is not None, "WORKER_ENGINE_RECEIPT_MISSING")
     return {**result, "opf_provider_package": binding.route.provider_package,
             "opf_profile_package": binding.route.profile_package,
@@ -585,6 +588,8 @@ async def execute_runtime_flash(
     client: SiteWorkerControlClient, *, product_root: Path, request: JobRequest,
     active_asset_set: Mapping[str, Any] | None, job_deadline_monotonic: float,
     image_root: Path, job_binding: Mapping[str, Any] | None,
+    attempt: int = 1,
+    stage_event=None,
 ) -> dict[str, Any]:
     """Production REST Flash cutover; no direct-C3 fallback.
 
@@ -649,7 +654,8 @@ async def execute_runtime_flash(
             site_id=request.site_id, target=request.target, image=request.image,
             image_root=image_root, hardware=hardware,
             job_deadline_monotonic=job_deadline_monotonic, job_timeout_s=request.timeout_s,
-            job_binding=job_binding, operation=operation)
+            job_binding=job_binding, operation=operation,
+            attempt=attempt, stage_event=stage_event)
     except SiteWorkerRefused as exc:
         raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED,
                           "OPF_WORKER_OBSERVATION_DENIED:" + exc.code) from exc
