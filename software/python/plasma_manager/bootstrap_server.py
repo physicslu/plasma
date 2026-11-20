@@ -186,8 +186,13 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         self._json(status, {"ok": False, "error": {"code": code, "message": str(exc)}})
 
     def _trusted_idle_observation(self, alias: str) -> bool:
+        return self._trusted_observation(alias) and not self._alias_has_active_execution(alias)
+
+    def _trusted_observation(self, alias: str) -> bool:
+        """The fleet observation is current and of the right PPU. Says nothing
+        about Site activity, so it is the part a programming admission keeps."""
         item = self._fleet_item_for_alias(alias)
-        if item is None or self._alias_has_active_execution(alias):
+        if item is None:
             return False
         observation = item.get("observation")
         return (
@@ -278,6 +283,16 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         fleet poller, the Bootstrap coordinator, the registry - which is what
         this judgement is made of.
 
+        This is the PROGRAMMING admission of the Platform layer, not the
+        Platform maintenance gate: it does not ask whether a Site of the PPU
+        is active. Whether THIS Site is released, and whether the PPU's
+        execution lease is held by this Batch or by another owner, is judged
+        per Site from the PPU's own live state (``target_block``) and finally
+        by the PPU's atomic lease at Job admission. A 2 s fleet snapshot of a
+        peer Site's activity is never a reason to hold a released Site.
+        Platform maintenance (``_bootstrap_mutation_allowed``) still requires
+        the whole PPU idle.
+
         Those three ARE the shared control. If any of them is missing, this
         gate cannot be executed at all, and that is not one PPU's problem: it
         is reported as a shared failure rather than quietly degrading into
@@ -293,18 +308,21 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
         # other existing Bootstrap HTTP surfaces on their own policy path.
         probe._fleet_item_for_alias = probe._programming_fleet_item_for_alias
         try:
-            block = cls._platform_mutation_block(probe, alias)
+            block = cls._platform_mutation_block(probe, alias, programming=True)
         except (BootstrapManagerError, PPUHTTPError) as exc:
             return TARGET_STATE_UNAVAILABLE, f"PPU_PLATFORM_STATE_UNREADABLE_{type(exc).__name__}"
         except Exception as exc:
             return SHARED_CONTROL_FAILURE, f"PLATFORM_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}"
         return None if block is None else (TARGET_NOT_READY, block[0].upper())
 
-    def _platform_mutation_block(self, alias: str) -> tuple[str, str] | None:
+    def _platform_mutation_block(self, alias: str, *,
+                                 programming: bool = False) -> tuple[str, str] | None:
         # Platform maintenance authorization is independent from programming
         # Registration. Registration controls managed Site/programming admission;
         # this gate instead proves the PPU is safe to mutate at the Platform layer.
-        if self._alias_has_active_execution(alias):
+        # ``programming``: the same Platform states and observation trust, minus
+        # the PPU-wide "no Site active" condition, which only maintenance needs.
+        if not programming and self._alias_has_active_execution(alias):
             return ("ppu_busy",
                     "active PPU Jobs must finish or be cancelled before Platform maintenance")
         platform = self._bootstrap().status(alias)
@@ -325,6 +343,11 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             return None
 
         if runtime_state == "runtime_active":
+            if programming:
+                if not self._trusted_observation(alias):
+                    return ("ppu_observation_untrusted",
+                            "a current trusted PPU observation is required for programming admission")
+                return None
             if not self._trusted_idle_observation(alias):
                 return ("ppu_idle_state_unproven",
                         "a current trusted idle PPU observation is required for normal Runtime "

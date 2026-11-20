@@ -207,7 +207,8 @@ def test_retry_is_refused_when_the_ppu_is_not_released(tmp_path):
     gateway.relay = relay
     batch = final(batches, start(batches, ALIAS, body(retry_limit=3)))
     assert batch["outcome"] == "FAIL"
-    assert batch["reason"] == "RETRY_NOT_ELIGIBLE_PPU_NOT_RELEASED_SITE_NOT_READY_OR_BUSY"
+    # The held lease names no owner of this Batch: another Execution Owner.
+    assert batch["reason"] == "RETRY_NOT_ELIGIBLE_PPU_NOT_RELEASED_PPU_BUSY"
     assert len(gateway.posts) == 1
 
 

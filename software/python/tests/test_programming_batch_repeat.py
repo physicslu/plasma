@@ -584,8 +584,10 @@ def test_stress_10000_cycles_counts_journal_restart_and_resources(tmp_path):
 
 
 def _platform_busy(s, times):
-    """The Platform gate's PPU_BUSY right after a Cycle (2-Site HIL 2026-11-19):
-    the fleet observation still shows the finished Site, or a peer, active."""
+    """A PPU_BUSY verdict right after a Cycle. Before Site-level admission
+    (#1503) the Platform gate's PPU-wide fleet read produced it for a PEER
+    Site of the same Batch and the lane waited it out. Now PPU_BUSY only means
+    another Execution Owner (or maintenance), so it is paused for at once."""
     seen = []
     def gate(alias):
         settled = s.batches._batches[s.batch_id]["units"][0]["cycle"]["settled"]
@@ -597,14 +599,19 @@ def _platform_busy(s, times):
     return seen
 
 
-def test_platform_ppu_busy_after_a_cycle_is_rechecked_then_proceeds(tmp_path):
+def test_ppu_busy_after_a_cycle_is_not_waited_out_and_submits_nothing(tmp_path):
     s = Session(tmp_path, repeat=2, replace_ic_before_next_cycle=False)
-    s.batches.release_wait_s = 5.0
-    seen = _platform_busy(s, 3)
+    s.batches.release_wait_s = 30.0
+    seen = _platform_busy(s, 1)
+    began = time.monotonic()
+    unit = s.awaiting()
+    assert time.monotonic() - began < 5.0          # no RELEASE_WAIT_S re-check loop
+    assert unit["cycle"]["wait_reason"] == "NEXT_CYCLE_EXECUTION_PPU_BUSY"
+    assert len(seen) == 1 and len(s.gateway.posts) == 1
+    # Continue re-runs every gate (now clear) and only then submits.
+    s.cont()
     batch = s.done()
-    cycle = batch["units"][0]["cycle"]
-    assert len(seen) == 3 and cycle["pass"] == 2 and cycle["continue_seq"] == 0
-    assert len(s.gateway.posts) == 2
+    assert batch["units"][0]["cycle"]["pass"] == 2 and len(s.gateway.posts) == 2
 
 
 def test_platform_ppu_busy_that_never_clears_pauses_without_submitting(tmp_path):
@@ -619,7 +626,7 @@ def test_platform_ppu_busy_that_never_clears_pauses_without_submitting(tmp_path)
     assert len(s.gateway.posts) == 1
 
 
-def test_release_wait_covers_one_peer_job_plus_observation_refresh():
+def test_only_the_sites_own_release_is_waited_for():
     from plasma_manager.programming_batch import RELEASE_PENDING_REASONS, RELEASE_WAIT_S
-    # Observed on Z2 2026-11-19: one E/P/V Job ~12.5 s, fleet poll 2 s.
-    assert RELEASE_WAIT_S >= 30 and {"PPU_BUSY", "SITE_NOT_READY_OR_BUSY"} <= RELEASE_PENDING_REASONS
+    # One E/P/V Job ~12.5 s on Z2 (2026-11-19); the bound is unchanged.
+    assert RELEASE_WAIT_S >= 30 and RELEASE_PENDING_REASONS == {"SITE_NOT_READY_OR_BUSY"}

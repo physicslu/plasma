@@ -102,18 +102,16 @@ LEGACY_JOURNAL_SCHEMA = "plasma.manager.programming-batch-journal.v1"
 MAX_RETRY_LIMIT = 5
 #: Manual Repeat: Cycles per selected Site in one Manual Session (WP-02).
 MAX_REPEAT = 10000
-#: After a settled Cycle the PPU (or the Manager's fleet observation of it,
-#: polled every few seconds) may not show the Site released yet, and a peer
-#: Site of the same PPU may still be running. The next Cycle re-reads the
-#: same gates for at most this long before it pauses for the operator: long
-#: enough for one peer Job plus an observation refresh. Only re-checks: no
-#: gate is skipped or relaxed while waiting.
+#: After a settled Cycle the PPU may not show THIS Site released yet. The
+#: next Cycle re-reads the same gates for at most this long before it pauses
+#: for the operator. Only re-checks: no gate is skipped or relaxed meanwhile.
 RELEASE_WAIT_S = 60.0
 RELEASE_RECHECK_S = 0.5
-#: Verdicts that are transient right after a terminal Job: the Site readiness
-#: read, and the Platform gate's PPU-wide "a Site is active" (2-Site HIL
-#: 2026-11-19: NEXT_CYCLE_EXECUTION_PPU_BUSY on every next Cycle).
-RELEASE_PENDING_REASONS = frozenset({"SITE_NOT_READY_OR_BUSY", "PPU_BUSY"})
+#: The only verdict that is transient right after a terminal Job: this Site's
+#: own release. A peer Site of the same Batch never blocks it (the Platform
+#: gate no longer reads PPU-wide activity for programming), and PPU_BUSY now
+#: means another Execution Owner, which is paused for, never waited out.
+RELEASE_PENDING_REASONS = frozenset({"SITE_NOT_READY_OR_BUSY"})
 MAX_TARGETS = 32
 MAX_SITES_PER_BATCH = 64
 STOP_TOKEN = "STOP_QUEUING"
