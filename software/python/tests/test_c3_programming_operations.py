@@ -289,6 +289,45 @@ def test_verify_only_mismatch_is_a_safe_failure_and_never_writes():
     run(scenario())
 
 
+def test_stage_events_reject_other_job_site_session_and_stale_sequence():
+    async def scenario():
+        with short_tmp() as folder:
+            stack, resource = ops_stack(folder)
+            async with stack:
+                original_call = stack.manager.interfaces[2]._site_worker.call
+                opened_job = None
+
+                def noisy_call(op, **fields):
+                    nonlocal opened_job
+                    if op == "open_job_session":
+                        opened_job = fields["job_id"]
+                    callback = fields.get("stage_event")
+                    if op == "run" and callback is not None:
+                        base = {"job_id": opened_job, "site_id": 2,
+                                "session_id": fields["session_id"], "sequence": 1,
+                                "stage": "erase", "state": "started"}
+                        for changes in ({"job_id": "stale-job"}, {"site_id": 1},
+                                        {"session_id": "stale-session"}, {"sequence": 0}):
+                            callback({**base, **changes})
+                    result = original_call(op, **fields)
+                    if op == "run" and callback is not None:
+                        callback({"job_id": opened_job, "site_id": 2,
+                                  "session_id": fields["session_id"], "sequence": 1,
+                                  "stage": "erase", "state": "started"})
+                    return result
+
+                stack.manager.interfaces[2]._site_worker.call = noisy_call
+                status, job = await submit(stack, ops_body(resource,
+                    ["erase", "program", "verify"], FW_A))
+                assert status == 202 and job["state"] == "success", job
+                assert [(item["stage"], item["state"]) for item in job["stage_events"]] == [
+                    (stage, state) for stage in ("erase", "program", "verify")
+                    for state in ("started", "completed")]
+                assert [item["sequence"] for item in job["stage_events"]] == list(range(1, 7))
+
+    run(scenario())
+
+
 def test_erase_then_program_at_a_non_base_binding_address():
     async def scenario():
         with short_tmp() as folder:
