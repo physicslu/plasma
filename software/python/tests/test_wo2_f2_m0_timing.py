@@ -60,3 +60,52 @@ def test_sha256_observation_preserves_digest(monkeypatch, capsys, tmp_path):
     records = _records(capsys)
     assert len(records) == 1 and records[0]["event"] == "ppu_asset_sha256"
     assert records[0]["bytes_hashed"] == 3 and records[0]["duration_ms"] >= 0
+
+
+def test_admission_event_occurs_per_invocation(monkeypatch, capsys):
+    import time
+    from plasma_manager.programming_batch import ProgrammingBatchCoordinator
+    monkeypatch.setenv("PLASMA_M0_TIMING", "1")
+    coordinator = object.__new__(ProgrammingBatchCoordinator)
+    coordinator.monotonic = time.monotonic
+    coordinator._platform_block = lambda alias: None
+    coordinator._site_block = lambda alias, site: None
+    for _ in range(3):
+        assert coordinator._admission_block("ppu", 1) is None
+    events = _records(capsys)
+    assert len(events) == 3
+    assert all(x["event"] == "manager_admission" and x["site_id"] == 1
+               and x["duration_ms"] >= 0 for x in events)
+
+
+def test_disabled_admission_does_not_advance_fake_clock(monkeypatch, capsys):
+    from plasma_manager.programming_batch import ProgrammingBatchCoordinator
+    monkeypatch.delenv("PLASMA_M0_TIMING", raising=False)
+    coordinator = object.__new__(ProgrammingBatchCoordinator)
+    coordinator.monotonic = lambda: (_ for _ in ()).throw(AssertionError("clock advanced"))
+    coordinator._platform_block = lambda alias: None
+    coordinator._site_block = lambda alias, site: None
+    assert coordinator._admission_block("ppu", 1) is None
+    assert _records(capsys) == []
+
+
+def test_site_status_records_resource_duration_without_changing_payload(monkeypatch, capsys):
+    from types import SimpleNamespace
+    import pytest
+    from plasma_core.errors import PlasmaError
+    from plasma_server.site_manager import SiteManager
+
+    monkeypatch.setenv("PLASMA_M0_TIMING", "1")
+    manager = object.__new__(SiteManager)
+    manager._site_configs = {1: SimpleNamespace(enabled=True, interface="mock")}
+    manager.workers = {}
+    manager.ppu_snapshot = lambda: {"ppu_id": "ppu"}
+    manager.active_resources_snapshot = lambda: {"state": "VERIFIED"}
+    manager._latest_job_summary = lambda site: None
+    result = manager.status(site_id=1)
+    assert result["ppu"]["active_resources"] == {"state": "VERIFIED"}
+    assert [event["event"] for event in _records(capsys)] == [
+        "ppu_site_resources", "ppu_site_status",
+    ]
+    with pytest.raises(PlasmaError):
+        manager.status(site_id=2)  # No invented status for an invalid Site.
