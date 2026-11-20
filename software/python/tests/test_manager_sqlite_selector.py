@@ -1,4 +1,4 @@
-"""Manager-owned SQLite Selector opt-in: API parity and fail closed.
+"""Manager-owned SQLite-only Selector: full source parity and fail closed.
 
 Host-only; no PPU, Z2, DUT, Gateway or live programming is contacted.
 """
@@ -20,7 +20,7 @@ from plasma_manager import server as manager_server
 from plasma_web import legacy_device_selector as selector
 from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
 from plasma_web.catalog_sqlite_selector import read_selector_view
-from plasma_web.device_catalog import DeviceCatalog, DeviceCatalogIntegrityError, default_catalog_manifest_path
+from plasma_web.device_catalog import DeviceCatalog, DeviceCatalogIntegrityError, default_catalog_manifest_path, get_default_device_catalog
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
@@ -57,26 +57,53 @@ def _get(port: int, path: str) -> tuple[int, dict]:
         return exc.code, json.loads(exc.read())
 
 
-def test_sqlite_search_produces_identical_full_response_without_api_drift(
+def test_sqlite_only_matches_full_exact_source_and_qualification_snapshot(
     source_qualified_database: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv(selector.SQLITE_SELECTOR_DB_ENV, raising=False)
-    queries = (
-        "q=STM32F103C8T6&limit=1",
-        "q=STM32F103&limit=5&offset=3",
-        "q=STM32F103&levels=2,3&limit=7",
-        "q=MCXA185VLH&limit=1",
-        "q=ATSAML&levels=1&limit=3",
-        "q=PIC32MX&limit=4&offset=2",
-        "q=&limit=5",
-    )
-    original = [selector.search_response(query) for query in queries]
-    legacy_levels = selector.warm()
+    # Compare against the original trusted import sources in this OFFLINE test,
+    # never through a runtime Selector fallback.
+    source = get_default_device_catalog()
+    qualification = get_default_programming_qualification_registry()
+    imported, projections, level_counts = read_selector_view(str(source_qualified_database))
+    assert imported.records == source.records  # all L0/L1/L2/L3 Exact ICPNs, ordered
+    assert imported.size == len(projections)
+    assert level_counts == qualification.summary["catalog_level_counts"]
+    for record in source.records:
+        key = (record.vendor.casefold(), record.identifier.casefold())
+        assert projections[key] == qualification.describe(record.vendor, record.identifier)
+
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(source_qualified_database))
-    assert selector.warm() == legacy_levels
-    assert [selector.search_response(query) for query in queries] == original
+    assert selector.warm() == level_counts
+    for query, selected_levels, page_size in (
+        ("STM32F103", (1, 2, 3), 7),
+        ("STM32F103", (2, 3), 7),
+        ("ATSAML", (1,), 5),
+        ("PIC32MX", (1, 2, 3), 3),
+        ("", (1, 2, 3), 100),
+    ):
+        expected, total = source.search_with_total(
+            query, limit=source.size, offset=0,
+            predicate=lambda record: qualification.describe(
+                record.vendor, record.identifier
+            )["catalog_level"] in selected_levels,
+        )
+        received = []
+        for offset in range(0, total + page_size, page_size):
+            raw = f"q={query}&levels={','.join(map(str, selected_levels))}&limit={page_size}&offset={offset}"
+            status, payload = selector.search_response(raw)
+            assert status == 200, payload
+            assert payload["total_count"] == total
+            assert payload["offset"] == offset
+            assert payload["catalog_size"] == sum(level_counts[str(i)] for i in selected_levels)
+            received.extend((row["vendor"], row["identifier"]) for row in payload["results"])
+        assert received == [(row.vendor, row.identifier) for row in expected]
+    assert selector.search_response("q=MCXA185VLH&limit=1")[1]["total_count"] == 0
+
+    # Neither a missing env nor a stale source manifest may resurrect the old path.
     monkeypatch.delenv(selector.SQLITE_SELECTOR_DB_ENV)
-    assert selector.search_response(queries[0]) == original[0]
+    assert selector.search_response("q=STM32F103C8T6")[0] == 503
+    with pytest.raises(DeviceCatalogIntegrityError):
+        selector.warm()
 
 
 def test_manager_http_sqlite_mode_retains_l0_and_invalid_query_contract(
@@ -95,6 +122,9 @@ def test_manager_http_sqlite_mode_retains_l0_and_invalid_query_contract(
 def test_unconfigured_or_missing_sqlite_fail_503_without_csv_fallback(
     tmp_path: Path, manager_port: int, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv(selector.SQLITE_SELECTOR_DB_ENV, raising=False)
+    status, body = _get(manager_port, "/api/devices/search?q=STM32")
+    assert status == 503 and body["error"]["error_type"] == "DEVICE_SELECTOR_UNAVAILABLE"
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, "")
     status, body = _get(manager_port, "/api/devices/search?q=STM32")
     assert status == 503 and "results" not in body
