@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.device_catalog import default_catalog_manifest_path
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.legacy_device_selector import _device_search_payload
 from plasma_web.nxp_manufacturer_device_evidence import (
@@ -23,6 +28,17 @@ class NXPManufacturerDeviceTests(unittest.TestCase):
         cls.evidence = get_default_nxp_manufacturer_device_evidence()
         cls.nxp = [r for r in cls.catalog.records if r.vendor == "NXP"]
         cls.new = [r for r in cls.nxp if r.family in {"MCX", "K32L2"}]
+        # Offline test fixture: runtime Selector always consumes a qualified SQLite revision.
+        cls._sqlite_temporary = tempfile.TemporaryDirectory(prefix="plasma-selector-regression-")
+        cls.addClassCleanup(cls._sqlite_temporary.cleanup)
+        database = Path(cls._sqlite_temporary.name) / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
+        cls._sqlite_environment = patch.dict(os.environ, {"PLASMA_CATALOG_SQLITE_DB": str(database)})
+        cls._sqlite_environment.start()
+        cls.addClassCleanup(cls._sqlite_environment.stop)
 
     def test_bounded_212_admitted_exact_and_source_verified(self) -> None:
         self.assertEqual(self.catalog.size, 5885)
