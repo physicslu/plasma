@@ -143,23 +143,34 @@ Publisher against the same persistent SQLite file; they must **not** replace,
 copy over, delete, or reinitialize that file with a prebuilt Official-only DB.
 Before and after a data update, validate exact local record/profile content,
 record counts, revisions, and visibility independently from Official row counts.
-An Official revision or rollback that collides with a customer-owned
-`(manufacturer, exact_icpn)` must fail closed without deleting either record.
-For Official validate, stage, publish and rollback, Manager returns **HTTP 409**
-with `error.code=CATALOG_LOCAL_IDENTITY_CONFLICT`,
-`conflict_count`, `conflicts` (manufacturer, Exact ICPN, local revision and
-Profile ID; first 100 when there are more), and `truncated`. IC Management
-shows an actionable notice, links each conflicting row to its Local editor,
-and offers Local JSON backup. The user must first determine whether both
-records identify the **same physical IC**. If they do, do **not** invent a
-new Exact ICPN; the custom Profile must be preserved/rebound to the Official
-identity only under a separately authorized, reviewed migration (not implemented
-by this Gate 1). If the existing Local identity is genuinely wrong, the user
-may explicitly create a verified replacement, confirm its Profile, then remove
-the mistaken Local record. The Official revision remains blocked until each
-conflict is resolved. **No automatic rename, delete, merge, or promotion is
-permitted.** Collisions are checked again atomically
-inside Publish/Rollback to prevent a race after a successful preflight.
+Official Catalog and customer Local records may legitimately have the **same**
+`(manufacturer, exact_icpn)` in distinct SQLite namespaces. An Official
+Publisher update must not block, overwrite, promote or hide customer data.
+The IC Selector and IC Management explicitly distinguish **OFFICIAL IC**
+(authoritative published identity and Qualification) from **CUSTOMER IC**
+(customer-owned, UNVERIFIED). An identical Exact ICPN does not by itself
+establish that the customer Profile has been reviewed or granted hardware
+execution authority.
+
+If the customer confirms that the two records describe the **same physical
+IC**, the authorized `POST /api/catalog/management/link-local-official`
+operation requires an exact published Official identity, the current customer
+Local revision and `confirmed_same_ic=true`. In a single `BEGIN IMMEDIATE`
+transaction it moves the entire Local record and Profile to
+`controller_overlays(namespace='official_profile_link')` and writes a
+`LOCAL_LINK_OFFICIAL` Audit event containing the original content digest.
+The stored Profile remains customer-owned and `UNVERIFIED`, with no
+Qualification / Job admission promotion; the Official identity and Level
+always come from the active Official revision. After a later Official rollback
+removes the identity, the link is `PENDING_OFFICIAL`, the customer Profile
+persists and is visibly not an Official IC until re-publication.
+
+IC Management provides a checkbox for explicit physical-identity confirmation,
+a Link button and a separate **OFFICIAL IC · CUSTOMER PROFILE** list. It
+must not silently equate same-name records, auto-link customer Profiles, or
+invent another manufacturer Exact ICPN. If the Local identity was truly wrong,
+a separately authorized correction remains necessary; normal Official updates
+must remain non-destructive for both namespaces.
 Use SQLite online backup or equivalent consistent snapshot for recovery;
 copying just the live `.sqlite3` file without its WAL is not safe.
 
