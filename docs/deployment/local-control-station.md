@@ -88,6 +88,58 @@ The Manager owns the Catalog-only Device Selector (`GET /api/devices/search`, re
 
 Releases built before this contract have no `catalog/` directory. Re-activating such a SHA with the current script is refused; roll back with the script from that older clean checkout.
 
+## Manager IC Selector SQLite-only cutover (Catalog Database v1)
+
+The Manager-owned `GET /api/devices/search` (and Console BFF
+`GET /api/manager/devices/search`) reads **only the active, complete
+SQLite Catalog/Qualification revision** selected by `PLASMA_CATALOG_SQLITE_DB`.
+The legacy Manifest and Programming Qualification registry are **not**
+alternative runtime Selector authorities. Missing configuration, missing
+SQLite file, invalid revision, incomplete qualification or integrity failure
+returns `503 DEVICE_SELECTOR_UNAVAILABLE`, never empty success or implicit
+re-import. Invalid query arguments still return 400; L0 remains internal,
+L1–L3 are customer-visible, and standard Job selection remains L2/L3.
+
+For the Linux `local-control-station` profile, the persistent Manager database
+defaults to `~/.local/state/plasma/local-control-station/catalog.sqlite3`.
+Set `PLASMA_LOCAL_CONTROL_STATION_CATALOG_DB` to an **existing** qualified
+database path when the Controller Catalog is already provisioned elsewhere.
+The canonical deployment self-test checks this exact database **before
+activation**; it must not reset, replace, or seed an existing published
+revision. The Manager user-systemd unit binds
+`PLASMA_CATALOG_SQLITE_DB` to that database. Platform launchers use
+their corresponding persistent user-state / ProgramData Catalog path, with
+`PLASMA_CATALOG_SQLITE_DB` as an explicit override. Provision data separately.
+
+Initial provisioning is an **offline, owner-authorized data operation**, not
+a Selector read fallback. In a clean, trusted offline environment, with the
+manifest, IC Support and source/evidence roots configured for the SAME
+verified Catalog revision, use the existing publisher CLI to create a
+qualified database in a **new** destination:
+
+```bash
+python3 -m plasma_web.catalog_sqlite_repository \
+  --db /trusted/manager-state/catalog.sqlite3 \
+  --manifest /trusted/data/device-catalog/production/icpn-v1-manifest.json \
+  --with-qualification
+```
+
+Verify the complete qualification count, active revision, L0 exclusion and
+customer search through the Manager endpoint before changing a running
+deployment. **Do not invoke this initial importer against an existing
+published SQLite database** simply because the software version changed.
+Later Catalog revisions are published through the versioned, transactional
+SQLite Publisher; keep source Manifest, manufacturer evidence and qualification
+import tools as offline acquisition/provenance inputs. Do not mistake the
+legacy source-dependent *optional display metadata* for Canonical Catalog
+identity or an admission authority. Selector availability does not decide
+already-admitted PPU Jobs.
+
+This Gate 1 changes runtime read semantics and deployment contracts, **not**
+an existing SWPC installation or persistent Catalog. Production cutover must
+first establish the real Manager database path and backup/rollback eligibility;
+a GitHub-hosted Mock is not evidence of a successful SWPC migration.
+
 ## PPU target contract
 
 The target is configured explicitly and is not hard-coded to SWPC or PYNQ-Z2.
