@@ -1029,30 +1029,20 @@ class CatalogSqliteShadowRepository:
 
     def link_local_to_official(
         self, vendor: str, icpn: str, *, expected_local_revision: int,
-        official_candidate: dict[str, Any], confirmed_same_ic: bool, actor: str,
+        confirmed_same_ic: bool, actor: str,
     ) -> dict[str, Any]:
-        """Move the intact customer-owned Profile to an Official identity link.
+        """Link an intact Customer Profile to an already-published Official IC.
 
-        An explicit owner confirmation is required. This does not publish an
-        Official IC, elevate qualification, or authorize hardware programming.
+        Identity and qualification stay owned by the active Official revision.
+        This transaction never grants the Customer Profile Job authorization.
         """
         if (not all(isinstance(x, str) and x.strip() for x in (vendor, icpn, actor))
                 or type(expected_local_revision) is not int or expected_local_revision <= 0
-                or confirmed_same_ic is not True or not isinstance(official_candidate, dict)):
-            raise DeviceCatalogIntegrityError("explicit same-IC confirmation and current Local revision required")
-        try:
-            candidate_data = dict(official_candidate["record"])
-            candidate_data["cpu_architectures"] = tuple(candidate_data["cpu_architectures"])
-            candidate = DeviceCatalogRecord(**candidate_data)
-            qualification = official_candidate["qualification"]
-        except (KeyError, ValueError, TypeError) as exc:
-            raise DeviceCatalogIntegrityError("qualified Official candidate required to link Local Profile") from exc
-        if not isinstance(qualification, dict):
-            raise DeviceCatalogIntegrityError("qualified Official candidate required to link Local Profile")
-        self._validate_publication(candidate, qualification)
+                or confirmed_same_ic is not True):
+            raise DeviceCatalogIntegrityError(
+                "explicit same-IC confirmation and current Local revision required"
+            )
         key = (vendor.strip().casefold(), icpn.strip().casefold())
-        if _identity(candidate) != key:
-            raise DeviceCatalogIntegrityError("Official candidate identity differs from customer exact ICPN")
         with sqlite3.connect(self.path, timeout=10) as conn:
             self._init_schema(conn)
             conn.execute("BEGIN IMMEDIATE")
@@ -1065,35 +1055,39 @@ class CatalogSqliteShadowRepository:
             local = json.loads(current[0])
             if local.get("revision") != expected_local_revision:
                 raise DeviceCatalogIntegrityError("customer Local record revision changed; reload before linking")
-            if (local.get("record", {}).get("vendor", "").casefold(),
-                    local.get("record", {}).get("identifier", "").casefold()) != key:
+            record = local.get("record", {})
+            if (str(record.get("vendor", "")).casefold(),
+                    str(record.get("identifier", "")).casefold()) != key:
                 raise DeviceCatalogIntegrityError("customer Local identity does not match stored key")
             if not isinstance(local.get("profile"), dict) or not local["profile"].get("profile_id"):
                 raise DeviceCatalogIntegrityError("customer Profile is incomplete; link refused")
-            existing = conn.execute(
+            if conn.execute(
                 "SELECT 1 FROM controller_overlays WHERE namespace='official_profile_link' "
                 "AND vendor_key=? AND icpn_key=?", key
-            ).fetchone()
-            if existing:
+            ).fetchone():
                 raise DeviceCatalogIntegrityError("Official IC already has a customer Profile link")
             active = conn.execute(
                 "SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1"
             ).fetchone()
             if active is None:
                 raise DeviceCatalogIntegrityError("no active Official Catalog")
-            official = self._read_revision(conn, active[0])
-            # When absent, the link stays PENDING until the Publisher activates
-            # the authenticated Official candidate; preserve the source record.
-            active_match = official.catalog.resolve(vendor, icpn)
+            snapshot = self._read_revision(conn, active[0])
+            official = snapshot.catalog.resolve(vendor, icpn)
+            if official is None:
+                raise DeviceCatalogIntegrityError(
+                    "the same exact ICPN must be published as an Official IC before linking"
+                )
+            # Never copy a customer-supplied Level or Provider over the Official
+            # identity. Preserve the entire previous local record and Profile.
             linked = {
                 **local,
                 "origin": "CUSTOMER",
                 "verification": "UNVERIFIED",
                 "official_link": {
-                    "manufacturer": candidate.vendor,
-                    "exact_icpn": candidate.identifier,
-                    "source_authority": candidate.source_authority,
-                    "status_at_link": "ACTIVE" if active_match else "PENDING_OFFICIAL",
+                    "manufacturer": official.vendor,
+                    "exact_icpn": official.identifier,
+                    "source_authority": official.source_authority,
+                    "official_revision_at_link": active[0],
                 },
             }
             conn.execute(
@@ -1107,7 +1101,8 @@ class CatalogSqliteShadowRepository:
             if removed.rowcount != 1:
                 raise DeviceCatalogIntegrityError("customer Local record changed during link")
             detail = _encoded({
-                "manufacturer": candidate.vendor, "exact_icpn": candidate.identifier,
+                "manufacturer": official.vendor,
+                "exact_icpn": official.identifier,
                 "local_revision": expected_local_revision,
                 "profile_id": local["profile"]["profile_id"],
                 "preserved_source_sha256": _digest(local),
@@ -1115,13 +1110,15 @@ class CatalogSqliteShadowRepository:
             })
             conn.execute(
                 "INSERT INTO catalog_audit_events(action,actor,predecessor,revision_sha256,detail) "
-                "VALUES (?,?,?,?,?)", ("LOCAL_LINK_OFFICIAL", actor, active[0], None, detail)
+                "VALUES (?,?,?,?,?)",
+                ("LOCAL_LINK_OFFICIAL", actor, active[0], None, detail),
             )
         return {
-            "manufacturer": candidate.vendor, "exact_icpn": candidate.identifier,
-            "ic_origin": "OFFICIAL" if active_match else "CUSTOMER",
+            "manufacturer": official.vendor,
+            "exact_icpn": official.identifier,
+            "ic_origin": "OFFICIAL",
             "profile_origin": "CUSTOMER",
-            "link_status": "ACTIVE" if active_match else "PENDING_OFFICIAL",
+            "link_status": "ACTIVE",
             "local_revision": expected_local_revision,
             "profile_id": local["profile"]["profile_id"],
         }
