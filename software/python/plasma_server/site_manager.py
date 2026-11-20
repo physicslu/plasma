@@ -31,6 +31,7 @@ from .execution_router import RoutedProgrammingHandler, SiteExecutionRouter
 from .job_manager import JobRegistry, JobRuntime
 from .runtime_control import RuntimeQuiesceGate
 from .site_worker import SiteWorker
+from .time_sync import ChronyTimeSync
 
 InterfaceFactory = Callable[[SiteConfig], BaseInterface]
 # OFE-1B Job Image source (Gateway-validated, PPU re-verified at admission).
@@ -117,6 +118,9 @@ class SiteManager:
         self._reservation: dict[str, Any] | None = self._load_reservation()
         self._delegated_package_jobs: set[str] = set()
         self._runtime_quiesce = RuntimeQuiesceGate()
+        self._time_sync = ChronyTimeSync()
+        # Production Stage C wiring supplies the root Site Worker status.
+        self._site_worker_status_reader: Callable[[], dict[str, Any]] | None = None
         self._started = False
 
         for site in config.sites:
@@ -622,6 +626,69 @@ class SiteManager:
     def resource_reservation_snapshot(self) -> dict[str, Any]:
         with self._execution_lock:
             return self._reservation_view(self._reservation_now())
+
+    def pre_start_time_sync(self, *, owner_id: str, token: str | None,
+                            threshold_ms: int, budget_ms: int) -> dict[str, Any]:
+        """Serialize a bounded clock correction against all PPU admissions.
+
+        A Batch may use only its own Resource Reservation before its first
+        Job. The same lock protects reservation, Job lease and B3 quiesce;
+        holding it through chronyc closes the check-to-adjust race.
+        """
+        started = time.monotonic()
+        self._validate_execution_owner(owner_id, "owner_id")
+        if type(threshold_ms) is not int or not 1 <= threshold_ms <= 1000:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid time sync threshold")
+        if type(budget_ms) is not int or not 100 <= budget_ms <= 5000:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid time sync budget")
+        with self._execution_lock:
+            reservation = self._reservation_now()
+            busy = (self._runtime_quiesce.active() or self._execution_lease is not None
+                    or any(not job.state.terminal for job in self.registry.all()))
+            if reservation is not None:
+                busy = busy or (reservation["state"] != "ACTIVE"
+                                or reservation["owner_id"] != owner_id
+                                or token != reservation["token"]
+                                or bool(reservation["job_ids"]))
+            elif token is not None:
+                busy = True
+            if not busy and (self._site_worker_status_reader is not None
+                             or any(site.interface != "mock" for site in self._site_configs.values()
+                                    if site.enabled)):
+                # Root admission records and Site sessions are owned by the
+                # separate privileged Worker, not inferred from an idle REST
+                # queue. An unreadable Worker is an unverified owner.
+                try:
+                    worker = (self._site_worker_status_reader()
+                              if self._site_worker_status_reader is not None else None)
+                    busy = (not isinstance(worker, dict)
+                            or not isinstance(worker.get("sessions"), list)
+                            or bool(worker["sessions"])
+                            or not isinstance(worker.get("sealed_sites"), list)
+                            or bool(worker["sealed_sites"])
+                            or not isinstance(worker.get("admission_record_sites"), list)
+                            or bool(worker["admission_record_sites"])
+                            or worker.get("not_ready") is not None)
+                except Exception:  # noqa: BLE001 - unknown Root ownership is busy
+                    busy = True
+            if busy:
+                return {"ppu_id": self.config.ppu.id, "status": "SKIPPED_BUSY",
+                        "source": "chronyd", "service": "chrony",
+                        "before_offset_ms": None, "after_offset_ms": None,
+                        "uncertainty_ms": None, "adjustment_performed": False,
+                        "warning_code": "PPU_BUSY_OR_ROOT_OWNERSHIP_UNVERIFIED",
+                        "elapsed_ms": round((time.monotonic() - started) * 1000, 3),
+                        "observed_at_utc": iso_now()}
+            result = self._time_sync.execute(ppu_id=self.config.ppu.id,
+                                             threshold_ms=threshold_ms,
+                                             budget_ms=budget_ms)
+            self.server_log.event(
+                "INFO" if result["status"] in {"SYNCED", "CORRECTED"} else "WARNING",
+                "pre_start_time_sync", ppu_id=self.config.ppu.id,
+                owner_id=owner_id, status=result["status"],
+                warning_code=result["warning_code"],
+                adjustment_performed=result["adjustment_performed"])
+            return result
 
     def _release_execution_job(self, job_id: str) -> None:
         released: tuple[str, str] | None = None

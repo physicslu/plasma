@@ -507,6 +507,15 @@ export default function FactoryConsoleV2() {
    * Site's lines are logged together once it is loaded.
    */
   const logManagedBatch = useCallback((batch: ProgrammingBatch, topology: ManagedTopology | null) => {
+    for (const [alias, observation] of Object.entries(batch.time_sync ?? {})) {
+      const key = `${batch.batch_id}:time-sync:${alias}`;
+      if (loggedRecords.current.has(key)) continue;
+      loggedRecords.current.set(key, observation.status);
+      appendLog(`[TIME SYNC] PPU ${alias} · ${observation.status} · ${observation.service ?? "service unknown"}${
+        observation.after_offset_ms == null ? "" : ` · offset ${observation.after_offset_ms} ms`}${
+        observation.warning_code ? ` · ${observation.warning_code}` : ""} · ${observation.elapsed_ms} ms`,
+        observation.status === "SYNCED" || observation.status === "CORRECTED" ? "INFO" : "WARN");
+    }
     for (const unit of batch.units) {
       const last = unit.attempts[unit.attempts.length - 1] ?? null;
       if (unit.outcome == null && last?.outcome == null) continue;
