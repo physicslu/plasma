@@ -61,6 +61,7 @@ MONITOR_SENSITIVE = re.compile(
 # Fixed trusted-main Path 2 observation; NOT an arbitrary-script capability.
 NATIVE_PREFLIGHT = "codex-native-install-v1"
 EXPECTED_RUNNER = "SWPC-plasma-codex"
+LOCAL_CS_OWNER_REPO = Path("/storage/projects/plasma")
 TASK_ID = re.compile(r"[a-z][a-z0-9-]{2,63}\Z")
 SHA40 = re.compile(r"[a-f0-9]{40}\Z")
 SHA256 = re.compile(r"[a-f0-9]{64}\Z")
@@ -782,7 +783,7 @@ def run_task(task: dict, *, workspace: Path = ROOT,
                     and "--dev-fresh-state" not in argv[2:],
                     "LOCAL_CS_OWNER_OPERATION_DENIED")
             require(approval["pr_number"] == 0, "LOCAL_CS_OWNER_MAIN_ONLY")
-            owner_repo = Path("/storage/projects/plasma")
+            owner_repo = LOCAL_CS_OWNER_REPO
             owner_git = ["sudo", "-n", "-u", "gordon",
                          "git", "-C", str(owner_repo)]
             for args, expected, reason in (
