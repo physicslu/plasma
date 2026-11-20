@@ -14,7 +14,9 @@ import os
 import re
 import socket
 import stat
+import sys
 import tempfile
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -27,6 +29,21 @@ BUNDLE = "plasma.ppu.bundle.v3"
 
 class AssetSetError(RuntimeError):
     pass
+
+
+def _m0_timing(event: str, **fields: Any) -> None:
+    """Best-effort stderr measurement: never changes verification results."""
+    if os.environ.get("PLASMA_M0_TIMING") != "1":
+        return
+    try:
+        sys.stderr.write("PLASMA_M0 " + json.dumps(
+            {"event": event, "pid": os.getpid(),
+             "thread_id": threading.get_ident(), "monotonic_ns": time.monotonic_ns(),
+             **fields},
+            sort_keys=True, separators=(",", ":"),
+        ) + "\n")
+    except (OSError, TypeError, ValueError):
+        pass
 
 
 def _json_file(path: Path, *, max_bytes: int = 65536) -> dict[str, Any]:
@@ -42,13 +59,20 @@ def _json_file(path: Path, *, max_bytes: int = 65536) -> dict[str, Any]:
 
 
 def _digest(path: Path) -> str:
-    checksum = hashlib.sha256()
-    if path.is_symlink() or not path.is_file():
-        raise AssetSetError("ASSET_SET_FILE_UNTRUSTED")
-    with path.open("rb") as data:
-        for chunk in iter(lambda: data.read(1024 * 1024), b""):
-            checksum.update(chunk)
-    return checksum.hexdigest()
+    started = time.monotonic()
+    bytes_hashed = 0
+    try:
+        checksum = hashlib.sha256()
+        if path.is_symlink() or not path.is_file():
+            raise AssetSetError("ASSET_SET_FILE_UNTRUSTED")
+        with path.open("rb") as data:
+            for chunk in iter(lambda: data.read(1024 * 1024), b""):
+                bytes_hashed += len(chunk)
+                checksum.update(chunk)
+        return checksum.hexdigest()
+    finally:
+        _m0_timing("ppu_asset_sha256", bytes_hashed=bytes_hashed,
+                   duration_ms=round((time.monotonic() - started) * 1000, 3))
 
 
 def _root(product_root: Path) -> tuple[Path, Path, Path]:
