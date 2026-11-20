@@ -715,6 +715,11 @@ def test_customer_local_icpns_survive_official_updates_and_conflicting_revisions
     before = repo.local_records()
     assert len(before) == 2
     assert all(item["origin"] == "LOCAL" and item["verification"] == "UNVERIFIED" for item in before)
+    assert repo.import_verified_manifest(
+        default_catalog_manifest_path(),
+        qualification_registry=get_default_programming_qualification_registry(),
+    ) == initial  # same-source importer must never reset user_catalog
+    assert repo.local_records() == before
 
     change = [{"record": asdict(future_official_record), "qualification": l1}]
     published = repo.publish_staged(repo.stage_revision(change, actor="publisher"), actor="publisher")
