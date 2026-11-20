@@ -81,12 +81,23 @@ def test_sqlite_only_matches_full_exact_source_and_qualification_snapshot(
         ("PIC32MX", (1, 2, 3), 3),
         ("", (1, 2, 3), 100),
     ):
-        expected, total = source.search_with_total(
-            query, limit=source.size, offset=0,
-            predicate=lambda record: qualification.describe(
+        def selected(record):
+            return qualification.describe(
                 record.vendor, record.identifier
-            )["catalog_level"] in selected_levels,
+            )["catalog_level"] in selected_levels
+
+        # Public source and runtime Selector both enforce the 100-row page cap.
+        # Compare every page rather than bypassing the source query contract.
+        expected, total = source.search_with_total(
+            query, limit=100, offset=0, predicate=selected,
         )
+        expected = list(expected)
+        for source_offset in range(100, total, 100):
+            page, page_total = source.search_with_total(
+                query, limit=100, offset=source_offset, predicate=selected,
+            )
+            assert page_total == total
+            expected.extend(page)
         received = []
         for offset in range(0, total + page_size, page_size):
             raw = f"q={query}&levels={','.join(map(str, selected_levels))}&limit={page_size}&offset={offset}"
@@ -235,7 +246,17 @@ def test_catalog_management_local_round_trip_and_publisher_boundary(
     assert repo.read_active().revision_sha256 == official_revision
     official = json.loads(json.dumps(entry))
     official["record"].update(vendor="STMicroelectronics", identifier="STM32F103C8T6")
-    assert post("local", {"entries": [official]})[0] == 400
+    status, result = post("local", {"entries": [official]})
+    assert status == 200
+    assert result["changes"][0]["verification"] == "UNVERIFIED"
+    assert repo.read_active().revision_sha256 == official_revision
+    status, coexist = _get(manager_port, "/api/devices/search?q=STM32F103C8T6")
+    assert status == 200
+    assert any(row["icpn"] == "STM32F103C8T6" for row in coexist["results"])
+    assert any(row["record"]["identifier"] == "STM32F103C8T6"
+               and row["verification"] == "UNVERIFIED"
+               for row in coexist["local_results"])
+    assert repo.linked_customer_profiles() == []
 
 
 def test_manager_http_export_reads_one_snapshot_and_preserves_catalog(
