@@ -12,6 +12,9 @@ config_dir="$config_home/plasma/local-control-station"
 config_file="${PLASMA_LOCAL_CONTROL_STATION_CONFIG:-$config_dir/profile.env}"
 manager_config="$config_dir/manager.yaml"
 state_dir="$state_home/plasma/local-control-station"
+# Explicit Manager-owned persistent SQLite Catalog; do not bootstrap from Manifest
+# during deployment or silently substitute immutable release bytes for published data.
+catalog_sqlite="${PLASMA_LOCAL_CONTROL_STATION_CATALOG_DB:-$state_dir/catalog.sqlite3}"
 evidence="$state_dir/install.json"
 release_root="$data_home/plasma/local-control-station/releases"
 current_link="$data_home/plasma/local-control-station/current"
@@ -199,9 +202,11 @@ validate_release_selector() {
   catalog="$release/$release_catalog_dir"
   [[ -f "$catalog/$catalog_manifest_relative" && -d "$catalog/data/ic-support" ]] || return 1
   [[ -f "$release/venv/bin/python" ]] || return 1
+  [[ -f "$catalog_sqlite" ]] || die "Manager SQLite Catalog must be provisioned before Control Station deployment: $catalog_sqlite"
   (
     cd "$catalog"
-    env PLASMA_DEVICE_CATALOG_MANIFEST="$catalog/$catalog_manifest_relative" \
+    env PLASMA_CATALOG_SQLITE_DB="$catalog_sqlite" \
+      PLASMA_DEVICE_CATALOG_MANIFEST="$catalog/$catalog_manifest_relative" \
       PLASMA_IC_SUPPORT_ROOT="$catalog/data/ic-support" \
       PLASMA_RUNTIME_EVIDENCE_ROOT="$catalog" \
       "$release/venv/bin/python" -I -B - "$selector_probe_query" <<'PY'
@@ -389,6 +394,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$state_dir
 Environment=PYTHONUNBUFFERED=1
+Environment=PLASMA_CATALOG_SQLITE_DB=$catalog_sqlite
 Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$current_link/$release_catalog_dir/$catalog_manifest_relative
 Environment=PLASMA_IC_SUPPORT_ROOT=$current_link/$release_catalog_dir/data/ic-support
 Environment=PLASMA_RUNTIME_EVIDENCE_ROOT=$current_link/$release_catalog_dir

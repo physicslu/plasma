@@ -88,6 +88,97 @@ The Manager owns the Catalog-only Device Selector (`GET /api/devices/search`, re
 
 Releases built before this contract have no `catalog/` directory. Re-activating such a SHA with the current script is refused; roll back with the script from that older clean checkout.
 
+## Manager IC Selector SQLite-only cutover (Catalog Database v1)
+
+The Manager-owned `GET /api/devices/search` (and Console BFF
+`GET /api/manager/devices/search`) reads **only the active, complete
+SQLite Catalog/Qualification revision** selected by `PLASMA_CATALOG_SQLITE_DB`.
+The legacy Manifest and Programming Qualification registry are **not**
+alternative runtime Selector authorities. Missing configuration, missing
+SQLite file, invalid revision, incomplete qualification or integrity failure
+returns `503 DEVICE_SELECTOR_UNAVAILABLE`, never empty success or implicit
+re-import. Invalid query arguments still return 400; L0 remains internal,
+L1–L3 are customer-visible, and standard Job selection remains L2/L3.
+
+For the Linux `local-control-station` profile, the persistent Manager database
+defaults to `~/.local/state/plasma/local-control-station/catalog.sqlite3`.
+Set `PLASMA_LOCAL_CONTROL_STATION_CATALOG_DB` to an **existing** qualified
+database path when the Controller Catalog is already provisioned elsewhere.
+The canonical deployment self-test checks this exact database **before
+activation**; it must not reset, replace, or seed an existing published
+revision. The Manager user-systemd unit binds
+`PLASMA_CATALOG_SQLITE_DB` to that database. Platform launchers use
+their corresponding persistent user-state / ProgramData Catalog path, with
+`PLASMA_CATALOG_SQLITE_DB` as an explicit override. Provision data separately.
+
+Initial provisioning is an **offline, owner-authorized data operation**, not
+a Selector read fallback. In a clean, trusted offline environment, with the
+manifest, IC Support and source/evidence roots configured for the SAME
+verified Catalog revision, use the existing publisher CLI to create a
+qualified database in a **new** destination:
+
+```bash
+python3 -m plasma_web.catalog_sqlite_repository \
+  --db /trusted/manager-state/catalog.sqlite3 \
+  --manifest /trusted/data/device-catalog/production/icpn-v1-manifest.json \
+  --with-qualification
+```
+
+Verify the complete qualification count, active revision, L0 exclusion and
+customer search through the Manager endpoint before changing a running
+deployment. **Do not invoke this initial importer against an existing
+published SQLite database** simply because the software version changed.
+Later Catalog revisions are published through the versioned, transactional
+SQLite Publisher; keep source Manifest, manufacturer evidence and qualification
+import tools as offline acquisition/provenance inputs. Do not mistake the
+legacy source-dependent *optional display metadata* for Canonical Catalog
+identity or an admission authority. Selector availability does not decide
+already-admitted PPU Jobs.
+
+**Customer-owned IC preservation is a hard upgrade invariant.**
+Local Exact ICPNs and custom Profiles reside in
+`controller_overlays(namespace='user_catalog')`, outside immutable Official
+Catalog revisions. Official data upgrades must use the existing transactional
+Publisher against the same persistent SQLite file; they must **not** replace,
+copy over, delete, or reinitialize that file with a prebuilt Official-only DB.
+Before and after a data update, validate exact local record/profile content,
+record counts, revisions, and visibility independently from Official row counts.
+Official Catalog and customer Local records may legitimately have the **same**
+`(manufacturer, exact_icpn)` in distinct SQLite namespaces. An Official
+Publisher update must not block, overwrite, promote or hide customer data.
+The IC Selector and IC Management explicitly distinguish **OFFICIAL IC**
+(authoritative published identity and Qualification) from **CUSTOMER IC**
+(customer-owned, UNVERIFIED). An identical Exact ICPN does not by itself
+establish that the customer Profile has been reviewed or granted hardware
+execution authority.
+
+If the customer confirms that the two records describe the **same physical
+IC**, the authorized `POST /api/catalog/management/link-local-official`
+operation requires an exact published Official identity, the current customer
+Local revision and `confirmed_same_ic=true`. In a single `BEGIN IMMEDIATE`
+transaction it moves the entire Local record and Profile to
+`controller_overlays(namespace='official_profile_link')` and writes a
+`LOCAL_LINK_OFFICIAL` Audit event containing the original content digest.
+The stored Profile remains customer-owned and `UNVERIFIED`, with no
+Qualification / Job admission promotion; the Official identity and Level
+always come from the active Official revision. After a later Official rollback
+removes the identity, the link is `PENDING_OFFICIAL`, the customer Profile
+persists and is visibly not an Official IC until re-publication.
+
+IC Management provides a checkbox for explicit physical-identity confirmation,
+a Link button and a separate **OFFICIAL IC · CUSTOMER PROFILE** list. It
+must not silently equate same-name records, auto-link customer Profiles, or
+invent another manufacturer Exact ICPN. If the Local identity was truly wrong,
+a separately authorized correction remains necessary; normal Official updates
+must remain non-destructive for both namespaces.
+Use SQLite online backup or equivalent consistent snapshot for recovery;
+copying just the live `.sqlite3` file without its WAL is not safe.
+
+This Gate 1 changes runtime read semantics and deployment contracts, **not**
+an existing SWPC installation or persistent Catalog. Production cutover must
+first establish the real Manager database path and backup/rollback eligibility;
+a GitHub-hosted Mock is not evidence of a successful SWPC migration.
+
 ## PPU target contract
 
 The target is configured explicitly and is not hard-coded to SWPC or PYNQ-Z2.

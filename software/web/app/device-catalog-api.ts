@@ -439,6 +439,13 @@ export type DeviceSearchResult = {
     revision_sha256: string | null;
   };
   catalog_origin: string;
+  ic_origin?: "OFFICIAL";
+  linked_customer_profile?: {
+    origin: "CUSTOMER";
+    profile_id: string;
+    local_revision: number;
+    verification: "UNVERIFIED";
+  } | null;
   backend_candidate?: BackendCandidateEvidence | null;
   backend_source_reference?: BackendSourceReference | null;
   backend_providers?: VersionedOpenOCDProvider[];
@@ -462,7 +469,7 @@ export type DeviceSearchResponse = {
   catalog_size: number;
   count: number;
   total_count: number;
-  local_results?: Array<{ record: { vendor: string; identifier: string; family: string; package: string; flash_size: string }; revision: number; origin: "LOCAL"; verification: "UNVERIFIED" }>;
+  local_results?: Array<{ record: { vendor: string; identifier: string; family: string; package: string; flash_size: string }; revision: number; origin: "LOCAL" | "CUSTOMER"; verification: "UNVERIFIED"; link_status?: "PENDING_OFFICIAL" }>;
   limit: number;
   offset: number;
   results: DeviceSearchResult[];

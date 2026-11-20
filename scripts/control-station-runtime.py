@@ -78,6 +78,19 @@ def _recording(evidence_root, required):
             record(os.path.join(str(evidence_root), rel))
     return _available(evidence_root, required)
 evidence.source_files_available = _recording
+# Build-time source tracing is an explicit offline import, never a runtime
+# Selector fallback. Only the qualified SQLite snapshot is searched.
+import tempfile
+from pathlib import Path
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
+_database_temporary = tempfile.TemporaryDirectory(prefix="plasma-selector-trace-")
+_database = Path(_database_temporary.name) / "catalog.sqlite3"
+CatalogSqliteShadowRepository(_database).import_verified_manifest(
+    Path(os.environ["PLASMA_DEVICE_CATALOG_MANIFEST"]),
+    qualification_registry=get_default_programming_qualification_registry(),
+)
+os.environ["PLASMA_CATALOG_SQLITE_DB"] = str(_database)
 selector = importlib.import_module("plasma_web.legacy_device_selector")
 selector.warm()
 records = set()

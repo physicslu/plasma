@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 from collections import Counter
@@ -11,6 +12,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from plasma_web import backend_candidate_registry as registry
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.device_catalog import default_catalog_manifest_path
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.device_catalog import (
     DeviceCatalog, DeviceCatalogIntegrityError, get_default_device_catalog,
 )
@@ -23,6 +27,17 @@ class BackendCandidateRegistryTests(unittest.TestCase):
     def setUpClass(cls):
         cls.catalog = get_default_device_catalog()
         cls.registry = registry.BackendCandidateRegistry(cls.catalog)
+        # Offline test fixture: runtime Selector always consumes a qualified SQLite revision.
+        cls._sqlite_temporary = tempfile.TemporaryDirectory(prefix="plasma-selector-regression-")
+        cls.addClassCleanup(cls._sqlite_temporary.cleanup)
+        database = Path(cls._sqlite_temporary.name) / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
+        cls._sqlite_environment = patch.dict(os.environ, {"PLASMA_CATALOG_SQLITE_DB": str(database)})
+        cls._sqlite_environment.start()
+        cls.addClassCleanup(cls._sqlite_environment.stop)
 
     def exact(self, icpn):
         row = self.catalog.resolve("STMicroelectronics", icpn)
@@ -108,8 +123,7 @@ class BackendCandidateRegistryTests(unittest.TestCase):
                 self.assertIsNone(self.registry.lookup(r))
 
     def test_current_api_keeps_mapping_separate_from_candidate(self):
-        with patch("plasma_web.legacy_device_selector.get_default_device_catalog", return_value=self.catalog), \
-             patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=self.registry):
+        with patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=self.registry):
             h5 = _device_search_payload("STM32H503CBT6", 3)
             c5 = _device_search_payload("STM32C531CBT3TR", 3)
             f1 = _device_search_payload("STM32F103C8T6", 3)
@@ -146,8 +160,7 @@ class BackendCandidateRegistryTests(unittest.TestCase):
         self.assertEqual(f1["results"][0]["backend"]["mapping_status"], "mapped")
 
     def test_api_still_returns_only_admitted_exact_icpns(self):
-        with patch("plasma_web.legacy_device_selector.get_default_device_catalog", return_value=self.catalog), \
-             patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=self.registry):
+        with patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=self.registry):
             payload = _device_search_payload("STM32H5", 100)
         self.assertEqual(payload["count"], 100)
         self.assertEqual({r["family"] for r in payload["results"]}, {"STM32H5"})

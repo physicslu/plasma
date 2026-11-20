@@ -22,6 +22,9 @@ import pytest
 
 from plasma_manager import server as manager_server
 from plasma_web import gateway_base, legacy_device_selector
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.device_catalog import default_catalog_manifest_path, DeviceCatalogIntegrityError
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -34,8 +37,19 @@ def _get(port: int, path: str) -> tuple[int, dict]:
         return exc.code, json.loads(exc.read())
 
 
+@pytest.fixture(scope="module")
+def qualified_sqlite_db(tmp_path_factory):
+    db = tmp_path_factory.mktemp("manager-selector") / "catalog.sqlite3"
+    CatalogSqliteShadowRepository(db).import_verified_manifest(
+        default_catalog_manifest_path(),
+        qualification_registry=get_default_programming_qualification_registry(),
+    )
+    return db
+
+
 @pytest.fixture
-def manager_port():
+def manager_port(qualified_sqlite_db, monkeypatch):
+    monkeypatch.setenv(legacy_device_selector.SQLITE_SELECTOR_DB_ENV, str(qualified_sqlite_db))
     httpd = manager_server.PlasmaManagerHTTPServer(("127.0.0.1", 0), manager_server.PlasmaManagerHandler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
@@ -76,12 +90,10 @@ def test_manager_selector_unavailable_is_503_not_empty(manager_port, monkeypatch
 
 
 def test_manager_catalog_data_failure_is_503(manager_port, monkeypatch):
-    from plasma_web.device_catalog import DeviceCatalogIntegrityError
+    def unavailable(_repo):
+        raise DeviceCatalogIntegrityError("SQLite Catalog data absent")
 
-    def unavailable():
-        raise DeviceCatalogIntegrityError("Catalog data absent")
-
-    monkeypatch.setattr(legacy_device_selector, "get_default_device_catalog", unavailable)
+    monkeypatch.setattr(CatalogSqliteShadowRepository, "read_active", unavailable)
     status, body = _get(manager_port, "/api/devices/search?q=STM32")
     assert status == 503 and "results" not in body
     assert body["error"]["error_type"] == "DEVICE_SELECTOR_UNAVAILABLE"
@@ -152,7 +164,17 @@ def test_packaged_manager_serves_selector_from_its_own_catalog(tmp_path: Path):
         encoding="utf-8",
     )
     log = tmp_path / "manager.log"
-    env = {"PATH": "/usr/bin:/bin", "PYTHONUNBUFFERED": "1"}  # no Catalog env, no site-packages
+    # Packaged Manager must be explicitly given a pre-provisioned, qualified SQLite
+    # database; the runtime must never create one by reading a bundled Manifest.
+    database = tmp_path / "provisioned-catalog.sqlite3"
+    CatalogSqliteShadowRepository(database).import_verified_manifest(
+        catalog / packager.CATALOG_MANIFEST_RELATIVE,
+        qualification_registry=get_default_programming_qualification_registry(),
+    )
+    env = {
+        "PATH": "/usr/bin:/bin", "PYTHONUNBUFFERED": "1",
+        "PLASMA_CATALOG_SQLITE_DB": str(database),
+    }  # no site-packages; standalone Manager reads only the SQLite snapshot
     with log.open("wb") as stream:
         process = subprocess.Popen([sys.executable, "-I", "-S", str(app), "--config", str(config)],
                                    cwd=tmp_path, env=env, stdout=stream, stderr=subprocess.STDOUT)

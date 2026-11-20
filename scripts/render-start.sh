@@ -117,6 +117,24 @@ trap 'exit 0' INT TERM
 mkdir -p "${state_root}/output" "${state_root}/logs" "${state_root}/engineering"
 manager_config="${state_root}/manager.yaml"
 observation_db="${state_root}/manager-observations.sqlite3"
+# The disposable Mock CD demo provisions its SQLite Catalog before launching
+# Manager; live Selector reads never import the source Manifest on demand.
+export PLASMA_CATALOG_SQLITE_DB="${state_root}/catalog.sqlite3"
+python - <<'PY'
+import os
+from pathlib import Path
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.catalog_sqlite_selector import read_selector_view
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
+
+db = Path(os.environ["PLASMA_CATALOG_SQLITE_DB"])
+if not db.exists():
+    CatalogSqliteShadowRepository(db).import_verified_manifest(
+        Path(os.environ["PLASMA_DEVICE_CATALOG_MANIFEST"]),
+        qualification_registry=get_default_programming_qualification_registry(),
+    )
+read_selector_view(str(db))  # reject stale, incomplete or corrupt DB; no fallback
+PY
 
 printf '[render-start] Starting localhost-only Plasma Protocol v3.3 Server\n'
 python -m plasma_server.server --config "${config_path}" &

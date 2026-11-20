@@ -338,9 +338,9 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
 
         <div className="icSelectorResults" role="list">
           {localResults.map(item => <div className="icSelectorResult" role="listitem" key={`local:${item.record.vendor}:${item.record.identifier}`}>
-            <div className="icSelectorIdentity"><strong>{item.record.identifier}</strong><span>LOCAL / UNVERIFIED · r{item.revision}</span></div>
+            <div className="icSelectorIdentity"><strong>{item.record.identifier}</strong><span>{item.link_status === "PENDING_OFFICIAL" ? (zh ? "客戶自建 · 等待官方發布" : "CUSTOMER · PENDING OFFICIAL") : (zh ? "客戶自建 · 未驗證" : "CUSTOMER · UNVERIFIED")} · r{item.revision}</span></div>
             <div className="icSelectorTaxonomy"><b>{item.record.vendor}</b><span>{item.record.family}</span><span>{item.record.package}</span></div>
-            <div className="icSelectorStatusStack"><span>Controller-local Custom Profile · No official L2/L3 or Job admission</span></div>
+            <div className="icSelectorStatusStack"><span>{zh ? "客戶 Profile · 不代表官方 L2/L3 或燒錄授權" : "Customer Profile · No official L2/L3 or Job admission"}</span></div>
           </div>)}
           {results.map(device => {
             const active = selected?.vendor === device.vendor && selected?.identifier === device.identifier;
@@ -354,7 +354,8 @@ export function ICSelector({ usage = "lookup", onSelect }: ICSelectorProps) {
               >
                 <div className="icSelectorIdentity">
                   <strong>{device.icpn ?? device.identifier}</strong>
-                  <span>Exact ICPN</span>
+                  <span>{zh ? "官方 IC · Exact ICPN" : "OFFICIAL IC · Exact ICPN"}</span>
+                  {device.linked_customer_profile && <span>{zh ? "客戶自訂 Profile" : "CUSTOMER PROFILE"} · {device.linked_customer_profile.profile_id} · r{device.linked_customer_profile.local_revision} · {zh ? "未驗證" : "UNVERIFIED"}</span>}
                 </div>
                 <div className="icSelectorTaxonomy">
                   <b>{device.vendor}</b>

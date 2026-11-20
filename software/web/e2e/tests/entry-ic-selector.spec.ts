@@ -305,7 +305,7 @@ test("IC Management local save survives reload and appears only in Selector look
   await expect(page.getByLabel("Changes preview")).toContainText("ADDED · LocalVendor LOCAL123");
   await page.getByRole("button", { name: "Save local changes" }).click();
   await page.reload();
-  await expect(page.getByText("LOCAL / UNVERIFIED · r1")).toBeVisible();
+  await expect(page.getByText("CUSTOMER IC / UNVERIFIED · r1")).toBeVisible();
   const jsonDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JSON", exact: true }).click();
   const exportedJson = await readFile(await (await jsonDownload).path(), "utf8");
@@ -327,5 +327,5 @@ test("IC Management local save survives reload and appears only in Selector look
   });
   await page.getByRole("link", { name: "Open IC Selector" }).click();
   await page.getByRole("textbox", { name: "Search admitted ICPN" }).fill("LOCAL123");
-  await expect(page.getByText("LOCAL / UNVERIFIED · r1")).toBeVisible();
+  await expect(page.getByText(/^(CUSTOMER · UNVERIFIED|客戶自建 · 未驗證) · r1$/)).toBeVisible();
 });

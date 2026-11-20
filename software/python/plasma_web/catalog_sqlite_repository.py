@@ -1004,6 +1004,134 @@ class CatalogSqliteShadowRepository:
             rows = conn.execute("SELECT profile_json FROM controller_overlays WHERE namespace='user_catalog' ORDER BY vendor_key,icpn_key").fetchall()
         return [json.loads(row[0]) for row in rows]
 
+    def linked_customer_profiles(
+        self, official_keys: set[tuple[str, str]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Read customer-owned links without granting Job authority.
+
+        An optional caller-owned snapshot keyset keeps Selector origin labels
+        consistent with the exact Catalog revision searched, without a second
+        full SQLite Catalog scan.
+        """
+        if official_keys is None:
+            snapshot = self.read_active()
+            official_keys = {_identity(row) for row in snapshot.catalog.records}
+        with sqlite3.connect(self.path) as conn:
+            self._init_schema(conn)
+            rows = conn.execute(
+                "SELECT profile_json FROM controller_overlays "
+                "WHERE namespace='official_profile_link' ORDER BY vendor_key,icpn_key"
+            ).fetchall()
+        linked = []
+        for (payload,) in rows:
+            entry = json.loads(payload)
+            identity = entry["record"]
+            is_official = (identity["vendor"].casefold(), identity["identifier"].casefold()) in official_keys
+            linked.append({
+                **entry,
+                "ic_origin": "OFFICIAL" if is_official else "CUSTOMER",
+                "profile_origin": "CUSTOMER",
+                "link_status": "ACTIVE" if is_official else "PENDING_OFFICIAL",
+                "verification": "UNVERIFIED",
+            })
+        return linked
+
+    def link_local_to_official(
+        self, vendor: str, icpn: str, *, expected_local_revision: int,
+        confirmed_same_ic: bool, actor: str,
+    ) -> dict[str, Any]:
+        """Link an intact Customer Profile to an already-published Official IC.
+
+        Identity and qualification stay owned by the active Official revision.
+        This transaction never grants the Customer Profile Job authorization.
+        """
+        if (not all(isinstance(x, str) and x.strip() for x in (vendor, icpn, actor))
+                or type(expected_local_revision) is not int or expected_local_revision <= 0
+                or confirmed_same_ic is not True):
+            raise DeviceCatalogIntegrityError(
+                "explicit same-IC confirmation and current Local revision required"
+            )
+        key = (vendor.strip().casefold(), icpn.strip().casefold())
+        with sqlite3.connect(self.path, timeout=10) as conn:
+            self._init_schema(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            current = conn.execute(
+                "SELECT profile_json FROM controller_overlays "
+                "WHERE namespace='user_catalog' AND vendor_key=? AND icpn_key=?", key
+            ).fetchone()
+            if current is None:
+                raise DeviceCatalogIntegrityError("customer Local record not found; reload before linking")
+            local = json.loads(current[0])
+            if local.get("revision") != expected_local_revision:
+                raise DeviceCatalogIntegrityError("customer Local record revision changed; reload before linking")
+            record = local.get("record", {})
+            if (str(record.get("vendor", "")).casefold(),
+                    str(record.get("identifier", "")).casefold()) != key:
+                raise DeviceCatalogIntegrityError("customer Local identity does not match stored key")
+            if not isinstance(local.get("profile"), dict) or not local["profile"].get("profile_id"):
+                raise DeviceCatalogIntegrityError("customer Profile is incomplete; link refused")
+            if conn.execute(
+                "SELECT 1 FROM controller_overlays WHERE namespace='official_profile_link' "
+                "AND vendor_key=? AND icpn_key=?", key
+            ).fetchone():
+                raise DeviceCatalogIntegrityError("Official IC already has a customer Profile link")
+            active = conn.execute(
+                "SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1"
+            ).fetchone()
+            if active is None:
+                raise DeviceCatalogIntegrityError("no active Official Catalog")
+            snapshot = self._read_revision(conn, active[0])
+            official = snapshot.catalog.resolve(vendor, icpn)
+            if official is None:
+                raise DeviceCatalogIntegrityError(
+                    "the same exact ICPN must be published as an Official IC before linking"
+                )
+            # Never copy a customer-supplied Level or Provider over the Official
+            # identity. Preserve the entire previous local record and Profile.
+            linked = {
+                **local,
+                "origin": "CUSTOMER",
+                "verification": "UNVERIFIED",
+                "official_link": {
+                    "manufacturer": official.vendor,
+                    "exact_icpn": official.identifier,
+                    "source_authority": official.source_authority,
+                    "official_revision_at_link": active[0],
+                },
+            }
+            conn.execute(
+                "INSERT INTO controller_overlays(namespace,vendor_key,icpn_key,profile_json) "
+                "VALUES ('official_profile_link',?,?,?)", (*key, _encoded(linked))
+            )
+            removed = conn.execute(
+                "DELETE FROM controller_overlays WHERE namespace='user_catalog' "
+                "AND vendor_key=? AND icpn_key=?", key
+            )
+            if removed.rowcount != 1:
+                raise DeviceCatalogIntegrityError("customer Local record changed during link")
+            detail = _encoded({
+                "manufacturer": official.vendor,
+                "exact_icpn": official.identifier,
+                "local_revision": expected_local_revision,
+                "profile_id": local["profile"]["profile_id"],
+                "preserved_source_sha256": _digest(local),
+                "link_namespace": "official_profile_link",
+            })
+            conn.execute(
+                "INSERT INTO catalog_audit_events(action,actor,predecessor,revision_sha256,detail) "
+                "VALUES (?,?,?,?,?)",
+                ("LOCAL_LINK_OFFICIAL", actor, active[0], None, detail),
+            )
+        return {
+            "manufacturer": official.vendor,
+            "exact_icpn": official.identifier,
+            "ic_origin": "OFFICIAL",
+            "profile_origin": "CUSTOMER",
+            "link_status": "ACTIVE",
+            "local_revision": expected_local_revision,
+            "profile_id": local["profile"]["profile_id"],
+        }
+
     def delete_local_record(self, vendor: str, icpn: str, *, actor: str) -> None:
         if not all(isinstance(value, str) and value.strip() for value in (vendor, icpn, actor)):
             raise DeviceCatalogIntegrityError("local identity and actor required")
@@ -1016,7 +1144,7 @@ class CatalogSqliteShadowRepository:
             conn.execute("INSERT INTO catalog_audit_events(action,actor,predecessor,revision_sha256,detail) VALUES (?,?,?,?,?)", ("LOCAL_DELETE", actor, None, None, f"{vendor.casefold()}:{icpn.casefold()}"))
 
     def save_local_records(self, entries: list[dict[str, Any]], *, actor: str, dry_run: bool = False) -> list[dict[str, Any]]:
-        """Validate the entire import before a single atomic local write."""
+        """Persist LOCAL identities independently from same-key Official records."""
         if not actor.strip() or not entries or len(entries) > 1000:
             raise DeviceCatalogIntegrityError("actor and 1-1000 local records required")
         prepared = []
@@ -1067,12 +1195,15 @@ class CatalogSqliteShadowRepository:
             active = conn.execute("SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1").fetchone()
             if active is None:
                 raise DeviceCatalogIntegrityError("no active official Catalog revision")
-            official = self._read_revision(conn, active[0])
-            official_keys = {_identity(row) for row in official.catalog.records}
-            if any(key in official_keys for key, _ in prepared):
-                raise DeviceCatalogIntegrityError("local exact ICPN conflicts with official Catalog")
             output = []
             for key, data in prepared:
+                if conn.execute(
+                    "SELECT 1 FROM controller_overlays WHERE namespace='official_profile_link' "
+                    "AND vendor_key=? AND icpn_key=?", key
+                ).fetchone():
+                    raise DeviceCatalogIntegrityError(
+                        "customer Profile already linked to Official IC; duplicate Local identity refused"
+                    )
                 old = conn.execute("SELECT profile_json FROM controller_overlays WHERE namespace='user_catalog' AND vendor_key=? AND icpn_key=?", key).fetchone()
                 previous = json.loads(old[0]) if old else None
                 unchanged = bool(previous and previous["record"] == data["record"] and previous["profile"] == data["profile"])

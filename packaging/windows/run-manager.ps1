@@ -49,6 +49,12 @@ if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
 # including null, remains authoritative.
 $env:PLASMA_MANAGER_REGISTRY_STATE_PATH_FALLBACK = Join-Path $programDataRoot 'state\manager-registry.json'
 
+# Explicit durable Catalog store: no legacy Manifest/Qualification runtime fallback.
+# A missing or unqualified database yields Selector HTTP 503 until provisioned.
+if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable('PLASMA_CATALOG_SQLITE_DB'))) {
+    $env:PLASMA_CATALOG_SQLITE_DB = Join-Path $programDataRoot 'state\catalog.sqlite3'
+}
+
 $runtime = Join-Path $PSScriptRoot '..\runtime\manager\manager.pyz'
 & $python $runtime --config $configPath
 exit $LASTEXITCODE

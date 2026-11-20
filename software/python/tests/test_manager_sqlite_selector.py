@@ -1,4 +1,4 @@
-"""Manager-owned SQLite Selector opt-in: API parity and fail closed.
+"""Manager-owned SQLite-only Selector: full source parity and fail closed.
 
 Host-only; no PPU, Z2, DUT, Gateway or live programming is contacted.
 """
@@ -20,7 +20,7 @@ from plasma_manager import server as manager_server
 from plasma_web import legacy_device_selector as selector
 from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
 from plasma_web.catalog_sqlite_selector import read_selector_view
-from plasma_web.device_catalog import DeviceCatalog, DeviceCatalogIntegrityError, default_catalog_manifest_path
+from plasma_web.device_catalog import DeviceCatalog, DeviceCatalogIntegrityError, default_catalog_manifest_path, get_default_device_catalog
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
@@ -57,26 +57,64 @@ def _get(port: int, path: str) -> tuple[int, dict]:
         return exc.code, json.loads(exc.read())
 
 
-def test_sqlite_search_produces_identical_full_response_without_api_drift(
+def test_sqlite_only_matches_full_exact_source_and_qualification_snapshot(
     source_qualified_database: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv(selector.SQLITE_SELECTOR_DB_ENV, raising=False)
-    queries = (
-        "q=STM32F103C8T6&limit=1",
-        "q=STM32F103&limit=5&offset=3",
-        "q=STM32F103&levels=2,3&limit=7",
-        "q=MCXA185VLH&limit=1",
-        "q=ATSAML&levels=1&limit=3",
-        "q=PIC32MX&limit=4&offset=2",
-        "q=&limit=5",
-    )
-    original = [selector.search_response(query) for query in queries]
-    legacy_levels = selector.warm()
+    # Compare against the original trusted import sources in this OFFLINE test,
+    # never through a runtime Selector fallback.
+    source = get_default_device_catalog()
+    qualification = get_default_programming_qualification_registry()
+    imported, projections, level_counts = read_selector_view(str(source_qualified_database))
+    assert imported.records == source.records  # all L0/L1/L2/L3 Exact ICPNs, ordered
+    assert imported.size == len(projections)
+    assert level_counts == qualification.summary["catalog_level_counts"]
+    for record in source.records:
+        key = (record.vendor.casefold(), record.identifier.casefold())
+        assert projections[key] == qualification.describe(record.vendor, record.identifier)
+
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(source_qualified_database))
-    assert selector.warm() == legacy_levels
-    assert [selector.search_response(query) for query in queries] == original
+    assert selector.warm() == level_counts
+    for query, selected_levels, page_size in (
+        ("STM32F103", (1, 2, 3), 7),
+        ("STM32F103", (2, 3), 7),
+        ("ATSAML", (1,), 5),
+        ("PIC32MX", (1, 2, 3), 3),
+        ("", (1, 2, 3), 100),
+    ):
+        def selected(record):
+            return qualification.describe(
+                record.vendor, record.identifier
+            )["catalog_level"] in selected_levels
+
+        # Public source and runtime Selector both enforce the 100-row page cap.
+        # Compare every page rather than bypassing the source query contract.
+        expected, total = source.search_with_total(
+            query, limit=100, offset=0, predicate=selected,
+        )
+        expected = list(expected)
+        for source_offset in range(100, total, 100):
+            page, page_total = source.search_with_total(
+                query, limit=100, offset=source_offset, predicate=selected,
+            )
+            assert page_total == total
+            expected.extend(page)
+        received = []
+        for offset in range(0, total + page_size, page_size):
+            raw = f"q={query}&levels={','.join(map(str, selected_levels))}&limit={page_size}&offset={offset}"
+            status, payload = selector.search_response(raw)
+            assert status == 200, payload
+            assert payload["total_count"] == total
+            assert payload["offset"] == offset
+            assert payload["catalog_size"] == sum(level_counts[str(i)] for i in selected_levels)
+            received.extend((row["vendor"], row["identifier"]) for row in payload["results"])
+        assert received == [(row.vendor, row.identifier) for row in expected]
+    assert selector.search_response("q=MCXA185VLH&limit=1")[1]["total_count"] == 0
+
+    # Neither a missing env nor a stale source manifest may resurrect the old path.
     monkeypatch.delenv(selector.SQLITE_SELECTOR_DB_ENV)
-    assert selector.search_response(queries[0]) == original[0]
+    assert selector.search_response("q=STM32F103C8T6")[0] == 503
+    with pytest.raises(DeviceCatalogIntegrityError):
+        selector.warm()
 
 
 def test_manager_http_sqlite_mode_retains_l0_and_invalid_query_contract(
@@ -95,6 +133,9 @@ def test_manager_http_sqlite_mode_retains_l0_and_invalid_query_contract(
 def test_unconfigured_or_missing_sqlite_fail_503_without_csv_fallback(
     tmp_path: Path, manager_port: int, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv(selector.SQLITE_SELECTOR_DB_ENV, raising=False)
+    status, body = _get(manager_port, "/api/devices/search?q=STM32")
+    assert status == 503 and body["error"]["error_type"] == "DEVICE_SELECTOR_UNAVAILABLE"
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, "")
     status, body = _get(manager_port, "/api/devices/search?q=STM32")
     assert status == 503 and "results" not in body
@@ -205,7 +246,17 @@ def test_catalog_management_local_round_trip_and_publisher_boundary(
     assert repo.read_active().revision_sha256 == official_revision
     official = json.loads(json.dumps(entry))
     official["record"].update(vendor="STMicroelectronics", identifier="STM32F103C8T6")
-    assert post("local", {"entries": [official]})[0] == 400
+    status, result = post("local", {"entries": [official]})
+    assert status == 200
+    assert result["changes"][0]["verification"] == "UNVERIFIED"
+    assert repo.read_active().revision_sha256 == official_revision
+    status, coexist = _get(manager_port, "/api/devices/search?q=STM32F103C8T6")
+    assert status == 200
+    assert any(row["icpn"] == "STM32F103C8T6" for row in coexist["results"])
+    assert any(row["record"]["identifier"] == "STM32F103C8T6"
+               and row["verification"] == "UNVERIFIED"
+               for row in coexist["local_results"])
+    assert repo.linked_customer_profiles() == []
 
 
 def test_manager_http_export_reads_one_snapshot_and_preserves_catalog(
@@ -287,3 +338,62 @@ def test_local_ic_survives_manager_http_restart(tmp_path: Path, monkeypatch: pyt
         assert status == 200 and management["local"][0]["revision"] == 1
     finally:
         restarted.shutdown(); restarted.server_close(); restarted_thread.join(timeout=2)
+
+
+def test_manager_customer_official_link_api_preserves_both_provenances(
+    manager_port: int, source_qualified_database: Path, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = tmp_path / "link-manager.sqlite3"
+    with sqlite3.connect(source_qualified_database) as src, sqlite3.connect(database) as dst:
+        src.backup(dst)
+    repo = CatalogSqliteShadowRepository(database)
+    monkeypatch.setenv("PLASMA_CATALOG_SQLITE_DB", str(database))
+    monkeypatch.setenv("PLASMA_CATALOG_PUBLISH_TOKEN", "link-test-publisher")
+
+    record = {"vendor": "STMicroelectronics", "identifier": "STM32F103C8T6",
+              "family": "Customer STM32F1", "package": "LQFP48", "flash_size": "64 KiB"}
+    original = {"record": record, "profile": {
+        "profile_id": "customer-owned-f1", "provider_id": "customer-provider",
+        "operations": ["erase", "program"], "source_evidence": ["owner-verified-custom"]}}
+    repo.save_local_records([original], actor="owner")
+    def post(token: str, confirmation: bool, revision: int) -> tuple[int, dict]:
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{manager_port}/api/catalog/management/link-local-official",
+            data=json.dumps({
+                "vendor": record["vendor"], "icpn": record["identifier"],
+                "expected_local_revision": revision, "confirmed_same_ic": confirmation,
+            }).encode(), method="POST",
+            headers={"Content-Type": "application/json", "X-Plasma-Catalog-Publisher": token},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as exc:
+            return exc.code, json.loads(exc.read())
+
+    assert post("wrong", True, 1)[0] == 403
+    assert post("link-test-publisher", False, 1)[0] == 400
+    assert post("link-test-publisher", True, 2)[0] == 400
+    assert len(repo.local_records()) == 1
+    status, result = post("link-test-publisher", True, 1)
+    assert status == 200
+    assert result["link"]["ic_origin"] == "OFFICIAL"
+    assert result["link"]["profile_origin"] == "CUSTOMER"
+    assert result["link"]["profile_id"] == "customer-owned-f1"
+    assert repo.local_records() == []
+
+    status, manager = _get(manager_port, "/api/catalog/management")
+    assert status == 200
+    assert manager["local"] == []
+    assert len(manager["linked_profiles"]) == 1
+    assert manager["linked_profiles"][0]["profile"]["profile_id"] == "customer-owned-f1"
+    assert manager["linked_profiles"][0]["verification"] == "UNVERIFIED"
+    assert manager["linked_profiles"][0]["link_status"] == "ACTIVE"
+    status, search = _get(manager_port, "/api/devices/search?q=STM32F103C8T6&limit=1")
+    assert status == 200
+    assert search["results"][0]["ic_origin"] == "OFFICIAL"
+    assert search["results"][0]["linked_customer_profile"]["origin"] == "CUSTOMER"
+    assert search["results"][0]["linked_customer_profile"]["verification"] == "UNVERIFIED"
+    assert post("link-test-publisher", True, 1)[0] == 400
+    assert [event["action"] for event in repo.history()["audit"]].count("LOCAL_LINK_OFFICIAL") == 1

@@ -698,6 +698,188 @@ def test_readers_observe_complete_revision_during_publish(tmp_path: Path) -> Non
     assert set(observed) <= {(initial, repo.read_active().size - 1), (published, repo.read_active().size)}
 
 
+def test_customer_and_official_same_exact_icpn_coexist_across_publish_rollback(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Official and LOCAL are independent namespaces, not identity conflicts."""
+    repo, initial, future_official_record, l1, _ = _publisher_fixture(tmp_path)
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
+    entries = [
+        {"record": {"vendor": "LocalVendor", "identifier": "CUSTOM-A"},
+         "profile": {"profile_id": "customer-profile-a", "operations": ["program"]}},
+        {"record": {"vendor": "LocalVendor", "identifier": "CUSTOM-B"},
+         "profile": {"profile_id": "customer-profile-b", "operations": ["erase", "verify"]}},
+    ]
+    repo.save_local_records(entries, actor="customer")
+    before = repo.local_records()
+    assert len(before) == 2
+    assert all(row["origin"] == "LOCAL" and row["verification"] == "UNVERIFIED" for row in before)
+    assert repo.import_verified_manifest(
+        default_catalog_manifest_path(),
+        qualification_registry=get_default_programming_qualification_registry(),
+    ) == initial
+    assert repo.local_records() == before
+
+    change = [{"record": asdict(future_official_record), "qualification": l1}]
+    # Create the LOCAL identity after validation/staging to also prove that
+    # an Official release can proceed if customers create matching ICPNs later.
+    assert repo.validate_changes(change)[0]["status"] == "ADDED"
+    stage = repo.stage_revision(change, actor="publisher")
+    local_same_key = {
+        "record": {"vendor": future_official_record.vendor,
+                   "identifier": future_official_record.identifier},
+        "profile": {"profile_id": "customer-custom-profile", "operations": ["program"]},
+    }
+    local_save = repo.save_local_records([local_same_key], actor="customer")
+    assert local_save[0]["revision"] == 1
+    preserved = repo.local_records()
+    published = repo.publish_staged(stage, actor="publisher")
+    assert published != initial
+    assert repo.local_records() == preserved
+    assert CatalogSqliteShadowRepository(repo.path).local_records() == preserved
+
+    same_key = future_official_record.identifier
+    status, payload = selector.search_response(f"q={same_key}")
+    assert status == 200, payload
+    official = next(row for row in payload["results"] if row["icpn"] == same_key)
+    customer = next(row for row in payload["local_results"] if row["record"]["identifier"] == same_key)
+    assert official["catalog_level"] == 1
+    assert official["job_selectable"] is False
+    assert customer["origin"] == "LOCAL"
+    assert customer["verification"] == "UNVERIFIED"
+    assert customer["profile"]["profile_id"] == "customer-custom-profile"
+    assert all(row["origin"] == "LOCAL" for row in preserved)
+
+    # Repeat LOCAL save on an already-Official identity: both must remain intact.
+    assert repo.save_local_records([local_same_key], actor="customer")[0]["change"] == "UNCHANGED"
+    assert repo.read_active().revision_sha256 == published
+    assert repo.local_records() == preserved
+
+    repo.rollback(initial, actor="publisher")
+    assert repo.local_records() == preserved
+    assert repo.read_active().revision_sha256 == initial
+    # Re-publishing a previously staged Official snapshot must still be legal.
+    second = repo.publish_staged(repo.stage_revision(change, actor="publisher"), actor="publisher")
+    assert second == published
+    assert repo.local_records() == preserved
+    assert selector.search_response(f"q={same_key}")[0] == 200
+
+
+def test_customer_profile_links_to_existing_official_ic_without_identity_or_qualification_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, initial, _, _, _ = _publisher_fixture(tmp_path)
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
+    official = repo.read_active().catalog.resolve("STMicroelectronics", "STM32F103C8T6")
+    assert official is not None
+    customer = {
+        "record": {"vendor": official.vendor, "identifier": official.identifier,
+                   "family": "Customer F1", "package": "LQFP48", "flash_size": "64 KiB"},
+        "profile": {"profile_id": "customer-f1-profile", "provider_id": "customer-vendor",
+                    "operations": ["erase", "program"], "source_evidence": ["customer-provenance-1"]},
+    }
+    repo.save_local_records([customer], actor="owner")
+    original = repo.local_records()[0]
+    before = repo.read_active()
+    assert repo.linked_customer_profiles() == []
+    with pytest.raises(DeviceCatalogIntegrityError, match="same-IC confirmation"):
+        repo.link_local_to_official(
+            official.vendor, official.identifier, expected_local_revision=1,
+            confirmed_same_ic=False, actor="owner",
+        )
+    with pytest.raises(DeviceCatalogIntegrityError, match="revision changed"):
+        repo.link_local_to_official(
+            official.vendor, official.identifier, expected_local_revision=2,
+            confirmed_same_ic=True, actor="owner",
+        )
+    assert repo.local_records() == [original]
+
+    linked = repo.link_local_to_official(
+        official.vendor, official.identifier, expected_local_revision=1,
+        confirmed_same_ic=True, actor="owner",
+    )
+    assert linked == {
+        "manufacturer": official.vendor, "exact_icpn": official.identifier,
+        "ic_origin": "OFFICIAL", "profile_origin": "CUSTOMER",
+        "link_status": "ACTIVE", "local_revision": 1, "profile_id": "customer-f1-profile",
+    }
+    assert repo.local_records() == []
+    with pytest.raises(DeviceCatalogIntegrityError, match="already linked to Official IC"):
+        repo.save_local_records([customer], actor="owner")
+    retained = CatalogSqliteShadowRepository(repo.path).linked_customer_profiles()[0]
+    assert retained["record"] == original["record"]
+    assert retained["profile"] == original["profile"]
+    assert retained["revision"] == original["revision"]
+    assert retained["ic_origin"] == "OFFICIAL"
+    assert retained["profile_origin"] == "CUSTOMER"
+    assert retained["verification"] == "UNVERIFIED"
+    assert retained["official_link"]["official_revision_at_link"] == initial
+    assert repo.read_active().revision_sha256 == before.revision_sha256
+    assert repo.read_active().qualifications == before.qualifications
+    assert [e["action"] for e in repo.history()["audit"]].count("LOCAL_LINK_OFFICIAL") == 1
+    with pytest.raises(DeviceCatalogIntegrityError, match="not found"):
+        repo.link_local_to_official(
+            official.vendor, official.identifier, expected_local_revision=1,
+            confirmed_same_ic=True, actor="owner",
+        )
+    status, response = selector.search_response("q=STM32F103C8T6&limit=1")
+    assert status == 200
+    result = response["results"][0]
+    assert result["ic_origin"] == "OFFICIAL"
+    assert result["linked_customer_profile"] == {
+        "origin": "CUSTOMER", "profile_id": "customer-f1-profile",
+        "local_revision": 1, "verification": "UNVERIFIED",
+    }
+    assert result["programming_qualification"] == before.qualifications[
+        (official.vendor.casefold(), official.identifier.casefold())
+    ]
+    assert result["job_selectable"] is before.qualifications[
+        (official.vendor.casefold(), official.identifier.casefold())
+    ]["job_selectable"]
+
+
+def test_link_does_not_allow_nonofficial_ic_and_survives_official_rollback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, initial, future, l1, _ = _publisher_fixture(tmp_path)
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
+    customer = {
+        "record": {"vendor": future.vendor, "identifier": future.identifier,
+                   "family": "Customer exact F1", "package": "LQFP48", "flash_size": "64 KiB"},
+        "profile": {"profile_id": "customer-custom-f1", "operations": ["program"]},
+    }
+    repo.save_local_records([customer], actor="owner")
+    with pytest.raises(DeviceCatalogIntegrityError, match="must be published"):
+        repo.link_local_to_official(
+            future.vendor, future.identifier, expected_local_revision=1,
+            confirmed_same_ic=True, actor="owner",
+        )
+    assert repo.local_records()[0]["profile"]["profile_id"] == "customer-custom-f1"
+
+    changes = [{"record": asdict(future), "qualification": l1}]
+    published = repo.publish_staged(repo.stage_revision(changes, actor="publisher"), actor="publisher")
+    assert repo.read_active().revision_sha256 == published
+    repo.link_local_to_official(
+        future.vendor, future.identifier, expected_local_revision=1,
+        confirmed_same_ic=True, actor="owner",
+    )
+    assert repo.linked_customer_profiles()[0]["link_status"] == "ACTIVE"
+    repo.rollback(initial, actor="publisher")
+    preserved = repo.linked_customer_profiles()[0]
+    assert preserved["link_status"] == "PENDING_OFFICIAL"
+    assert preserved["ic_origin"] == "CUSTOMER"
+    assert preserved["profile"]["profile_id"] == "customer-custom-f1"
+    assert repo.local_records() == []
+    pending_status, pending = selector.search_response("q=STM32F103C8T6-TEST-EXACT")
+    assert pending_status == 200
+    assert any(item["record"]["identifier"] == future.identifier for item in pending["local_results"])
+    assert not any(item["identifier"] == future.identifier for item in pending["results"])
+    revived = repo.publish_staged(repo.stage_revision(changes, actor="publisher"), actor="publisher")
+    assert revived == published
+    assert repo.linked_customer_profiles()[0]["link_status"] == "ACTIVE"
+    assert repo.linked_customer_profiles()[0]["profile"] == preserved["profile"]
+
+
 def test_management_local_batch_atomic_preview_and_selector_refresh(tmp_path: Path, monkeypatch) -> None:
     repo, initial, official_record, l1, _ = _publisher_fixture(tmp_path)
     monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
@@ -721,8 +903,12 @@ def test_management_local_batch_atomic_preview_and_selector_refresh(tmp_path: Pa
         repo.save_local_records([entry, forged], actor="test")
     assert len(repo.local_records()) == 1
     official = json.loads(json.dumps(entry)); official["record"].update(vendor="STMicroelectronics", identifier="STM32F103C8T6")
-    with pytest.raises(DeviceCatalogIntegrityError):
-        repo.save_local_records([official], actor="test")
+    coexistence = repo.save_local_records([official], actor="test", dry_run=True)
+    assert coexistence[0]["change"] == "ADDED"
+    assert coexistence[0]["origin"] == "LOCAL"
+    assert coexistence[0]["verification"] == "UNVERIFIED"
+    assert len(repo.local_records()) == 1
+    assert repo.read_active().revision_sha256 == initial
     official_changes = [{"record": asdict(official_record), "qualification": l1}]
     assert repo.validate_changes(official_changes)[0]["status"] == "ADDED"
     assert repo.read_active().revision_sha256 == initial

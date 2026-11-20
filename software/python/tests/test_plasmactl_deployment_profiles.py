@@ -449,6 +449,7 @@ def test_local_control_station_manager_is_bootstrap_capable_with_release_catalog
     units = source.split("write_units()", 1)[1].split("write_evidence()", 1)[0]
     assert "-m plasma_manager.bootstrap_server --config $manager_config" in units
     assert "-m plasma_manager.server --config" not in units
+    assert "Environment=PLASMA_CATALOG_SQLITE_DB=$catalog_sqlite" in units
     assert "Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$current_link/$release_catalog_dir/$catalog_manifest_relative" in units
     assert "Environment=PLASMA_IC_SUPPORT_ROOT=$current_link/$release_catalog_dir/data/ic-support" in units
     assert "Environment=PLASMA_RUNTIME_EVIDENCE_ROOT=$current_link/$release_catalog_dir" in units
@@ -497,6 +498,8 @@ def test_local_control_station_release_build_self_tests_manager_selector() -> No
     # A reused release without a working Selector Catalog is refused.
     assert 'validate_release_selector "$release" ||' in prepare
     selector = source.split("validate_release_selector() {", 1)[1].split("export_release_catalog()", 1)[0]
+    assert 'PLASMA_CATALOG_SQLITE_DB="$catalog_sqlite"' in selector
+    assert '[[ -f "$catalog_sqlite" ]] || die' in selector
     assert '"$release/venv/bin/python" -I -B' in selector
     assert "import plasma_manager.bootstrap_server" in selector
     assert "legacy_device_selector.search_response" in selector

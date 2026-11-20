@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import threading
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 from http.client import HTTPConnection
 from urllib.parse import quote
 
-from plasma_web.device_catalog import get_default_device_catalog
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.device_catalog import get_default_device_catalog, default_catalog_manifest_path
 from plasma_manager.server import PlasmaManagerHandler, PlasmaManagerHTTPServer
 from plasma_web.gateway import PlasmaWebHandler, _parse_target_device
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
@@ -19,6 +24,15 @@ EXPECTED_CUSTOMER_SELECTOR_SIZE = sum(_LEVEL_COUNTS[str(level)] for level in (1,
 class DeviceCatalogWebGatewayTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        # HTTP Selector reads the pre-published SQLite Catalog, never a Manifest.
+        cls._sqlite_temp = tempfile.TemporaryDirectory(prefix="plasma-manager-catalog-")
+        cls._database = Path(cls._sqlite_temp.name) / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(cls._database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
+        cls._sqlite_env = patch.dict(os.environ, {"PLASMA_CATALOG_SQLITE_DB": str(cls._database)})
+        cls._sqlite_env.start()
         cls.server = PlasmaManagerHTTPServer(("127.0.0.1", 0), PlasmaManagerHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -28,6 +42,8 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join()
+        cls._sqlite_env.stop()
+        cls._sqlite_temp.cleanup()
 
     def request(self, path: str):
         connection = HTTPConnection("127.0.0.1", self.server.server_port)
