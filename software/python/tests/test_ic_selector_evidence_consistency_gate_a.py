@@ -5,6 +5,8 @@ from dataclasses import replace
 import os
 import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
 from plasma_web.device_catalog import default_catalog_manifest_path
