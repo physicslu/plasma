@@ -59,7 +59,8 @@ def _json_file(path: Path, *, max_bytes: int = 65536) -> dict[str, Any]:
 
 
 def _digest(path: Path) -> str:
-    started = time.monotonic()
+    started = (time.monotonic()
+               if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
     bytes_hashed = 0
     try:
         checksum = hashlib.sha256()
@@ -67,12 +68,14 @@ def _digest(path: Path) -> str:
             raise AssetSetError("ASSET_SET_FILE_UNTRUSTED")
         with path.open("rb") as data:
             for chunk in iter(lambda: data.read(1024 * 1024), b""):
-                bytes_hashed += len(chunk)
+                if started is not None:
+                    bytes_hashed += len(chunk)
                 checksum.update(chunk)
         return checksum.hexdigest()
     finally:
-        _m0_timing("ppu_asset_sha256", bytes_hashed=bytes_hashed,
-                   duration_ms=round((time.monotonic() - started) * 1000, 3))
+        if started is not None:
+            _m0_timing("ppu_asset_sha256", bytes_hashed=bytes_hashed,
+                       duration_ms=round((time.monotonic() - started) * 1000, 3))
 
 
 def _root(product_root: Path) -> tuple[Path, Path, Path]:

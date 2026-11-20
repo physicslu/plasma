@@ -1406,7 +1406,8 @@ class BundleProgrammingWorkflow:
                 # Submission commits under the same lock as the global latch.
                 # After this durable point it is possibly sent, never resent.
                 self._update(run, job_submission_count=1)
-            submit_started = self.monotonic()
+            submit_started = (self.monotonic()
+                              if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
             try:
                 status, _headers, body = client.relay(
                     "POST", "/api/jobs",
@@ -1416,9 +1417,10 @@ class BundleProgrammingWorkflow:
             except Exception as exc:
                 raise _OutcomeUnknown("JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT") from exc
             finally:
-                _m0_timing("manager_submit_http", run_id=run.run_id,
-                           plan_id=plan.plan_id, ppu_alias=run.alias, site_id=run.site,
-                           duration_ms=round((self.monotonic() - submit_started) * 1000, 3))
+                if submit_started is not None:
+                    _m0_timing("manager_submit_http", run_id=run.run_id,
+                               plan_id=plan.plan_id, ppu_alias=run.alias, site_id=run.site,
+                               duration_ms=round((self.monotonic() - submit_started) * 1000, 3))
         finally:
             self.gate.end_managed_write(run.alias)
         if status != 202:

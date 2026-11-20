@@ -617,7 +617,8 @@ class SiteManager:
                 recoverable=True,
             )
 
-        enqueue_started = time.monotonic()
+        enqueue_started = (time.monotonic()
+                           if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
         # Reserve before reading Active identity or resolving a hardware route.
         # The same lease excludes activation/FPGA reload through every queued
         # Job, retry and cancellation cleanup, across the whole PPU.
@@ -673,10 +674,11 @@ class SiteManager:
         runtime.future.add_done_callback(
             lambda _future, job_id=request.job_id: self._release_execution_job(job_id)
         )
-        _m0_timing("ppu_enqueue", job_id=request.job_id,
-                   site_id=request.site_id,
-                   duration_ms=round((time.monotonic() - enqueue_started) * 1000, 3),
-                   admission_timing_ms=timing)
+        if enqueue_started is not None:
+            _m0_timing("ppu_enqueue", job_id=request.job_id,
+                       site_id=request.site_id,
+                       duration_ms=round((time.monotonic() - enqueue_started) * 1000, 3),
+                       admission_timing_ms=timing)
         self.server_log.event(
             "INFO",
             "job_queued",
@@ -796,13 +798,15 @@ class SiteManager:
         if site_id is not None:
             # Site-scoped status (Manager readiness) carries the PPU-derived
             # Resource identity; unscoped UI polling does not pay for it.
-            status_started = time.monotonic()
+            status_started = (time.monotonic()
+                              if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
             try:
                 ppu["active_resources"] = self.active_resources_snapshot()
             finally:
-                _m0_timing("ppu_site_resources", site_id=site_id,
-                           duration_ms=round((time.monotonic() - status_started) * 1000, 3))
-        if site_id is not None:
+                if status_started is not None:
+                    _m0_timing("ppu_site_resources", site_id=site_id,
+                               duration_ms=round((time.monotonic() - status_started) * 1000, 3))
+        if site_id is not None and status_started is not None:
             _m0_timing("ppu_site_status", site_id=site_id,
                        duration_ms=round((time.monotonic() - status_started) * 1000, 3))
         return {

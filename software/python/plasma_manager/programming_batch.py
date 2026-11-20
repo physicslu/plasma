@@ -1082,13 +1082,15 @@ class ProgrammingBatchCoordinator:
         failure of the machinery that was meant to judge, and the only safe
         reading of "I could not tell" is to stop submitting.
         """
-        started = self.monotonic()
+        started = (self.monotonic()
+                   if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
         try:
             platform = self._platform_block(alias)
             return platform if platform is not None else self._site_block(alias, site)
         finally:
-            _m0_timing("manager_admission", ppu_alias=alias, site_id=site,
-                       duration_ms=round((self.monotonic() - started) * 1000, 3))
+            if started is not None:
+                _m0_timing("manager_admission", ppu_alias=alias, site_id=site,
+                           duration_ms=round((self.monotonic() - started) * 1000, 3))
 
     def reconcile_start(self, start_id: str) -> dict[str, Any]:
         """Read-only: what became of the Start that carried ``start_id``."""
@@ -1577,7 +1579,8 @@ class ProgrammingBatchCoordinator:
                     unit["failure_domain"] = domain
                 return ("FAIL" if number > 1 else "BLOCKED"), f"EXECUTION_{reason}"
             if plan is None:
-                plan_started = self.monotonic()
+                plan_started = (self.monotonic()
+                                if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
                 try:
                     plan = self.workflow.plan(alias, site_body)["plan"]
                 except ProgrammingError as exc:
@@ -1587,10 +1590,11 @@ class ProgrammingBatchCoordinator:
                     # The earlier FAIL stands; the retry could not be planned.
                     return "FAIL", f"RETRY_PLAN_REFUSED_{exc.code}"
                 finally:
-                    _m0_timing("manager_plan", batch_id=batch["batch_id"],
-                               cycle_id=unit["cycle"]["cycle_id"],
-                               ppu_alias=alias, site_id=site, attempt=number,
-                               duration_ms=round((self.monotonic() - plan_started) * 1000, 3))
+                    if plan_started is not None:
+                        _m0_timing("manager_plan", batch_id=batch["batch_id"],
+                                   cycle_id=unit["cycle"]["cycle_id"],
+                                   ppu_alias=alias, site_id=site, attempt=number,
+                                   duration_ms=round((self.monotonic() - plan_started) * 1000, 3))
             cycle = unit["cycle"]
             attempt = {"attempt": number, "cycle_index": cycle["index"],
                        "cycle_id": cycle["cycle_id"],
