@@ -305,7 +305,7 @@ def test_two_ppus_each_run_their_own_sites(tmp_path):
                      "attempt": 1}]
 
 
-def test_repeat_100_and_retry_keep_one_pre_start_sync(tmp_path):
+def test_repeat_100_keeps_one_pre_start_sync(tmp_path):
     batches, workflow, gateways, _c = rig(tmp_path, sites=(2,))
     started = batches.start_batch(with_start(
         workflow, [one("z2", 2)], repeat=100, replace_ic_before_next_cycle=False))
@@ -315,6 +315,17 @@ def test_repeat_100_and_retry_keep_one_pre_start_sync(tmp_path):
     assert len(gateways["z2"].posts) == 100
     assert len(gateways["z2"].time_sync_calls) == 1
     assert batch["time_sync"]["z2"]["status"] == "SYNCED"
+
+
+def test_retry_keeps_one_pre_start_sync(tmp_path):
+    batches, workflow, gateways, _c = rig(tmp_path, sites=(2,),
+                                          job_final=["failed", "success"])
+    started = batches.start_batch(with_start(
+        workflow, [one("z2", 2)], retry_limit=1))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS"
+    assert len(gateways["z2"].posts) == 2
+    assert len(gateways["z2"].time_sync_calls) == 1
 
 
 def test_pre_start_sync_warning_does_not_change_programming_outcome(tmp_path):
