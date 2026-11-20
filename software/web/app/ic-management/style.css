@@ -4,7 +4,8 @@
 .icManagement h1{font-size:30px;margin:3px 0}.icManagement h2{font-size:17px;margin:0 0 14px}
 .icManagement h2 small{font-size:11px;color:#f0b76e;margin-left:8px}
 .icManagement section{border:1px solid var(--border,#395059);border-radius:12px;padding:20px;margin:16px 0;background:var(--panel,#17262e)}
-.icManagement input,.icManagement textarea,.icManagement select{display:block;width:100%;box-sizing:border-box;margin:5px 0 12px;padding:9px;border:1px solid var(--border,#516671);border-radius:6px;background:var(--surface,#101c24);color:inherit}
+.icManagement input,.icManagement textarea,.icManagement select{display:block;width:100%;box-sizing:border-box;margin:5px 0 12px;padding:9px;border:1px solid var(--border,#516671);border-radius:6px;background:var(--panel-2);color:var(--text);caret-color:var(--text)}
+.icManagement input::placeholder,.icManagement textarea::placeholder{color:var(--muted);opacity:1}
 .icManagement textarea{min-height:180px;font:12px monospace}.icManagement label{font-size:12px;text-transform:capitalize}
 .managementGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 14px}
 .icManagement button{border:1px solid var(--cyan,#36d4e3);border-radius:6px;color:inherit;background:transparent;padding:7px 12px;margin:3px;cursor:pointer}
