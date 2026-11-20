@@ -752,7 +752,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self._json(status, payload)
 
     def _handle_catalog_management(self, path: str, raw_query: str = "") -> None:
-        from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+        from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository, CatalogLocalIdentityConflict
         from plasma_web.device_catalog import DeviceCatalogIntegrityError, DeviceCatalogRecord
         from urllib.parse import parse_qs
 
@@ -821,6 +821,13 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 self._json(404, {"ok": False, "error": {"message": "unknown Catalog management action"}})
                 return
             self._json(200, {"ok": True, **result})
+        except CatalogLocalIdentityConflict as exc:
+            self._json(409, {"ok": False, "error": {
+                "code": exc.code, "message": str(exc),
+                "conflicts": exc.conflicts,
+                "conflict_count": exc.conflict_count,
+                "truncated": exc.conflict_count > len(exc.conflicts),
+            }})
         except (DeviceCatalogIntegrityError, ValueError, TypeError, KeyError, OSError) as exc:
             self._json(400, {"ok": False, "error": {"message": str(exc)}})
 
