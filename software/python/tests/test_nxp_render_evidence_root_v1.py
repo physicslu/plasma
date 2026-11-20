@@ -8,11 +8,28 @@ from pathlib import Path
 from unittest.mock import patch
 
 import plasma_web.nxp_manufacturer_device_evidence as evidence_module
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.device_catalog import default_catalog_manifest_path
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.device_catalog import DEVICE_CATALOG_MANIFEST_ENV
 from plasma_web.legacy_device_selector import _device_search_payload
 
 
 class NXPInstalledWheelDataRootTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        # Offline test fixture: runtime Selector always consumes a qualified SQLite revision.
+        cls._sqlite_temporary = tempfile.TemporaryDirectory(prefix="plasma-selector-regression-")
+        cls.addClassCleanup(cls._sqlite_temporary.cleanup)
+        database = Path(cls._sqlite_temporary.name) / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
+        cls._sqlite_environment = patch.dict(os.environ, {"PLASMA_CATALOG_SQLITE_DB": str(database)})
+        cls._sqlite_environment.start()
+        cls.addClassCleanup(cls._sqlite_environment.stop)
+
     def test_explicit_manifest_anchors_source_regardless_of_installed_python_module(self) -> None:
         root = Path(__file__).resolve().parents[3]
         manifest = root / "data/device-catalog/production/icpn-v1-manifest.json"
