@@ -254,10 +254,10 @@ def test_unknown_latches_only_its_ppu_without_resend(tmp_path):
         return result
     h.workflow.start = start
     original_admission = h.batches._site_block
-    def admission(alias, site):
+    def admission(alias, site, **kw):
         if alias == 'z2' and site == 2:
             assert unknown.wait(WAIT)
-        return original_admission(alias, site)
+        return original_admission(alias, site, **kw)
     h.batches._site_block = admission
     good.release[1].set()
     good.release[2].set()
@@ -344,10 +344,10 @@ def test_shared_failure_stops_global_admission_and_observes_accepted_job(tmp_pat
             return "SHARED_CONTROL_FAILURE", "AUTHORITY_UNAVAILABLE"
     h = Harness(tmp_path, (1,), aliases=("z2", "peer", "third"), platform_gate=gate)
     original_plan = h.workflow.plan
-    def plan(alias, body):
+    def plan(alias, body, **kw):
         if alias == 'third':
             assert failed.wait(WAIT)
-        return original_plan(alias, body)
+        return original_plan(alias, body, **kw)
     h.workflow.plan = plan
     original_spawn = h.batches.spawn
     def spawn(target):
@@ -400,10 +400,10 @@ def test_journal_failure_never_submits_peer_or_retry(tmp_path, journal):
         h.workflow._write_journal_locked = persist
     failed = threading.Event()
     original_plan = h.workflow.plan
-    def plan(alias, body):
+    def plan(alias, body, **kw):
         if body['site_id'] == 2:
             assert failed.wait(WAIT)
-        return original_plan(alias, body)
+        return original_plan(alias, body, **kw)
     h.workflow.plan = plan
     original_status = h.workflow.run_status
     def status(*args, **kwargs):
@@ -572,6 +572,10 @@ def test_pre_submit_blocked_lane_cannot_delay_healthy_post(tmp_path, stage, shar
         if (alias, site) != ('z2', 1):
             assert entered.wait(WAIT), 'establish slow HTTP before healthy dispatch'
         phase.current = stage
+        if stage == 'plan':
+            # Hold the plan's own Site status read: without admission
+            # evidence the plan reads it (WO-2 F2 M2 fallback path).
+            kwargs = {**kwargs, 'evidence': None}
         try:
             return original(alias, body, **kwargs)
         finally:

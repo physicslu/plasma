@@ -271,6 +271,16 @@ different Bundles (only one pinned Set is read) and a missing `plasma_opf`
 `SiteManager._active_resource_resolver` (same rule as the Bundle Firmware
 resolver: trusted control plane, never from a Job or ZIP).
 
+**Verified Resource Snapshot (WO-2 F2 M2).** Every call still runs the full
+`verify_staged`. Only the *derivation* is memoised, process-local, keyed by
+`(product_root, asset_set_sha256, manifest_sha256)` where `manifest_sha256` is
+the digest that call's verification just proved; the derivation reads the
+manifest once and refuses bytes whose SHA256 differs from the key. A hit
+answers from that call's single verification (no file is read between it and
+the answer); a miss keeps the bracketing second verification and stores only
+after it. `generation` always comes from the fresh read. See
+[WO-2 F2 §6](wo2-f2-m1-verified-resource-snapshot-gap-audit.md#6-m2-implemented-batch-once-preparation-and-verified-resource-snapshot).
+
 ### 8.2 Job Image source (Gateway `POST /api/jobs`)
 
 A third, **exclusive** Job source (not combinable with the Bundle reference

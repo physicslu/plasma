@@ -146,15 +146,19 @@ def verify_staged(product_root: Path, asset_set_sha256: str) -> dict[str, Any]:
             expected.add(name)
     if receipt.get("files_verified") != len(expected) - 2:
         raise AssetSetError("ASSET_SET_FILE_COUNT_MISMATCH")
-    # Deny any extra file, symlink or unexpected filesystem object.
+    # Deny any extra file, symlink or unexpected filesystem object. One walk
+    # both denies and collects: a second walk would only re-read the tree.
+    observed = set()
     for item in target.rglob("*"):
         if item.is_symlink():
             raise AssetSetError("ASSET_SET_TREE_SYMLINK_DENIED")
-        if item.is_file() and str(item.relative_to(target)) not in expected:
-            raise AssetSetError("ASSET_SET_FILE_SET_MISMATCH")
-        if not item.is_file() and not item.is_dir():
+        if item.is_file():
+            name = str(item.relative_to(target))
+            if name not in expected:
+                raise AssetSetError("ASSET_SET_FILE_SET_MISMATCH")
+            observed.add(name)
+        elif not item.is_dir():
             raise AssetSetError("ASSET_SET_SPECIAL_FILE_DENIED")
-    observed = {str(item.relative_to(target)) for item in target.rglob("*") if item.is_file()}
     if observed != expected:
         raise AssetSetError("ASSET_SET_FILE_SET_MISMATCH")
     return {
@@ -170,12 +174,22 @@ def verify_staged(product_root: Path, asset_set_sha256: str) -> dict[str, Any]:
 
 def read_active(product_root: Path) -> dict[str, Any]:
     """Report verified Active identity. Never equate ACTIVE with FPGA READY."""
+    return _verified_active(product_root)[0]
+
+
+def _verified_active(product_root: Path) -> tuple[dict[str, Any], str | None]:
+    """``read_active`` plus the manifest SHA256 its full verification proved.
+
+    The digest is the content identity this very call verified (manifest
+    bytes against the B3 receipt, every declared file against the manifest,
+    no extra file): never a stat tuple and never a remembered result.
+    """
     _assets, _staged, active = _root(product_root)
     if not active.exists():
         return {
             "schema": SCHEMA, "state": "EMPTY",
             "asset_set_sha256": None, "ready": False, "fpga": "NOT_VERIFIED",
-        }
+        }, None
     record = _json_file(active)
     if (record.get("schema") != SCHEMA
             or type(record.get("generation")) is not int
@@ -190,7 +204,7 @@ def read_active(product_root: Path) -> dict[str, Any]:
         "generation": record["generation"],
         "ready": False, "fpga": "NOT_VERIFIED",
         "profile": "NOT_VERIFIED",
-    }
+    }, verified["manifest_sha256"]
 
 
 def _require_trusted_control_socket(socket_path: Path) -> None:
@@ -277,6 +291,18 @@ def resolve_active_firmware(
 
 RESOURCES_SCHEMA = "plasma.ppu.active-resources.v1"
 
+#: Verified Resource Snapshot (WO-2 F2 M2): the Resource identity DERIVED
+#: from one verified content identity, process-local and bounded. It never
+#: replaces verification: every lookup first fully re-verifies the Active Set
+#: (``verify_staged``), and the key is the manifest SHA256 that verification
+#: just proved. The derivation is a pure function of those manifest bytes
+#: (every file it reads is pinned by SHA256 in that manifest), so a hit is the
+#: value a fresh derivation would return. 0 disables it. Runtime restart
+#: empties it; nothing is persisted or rebuilt from metadata.
+RESOURCE_SNAPSHOT_MAX = 8
+_resource_snapshots: dict[tuple[str, str, str], tuple[dict[str, Any], str]] = {}
+_resource_snapshot_lock = threading.Lock()
+
 
 def read_active_resource_identity(product_root: Path) -> dict[str, Any]:
     """PPU-derived Programming Resource identity of the ONE Active Set (OFE-1B).
@@ -288,17 +314,43 @@ def read_active_resource_identity(product_root: Path) -> dict[str, Any]:
     different Bundles cannot mix. The Active pointer/generation must be
     unchanged across the derivation. Opens no hardware, switches nothing and
     authorizes nothing: the caller compares it with a Job Binding.
+
+    A Snapshot hit (same product root, Active Set and verified manifest
+    SHA256) skips the derivation and therefore its read window: nothing is
+    read between this call's full verification and the answer, so the second
+    verification that brackets a derivation has nothing left to bracket.
     """
-    before = read_active(product_root)
+    before, manifest_sha256 = _verified_active(product_root)
     if before["state"] != "ACTIVE":
         raise AssetSetError("ASSET_SET_RESOURCE_NOT_ACTIVE")
+    key = (str(product_root), before["asset_set_sha256"], manifest_sha256)
+    with _resource_snapshot_lock:
+        snapshot = _resource_snapshots.get(key) if RESOURCE_SNAPSHOT_MAX > 0 else None
+    if snapshot is not None:
+        resource, digest = snapshot
+        return {
+            "schema": RESOURCES_SCHEMA, "state": "VERIFIED",
+            "asset_set_sha256": before["asset_set_sha256"],
+            "generation": before["generation"],
+            "resource_set": json.loads(json.dumps(resource)),
+            "resource_set_sha256": digest,
+        }
     try:
         from plasma_opf import bundle_v3
     except ImportError as exc:  # Bootstrap control plane does not ship plasma_opf.
         raise AssetSetError("ASSET_SET_RESOURCE_IDENTITY_UNAVAILABLE") from exc
     _assets, staged, _active = _root(product_root)
     target = staged / before["asset_set_sha256"]
-    manifest = _json_file(target / "manifest.json")
+    manifest_path = target / "manifest.json"
+    # Derive from exactly the manifest bytes verified above, read ONCE: the
+    # Snapshot key names them, so a manifest swapped in and back during the
+    # derivation can never be stored under it.
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise AssetSetError("ASSET_SET_FILE_UNTRUSTED")
+    raw = manifest_path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != manifest_sha256:
+        raise AssetSetError("ASSET_SET_RESOURCE_ACTIVE_SET_CHANGED")
+    manifest = json.loads(raw)  # verified above as a JSON object
     # verify_staged already pinned every declared file by size/SHA256 and
     # denied symlinked parents; only manifest-declared paths may be read.
     declared = {entry["path"] for package in manifest["packages"]
@@ -317,11 +369,19 @@ def read_active_resource_identity(product_root: Path) -> dict[str, Any]:
         digest = bundle_v3.resource_set_sha256(resource)
     except bundle_v3.BundleBuildError as exc:
         raise AssetSetError(f"ASSET_SET_RESOURCE_IDENTITY_INVALID:{exc}") from exc
-    after = read_active(product_root)
+    after, after_manifest = _verified_active(product_root)
     if (after["state"] != "ACTIVE"
             or after["asset_set_sha256"] != before["asset_set_sha256"]
-            or after["generation"] != before["generation"]):
+            or after["generation"] != before["generation"]
+            or after_manifest != manifest_sha256):
         raise AssetSetError("ASSET_SET_RESOURCE_ACTIVE_SET_CHANGED")
+    if RESOURCE_SNAPSHOT_MAX > 0:
+        # Stored only after the bracketing verification proved the bytes
+        # derived from are the bytes this key names.
+        with _resource_snapshot_lock:
+            while len(_resource_snapshots) >= RESOURCE_SNAPSHOT_MAX:
+                _resource_snapshots.pop(next(iter(_resource_snapshots)))
+            _resource_snapshots[key] = (json.loads(json.dumps(resource)), digest)
     return {
         "schema": RESOURCES_SCHEMA, "state": "VERIFIED",
         "asset_set_sha256": before["asset_set_sha256"],

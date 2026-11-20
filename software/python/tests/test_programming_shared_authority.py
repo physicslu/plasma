@@ -139,10 +139,10 @@ def test_late_shared_check_observes_accepted_job_and_never_submits_peer(tmp_path
     gate = lambda: ('SHARED_CONTROL_FAILURE', 'AUTHORITY_LOST') if failed.is_set() else None
     h.batches.shared_control_gate = h.workflow.shared_control_gate = gate
     original = h.workflow.plan
-    def plan(alias, body):
+    def plan(alias, body, **kw):
         if alias == 'peer':
             assert h.gateways['z2'].submitted[1].wait(WAIT)
-        result = original(alias, body)
+        result = original(alias, body, **kw)
         if alias == 'peer' and stage == 'reservation':
             failed.set()
         return result
