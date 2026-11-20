@@ -75,7 +75,6 @@ type SiteRuntime = {
   enabled: boolean;
   state: SiteRunState;
   progress: number;
-  stages?: BatchSiteSnapshot["stages"];
   operation?: Operation;
   jobId?: string;
   error?: string;
@@ -305,7 +304,6 @@ function runtimeFromBatchSite(site: BatchSiteSnapshot, previous?: SiteRuntime): 
     enabled: previous?.enabled ?? true,
     state: site.state,
     progress: Math.round(site.progress_percent ?? 0),
-    stages: site.stages,
     operation: site.current_operation ?? undefined,
     jobId: site.current_job_id ?? undefined,
     error: site.error?.message,
@@ -699,7 +697,7 @@ export default function FactoryConsoleV2() {
         await delay(Math.min(POLL_INTERVAL_MS * 2 ** Math.min(failures, 5), 5000));
         continue;
       }
-      await delay(1000);
+      await delay(POLL_INTERVAL_MS);
     }
     appendLog(`[BAT] MANAGER OBSERVATION EXHAUSTED · ${batchId}; still held for read-only recovery`, "ERROR");
   }, [appendLog, applyBatchSnapshot, logManagedBatch]);
@@ -1917,7 +1915,7 @@ export default function FactoryConsoleV2() {
                                       data-site-state={displayState}
                                       data-batch-selected={selected ? "true" : "false"}
                                       aria-label={`${active.target.display_name} ${siteLabel(site.id)} ${stateText(site)}${site.currentRound ? ` ${roundUnit} ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : ""} ${selected ? "selected for Batch" : "excluded from Batch"}`}
-                                      title={`${group.facility.display_name} / ${active.target.display_name} / ${siteLabel(site.id)} · ${stateText(site)}${site.currentRound ? ` · ${roundUnit} ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : ""}`}
+                                      title={`${group.facility.display_name} / ${active.target.display_name} / ${siteLabel(site.id)} · ${stateText(site)}${site.currentRound ? ` · ${roundUnit} ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : ""}${site.operation ? ` · ${operationCodes[site.operation]} ${site.progress}%` : ""}`}
                                       key={site.id}
                                     >
                                       <div className="factorySiteLedCardTop">
@@ -1947,9 +1945,6 @@ export default function FactoryConsoleV2() {
                                         <b>{siteLabel(site.id)}</b>
                                       </div>
                                       <div className="factorySiteLed" data-state={displayState}><i /></div>
-                                      {managed && site.stages && <div className="programmingStages" aria-label={`${siteLabel(site.id)} programming stages`}>
-                                        {site.stages.map(item => <span key={item.name} className={`programmingStage is-${item.state}`} aria-label={`${item.name} ${item.state}`}>{item.name.toUpperCase()}</span>)}
-                                      </div>}
                                       <small>{site.communicationState === "reconnecting"
                                         ? `RETRY ${site.communicationAttempt ?? 1}`
                                         : displayState === "running" && site.currentRound

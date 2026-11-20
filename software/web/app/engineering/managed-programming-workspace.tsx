@@ -398,10 +398,7 @@ export default function ManagedProgrammingWorkspace() {
   const operations = normalizeOperations(selectedOperations);
   const needsImage = operations != null && operationsTakeImage(operations);
   // One IC Profile may serve multiple PPU-reported Sites; each has an independent Job.
-  const jobRoutes = useMemo(
-    () => (operations ? siteIds.map(id => routeDeclaring(routes, icpn, id, operations)) : []),
-    [operations, siteIds, routes, icpn],
-  );
+  const jobRoutes = operations ? siteIds.map(id => routeDeclaring(routes, icpn, id, operations)) : [];
   const jobRoute = jobRoutes.length && jobRoutes.every(route => route != null) ? jobRoutes[0] : null;
   // Erase carries ONE range for the whole Batch, so every selected Site must
   // declare the same Flash range; otherwise the range would be wrong for one.
@@ -1249,7 +1246,8 @@ export default function ManagedProgrammingWorkspace() {
                   // Each Site's own PPU progress (lanes run concurrently; the
                   // Batch's current_run is only one Site).
                   const ownBatch = batch != null && unit != null && runContext?.alias === ppu?.alias;
-                  const stages = ownBatch ? unitStageStatuses(batch, unit) : [];
+                  const stages = ownBatch ? unitStageStatuses(batch, unit)
+                    : selected ? selectedOperations.map(name => ({ name, state: "pending" as const })) : [];
                   const stage = ownBatch ? unitStageLabel(batch, unit) : null;
                   // The Site result is that Site's own verdict, never the
                   // Batch aggregate and never an intermediate attempt.
@@ -1296,8 +1294,8 @@ export default function ManagedProgrammingWorkspace() {
                       <td><b>{siteLabel(site.site_id)}</b></td>
                       <td><b>{icpn ?? site.target ?? "—"}</b><small>{site.interface ?? "—"}</small></td>
                       <td><span className="state">{state}</span>{cycleLabel && <small data-site-cycle={site.site_id}>{cycleLabel}</small>}</td>
-                      <td><div className="programmingStages" aria-label={`SITE ${site.site_id} programming stages`}>
-                        {stages.map(item => <span key={item.name} className={`programmingStage is-${item.state}`} aria-label={`${item.name} ${item.state}`}>{item.name.toUpperCase()}</span>)}
+                      <td><div className="engineeringStageList" aria-label={`SITE ${site.site_id} programming stages`}>
+                        {stages.map(item => <span key={item.name} className="engineeringStage" data-stage={item.name} data-state={item.state} aria-label={`${item.name} ${item.state}`}><i aria-hidden="true" />{item.name.toUpperCase()}</span>)}
                       </div></td>
                       <td><b className="engineeringResult" data-result={rowVerdict ?? "—"}>{rowVerdict == null || rowVerdict === "RUNNING" ? "—" : rowVerdict.replace("_", " ")}</b>{failDetail && <small data-site-fail-detail={site.site_id}>{failDetail}</small>}</td>
                       <td className="siteReadCell" data-testid={`site-read-${site.site_id}`}>

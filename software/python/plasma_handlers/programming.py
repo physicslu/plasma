@@ -123,7 +123,7 @@ class ProgrammingOperationHandler(BaseHandler):
                     ErrorCode.INVALID_ARGUMENT,
                     "programming takes an Image exactly when it programs or verifies")
             if hasattr(self.interface, "stage_event"):
-                self.interface.stage_event = lambda name, event: stage_callback(name, event, {})
+                self.interface.stage_event = stage_callback
                 try:
                     evidence = await self.interface.run_operations(tuple(operations), request.image)
                 finally:

@@ -47,7 +47,7 @@ class SiteWorkerControlClient:
         self.timeout_s = timeout_s
 
     def call(self, op: str, *, timeout_s: float | None = None,
-             stage_event: Callable[[str, str], None] | None = None,
+             stage_event: Callable[[dict[str, Any]], None] | None = None,
              **fields: Any) -> dict[str, Any]:
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
@@ -66,10 +66,11 @@ class SiteWorkerControlClient:
                         item = json.loads(line.decode("utf-8"))
                         event = item.get("stage_event") if isinstance(item, dict) else None
                         if event is not None:
-                            if (stage_event is not None and isinstance(event, dict)
-                                    and event.get("stage") in ("erase", "program", "verify")
-                                    and event.get("event") in ("started", "completed", "failed")):
-                                stage_event(event["stage"], event["event"])
+                            if stage_event is not None and isinstance(event, dict):
+                                try:
+                                    stage_event(event)
+                                except Exception:
+                                    pass  # Observation never changes the run result.
                         else:
                             reply = item
         except (OSError, ValueError, UnicodeDecodeError) as exc:
@@ -187,7 +188,8 @@ async def run_job_operations(
     address: int,
     length: int,
     erase_range: tuple[int, int] | None = None,
-    stage_event: Callable[[str, str], Awaitable[None]] | None = None,
+    attempt: int = 1,
+    stage_event: Callable[[str, str, dict[str, Any]], Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     """One ``programming`` Job (ordered erase / program / verify list) or one
     independent ``read`` Job, in ONE C-3 session.
@@ -250,15 +252,31 @@ async def run_job_operations(
                              "site_worker_bind": dict(bound)},
                 )
             loop = asyncio.get_running_loop()
-            def relay(stage: str, event: str) -> None:
-                if stage_event is not None:
-                    try:
-                        asyncio.run_coroutine_threadsafe(stage_event(stage, event), loop).result()
-                    except Exception:
-                        pass  # Observation must not change the Flash outcome.
+            last_sequence = 0
+            def relay(event: dict[str, Any]) -> None:
+                nonlocal last_sequence
+                if stage_event is None:
+                    return
+                sequence = event.get("sequence")
+                if (event.get("job_id") != job_id or event.get("site_id") != site_id
+                        or event.get("session_id") != session_id
+                        or type(sequence) is not int or sequence != last_sequence + 1
+                        or event.get("stage") not in steps
+                        or event.get("state") not in ("started", "completed", "failed")):
+                    return
+                last_sequence = sequence
+                fields = {"job_id": job_id, "site_id": site_id,
+                          "session_id": session_id, "attempt": attempt,
+                          "sequence": sequence}
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        stage_event(event["stage"], event["state"], fields), loop).result()
+                except Exception:
+                    pass  # Observation must not change the Flash outcome.
             result = await job_timing.in_thread(
                 "worker_run", client.call, "run", timeout_s=max_runtime_s + 30.0,
-                **({"stage_event": relay} if stage_event is not None else {}),
+                **({"stage_event": relay, "observe_stages": True}
+                   if stage_event is not None and opened.get("stage_events") is True else {}),
                 session_id=session_id, site=site_id, operation=operation)
             if isinstance(result.get("timing_ms"), dict):
                 # Site Worker admission / OpenOCD / revoke timing for this run.

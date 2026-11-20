@@ -623,7 +623,7 @@ def test_rest_flash_cycle_through_c3_passes_with_full_readback(in_process):
                 assert "adapter speed 500" in commands
                 erase = "flash erase_address 0x08000000 0x00000c00"
                 index = commands.index("reset halt")
-                assert commands[index:index + 4] == [
+                assert [c for c in commands[index:] if not c.startswith("echo PLASMA_STAGE_")][:4] == [
                     "reset halt", "poll off", "flash probe 0", erase
                 ]
                 assert any(c.startswith("dump_image ") for c in commands)

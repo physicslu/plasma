@@ -456,7 +456,7 @@ class SiteWorkerCore:
 
     def handle(self, request: object, peer: tuple[int, int, int],
                role: str | None = None,
-               event_sink: Callable[[str, str], None] | None = None) -> dict[str, Any]:
+               event_sink: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
         try:
             _require(isinstance(request, dict) and request.get("protocol") == PROTOCOL
                      and type(request.get("op")) is str, "REQUEST_INVALID")
@@ -475,7 +475,7 @@ class SiteWorkerCore:
             return {"ok": False, "error": exc.code}
 
     def _control(self, op: str, request: dict, peer: tuple[int, int, int],
-                 event_sink: Callable[[str, str], None] | None = None) -> dict[str, Any]:
+                 event_sink: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
         pid, _uid, _gid = peer
         trusted = self.runtime_pid()
         _require(trusted is not None and pid == trusted, "CONTROL_PEER_DENIED")
@@ -585,9 +585,12 @@ class SiteWorkerCore:
                         "address": s.flash_range.address, "length": s.flash_range.length,
                         "bound": True}
         if op == "run":
-            _require(set(request) == {"protocol", "op", "session_id", "site", "operation"}
+            _require(set(request) in ({"protocol", "op", "session_id", "site", "operation"},
+                                      {"protocol", "op", "session_id", "site", "operation", "observe_stages"})
                      and type(request["session_id"]) is str and type(request["site"]) is int
-                     and type(request["operation"]) is str, "REQUEST_INVALID")
+                     and type(request["operation"]) is str
+                     and ("observe_stages" not in request or request["observe_stages"] is True),
+                     "REQUEST_INVALID")
             with self._lock:
                 s = self._sessions.get(request["session_id"])
                 _require(s is not None and not s.closed, "SESSION_UNKNOWN")
@@ -596,7 +599,8 @@ class SiteWorkerCore:
                     _require(request["site"] == s.provider_route["site_id"]
                              and request["operation"] == s.provider_route["operation"],
                              "PROVIDER_ROUTE_MISMATCH")
-            return self._execute(s, request["site"], request["operation"], event_sink)
+            return self._execute(s, request["site"], request["operation"],
+                                 event_sink if request.get("observe_stages") else None)
         if op == "close_session":
             _require(set(request) == {"protocol", "op", "session_id"}
                      and type(request["session_id"]) is str, "REQUEST_INVALID")
@@ -711,6 +715,7 @@ class SiteWorkerCore:
                 self._site_owners[site] = s.session_id
         return {"session_id": s.session_id, "epoch": self.epoch, "sites": sorted(s.sites),
                 "owner_kind": owner_kind,
+                **({"stage_events": True} if not package else {}),
                 **({"worker_engine_selection_sha256": self.engine_selection_sha256}
                    if expected_engine is not None else {}),
                 **({"provider_route": dict(route), "deadline_monotonic": deadline,
@@ -738,7 +743,7 @@ class SiteWorkerCore:
         return self._execute(s, site, op)
 
     def _execute(self, s: _Session, site: int, op: str,
-                 event_sink: Callable[[str, str], None] | None = None) -> dict[str, Any]:
+                 event_sink: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
         _require(op in self.adapter.operations, "OPERATION_DENIED")
         with self._lock:
             _require(not s.closed, "SESSION_CLOSED")
@@ -775,11 +780,19 @@ class SiteWorkerCore:
             # fsynced before native admission, SWD, MMIO or OpenOCD can start.
             self._begin_operation_guard(site)
             try:
+                sequence = 0
+                def emit_stage(stage: str, state: str) -> None:
+                    nonlocal sequence
+                    sequence += 1
+                    if event_sink is not None:
+                        event_sink({"job_id": s.job_id, "site_id": site,
+                                    "session_id": s.session_id, "sequence": sequence,
+                                    "stage": stage, "state": state})
                 if op == PROGRAMMING:
                     result = dict(self.adapter.run(
                         site, op, deadline=s.expires, cancel=s.cancel, image=s.image,
                         flash_range=s.flash_range, operations=steps,
-                        **({"stage_event": event_sink} if event_sink is not None
+                        **({"stage_event": emit_stage} if event_sink is not None
                            and getattr(self.adapter, "supports_stage_events", False) else {})
                     ))
                 elif op == "read":
@@ -924,10 +937,9 @@ class SiteWorkerServer:
                         request = json.loads(data.decode("utf-8"))
                     except (ValueError, UnicodeDecodeError):
                         request = None
-                    def send_stage(stage: str, event: str) -> None:
+                    def send_stage(event: dict[str, Any]) -> None:
                         try:
-                            conn.sendall((json.dumps({"stage_event": {"stage": stage,
-                                                        "event": event}}) + "\n").encode())
+                            conn.sendall((json.dumps({"stage_event": event}) + "\n").encode())
                         except OSError:
                             pass  # Observation cannot alter the hardware outcome.
                     response = self.core.handle(request, peer, self.role,

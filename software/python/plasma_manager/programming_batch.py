@@ -93,6 +93,7 @@ from typing import Any, Callable, Generator, Mapping
 from .programming import (
     SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
     TARGET_TRANSACTION_UNKNOWN, BundleProgrammingWorkflow, JOB_TERMINAL, ProgrammingError,
+    _m0_timing,
 )
 
 BATCH_SCHEMA = "plasma.manager.programming-batch.v2"
@@ -867,7 +868,9 @@ class ProgrammingBatchCoordinator:
         return {
             "attempt": attempt.get("attempt"), "run_id": run.get("run_id"),
             "job_id": job.get("job_id"), "job_state": job.get("state"), "stage": job.get("stage"),
+            "job_attempt": job.get("attempt") if type(job.get("attempt")) is int else None,
             "stage_states": job.get("stage_states") if isinstance(job.get("stage_states"), dict) else {},
+            "stage_events": job.get("stage_events") if isinstance(job.get("stage_events"), list) else [],
             "progress_percent": percent if type(percent) in (int, float) else None,
         }
 
@@ -1082,8 +1085,15 @@ class ProgrammingBatchCoordinator:
         failure of the machinery that was meant to judge, and the only safe
         reading of "I could not tell" is to stop submitting.
         """
-        platform = self._platform_block(alias)
-        return platform if platform is not None else self._site_block(alias, site)
+        started = (self.monotonic()
+                   if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
+        try:
+            platform = self._platform_block(alias)
+            return platform if platform is not None else self._site_block(alias, site)
+        finally:
+            if started is not None:
+                _m0_timing("manager_admission", ppu_alias=alias, site_id=site,
+                           duration_ms=round((self.monotonic() - started) * 1000, 3))
 
     def reconcile_start(self, start_id: str) -> dict[str, Any]:
         """Read-only: what became of the Start that carried ``start_id``."""
@@ -1368,6 +1378,8 @@ class ProgrammingBatchCoordinator:
                 # Includes terminal journal failures, not just generator errors.
                 raise _SharedControlFailure(latch(exc)) from exc
 
+        _m0_timing("manager_batch_execution", batch_id=batch["batch_id"],
+                   repeat=batch["policy"]["repeat"], site_count=len(batch["units"]))
         # Share only the initial PPU-wide Platform verdict. Site readiness
         # remains independent; no remote call runs under the Journal lock.
         platforms = {}
@@ -1536,11 +1548,20 @@ class ProgrammingBatchCoordinator:
                     block = self._dispatch_block(batch, alias)
                 if block is not None:
                     return ("FAIL" if number > 1 else None), block
-                if site_verdict_fresh:
-                    site_verdict_fresh = False
-                    verdict = self._platform_block(alias)
-                else:
-                    verdict = self._admission_block(alias, site)
+                admission_started = (self.monotonic()
+                                     if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
+                try:
+                    if site_verdict_fresh:
+                        site_verdict_fresh = False
+                        verdict = self._platform_block(alias)
+                    else:
+                        verdict = self._admission_block(alias, site)
+                finally:
+                    if admission_started is not None:
+                        _m0_timing("manager_cycle_admission",
+                                   batch_id=batch["batch_id"], cycle_id=unit["cycle"]["cycle_id"],
+                                   ppu_alias=alias, site_id=site, attempt=number,
+                                   duration_ms=round((self.monotonic() - admission_started) * 1000, 3))
                 if verdict is None:
                     break
                 domain, reason = verdict
@@ -1570,6 +1591,8 @@ class ProgrammingBatchCoordinator:
                     unit["failure_domain"] = domain
                 return ("FAIL" if number > 1 else "BLOCKED"), f"EXECUTION_{reason}"
             if plan is None:
+                plan_started = (self.monotonic()
+                                if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
                 try:
                     plan = self.workflow.plan(alias, site_body)["plan"]
                 except ProgrammingError as exc:
@@ -1578,6 +1601,12 @@ class ProgrammingBatchCoordinator:
                         return "BLOCKED", exc.code
                     # The earlier FAIL stands; the retry could not be planned.
                     return "FAIL", f"RETRY_PLAN_REFUSED_{exc.code}"
+                finally:
+                    if plan_started is not None:
+                        _m0_timing("manager_plan", batch_id=batch["batch_id"],
+                                   cycle_id=unit["cycle"]["cycle_id"],
+                                   ppu_alias=alias, site_id=site, attempt=number,
+                                   duration_ms=round((self.monotonic() - plan_started) * 1000, 3))
             cycle = unit["cycle"]
             attempt = {"attempt": number, "cycle_index": cycle["index"],
                        "cycle_id": cycle["cycle_id"],

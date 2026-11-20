@@ -27,6 +27,7 @@ class BoundSession:
     deadline_monotonic: float
     worker_epoch: str | None = None
     worker_engine_selection_sha256: str | None = None
+    stage_events: bool = False
 
 
 def open_provider_job_session(
@@ -93,4 +94,5 @@ def open_provider_job_session(
                         selected.timeout_ms, selected.timeout_source, deadline,
                         opened.get("epoch") if expected_engine_selection_sha256 is not None else None,
                         opened.get("worker_engine_selection_sha256")
-                        if expected_engine_selection_sha256 is not None else None)
+                        if expected_engine_selection_sha256 is not None else None,
+                        opened.get("stage_events") is True)

@@ -197,6 +197,13 @@ def test_every_legal_list_is_one_job_one_session_one_receipt(operations):
                 assert job["operation"] == "programming"
                 assert job["job_binding"]["operations"] == operations
                 assert job["stage_states"] == {name: "completed" for name in operations}
+                events = job["stage_events"]
+                assert [(item["stage"], item["state"]) for item in events] == [
+                    (name, state) for name in operations for state in ("started", "completed")]
+                assert [item["sequence"] for item in events] == list(range(1, len(events) + 1))
+                assert len({item["session_id"] for item in events}) == 1
+                assert all(item["job_id"] == job["job_id"] and item["site_id"] == 2
+                           and item["attempt"] == 1 for item in events)
                 assert len(stack.sim.argvs) == 1
                 opened = [r for r in stack.worker_requests if r["op"] == "open_job_session"]
                 ran = [r for r in stack.worker_requests if r["op"] == "run"]
@@ -274,6 +281,8 @@ def test_verify_only_mismatch_is_a_safe_failure_and_never_writes():
                 assert status == 202 and job["state"] != "success", job
                 assert "VERIFY_MISMATCH" in json.dumps(job)
                 assert job["stage_states"]["verify"] == "failed"
+                assert [(item["stage"], item["state"]) for item in job["stage_events"]] == [
+                    ("verify", "started"), ("verify", "failed")]
                 assert actions(stack.sim.argvs[0]) == ["dump_image"]
                 assert bytes(stack.sim.memory) == before
                 assert stack.core._sealed == set()

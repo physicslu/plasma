@@ -127,6 +127,8 @@ export type RunScript = {
   readbackOk?: boolean;
   /** Number of status reads that still report a running Job. */
   runningPolls?: number;
+  /** All selected stages finished between two Manager polls, before the Receipt. */
+  fastStages?: boolean;
   /** The list the PPU claims it ran (default: exactly the planned list). */
   observedOperations?: string[];
   /** true: the Read Memory download differs from the receipt SHA256. */
@@ -309,6 +311,20 @@ export async function mockManager(page: Page, options: {
     const verifies = Boolean(operations?.includes("verify"));
     const readSha = createHash("sha256").update(flashBytes(range.address, range.length)).digest("hex");
     const jobId = `job-${planned.alias}-site${planned.siteId}-${state.planId.slice(-4)}`;
+    const selectedStages = (operations ?? []).filter(stage => stage !== "read");
+    const terminalStage = outcome === "FAIL" ? "failed" : "completed";
+    const stageTransitions = selectedStages.flatMap((stage, index) => [
+      { stage, state: "started", order: index * 2 + 1 },
+      ...(finished || script.fastStages || index < selectedStages.length - 1
+        ? [{ stage, state: finished && index === selectedStages.length - 1 ? terminalStage : "completed", order: index * 2 + 2 }]
+        : []),
+    ]);
+    const visibleTransitions = finished || script.fastStages
+      ? stageTransitions : stageTransitions.filter(item => item.order <= Math.max(1, selectedStages.length * 2 - 1));
+    const stageEvents = visibleTransitions.map((item, index) => ({
+      job_id: jobId, site_id: planned.siteId, session_id: `session-${jobId}`,
+      attempt: 1, sequence: index + 1, stage: item.stage, state: item.state, at: "t",
+    }));
     const steps = [
       { step: "PREFLIGHT", result: "PASS", at: "t" },
       ...(activation
@@ -324,7 +340,7 @@ export async function mockManager(page: Page, options: {
       reason: outcome === "PASS" ? null : outcome ? script.reason ?? `${outcome}_REASON` : null,
       created_at: "t", updated_at: "t", steps, activation: activation ? { b3_transaction_id: "c".repeat(32) } : {},
       job: { job_id: jobId, state: outcome ? (outcome === "PASS" ? "success" : "failed") : "running", stage: kind,
-        progress_percent: outcome ? 100 : 40 },
+        progress_percent: outcome ? 100 : 40, attempt: 1, stage_events: stageEvents },
       receipt: outcome === "PASS" || outcome === "FAIL" ? {
         schema: "plasma.manager.programming-receipt.v3", job_id: jobId, job_state: "success", operation: kind,
         operations, observed_operations: operations ? script.observedOperations ?? operations : null,
@@ -557,7 +573,8 @@ export async function mockManager(page: Page, options: {
       if (!latest) return null;
       const job = runRecord(latest.runId).job;
       return { attempt: latest.attempt, run_id: latest.runId, job_id: job.job_id, job_state: job.state,
-        stage: job.stage, progress_percent: job.progress_percent };
+        stage: job.stage, progress_percent: job.progress_percent,
+        job_attempt: job.attempt, stage_events: job.stage_events };
     };
     const units = batch.units.map(unit => ({
       ppu_alias: unit.alias, site_id: unit.siteId, status: unit.status, outcome: unit.outcome,

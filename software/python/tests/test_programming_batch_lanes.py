@@ -178,9 +178,16 @@ def test_every_running_site_reports_its_own_progress(tmp_path, count):
             assert time.monotonic() < deadline, "runs never recorded their Job"
             time.sleep(0.001)
         for run in list(h.workflow._runs.values()):
+            events = [{"job_id": run.job["job_id"], "site_id": run.site,
+                       "session_id": f"session-site-{run.site}", "attempt": 1,
+                       "sequence": sequence, "stage": stage, "state": state}
+                      for sequence, (stage, state) in enumerate(
+                          (("erase", "started"), ("erase", "completed"),
+                           ("program", "started")), 1)]
             h.workflow._update(run, job={**run.job, "state": "running", "stage": "program",
                                          "progress_percent": 30 + run.site,
-                                         "stage_states": {"erase": "completed", "program": "started"}})
+                                         "stage_states": {"erase": "completed", "program": "started"},
+                                         "stage_events": events, "attempt": 1})
         live = h.batches.status_batch(h.started["batch"]["batch_id"])["batch"]
         assert live["current_run"]["site_id"] in range(1, count + 1)
         for unit in live["units"]:
@@ -190,7 +197,8 @@ def test_every_running_site_reports_its_own_progress(tmp_path, count):
             assert unit["progress"] == {
                 "attempt": 1, "run_id": attempt["run_id"], "job_id": run.job["job_id"],
                 "job_state": "running", "stage": "program", "progress_percent": 30 + unit["site_id"],
-                "stage_states": {"erase": "completed", "program": "started"}}
+                "stage_states": {"erase": "completed", "program": "started"},
+                "job_attempt": 1, "stage_events": run.job["stage_events"]}
         assert len({u["progress"]["job_id"] for u in live["units"]}) == count
         stored = json.loads((tmp_path / "batches.json").read_text())["batches"][0]
         assert all("progress" not in u for u in stored["units"]), "display projection is never journaled"

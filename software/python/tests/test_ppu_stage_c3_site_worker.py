@@ -34,9 +34,13 @@ def test_control_socket_streams_stage_events_before_final_reply(tmp_path, monkey
     class FakeCore:
         def handle(self, request, peer, role, event_sink):
             assert role == "control" and request["op"] == "run"
+            assert request["observe_stages"] is True
+            sequence = 0
             for stage in ("erase", "program", "verify"):
-                event_sink(stage, "started")
-                event_sink(stage, "completed")
+                for state in ("started", "completed"):
+                    sequence += 1
+                    event_sink({"job_id": JOB, "site_id": 1, "session_id": "session",
+                                "sequence": sequence, "stage": stage, "state": state})
             return {"ok": True, "result": {"result": "PASS"}}
 
     server = worker.SiteWorkerServer(FakeCore(), tmp_path / "stages.sock", role="control")
@@ -71,10 +75,12 @@ def test_control_socket_streams_stage_events_before_final_reply(tmp_path, monkey
     events = []
     result = SiteWorkerControlClient(tmp_path / "stages.sock").call(
         "run", session_id="session", site=1, operation="programming",
-        stage_event=lambda stage, event: events.append((stage, event)))
+        observe_stages=True, stage_event=events.append)
     assert result == {"result": "PASS"}
-    assert events == [(stage, event) for stage in ("erase", "program", "verify")
-                      for event in ("started", "completed")]
+    assert [(event["stage"], event["state"], event["sequence"]) for event in events] == [
+        (stage, state, sequence) for sequence, (stage, state) in enumerate(
+            ((stage, state) for stage in ("erase", "program", "verify")
+             for state in ("started", "completed")), 1)]
 
 
 def flash_image(payload: bytes, profile=None, digest=None, load_address=None):

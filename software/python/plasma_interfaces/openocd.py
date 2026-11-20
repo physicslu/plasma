@@ -50,7 +50,7 @@ class OpenOCDInterface(BaseInterface):
         self._context: RuntimeJobContext | None = None
         # Worker receipt of the prepared ``read`` Job (bytes excluded).
         self.operation_evidence: dict[str, Any] | None = None
-        self.stage_event: Callable[[str, str], Awaitable[None]] | None = None
+        self.stage_event: Callable[[str, str, dict[str, Any]], Awaitable[None]] | None = None
 
     def bind_runtime_job(self, context: RuntimeJobContext) -> None:
         """Pin the Runtime-admitted context for one Job attempt.
@@ -150,6 +150,7 @@ class OpenOCDInterface(BaseInterface):
             image_root=self.normalized_image_root,
             job_binding=thaw(self._context.admitted_job_binding),
             stage_event=self.stage_event,
+            attempt=self._context.attempt,
         ))
 
     async def run_operations(
