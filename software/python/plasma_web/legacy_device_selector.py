@@ -5,7 +5,7 @@ PR-C2): the Console reaches it through its Manager BFF. The PPU Gateway never
 imports this module at startup and never needs it to accept, run or report
 Programming Jobs / Batches / Health; its transitional copy of the endpoint
 answers ``503 DEVICE_SELECTOR_UNAVAILABLE`` on a Catalog-free PPU (PR-C1).
-When this module, its Catalog/Qualification dependencies or the Catalog data
+When this module, its configured SQLite Catalog/Qualification snapshot or data
 are absent, every host answers 503 instead of an empty (fake) result.
 
 This module must not import the PPU Gateway (Manager imports it standalone).
@@ -30,12 +30,10 @@ from .device_catalog import (
     DEFAULT_SEARCH_LIMIT,
     MAX_SEARCH_LIMIT,
     DeviceCatalogIntegrityError,
-    get_default_device_catalog,
 )
 from .microchip_upstream_openocd_evidence import microchip_upstream_openocd_evidence
 from .nxp_manufacturer_device_evidence import get_default_nxp_manufacturer_device_evidence
 from .openocd_provider_registry import get_default_openocd_provider_registry
-from .programming_qualification import get_default_programming_qualification_registry
 
 SQLITE_SELECTOR_DB_ENV = "PLASMA_CATALOG_SQLITE_DB"
 
@@ -220,26 +218,17 @@ def _device_search_payload(
     *,
     levels: tuple[int, ...] = (1, 2, 3),
 ) -> dict[str, Any]:
-    if SQLITE_SELECTOR_DB_ENV in os.environ:
-        catalog, qualification_cache, level_counts = read_selector_view(
-            os.environ[SQLITE_SELECTOR_DB_ENV]
-        )
-        programming_qualification = None
-    else:
-        catalog = get_default_device_catalog()
-        programming_qualification = get_default_programming_qualification_registry()
-        qualification_cache = {}
-        level_counts = programming_qualification.summary["catalog_level_counts"]
+    # Runtime authority is the active, qualified SQLite revision alone.
+    # Missing configuration must never silently select the legacy Manifest.
+    database_path = os.environ.get(SQLITE_SELECTOR_DB_ENV, "").strip()
+    catalog, qualification_cache, level_counts = read_selector_view(database_path)
 
     def qualification_for(record: Any) -> dict[str, Any]:
         exact_icpn = record.icpn or record.identifier
         key = (record.vendor.casefold(), exact_icpn.casefold())
         qualification = qualification_cache.get(key)
         if qualification is None:
-            if programming_qualification is None:
-                raise DeviceCatalogIntegrityError("SQLite Selector qualification record unavailable")
-            qualification = programming_qualification.describe(record.vendor, exact_icpn)
-            qualification_cache[key] = qualification
+            raise DeviceCatalogIntegrityError("SQLite Selector qualification record unavailable")
         return qualification
 
     def visible(record: Any) -> bool:
@@ -324,11 +313,10 @@ def _device_search_payload(
 
     catalog_size = sum(int(level_counts[str(level)]) for level in levels)
     local_results = []
-    if SQLITE_SELECTOR_DB_ENV in os.environ:
-        for entry in CatalogSqliteShadowRepository(Path(os.environ[SQLITE_SELECTOR_DB_ENV])).local_records():
-            local_record = entry["record"]
-            if query.casefold() in (local_record["vendor"] + " " + local_record["identifier"] + " " + local_record.get("family", "")).casefold():
-                local_results.append(entry)
+    for entry in CatalogSqliteShadowRepository(Path(database_path)).local_records():
+        local_record = entry["record"]
+        if query.casefold() in (local_record["vendor"] + " " + local_record["identifier"] + " " + local_record.get("family", "")).casefold():
+            local_results.append(entry)
     return {
         "ok": True,
         "rest_contract_version": WEB_REST_CONTRACT_VERSION,
@@ -353,11 +341,10 @@ def search(query: str, limit: int, offset: int = 0, *, levels: tuple[int, ...] =
 
 
 def warm() -> dict[str, int]:
-    """Build the immutable Qualification registry once; return Level counts."""
-    if SQLITE_SELECTOR_DB_ENV in os.environ:
-        _catalog, _qualifications, counts = read_selector_view(os.environ[SQLITE_SELECTOR_DB_ENV])
-    else:
-        counts = get_default_programming_qualification_registry().summary["catalog_level_counts"]
+    """Validate the active SQLite Catalog/Qualification revision; never load source fallback."""
+    _catalog, _qualifications, counts = read_selector_view(
+        os.environ.get(SQLITE_SELECTOR_DB_ENV, "").strip()
+    )
     return {str(level): int(counts[str(level)]) for level in range(4)}
 
 
