@@ -3,12 +3,16 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import tempfile
 import unittest
 from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.device_catalog import default_catalog_manifest_path
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.backend_provenance import load_source_authorities
 from plasma_web.device_catalog import DeviceCatalogIntegrityError, get_default_device_catalog
 from plasma_web.openocd_provider_registry import (
@@ -23,6 +27,17 @@ class VersionedProviderRegistryTests(unittest.TestCase):
     def setUpClass(cls):
         cls.catalog = get_default_device_catalog()
         cls.provider = OpenOCDProviderRegistry(cls.catalog)
+        # Offline test fixture: runtime Selector always consumes a qualified SQLite revision.
+        cls._sqlite_temporary = tempfile.TemporaryDirectory(prefix="plasma-selector-regression-")
+        cls.addClassCleanup(cls._sqlite_temporary.cleanup)
+        database = Path(cls._sqlite_temporary.name) / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
+        cls._sqlite_environment = patch.dict(os.environ, {"PLASMA_CATALOG_SQLITE_DB": str(database)})
+        cls._sqlite_environment.start()
+        cls.addClassCleanup(cls._sqlite_environment.stop)
 
     def describe(self, part):
         return self.provider.describe("STMicroelectronics", part)
@@ -166,7 +181,6 @@ class VersionedProviderRegistryTests(unittest.TestCase):
         from plasma_web.legacy_device_selector import _device_search_payload
         candidates = BackendCandidateRegistry(self.catalog)
         with (
-            patch("plasma_web.legacy_device_selector.get_default_device_catalog", return_value=self.catalog),
             patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=candidates),
             patch("plasma_web.legacy_device_selector.get_default_openocd_provider_registry", return_value=self.provider),
         ):
