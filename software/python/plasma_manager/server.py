@@ -773,7 +773,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             body = self._read_json_object() if write else {}
             actor = "control-station-publisher"
             if self.command == "GET" and action == "":
-                result = {"local": repo.local_records(), "history": repo.history(), "evidence": repo.evidence_history()}
+                result = {"local": repo.local_records(), "linked_profiles": repo.linked_customer_profiles(), "history": repo.history(), "evidence": repo.evidence_history()}
             elif self.command == "GET" and action == "official":
                 params = parse_qs(raw_query)
                 vendor, icpn = params.get("vendor", [""])[0], params.get("icpn", [""])[0]
@@ -791,7 +791,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 result = {"revision": snapshot.revision_sha256, "total_count": len(matches), "official": [{"vendor": record.vendor, "identifier": record.identifier, "family": record.family, "source": record.source_authority, "level": snapshot.qualifications.get((record.vendor.casefold(), record.identifier.casefold()), {}).get("catalog_level")} for record in matches[:100]]}
             elif self.command == "GET" and action == "export":
                 snapshot = repo.read_active()
-                result = {"local": repo.local_records(), "official": [{"record": asdict(record), "qualification": snapshot.qualifications.get((record.vendor.casefold(), record.identifier.casefold()))} for record in snapshot.catalog.records]}
+                result = {"local": repo.local_records(), "linked_profiles": repo.linked_customer_profiles(), "official": [{"record": asdict(record), "qualification": snapshot.qualifications.get((record.vendor.casefold(), record.identifier.casefold()))} for record in snapshot.catalog.records]}
             elif self.command == "GET" and action == "diff":
                 revision = parse_qs(raw_query).get("revision", [""])[0]
                 result = {"changes": repo.diff_revision(revision)}
@@ -809,6 +809,14 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 data["cpu_architectures"] = tuple(data["cpu_architectures"])
                 record = DeviceCatalogRecord(**data)
                 result = {"evidence_id": repo.acquire_exact_evidence(record, kind=body.get("kind", ""), source_revision=body.get("source_revision", ""), actor=actor)}
+            elif self.command == "POST" and action == "link-local-official":
+                result = {"link": repo.link_local_to_official(
+                    body.get("vendor", ""), body.get("icpn", ""),
+                    expected_local_revision=body.get("expected_local_revision"),
+                    official_candidate=body.get("official_candidate"),
+                    confirmed_same_ic=body.get("confirmed_same_ic"),
+                    actor=actor,
+                )}
             elif self.command == "POST" and action == "delete-local":
                 repo.delete_local_record(body.get("vendor", ""), body.get("icpn", ""), actor=actor)
                 result = {"deleted": True}
