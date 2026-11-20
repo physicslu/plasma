@@ -207,3 +207,72 @@ test("IC Management explains Official versus Local ICPN conflicts without deleti
   await expect(official.getByRole("button", { name: "Stage" })).toBeDisabled();
   expect(mutatingRequests).toEqual([]);
 });
+
+
+test("IC Management clearly labels Customer IC, Official IC and linked Customer Profile", async ({ page }) => {
+  let linked = false;
+  const writes: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const local = {
+    record: { vendor: "STMicroelectronics", identifier: "STM32F103C8T6",
+              family: "Customer F1", package: "LQFP48", flash_size: "64 KiB" },
+    profile: { profile_id: "customer-f1", provider_id: "customer", operations: ["program"] },
+    origin: "LOCAL", revision: 2, verification: "UNVERIFIED",
+  };
+  await page.route("**/api/manager/catalog/management**", async route => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    const action = pathname.split("/").at(-1);
+    const reply = (status: number, value: object) => route.fulfill({
+      status, contentType: "application/json", body: JSON.stringify(value),
+    });
+    if (request.method() === "GET" && action === "management") {
+      return reply(200, {
+        ok: true, local: linked ? [] : [local],
+        linked_profiles: linked ? [{
+          ...local, origin: "CUSTOMER", ic_origin: "OFFICIAL", profile_origin: "CUSTOMER",
+          link_status: "ACTIVE",
+        }] : [],
+        history: { active_revision: "official-rev", revisions: [], audit: [] },
+        evidence: [],
+      });
+    }
+    if (request.method() === "GET" && action === "search") {
+      return reply(200, { ok: true, total_count: 1, official: [{
+        vendor: "STMicroelectronics", identifier: "STM32F103C8T6",
+        family: "STM32F1", source: "ST official", level: 3,
+      }] });
+    }
+    if (request.method() === "POST" && action === "link-local-official") {
+      writes.push({ url: pathname, body: request.postDataJSON() as Record<string, unknown> });
+      linked = true;
+      return reply(200, { ok: true, link: {
+        profile_id: "customer-f1", ic_origin: "OFFICIAL", profile_origin: "CUSTOMER",
+      } });
+    }
+    return reply(500, { ok: false, error: { message: "Unexpected test request" } });
+  });
+  await page.goto("/ic-management");
+  await expect(page.getByRole("heading", { name: "IC Management" })).toBeVisible();
+  await expect(page.getByText("CUSTOMER IC / UNVERIFIED · r2")).toBeVisible();
+  await page.locator(".managementList").first().getByRole("button").first().click();
+  const link = page.getByRole("button", { name: "Link to Official IC (preserve Customer Profile)" });
+  await expect(link).toBeDisabled();
+  expect(writes).toHaveLength(0);
+  await page.getByRole("checkbox", { name: /I verified that this CUSTOMER IC/ }).check();
+  await expect(link).toBeEnabled();
+  await link.click();
+  await expect(page.getByRole("heading", { name: "Official IC with Customer Profile" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Customer Profiles linked to Official ICs" })).toContainText("OFFICIAL IC");
+  await expect(page.getByRole("list", { name: "Customer Profiles linked to Official ICs" })).toContainText("CUSTOMER PROFILE");
+  await expect(page.getByRole("list", { name: "Customer Profiles linked to Official ICs" })).toContainText("UNVERIFIED");
+  expect(writes).toEqual([{
+    url: "/api/manager/catalog/management/link-local-official",
+    body: {
+      vendor: "STMicroelectronics", icpn: "STM32F103C8T6",
+      expected_local_revision: 2, confirmed_same_ic: true,
+    },
+  }]);
+  await page.getByRole("textbox", { name: "Search official ICs" }).fill("STM32F103C8T6");
+  await page.getByRole("button", { name: "Search official" }).click();
+  await expect(page.getByText(/OFFICIAL IC · CUSTOMER PROFILE · ST official/)).toBeVisible();
+});
