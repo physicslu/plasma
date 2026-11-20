@@ -695,7 +695,8 @@ def test_busy_site_blocks_before_any_write(tmp_path):
     gateway = FakeGateway(image=image(), busy=True)
     workflow, coord, _ = make(tmp_path, gateway=gateway)
     _planned, run = run_once(workflow)
-    assert run["outcome"] == "FAIL" and run["reason"] == "SITE_NOT_READY_OR_BUSY"
+    # A lease held with no owner evidence of this run: another owner.
+    assert run["outcome"] == "FAIL" and run["reason"] == "PPU_BUSY"
     assert "B1_create" not in coord.calls and gateway.posts == []
 
 

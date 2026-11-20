@@ -529,6 +529,12 @@ class BundleProgrammingWorkflow:
                  and row.get("state") == "idle" and row.get("current_job_id") is None
                  and row.get("queued_jobs") in (0, None))
         if not ready:
+            # Another Execution Owner holds the PPU lease: a PPU conflict, not
+            # this Site's release still pending. Runtime quiesce: maintenance.
+            if lease.get("busy") is True and not owned:
+                raise _StepFailure("PPU_BUSY")
+            if isinstance(activation, dict) and activation.get("active") is not False:
+                raise _StepFailure("PPU_RUNTIME_QUIESCED")
             raise _StepFailure("SITE_NOT_READY_OR_BUSY")
         # This Profile specifies its required execution interface, while the
         # actual Site interface is PPU-owned (never an IC-specific Site list).

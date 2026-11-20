@@ -714,7 +714,7 @@ def break_gateway(gateways, alias, exc):
 
 
 @pytest.mark.parametrize("fault, domain, reason_fragment", [
-    ("busy", "TARGET_NOT_READY", "SITE_NOT_READY_OR_BUSY"),
+    ("busy", "TARGET_NOT_READY", "PPU_BUSY"),  # lease held by another owner
     ("recovery", "TARGET_NOT_READY", "PPU_RECOVERY_REQUIRED"),
     ("timeout", "TARGET_STATE_UNAVAILABLE", "PPU_STATE_UNREADABLE_TimeoutError"),
     ("unreachable", "TARGET_STATE_UNAVAILABLE", "PPU_STATE_UNREADABLE_ConnectionError"),
