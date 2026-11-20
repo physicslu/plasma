@@ -21,12 +21,60 @@ from .test_ppu_bundle_v3_packages_contract import ROOT
 sys.path.insert(0, str(ROOT / "scripts"))
 import ppu_site_worker as worker  # noqa: E402
 import ppu_site_adapter_abi5 as abi5  # noqa: E402
+from plasma_interfaces.site_worker_c3 import SiteWorkerControlClient
 
 pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux") or os.geteuid() == 0,
                                 reason="Linux SO_PEERCRED, non-root")
 JOB = "1" * 32
 F103 = {"icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
         "flash_base": 0x08000000, "flash_size": 0x10000, "erase_granularity": 1024}
+
+
+def test_control_socket_streams_stage_events_before_final_reply(tmp_path, monkeypatch):
+    class FakeCore:
+        def handle(self, request, peer, role, event_sink):
+            assert role == "control" and request["op"] == "run"
+            for stage in ("erase", "program", "verify"):
+                event_sink(stage, "started")
+                event_sink(stage, "completed")
+            return {"ok": True, "result": {"result": "PASS"}}
+
+    server = worker.SiteWorkerServer(FakeCore(), tmp_path / "stages.sock", role="control")
+    monkeypatch.setattr(worker, "peer_credentials", lambda _conn: (os.getpid(), os.getuid(), os.getgid()))
+
+    class FakeConnection:
+        def __init__(self, request):
+            self.request, self.output = request, b""
+        def __enter__(self): return self
+        def __exit__(self, *_): return None
+        def settimeout(self, _value): pass
+        def recv(self, _size):
+            request, self.request = self.request, b""
+            return request
+        def sendall(self, data): self.output += data
+
+    class FakeClientSocket:
+        def __enter__(self): return self
+        def __exit__(self, *_): return None
+        def settimeout(self, _value): pass
+        def connect(self, _path): pass
+        def sendall(self, request):
+            connection = FakeConnection(request)
+            server._one(connection)
+            self.output = connection.output
+        def recv(self, _size):
+            output, self.output = self.output, b""
+            return output
+
+    monkeypatch.setattr("plasma_interfaces.site_worker_c3.socket.socket",
+                        lambda *_args, **_kwargs: FakeClientSocket())
+    events = []
+    result = SiteWorkerControlClient(tmp_path / "stages.sock").call(
+        "run", session_id="session", site=1, operation="programming",
+        stage_event=lambda stage, event: events.append((stage, event)))
+    assert result == {"result": "PASS"}
+    assert events == [(stage, event) for stage in ("erase", "program", "verify")
+                      for event in ("started", "completed")]
 
 
 def flash_image(payload: bytes, profile=None, digest=None, load_address=None):

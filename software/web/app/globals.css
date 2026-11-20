@@ -157,6 +157,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .track { width: 72px; height: 6px; background: color-mix(in srgb, var(--muted) 18%, var(--panel)); border-radius: 8px; overflow: hidden; }
 .track i { display: block; height: 100%; background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 75%, var(--panel)), var(--cyan)); transition: width .1s linear; }
 .tableProgress b { min-width: 28px; color: var(--text-soft); font: 9px var(--font-mono); }
+.programmingStages { display: flex; flex-wrap: wrap; gap: 4px; }
+.programmingStage { border: 1px solid currentColor; border-radius: 4px; padding: 3px 5px; font: 9px var(--font-mono); color: var(--muted); white-space: nowrap; }
+.programmingStage.is-completed { color: var(--green); }
+.programmingStage.is-failed { color: var(--red); }
+.programmingStage.is-running { color: var(--cyan); animation: programmingStageBreath 1s ease-in-out infinite; }
+@keyframes programmingStageBreath { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .programmingStage.is-running { animation: none; } }
 .rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; }
 .rowActions button, .rowDownload { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text-soft); font: 10px var(--font-mono); text-decoration: none; cursor: pointer; }
 .rowActions button.primary { border-color: color-mix(in srgb, var(--cyan) 60%, var(--line)); color: var(--cyan); }

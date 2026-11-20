@@ -248,6 +248,7 @@ class SiteWorker:
             "image_sha256": request.image_sha256 if request.has_image else None,
             "stage": runtime.stage,
             "stage_state": runtime.stage_state,
+            "stage_states": dict(runtime.stage_states),
             "stage_progress_percent": runtime.stage_progress_percent,
             "progress_percent": runtime.progress_percent,
             "bytes_done": runtime.bytes_done,
@@ -318,6 +319,8 @@ class SiteWorker:
                 level = "ERROR" if event == "failed" else "INFO"
                 runtime.stage = name
                 runtime.stage_state = event
+                if name in ("erase", "program", "verify"):
+                    runtime.stage_states[name] = event
                 runtime.stage_progress_percent = float(
                     fields.get("stage_progress_percent", runtime.stage_progress_percent)
                 )
@@ -345,6 +348,7 @@ class SiteWorker:
             while attempts <= request.max_retries:
                 attempts += 1
                 runtime.attempt = attempts
+                runtime.stage_states = {}
                 runtime.updated_at = iso_now()
                 attempt_started_at = iso_now()
                 attempt_started_monotonic = time.monotonic()
@@ -511,6 +515,8 @@ class SiteWorker:
             elif final_error:
                 state = terminal_state_for_error(final_error)
                 runtime.stage_state = "error" if state is JobState.ERROR else state.value
+                if runtime.stage in runtime.stage_states and runtime.stage_states[runtime.stage] == "started":
+                    runtime.stage_states[runtime.stage] = "failed"
             else:
                 state = JobState.SUCCESS
                 runtime.stage_state = "completed"

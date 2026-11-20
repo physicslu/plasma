@@ -455,7 +455,8 @@ class SiteWorkerCore:
                 del self._sessions[session_id]
 
     def handle(self, request: object, peer: tuple[int, int, int],
-               role: str | None = None) -> dict[str, Any]:
+               role: str | None = None,
+               event_sink: Callable[[str, str], None] | None = None) -> dict[str, Any]:
         try:
             _require(isinstance(request, dict) and request.get("protocol") == PROTOCOL
                      and type(request.get("op")) is str, "REQUEST_INVALID")
@@ -468,12 +469,13 @@ class SiteWorkerCore:
                 _require(op not in CONTROL_OPS, "CONTROL_PEER_DENIED")
             self._drop_if_runtime_restarted()
             if op in CONTROL_OPS:
-                return {"ok": True, "result": self._control(op, request, peer)}
+                return {"ok": True, "result": self._control(op, request, peer, event_sink)}
             return {"ok": True, "result": self._transport(op, request, peer)}
         except SiteWorkerDenied as exc:
             return {"ok": False, "error": exc.code}
 
-    def _control(self, op: str, request: dict, peer: tuple[int, int, int]) -> dict[str, Any]:
+    def _control(self, op: str, request: dict, peer: tuple[int, int, int],
+                 event_sink: Callable[[str, str], None] | None = None) -> dict[str, Any]:
         pid, _uid, _gid = peer
         trusted = self.runtime_pid()
         _require(trusted is not None and pid == trusted, "CONTROL_PEER_DENIED")
@@ -594,7 +596,7 @@ class SiteWorkerCore:
                     _require(request["site"] == s.provider_route["site_id"]
                              and request["operation"] == s.provider_route["operation"],
                              "PROVIDER_ROUTE_MISMATCH")
-            return self._execute(s, request["site"], request["operation"])
+            return self._execute(s, request["site"], request["operation"], event_sink)
         if op == "close_session":
             _require(set(request) == {"protocol", "op", "session_id"}
                      and type(request["session_id"]) is str, "REQUEST_INVALID")
@@ -735,7 +737,8 @@ class SiteWorkerCore:
             s = matches[0]
         return self._execute(s, site, op)
 
-    def _execute(self, s: _Session, site: int, op: str) -> dict[str, Any]:
+    def _execute(self, s: _Session, site: int, op: str,
+                 event_sink: Callable[[str, str], None] | None = None) -> dict[str, Any]:
         _require(op in self.adapter.operations, "OPERATION_DENIED")
         with self._lock:
             _require(not s.closed, "SESSION_CLOSED")
@@ -775,7 +778,9 @@ class SiteWorkerCore:
                 if op == PROGRAMMING:
                     result = dict(self.adapter.run(
                         site, op, deadline=s.expires, cancel=s.cancel, image=s.image,
-                        flash_range=s.flash_range, operations=steps
+                        flash_range=s.flash_range, operations=steps,
+                        **({"stage_event": event_sink} if event_sink is not None
+                           and getattr(self.adapter, "supports_stage_events", False) else {})
                     ))
                 elif op == "read":
                     result = dict(self.adapter.run(
@@ -919,7 +924,14 @@ class SiteWorkerServer:
                         request = json.loads(data.decode("utf-8"))
                     except (ValueError, UnicodeDecodeError):
                         request = None
-                    response = self.core.handle(request, peer, self.role)
+                    def send_stage(stage: str, event: str) -> None:
+                        try:
+                            conn.sendall((json.dumps({"stage_event": {"stage": stage,
+                                                        "event": event}}) + "\n").encode())
+                        except OSError:
+                            pass  # Observation cannot alter the hardware outcome.
+                    response = self.core.handle(request, peer, self.role,
+                                                send_stage if self.role == "control" else None)
                 conn.sendall((json.dumps(response, sort_keys=True) + "\n").encode())
             except OSError:
                 pass

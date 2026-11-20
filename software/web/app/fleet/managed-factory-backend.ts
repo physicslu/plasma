@@ -5,7 +5,7 @@
 import type { EngineeringTargetCatalog, PPUStatus } from "../plasma-api";
 import {
   awaitingUnits, batchSiteVerdict, runOfUnit, siteCapability, unitCycleLabel, unitFailDetail,
-  unitProgressPercent, type ManagedTopology, type ProgrammingRoute,
+  unitProgressPercent, unitStageStatuses, type ManagedTopology, type ProgrammingRoute,
 } from "../programming/managed-programming";
 import type { ProgrammingBatch, ProgrammingBatchUnit } from "../engineering/bundle-programming-api";
 import type { ProgrammingCapabilityCatalog } from "../programming-capabilities";
@@ -136,6 +136,7 @@ export function managedProductionSnapshot(
       current_operation: null, current_job_id: last?.job_id ?? null,
       // Each Site's own progress: lanes run concurrently, current_run is one Site.
       progress_percent: passed ? 100 : unitProgressPercent(batch, unit) ?? 0,
+      stages: unitStageStatuses(batch, unit),
       total_attempts: unit.attempts.length,
       retry_count: unit.cycle && unit.cycle.planned > 1
         ? unit.cycle.retry_attempts : Math.max(0, unit.attempts.length - 1),

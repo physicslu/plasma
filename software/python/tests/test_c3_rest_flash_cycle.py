@@ -292,6 +292,9 @@ class FlashSim:
             return int(text, 0) - self.base
 
         for command in commands:
+            if command.startswith("echo PLASMA_STAGE_"):
+                log += command[5:].encode() + b"\n"
+                continue
             path = re.search(r"\{([^{}]+)\}", command)
             tail = command[path.end():].split() if path else command.split()
             if command.startswith("flash erase_address "):
@@ -339,6 +342,13 @@ class _Proc:
 
     def read(self):
         return self._log
+
+    def readline(self):
+        if not self._log:
+            return b""
+        line, sep, rest = self._log.partition(b"\n")
+        self._log = rest
+        return line + sep
 
     def poll(self):
         if self._hang:
@@ -468,9 +478,11 @@ class Stack:
             Gateway.client_factory = staticmethod(InProcessClient)
 
             def worker_call(op, *, timeout_s=None, **fields):
+                stage_event = fields.pop("stage_event", None)
                 self.worker_requests.append({"op": op, **fields})
                 reply = self.core.handle({"protocol": worker.PROTOCOL, "op": op, **fields},
-                                         (os.getpid(), os.getuid(), os.getgid()), "control")
+                                         (os.getpid(), os.getuid(), os.getgid()), "control",
+                                         stage_event)
                 if not reply["ok"]:
                     raise SiteWorkerRefused(reply["error"])
                 return reply["result"]

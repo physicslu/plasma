@@ -127,6 +127,8 @@ export type ProgrammingRun = {
     job_id?: string;
     state?: string;
     stage?: string | null;
+    stage_state?: string | null;
+    stage_states?: Partial<Record<SequenceOperation, string>>;
     progress_percent?: number | null;
     bytes_done?: number | null;
     bytes_total?: number | null;
@@ -403,6 +405,7 @@ export type ProgrammingBatchUnitProgress = {
   job_id: string | null;
   job_state: string | null;
   stage: string | null;
+  stage_states?: Partial<Record<SequenceOperation, string>>;
   progress_percent: number | null;
 };
 

@@ -301,7 +301,7 @@ class BundleProgrammingWorkflow:
         deployment_deadline_s: float = 300.0,
         job_deadline_s: float = 300.0,
         poll_interval_s: float = 1.0,
-        job_poll_interval_s: float | None = 0.25,
+        job_poll_interval_s: float | None = 1.0,
     ) -> None:
         self.coordinator = coordinator
         self.registry = registry
@@ -317,8 +317,7 @@ class BundleProgrammingWorkflow:
         self.deployment_deadline_s = deployment_deadline_s
         self.job_deadline_s = job_deadline_s
         self.poll_interval_s = poll_interval_s
-        # A running Job's status is read more often than slow B3 deployments:
-        # the Job end is observed within 0.25 s instead of up to 1 s.
+        # Job and deployment status share the one-second observation cadence.
         # None keeps the general interval (tests that drive one fake clock).
         self.job_poll_interval_s = (poll_interval_s if job_poll_interval_s is None
                                     else job_poll_interval_s)
@@ -1424,7 +1423,7 @@ class BundleProgrammingWorkflow:
                 raise _OutcomeUnknown("JOB_STATUS_UNKNOWN_DO_NOT_RESUBMIT") from exc
             if not isinstance(job, dict) or job.get("job_id") != job_id:
                 raise _OutcomeUnknown("JOB_STATUS_IDENTITY_UNKNOWN")
-            progress = {k: job.get(k) for k in ("job_id", "state", "stage", "progress_percent",
+            progress = {k: job.get(k) for k in ("job_id", "state", "stage", "stage_state", "stage_states", "progress_percent",
                                                 "bytes_done", "bytes_total")}
             self._update(run, job=progress)
             if job.get("state") in JOB_TERMINAL:

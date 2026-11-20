@@ -70,6 +70,7 @@ export type BatchSiteSnapshot = {
   current_operation: Operation | null;
   current_job_id: string | null;
   progress_percent: number;
+  stages?: Array<{ name: "erase" | "program" | "verify"; state: "waiting" | "running" | "completed" | "failed" }>;
   total_attempts: number;
   retry_count: number;
   final_failures: number;

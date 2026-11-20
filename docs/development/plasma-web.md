@@ -79,6 +79,11 @@ PPU Runtime → Provider/FPGA/DUT.
 - Browser/Playwright and Mock PPU results are Host-only. Historical
   Site 1 2MHz/LA2016 and Site 2 real HIL evidence remain historical;
   multi-PPU/multi-Site v2 physical qualification is NOT_RUN.
+- E/P managed progress displays each selected Erase / Program / Verify stage per
+  Site: waiting gray, running with a one-second breathing animation, completed
+  green, failed red. Reduced-motion preference disables animation. No Flash
+  percentage or progress bar is shown; terminal verdict still requires the
+  Manager Receipt and SAFE_OFF evidence.
 
 Gate 1 implementation: Draft PR #1428. Gate 2 merge/deployment requires its
 current HEAD CI/Ruleset readiness and explicit owner approval; no hardware

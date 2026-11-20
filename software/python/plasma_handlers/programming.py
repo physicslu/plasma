@@ -122,15 +122,18 @@ class ProgrammingOperationHandler(BaseHandler):
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
                     "programming takes an Image exactly when it programs or verifies")
-            evidence = await self._stage(
-                "programming",
-                stage_callback,
-                lambda progress: self.interface.run_operations(
-                    tuple(operations), request.image, progress),
-                stage_index=0,
-                stage_count=1,
-                byte_progress=True,
-            )
+            if hasattr(self.interface, "stage_event"):
+                self.interface.stage_event = lambda name, event: stage_callback(name, event, {})
+                try:
+                    evidence = await self.interface.run_operations(tuple(operations), request.image)
+                finally:
+                    self.interface.stage_event = None
+            else:
+                evidence = await self._stage(
+                    "programming", stage_callback,
+                    lambda progress: self.interface.run_operations(
+                        tuple(operations), request.image, progress),
+                    stage_index=0, stage_count=1, byte_progress=True)
             return ExecutionOutput(
                 details={
                     "stages": list(operations),

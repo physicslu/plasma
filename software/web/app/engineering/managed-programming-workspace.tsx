@@ -32,7 +32,7 @@ import {
   routeSupportsIc,
   runManagedBatch,
   runManagedRead,
-  unitProgressPercent,
+  unitStageStatuses,
   unitStageLabel,
   unitCycleLabel,
   unitFailDetail,
@@ -1238,7 +1238,7 @@ export default function ManagedProgrammingWorkspace() {
           <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">
             <table className="channelTable">
               <thead>
-                <tr><th>SELECT</th><th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>READ</th><th>PROGRAMMING CAPABILITY</th></tr>
+                <tr><th>SELECT</th><th>SITE</th><th>TARGET IC</th><th>STATE</th><th>STAGES</th><th>RESULT</th><th>READ</th><th>PROGRAMMING CAPABILITY</th></tr>
               </thead>
               <tbody className="targetSitesSection">
                 {(ppu?.sites ?? []).map(site => {
@@ -1249,7 +1249,7 @@ export default function ManagedProgrammingWorkspace() {
                   // Each Site's own PPU progress (lanes run concurrently; the
                   // Batch's current_run is only one Site).
                   const ownBatch = batch != null && unit != null && runContext?.alias === ppu?.alias;
-                  const progress = ownBatch ? unitProgressPercent(batch, unit) : null;
+                  const stages = ownBatch ? unitStageStatuses(batch, unit) : [];
                   const stage = ownBatch ? unitStageLabel(batch, unit) : null;
                   // The Site result is that Site's own verdict, never the
                   // Batch aggregate and never an intermediate attempt.
@@ -1296,9 +1296,9 @@ export default function ManagedProgrammingWorkspace() {
                       <td><b>{siteLabel(site.site_id)}</b></td>
                       <td><b>{icpn ?? site.target ?? "—"}</b><small>{site.interface ?? "—"}</small></td>
                       <td><span className="state">{state}</span>{cycleLabel && <small data-site-cycle={site.site_id}>{cycleLabel}</small>}</td>
-                      <td>{progress == null
-                        ? <b>—</b>
-                        : <div className="tableProgress"><div className="track"><i style={{ width: `${progress}%` }} /></div><b>{Math.round(progress)}%</b></div>}</td>
+                      <td><div className="programmingStages" aria-label={`SITE ${site.site_id} programming stages`}>
+                        {stages.map(item => <span key={item.name} className={`programmingStage is-${item.state}`} aria-label={`${item.name} ${item.state}`}>{item.name.toUpperCase()}</span>)}
+                      </div></td>
                       <td><b className="engineeringResult" data-result={rowVerdict ?? "—"}>{rowVerdict == null || rowVerdict === "RUNNING" ? "—" : rowVerdict.replace("_", " ")}</b>{failDetail && <small data-site-fail-detail={site.site_id}>{failDetail}</small>}</td>
                       <td className="siteReadCell" data-testid={`site-read-${site.site_id}`}>
                         {canRead ? (

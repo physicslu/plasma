@@ -441,7 +441,7 @@ test("PR-C: every Site is judged on its own, and the Batch verdict never replace
   // The Site row shows that Site's verdict, not the Batch aggregate.
   assert.match(emode, /const rowVerdict = batch && unit\s*\? batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\)\.verdict : null;/);
   // A Site row's progress is that Site's own, never another Site's run.
-  assert.match(emode, /const progress = ownBatch \? unitProgressPercent\(batch, unit\) : null;/);
+  assert.match(emode, /const stages = ownBatch \? unitStageStatuses\(batch, unit\) : \[\];/);
   // A lost Start answer holds every Site it was for.
   assert.match(emode, /const siteRefusal = holdSites\(held\)\.map\(id => \{/);
 });
@@ -461,9 +461,26 @@ test("concurrent lanes: each Site's run is read by run_id and each attempt is ke
   assert.doesNotMatch(emode, /· sequential/);
   // Each Site shows its own progress: the Manager's per-unit projection of
   // that Site's latest attempt, current_run only as an older-Manager fallback.
-  assert.match(core, /export function unitProgressPercent\(/);
+  assert.match(core, /export function unitStageStatuses\(/);
   assert.match(core, /if \(!last \|\| !own \|\| own\.attempt !== last\.attempt\) return null;/);
   assert.match(await read("app/fleet/managed-factory-backend.ts"), /progress_percent: passed \? 100 : unitProgressPercent\(batch, unit\) \?\? 0,/);
   // The TERMINAL line waits for Site run lines read by run_id.
   assert.match(factory, /unitLogsRef\.current = Promise\.allSettled\(\[unitLogsRef\.current, loaded\]\);/);
+});
+
+test("E/P stage-only progress uses per-Site events and reduced-motion styling", async () => {
+  const styles = await read("app/globals.css");
+  const projection = await read("app/fleet/managed-factory-backend.ts");
+  assert.match(core, /own\?\.stage_states \?\? held\?\.job\?\.stage_states/);
+  assert.match(core, /verdict === "PASS" \? "completed"/);
+  assert.match(emode, /<th>STAGES<\/th>/);
+  assert.doesNotMatch(emode, /tableProgress|unitProgressPercent/);
+  assert.match(factory, /site\.stages\.map\(/);
+  assert.doesNotMatch(factory, /site\.progress}%/);
+  assert.match(projection, /stages: unitStageStatuses\(batch, unit\)/);
+  assert.match(core, /MANAGED_POLL_MS = 1000/);
+  assert.match(factory, /MANAGER OBSERVATION EXHAUSTED/);
+  assert.match(factory, /await delay\(1000\);/);
+  assert.match(styles, /programmingStageBreath 1s/);
+  assert.match(styles, /prefers-reduced-motion: reduce/);
 });

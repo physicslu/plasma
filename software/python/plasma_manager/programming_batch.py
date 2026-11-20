@@ -867,6 +867,7 @@ class ProgrammingBatchCoordinator:
         return {
             "attempt": attempt.get("attempt"), "run_id": run.get("run_id"),
             "job_id": job.get("job_id"), "job_state": job.get("state"), "stage": job.get("stage"),
+            "stage_states": job.get("stage_states") if isinstance(job.get("stage_states"), dict) else {},
             "progress_percent": percent if type(percent) in (int, float) else None,
         }
 

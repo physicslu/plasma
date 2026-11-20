@@ -152,6 +152,7 @@ class SafeOff:
 
 class Abi5OpenocdAdapter:
     name = "z2-abi5-swd-openocd5088"
+    supports_stage_events = True
     supported_sites = frozenset({1, 2})
     # ``programming`` runs any
     # legal ordered erase / program / verify list; ``read`` is independent.
@@ -315,7 +316,8 @@ class Abi5OpenocdAdapter:
 
     def _run_operations(self, site: int, operations: tuple[str, ...], *, deadline: float,
                         cancel: threading.Event, image: FlashImage | None,
-                        flash_range: FlashRange | None) -> Mapping[str, Any]:
+                        flash_range: FlashRange | None,
+                        stage_event: Callable[[str, str], None] | None = None) -> Mapping[str, Any]:
         """``programming`` (ordered erase / program / verify list) or ``read``.
 
         One admitted OpenOCD session runs exactly the listed steps in order;
@@ -348,6 +350,12 @@ class Abi5OpenocdAdapter:
             erase_address, erase_length = address, length
         base = {"icpn": bound.icpn, "target_config": bound.profile.target_config,
                 **self._clock_evidence(bound.profile)}
+        def emit(stage: str, event: str) -> None:
+            if stage_event is not None:
+                try:
+                    stage_event(stage, event)
+                except Exception:
+                    pass  # Observation cannot alter a completed Flash operation.
 
         with tempfile.TemporaryDirectory(prefix="plasma-c3-op-") as directory:
             staged = Path(directory) / "normalized-image.bin"
@@ -356,23 +364,34 @@ class Abi5OpenocdAdapter:
             # erase-only proves the range blank, Read returns it.
             reads_back = operations[-1] in ("verify", "erase", "read")
             actions: list[str] = []
+            def action(stage: str, command: str, *, final: bool = False) -> None:
+                actions.extend((f"echo PLASMA_STAGE_STARTED_{stage}", command))
+                if not final:
+                    actions.append(f"echo PLASMA_STAGE_COMPLETED_{stage}")
             if "erase" in operations:
-                actions.append(f"flash erase_address 0x{erase_address:08x} 0x{erase_length:08x}")
+                action("erase", f"flash erase_address 0x{erase_address:08x} 0x{erase_length:08x}",
+                       final=operations[-1] == "erase")
             if "program" in operations:
                 staged.write_bytes(image.payload)
                 staged.chmod(0o600)
                 # No ``erase`` keyword: Program never erases by itself.
-                actions.append(f"flash write_image {self._tcl_path(staged)} 0x{address:08x} bin")
+                action("program", f"flash write_image {self._tcl_path(staged)} 0x{address:08x} bin",
+                       final=operations[-1] == "program")
             if reads_back:
+                if "verify" in operations:
+                    actions.append("echo PLASMA_STAGE_STARTED_verify")
                 actions.append(f"dump_image {self._tcl_path(readback)} 0x{address:08x} 0x{length:08x}")
             argv = self._operation_argv(site, bound, actions)
             log, rc, safe_off = self._session(site, deadline=deadline, cancel=cancel,
-                                              argv=argv, max_duration_s=300)
+                                              argv=argv, max_duration_s=300,
+                                              stage_event=emit)
             timing = self._session_timing.pop(site, None)
             if timing is not None:
                 base["timing_ms"] = timing
 
             def failed(code: str, rc: Any, **extra: Any) -> dict[str, Any]:
+                if extra.get("failed_step") in operations:
+                    emit(extra["failed_step"], "failed")
                 return {"result": "FAIL", "code": code, "openocd_rc": rc,
                         **({"timing_ms": timing} if timing is not None else {}),
                         **safe_off.receipt(), **extra}
@@ -428,6 +447,8 @@ class Abi5OpenocdAdapter:
                                       readback_sha256=observed_sha)
                     steps["erase"].update(blank_verified=True, bytes_verified=length,
                                           readback_sha256=observed_sha)
+            if operations[-1] in ("erase", "program", "verify"):
+                emit(operations[-1], "completed")
             return {"result": "PASS", **base, "operations": list(operations), "steps": steps,
                     "load_address": address, "openocd_rc": 0, **safe_off.receipt()}
 
@@ -487,7 +508,8 @@ class Abi5OpenocdAdapter:
     def run(self, site: int, operation: str, *, deadline: float,
             cancel: threading.Event, image: FlashImage | None = None,
             flash_range: FlashRange | None = None,
-            operations: tuple[str, ...] | None = None) -> Mapping[str, Any]:
+            operations: tuple[str, ...] | None = None,
+            stage_event: Callable[[str, str], None] | None = None) -> Mapping[str, Any]:
         if site not in self.supported_sites or operation not in self.operations:
             raise TransportDenied("OPERATION_OR_SITE_NOT_SUPPORTED")
         if operation == PROGRAMMING:
@@ -496,7 +518,8 @@ class Abi5OpenocdAdapter:
             except SiteWorkerDenied:
                 raise TransportDenied("OPERATIONS_INVALID") from None
             return self._run_operations(site, steps, deadline=deadline, cancel=cancel,
-                                        image=image, flash_range=flash_range)
+                                        image=image, flash_range=flash_range,
+                                        stage_event=stage_event)
         if operation == "read":
             return self._run_operations(site, ("read",), deadline=deadline, cancel=cancel,
                                         image=None, flash_range=flash_range)
@@ -524,7 +547,8 @@ class Abi5OpenocdAdapter:
     def _session(self, site: int, *, deadline: float, cancel: threading.Event,
                  argv: list[str] | None = None,
                  max_duration_s: float = OPENOCD_MAX_S,
-                 cleanup_probe: bool = True) -> tuple[str, Any, SafeOff]:
+                 cleanup_probe: bool = True,
+                 stage_event: Callable[[str, str], None] | None = None) -> tuple[str, Any, SafeOff]:
         """Run one admitted OpenOCD session and observe its safe release.
 
         Returns only on a session that proved SAFE_OFF; the returned
@@ -570,11 +594,30 @@ class Abi5OpenocdAdapter:
         child = None
         operation_error = None
         cleanup_error = False
+        output: list[bytes] = []
+        reader: threading.Thread | None = None
+        def drain() -> None:
+            if child is None or child.stdout is None:
+                return
+            for line in iter(child.stdout.readline, b""):
+                raw_line = line if isinstance(line, bytes) else line.encode("utf-8", "replace")
+                output.append(raw_line)
+                if stage_event is not None:
+                    marker = re.fullmatch(
+                        rb"(?:User : |Info : )?PLASMA_STAGE_(STARTED|COMPLETED)_(erase|program|verify)\r?\n?",
+                        raw_line)
+                    if marker:
+                        try:
+                            stage_event(marker[2].decode(), marker[1].decode().lower())
+                        except Exception:
+                            pass  # Status delivery cannot interrupt the OpenOCD pipe.
         try:
             child = self._popen(self._argv(site) if argv is None else argv,
                                 stdin=subprocess.DEVNULL,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 start_new_session=True, close_fds=True)
+            reader = threading.Thread(target=drain, daemon=True)
+            reader.start()
             limit = min(deadline, time.monotonic() + max_duration_s)
             while child.poll() is None:
                 if cancel.is_set():
@@ -589,8 +632,8 @@ class Abi5OpenocdAdapter:
                     child.wait()
                     break
                 time.sleep(self.poll_s)
-            out = child.stdout.read() if child.stdout else b""
-            raw = out if isinstance(out, bytes) else str(out).encode("utf-8", "replace")
+            reader.join()
+            raw = b"".join(output)
             log = raw.decode("utf-8", "replace")
             rc = child.returncode
         except Exception as exc:

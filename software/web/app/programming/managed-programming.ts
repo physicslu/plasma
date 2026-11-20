@@ -890,6 +890,24 @@ export function unitStageLabel(batch: ProgrammingBatch, unit: ProgrammingBatchUn
   return held && held.outcome == null ? runStageLabel(held) : null;
 }
 
+export type StageStatus = { name: "erase" | "program" | "verify"; state: "waiting" | "running" | "completed" | "failed" };
+
+/** Each Site uses only its latest attempt; a terminal PASS comes from its judged Receipt. */
+export function unitStageStatuses(batch: ProgrammingBatch, unit: ProgrammingBatchUnit): StageStatus[] {
+  const own = ownUnitProgress(unit);
+  const held = runOfUnit(batch, unit);
+  const states = own?.stage_states ?? held?.job?.stage_states ?? {};
+  const verdict = batchSiteVerdict(batch, unit, held).verdict;
+  return batch.operations.map(name => {
+    const event = states[name];
+    const state = verdict === "PASS" ? "completed"
+      : event === "completed" ? "completed"
+      : event === "failed" ? "failed"
+      : event === "started" || event === "progress" ? "running" : "waiting";
+    return { name, state };
+  });
+}
+
 function ownUnitProgress(unit: ProgrammingBatchUnit) {
   const last = unit.attempts[unit.attempts.length - 1];
   const own = unit.progress;
