@@ -104,8 +104,10 @@ def test_site_status_records_resource_duration_without_changing_payload(monkeypa
     manager._latest_job_summary = lambda site: None
     result = manager.status(site_id=1)
     assert result["ppu"]["active_resources"] == {"state": "VERIFIED"}
-    assert [event["event"] for event in _records(capsys)] == [
+    observations = _records(capsys)
+    assert [event["event"] for event in observations] == [
         "ppu_site_resources", "ppu_site_status",
     ]
+    assert observations[1]["duration_ms"] >= observations[0]["duration_ms"]
     with pytest.raises(PlasmaError):
         manager.status(site_id=2)  # No invented status for an invalid Site.

@@ -771,6 +771,10 @@ class SiteManager:
                 ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
                 f"unsupported protocol version: {protocol_version!r}",
             )
+        # Observe the entire site-scoped status, not only its Resource read.
+        status_started = (time.monotonic()
+                          if site_id is not None and os.environ.get("PLASMA_M0_TIMING") == "1"
+                          else None)
         if job_id:
             return {"job": self.registry.get(job_id).snapshot(protocol_version)}
         site_ids = [site_id] if site_id is not None else sorted(self._site_configs)
@@ -798,14 +802,13 @@ class SiteManager:
         if site_id is not None:
             # Site-scoped status (Manager readiness) carries the PPU-derived
             # Resource identity; unscoped UI polling does not pay for it.
-            status_started = (time.monotonic()
-                              if os.environ.get("PLASMA_M0_TIMING") == "1" else None)
+            resources_started = time.monotonic() if status_started is not None else None
             try:
                 ppu["active_resources"] = self.active_resources_snapshot()
             finally:
-                if status_started is not None:
+                if resources_started is not None:
                     _m0_timing("ppu_site_resources", site_id=site_id,
-                               duration_ms=round((time.monotonic() - status_started) * 1000, 3))
+                               duration_ms=round((time.monotonic() - resources_started) * 1000, 3))
         if site_id is not None and status_started is not None:
             _m0_timing("ppu_site_status", site_id=site_id,
                        duration_ms=round((time.monotonic() - status_started) * 1000, 3))
