@@ -1197,6 +1197,13 @@ class CatalogSqliteShadowRepository:
                 raise DeviceCatalogIntegrityError("no active official Catalog revision")
             output = []
             for key, data in prepared:
+                if conn.execute(
+                    "SELECT 1 FROM controller_overlays WHERE namespace='official_profile_link' "
+                    "AND vendor_key=? AND icpn_key=?", key
+                ).fetchone():
+                    raise DeviceCatalogIntegrityError(
+                        "customer Profile already linked to Official IC; duplicate Local identity refused"
+                    )
                 old = conn.execute("SELECT profile_json FROM controller_overlays WHERE namespace='user_catalog' AND vendor_key=? AND icpn_key=?", key).fetchone()
                 previous = json.loads(old[0]) if old else None
                 unchanged = bool(previous and previous["record"] == data["record"] and previous["profile"] == data["profile"])
