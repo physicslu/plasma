@@ -252,9 +252,26 @@ def _device_search_payload(
     versioned_providers = get_default_openocd_provider_registry() if needs_legacy_enrichment else None
     ic_support = get_default_ic_support_resolver() if needs_legacy_enrichment else None
     device_basic = get_default_manufacturer_device_basic_resolver() if needs_legacy_enrichment else None
+    linked_profiles = CatalogSqliteShadowRepository(Path(database_path)).linked_customer_profiles()
+    linked_by_key = {
+        (entry["record"]["vendor"].casefold(), entry["record"]["identifier"].casefold()): entry
+        for entry in linked_profiles
+    }
     results = []
     for record in matches:
         item = record.to_payload()
+        # Explicitly separate immutable Official IC identity from a customer-
+        # owned Profile link. Profile metadata never changes Job admission.
+        item["ic_origin"] = "OFFICIAL"
+        attached = linked_by_key.get((record.vendor.casefold(), record.identifier.casefold()))
+        item["linked_customer_profile"] = (
+            {
+                "origin": "CUSTOMER",
+                "profile_id": attached["profile"]["profile_id"],
+                "local_revision": attached["revision"],
+                "verification": "UNVERIFIED",
+            } if attached is not None else None
+        )
         qualification = qualification_for(record)
         published_only = bool(qualification.get("data_only_publication"))
         item["catalog_level"] = qualification["catalog_level"]
@@ -317,6 +334,14 @@ def _device_search_payload(
         local_record = entry["record"]
         if query.casefold() in (local_record["vendor"] + " " + local_record["identifier"] + " " + local_record.get("family", "")).casefold():
             local_results.append(entry)
+    # A Profile waiting for an Official revision remains visible as CUSTOMER,
+    # not falsely promoted to Official nor hidden from its owner.
+    for linked in linked_profiles:
+        if linked["link_status"] != "PENDING_OFFICIAL":
+            continue
+        local_record = linked["record"]
+        if query.casefold() in (local_record["vendor"] + " " + local_record["identifier"] + " " + local_record.get("family", "")).casefold():
+            local_results.append(linked)
     return {
         "ok": True,
         "rest_contract_version": WEB_REST_CONTRACT_VERSION,
