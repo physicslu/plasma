@@ -770,7 +770,38 @@ def run_task(task: dict, *, workspace: Path = ROOT,
         # The authorized Work Order pins exact argv; command semantics and hardware
         # admission belong to plasmactl/Manager, not a stale Dispatcher allowlist.
         require(not sandbox, "OPERATOR_CLI_SANDBOX_DENIED")
-        command = ["/bin/bash", str(script), *task["argv"]]
+        argv = task["argv"]
+        if len(argv) >= 2 and argv[1] == "local-control-station":
+            # The existing SWPC Control Station belongs to gordon, not the
+            # plasma-codex Runner. Reuse only the installed non-root sudo
+            # delegation, the owner's user bus and the owner's CLEAN main tree.
+            # Never execute a PR candidate or the Runner's private checkout as
+            # gordon; neither arbitrary scripts nor general CLI commands inherit
+            # this identity.
+            require(argv[0] in ("status", "verify", "deploy", "logs", "restart")
+                    and "--dev-fresh-state" not in argv[2:],
+                    "LOCAL_CS_OWNER_OPERATION_DENIED")
+            require(approval["pr_number"] == 0, "LOCAL_CS_OWNER_MAIN_ONLY")
+            owner_repo = Path("/storage/projects/plasma")
+            owner_git = ["sudo", "-n", "-u", "gordon",
+                         "git", "-C", str(owner_repo)]
+            for args, expected, reason in (
+                (["rev-parse", "HEAD"], approval["pinned_sha"].encode(),
+                 "LOCAL_CS_OWNER_SOURCE_SHA_DENIED"),
+                (["status", "--porcelain", "--untracked-files=normal"], b"",
+                 "LOCAL_CS_OWNER_SOURCE_DIRTY"),
+            ):
+                checked = executor([*owner_git, *args], cwd=workspace_root,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   timeout=15, check=False)
+                require(checked.returncode == 0 and checked.stdout.strip() == expected,
+                        reason)
+            command = ["sudo", "-n", "-u", "gordon",
+                       "HOME=/home/gordon", "XDG_RUNTIME_DIR=/run/user/1000",
+                       "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus",
+                       "/bin/bash", str(owner_repo / "scripts/plasmactl"), *argv]
+        else:
+            command = ["/bin/bash", str(script), *argv]
     else:
         command = [sys.executable, str(script), *task["argv"]]
     if sandbox:
