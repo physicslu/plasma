@@ -111,3 +111,113 @@ def test_site_status_records_resource_duration_without_changing_payload(monkeypa
     assert observations[1]["duration_ms"] >= observations[0]["duration_ms"]
     with pytest.raises(PlasmaError):
         manager.status(site_id=2)  # No invented status for an invalid Site.
+
+
+def test_m1_bootstrap_reads_have_duration_and_do_not_repeat(monkeypatch, capsys):
+    import time
+    import pytest
+    from plasma_manager.programming import BundleProgrammingWorkflow
+
+    workflow = object.__new__(BundleProgrammingWorkflow)
+    workflow.monotonic = time.monotonic
+    calls = []
+    monkeypatch.setenv("PLASMA_M0_TIMING", "1")
+
+    def read(alias):
+        calls.append(alias)
+        return {"state": "ACTIVE"}
+
+    assert workflow._timed_bootstrap_read("z2", read, "assets") == {"state": "ACTIVE"}
+    assert calls == ["z2"]
+    record, = _records(capsys)
+    assert record["event"] == "manager_bootstrap_read"
+    assert record["operation"] == "assets" and record["ppu_alias"] == "z2"
+    assert record["duration_ms"] >= 0
+
+    def fail(alias):
+        calls.append(alias)
+        raise ValueError("Bootstrap unavailable")
+
+    with pytest.raises(ValueError, match="Bootstrap unavailable"):
+        workflow._timed_bootstrap_read("z2", fail, "status")
+    record, = _records(capsys)
+    assert record["event"] == "manager_bootstrap_read"
+    assert record["operation"] == "status" and record["duration_ms"] >= 0
+    assert calls == ["z2", "z2"]
+
+
+def test_m1_readiness_2_gets_and_failure_remain_fail_closed(monkeypatch, capsys):
+    import time
+    import pytest
+    from plasma_manager.programming import BundleProgrammingWorkflow, _StepFailure
+
+    workflow = object.__new__(BundleProgrammingWorkflow)
+    workflow.monotonic = time.monotonic
+    paths = []
+    health = {"ok": True, "execution": "ready"}
+    status = {
+        "ppu": {"ppu_id": "ppu", "execution": {"busy": False, "active_job_count": 0},
+                "active_resources": {"state": "VERIFIED"}},
+        "sites": [{"site_id": 1, "enabled": True, "state": "idle",
+                   "current_job_id": None, "queued_jobs": 0, "interface": "mock"}],
+    }
+
+    def get(_client, path):
+        paths.append(path)
+        return health if path == "/api/health/ready" else status
+
+    workflow._gateway_get = get
+    monkeypatch.setenv("PLASMA_M0_TIMING", "1")
+    ready = workflow._readiness(object(), 1, "mock")
+    assert ready["ppu_id"] == "ppu" and ready["site_id"] == 1
+    assert paths == ["/api/health/ready", "/api/status?site=1"]
+    events = _records(capsys)
+    assert [r["event"] for r in events] == [
+        "manager_readiness_http", "manager_readiness_http", "manager_readiness"]
+    assert [r["endpoint"] for r in events[:2]] == ["health_ready", "site_status"]
+    assert all(r["duration_ms"] >= 0 for r in events)
+
+    paths.clear()
+    status["sites"][0]["state"] = "busy"
+    with pytest.raises(_StepFailure, match="SITE_NOT_READY_OR_BUSY"):
+        workflow._readiness(object(), 1, "mock")
+    assert paths == ["/api/health/ready", "/api/status?site=1"]
+    assert [r["event"] for r in _records(capsys)] == [
+        "manager_readiness_http", "manager_readiness_http", "manager_readiness"]
+
+
+def test_m1_observation_off_preserves_no_clock_reads(monkeypatch, capsys):
+    from plasma_manager.programming import BundleProgrammingWorkflow
+
+    workflow = object.__new__(BundleProgrammingWorkflow)
+    workflow.monotonic = lambda: (_ for _ in ()).throw(AssertionError("clock advanced"))
+    workflow._gateway_get = lambda _client, path: (
+        {"ok": True, "execution": "ready"} if path == "/api/health/ready"
+        else {"ppu": {"ppu_id": "ppu", "execution": {
+            "busy": False, "active_job_count": 0}},
+              "sites": [{"site_id": 1, "enabled": True, "state": "idle",
+                         "current_job_id": None, "queued_jobs": 0, "interface": "mock"}]})
+    monkeypatch.delenv("PLASMA_M0_TIMING", raising=False)
+    assert workflow._timed_bootstrap_read("z2", lambda alias: {"alias": alias},
+                                          "status") == {"alias": "z2"}
+    assert workflow._readiness(object(), 1, "mock")["state"] == "idle"
+    assert _records(capsys) == []
+
+
+def test_m1_first_cycle_and_run_phases_carry_correlation(monkeypatch, capsys, tmp_path):
+    from .test_programming_batch_repeat import Session
+
+    monkeypatch.setenv("PLASMA_M0_TIMING", "1")
+    session = Session(tmp_path, repeat=1)
+    assert session.done()["outcome"] == "PASS"
+    events = _records(capsys)
+    initial = [r for r in events if r["event"] == "manager_initial_admission"]
+    assert len(initial) == 1
+    assert initial[0]["batch_id"] == session.batch_id
+    assert initial[0]["cycle_id"] and initial[0]["site_id"] == 1
+    assert initial[0]["platform_leader"] is True and initial[0]["duration_ms"] >= 0
+    for name in ("manager_preflight", "manager_presubmit_readiness"):
+        samples = [r for r in events if r["event"] == name]
+        assert len(samples) == 1 and samples[0]["run_id"] and samples[0]["plan_id"]
+        assert samples[0]["duration_ms"] >= 0
+    assert any(r["event"] == "manager_bootstrap_read" for r in events)
