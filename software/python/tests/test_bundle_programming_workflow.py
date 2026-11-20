@@ -139,6 +139,7 @@ class FakeGateway:
         self.read_file_tamper = False
         self.downloads = 0
         self.posts: list[dict] = []
+        self.time_sync_calls: list[dict] = []
         # The real C-3 PPU shape of a definite Site Worker FAIL: Job ``error``,
         # empty ``details``, Worker result in ``error.context``. A dict tampers
         # ``site_worker_result`` (key "context" tampers the context instead).
@@ -150,6 +151,14 @@ class FakeGateway:
         return status, {"Content-Type": "application/json"}, json.dumps(payload).encode()
 
     def relay(self, method, path, *, headers, body, timeout_s, max_response_bytes):
+        if method == "POST" and path == "/api/pre-start-time-sync":
+            self.time_sync_calls.append(json.loads(body))
+            return self._resp(200, {"time_sync": {
+                "ppu_id": self.ppu_id, "status": "SYNCED", "source": "chronyd",
+                "service": "chrony", "before_offset_ms": 1.0,
+                "after_offset_ms": 1.0, "uncertainty_ms": 1.0,
+                "elapsed_ms": 1.0, "adjustment_performed": False,
+                "warning_code": None, "observed_at_utc": "2026-11-20T00:00:00+00:00"}})
         if method == "POST" and path == "/api/resource-reservations":
             request = json.loads(body)
             if request["action"] == "acquire":
@@ -393,6 +402,8 @@ def test_success_with_activation_runs_b1_b2_b3_then_one_programming_job(tmp_path
     assert coord.calls.count("B2") == 1 and coord.calls.count("B3") == 1
     assert bytes(coord.uploaded) and coord.upload_sha == planned["bundle"]["archive_sha256"]
     assert len(gateway.posts) == 1 and run["job_submission_count"] == 1
+    assert len(gateway.time_sync_calls) == 1
+    assert run["time_sync"]["status"] == "SYNCED"
     post = gateway.posts[0]
     assert post["operations"] == ["erase", "program", "verify"] and post["site_id"] == 2
     assert "operation" not in post

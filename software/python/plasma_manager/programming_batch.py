@@ -1011,6 +1011,7 @@ class ProgrammingBatchCoordinator:
                 "policy": policy, "state": "running",
                 "execution_status": "RUNNING", "outcome": None, "reason": None,
                 "stop_requested": False, "failure_domain": None, "units": units,
+                "time_sync": {},
                 "journal_persisted": True,
                 "created_at": accepted_at, "updated_at": accepted_at,
                 "started_at": accepted_at, "finished_at": None,
@@ -1402,6 +1403,7 @@ class ProgrammingBatchCoordinator:
         # Share only the initial PPU-wide Platform verdict. Site readiness
         # remains independent; no remote call runs under the Journal lock.
         platforms = {}
+        time_syncs: dict[str, Future] = {}
         lanes = []
         # Batch-once immutable preparation (WO-2 F2 M2), shared by every lane
         # of this Batch run and by none other. It carries no PPU state.
@@ -1445,8 +1447,9 @@ class ProgrammingBatchCoordinator:
             alias = unit["ppu_alias"]
             leader = alias not in platforms
             future = platforms.setdefault(alias, Future())
+            sync_future = time_syncs.setdefault(alias, Future())
             lanes.append((unit, self._run_lane(
-                batch, unit, plan_body, future, leader, preparation)))
+                batch, unit, plan_body, future, leader, preparation, sync_future)))
         failure = None
         if lanes:
             with ThreadPoolExecutor(max_workers=len(lanes),
@@ -1497,7 +1500,8 @@ class ProgrammingBatchCoordinator:
     def _run_lane(self, batch: dict[str, Any], unit: dict[str, Any],
                   plan_body: Mapping[str, Any], platform: Future,
                   platform_leader: bool,
-                  preparation: BatchPreparation | None = None) -> Generator[
+                  preparation: BatchPreparation | None = None,
+                  time_sync: Future | None = None) -> Generator[
                       None, None, tuple[str | None, str | None]]:
         """Every Cycle of ONE Site lane. Returns that Site's outcome and reason.
 
@@ -1507,6 +1511,34 @@ class ProgrammingBatchCoordinator:
         through the same dispatch and admission gates, never around them.
         """
         alias, cycle, policy = unit["ppu_alias"], unit["cycle"], batch["policy"]
+        if time_sync is not None:
+            if platform_leader:
+                try:
+                    session = self.workflow._batch_session(alias, batch["batch_id"])
+                    if session is None:
+                        observation = {"ppu_id": None, "status": "SKIPPED_BUSY",
+                                       "source": None, "service": None,
+                                       "before_offset_ms": None, "after_offset_ms": None,
+                                       "uncertainty_ms": None, "elapsed_ms": 0.0,
+                                       "adjustment_performed": False,
+                                       "warning_code": "NO_BATCH_RESERVATION",
+                                       "observed_at_utc": _now()}
+                    else:
+                        observation = self.workflow.pre_start_time_sync(
+                            alias, batch["batch_id"], session["reservation"]["ppu_id"])
+                    with self._lock:
+                        batch.setdefault("time_sync", {})[alias] = observation
+                        batch["updated_at"] = _now()
+                        self._persist_locked()
+                except BaseException as exc:
+                    time_sync.set_exception(exc)
+                    raise
+                else:
+                    time_sync.set_result(observation)
+            else:
+                # The PPU-wide observation precedes every first Job. A warning
+                # never changes a Site's Programming Admission or outcome.
+                time_sync.result()
         first = True
         while True:
             outcome, reason = yield from self._run_cycle(

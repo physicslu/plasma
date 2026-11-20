@@ -280,6 +280,14 @@ class PlasmaClient:
             "owner_id": owner_id, "token": token, "expected": expected,
         }))
 
+    async def pre_start_time_sync(self, owner_id: str, token: str | None,
+                                  threshold_ms: int, budget_ms: int) -> dict[str, Any]:
+        return await self.send(Frame(metadata={
+            "protocol_version": self.protocol_version,
+            "message_type": "pre_start_time_sync", "owner_id": owner_id,
+            "token": token, "threshold_ms": threshold_ms, "budget_ms": budget_ms,
+        }))
+
 
 def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()

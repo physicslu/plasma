@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import subprocess
 import sys
 import threading
 import time
@@ -14,7 +15,10 @@ from plasma_core.config import PlasmaConfig, PPUConfig, ServerConfig, SiteConfig
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
+from plasma_core.protocol import Frame, PROTOCOL_VERSION
+from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import PPUExecutionLease, SiteManager
+from plasma_server.time_sync import ChronyTimeSync
 from plasma_server.runtime_control import RuntimeControlServer
 from plasma_web.runtime_activation import RuntimeActivationError, SiteRuntimeActivationController, desired_runtime_revision
 from plasma_web.runtime_activation_helper import RuntimeActivationExecutor, RuntimeActivationHelperError
@@ -60,6 +64,163 @@ def test_quiesce_is_bounded_and_expires(tmp_path: Path) -> None:
     manager.acquire_runtime_quiesce(2)
     manager._runtime_quiesce._deadline_monotonic = time.monotonic() - 1
     assert manager.runtime_quiesce_snapshot()["active"] is False
+
+
+def _tracking(offset: float, *, leap: str = "Normal", dispersion: float = .001) -> str:
+    direction = "fast" if offset >= 0 else "slow"
+    return ("Reference ID    : 12345678 (time.example)\n"
+            "Stratum         : 3\n"
+            f"System time     : {abs(offset):.9f} seconds {direction} of NTP time\n"
+            f"Root dispersion : {dispersion:.9f} seconds\n"
+            f"Leap status     : {leap}\n")
+
+
+@pytest.mark.parametrize("before,after,status,commands", [
+    (.001, None, "SYNCED", ["tracking"]),
+    (.250, .002, "CORRECTED", ["tracking", "makestep", "tracking"]),
+    (.250, .240, "FAILED", ["tracking", "makestep", "tracking"]),
+])
+def test_chrony_immediate_step_requires_post_verification(before, after, status, commands):
+    calls = []
+    observations = iter([_tracking(before)] + ([_tracking(after)] if after is not None else []))
+    def runner(args, **kwargs):
+        calls.append(args[-1])
+        assert args[:2] == ["chronyc", "-n"] and kwargs["timeout"] > 0
+        return subprocess.CompletedProcess(args, 0,
+                                           "" if args[-1] == "makestep" else next(observations), "")
+    result = ChronyTimeSync(runner=runner).execute(ppu_id="ppu-a")
+    assert result["status"] == status and calls == commands
+    assert result["adjustment_performed"] is (after is not None)
+    assert result["before_offset_ms"] == before * 1000
+    if after is not None:
+        assert result["after_offset_ms"] == after * 1000
+
+
+@pytest.mark.parametrize("fault,status", [
+    (FileNotFoundError(), "UNSUPPORTED"),
+    (PermissionError(), "FAILED"),
+    (subprocess.TimeoutExpired(["chronyc"], 1), "TIMEOUT"),
+    (RuntimeError("failed"), "FAILED"),
+])
+def test_chrony_failures_are_warnings_without_host_clock_write(fault, status):
+    def runner(*_args, **_kwargs):
+        raise fault
+    result = ChronyTimeSync(runner=runner).execute(ppu_id="ppu-a")
+    assert result["status"] == status
+    assert result["adjustment_performed"] is False
+    assert result["before_offset_ms"] is None
+
+
+@pytest.mark.parametrize("observation", [
+    _tracking(.001, leap="Not synchronised"),
+    _tracking(.001, dispersion=.2),
+    _tracking(.001).replace("12345678", "00000000"),
+])
+def test_untrusted_chrony_source_never_steps(observation):
+    calls = []
+    def runner(args, **_kwargs):
+        calls.append(args[-1])
+        return subprocess.CompletedProcess(args, 0, observation, "")
+    result = ChronyTimeSync(runner=runner).execute(ppu_id="ppu-a")
+    assert result["status"] == "UNTRUSTED_SOURCE"
+    assert calls == ["tracking"]
+
+
+def test_time_sync_reuses_execution_lock_reservation_and_quiesce(tmp_path: Path):
+    manager, _identity, expected = _m3_manager(tmp_path)
+    calls = []
+    manager._time_sync.execute = lambda **kwargs: calls.append(kwargs) or {
+        "ppu_id": "ppu-a", "status": "SYNCED", "warning_code": None,
+        "adjustment_performed": False}
+    def sync(owner="batch-1", token=None):
+        return manager.pre_start_time_sync(owner_id=owner, token=token,
+                                           threshold_ms=100, budget_ms=1000)
+    lease = manager.acquire_runtime_quiesce(2)
+    assert sync()["status"] == "SKIPPED_BUSY"
+    manager.release_runtime_quiesce(lease["token"])
+    reservation = manager.resource_reservation("acquire", owner_id="batch-1",
+                                               expected=expected)
+    token = reservation["token"]
+    assert sync("other", token)["status"] == "SKIPPED_BUSY"
+    assert sync("batch-1", "wrong")["status"] == "SKIPPED_BUSY"
+    assert sync("batch-1", token)["status"] == "SYNCED"
+    manager._execution_lease = PPUExecutionLease("rest_client", "batch-1", {"job-1"})
+    assert sync("batch-1", token)["status"] == "SKIPPED_BUSY"
+    manager._execution_lease = None
+    assert len(calls) == 1
+    assert manager.resource_reservation("release", owner_id="batch-1",
+                                        token=token)["state"] == "RELEASED"
+
+
+def test_time_sync_holds_admission_lock_through_clock_operation(tmp_path: Path):
+    manager = SiteManager(config(tmp_path))
+    entered, release, acquired = threading.Event(), threading.Event(), threading.Event()
+    def clock(**_kwargs):
+        entered.set()
+        assert release.wait(2)
+        return {"status": "SYNCED", "warning_code": None,
+                "adjustment_performed": False}
+    manager._time_sync.execute = clock
+    first = threading.Thread(target=lambda: manager.pre_start_time_sync(
+        owner_id="run-1", token=None, threshold_ms=100, budget_ms=1000))
+    second = threading.Thread(target=lambda: (manager.acquire_runtime_quiesce(2), acquired.set()))
+    first.start()
+    assert entered.wait(2)
+    second.start()
+    assert not acquired.wait(.02)
+    release.set()
+    first.join(2)
+    second.join(2)
+    assert acquired.is_set()
+
+
+@pytest.mark.parametrize("worker", [
+    None,
+    {"sessions": [{"job_id": "external"}], "sealed_sites": [],
+     "admission_record_sites": [], "not_ready": None},
+    {"sessions": [], "sealed_sites": [1], "admission_record_sites": [], "not_ready": None},
+    {"sessions": [], "sealed_sites": [], "admission_record_sites": [1], "not_ready": None},
+])
+def test_root_site_worker_ownership_prevents_clock_step(tmp_path: Path, worker):
+    manager = SiteManager(config(tmp_path))
+    manager._site_worker_status_reader = lambda: worker
+    manager._time_sync.execute = lambda **_kwargs: pytest.fail("clock adjusted while Root unverified")
+    result = manager.pre_start_time_sync(owner_id="run-1", token=None,
+                                         threshold_ms=100, budget_ms=1000)
+    assert result["status"] == "SKIPPED_BUSY"
+
+
+def test_idle_root_site_worker_allows_bounded_clock_check(tmp_path: Path):
+    manager = SiteManager(config(tmp_path))
+    manager._site_worker_status_reader = lambda: {
+        "sessions": [], "sealed_sites": [], "admission_record_sites": [],
+        "not_ready": None}
+    manager._time_sync.execute = lambda **_kwargs: {
+        "status": "SYNCED", "warning_code": None, "adjustment_performed": False}
+    assert manager.pre_start_time_sync(owner_id="run-1", token=None,
+                                       threshold_ms=100, budget_ms=1000)["status"] == "SYNCED"
+
+
+def test_time_sync_protocol_rejects_supplied_time_and_shell(tmp_path: Path):
+    manager = SiteManager(config(tmp_path))
+    calls = []
+    manager._time_sync.execute = lambda **kwargs: calls.append(kwargs) or {
+        "ppu_id": "ppu-a", "status": "SYNCED", "warning_code": None,
+        "adjustment_performed": False}
+    server = PlasmaServer(manager.config, manager)
+    request = {"protocol_version": PROTOCOL_VERSION,
+               "message_type": "pre_start_time_sync", "owner_id": "run-1",
+               "token": None, "threshold_ms": 100, "budget_ms": 1000}
+    async def scenario():
+        for extra in ({"timestamp": "2026-01-01T00:00:00Z"},
+                      {"command": "date -s now"}):
+            with pytest.raises(PlasmaError) as denied:
+                await server._dispatch(Frame(metadata={**request, **extra}), None)
+            assert denied.value.code is ErrorCode.INVALID_ARGUMENT
+        accepted = await server._dispatch(Frame(metadata=request), None)
+        assert accepted.metadata["status"] == "SYNCED"
+    asyncio.run(scenario())
+    assert len(calls) == 1
 
 
 # --- WO-2 F2 M3 Batch Resource Reservation (PPU authority) ---------------

@@ -145,6 +145,9 @@ class PackageActionRuntime:
         self.spawner = spawner
         self.python_executable = Path(python_executable)
         self.site_worker = site_worker
+        if site_worker is not None and callable(getattr(site_worker, "call", None)):
+            site_manager._site_worker_status_reader = lambda: site_worker.call(
+                "status", timeout_s=0.15)
         for interface in getattr(site_manager, "provider_interfaces", {}).values():
             interface.wire_runtime(self._run_programming_package)
 

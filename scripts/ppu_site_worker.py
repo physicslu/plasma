@@ -494,6 +494,7 @@ class SiteWorkerCore:
                         "supported_sites": sorted(self.adapter.supported_sites),
                         "operations": sorted(self.adapter.operations),
                         "sealed_sites": sorted(self._sealed),
+                        "admission_record_sites": sorted(self.adapter.startup_sealed_sites()),
                         "not_ready": getattr(self.adapter, "not_ready", None),
                         "identity": dict(self.adapter.identity()),
                         "sessions": sessions,
