@@ -54,6 +54,8 @@
 
 ## PPU architecture and runtime
 
+- **Plan** · `Gate 1` · `Host-only` · `Draft PR #1525` — [Pre-Start Time Synchronization v1](architecture/pre-start-time-sync-v1.md)：Managed Run 與每 Batch／PPU 首個 Job 前進行 best-effort chronyd 對時，失敗僅警告；Z2 實機服務、權限與延遲 NOT_VERIFIED。
+
 - **Current** · `PR #1343/#1348 Merged` · `S0–S5 partial` — [PLASMA Core Convergence and Deletion-First Roadmap](architecture/plasma-core-convergence-and-deletion-first-roadmap.md)：後續 OPF／Bundle／Runtime 收斂及舊程式刪除的共同基準；S0–S5 尚待個別 Gate 1，非 Runtime 或實機驗收。
 - **Reference** · `S5-A Gate 1` · `Host-only` — [OPF S5-A bounded source convergence and import-boundary regression](development/opf-s5a-source-convergence-gate1-20261108.md)：記錄可攜式 OPF 隔離匯入、故意注入相依的負向測試、退休 Compiler 防回流、既有路由與安全邊界；僅 Source-only，不是 S5 Final Closure 或實機驗收。
 - **Reference** · `S5-B Gate 1` · `Host-only` — [OPF S5-B final architecture convergence](development/opf-s5b-final-convergence-gate1-20261109.md)：PPU Gateway 相容 Device Selector 路由刪除後的 Consumer 稽核、刪除／保留清單、Import Graph、LOC 與 Runtime Footprint；僅 Host-only，HIL NOT_RUN。
