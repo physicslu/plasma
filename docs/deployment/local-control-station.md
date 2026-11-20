@@ -150,10 +150,15 @@ with `error.code=CATALOG_LOCAL_IDENTITY_CONFLICT`,
 `conflict_count`, `conflicts` (manufacturer, Exact ICPN, local revision and
 Profile ID; first 100 when there are more), and `truncated`. IC Management
 shows an actionable notice, links each conflicting row to its Local editor,
-and offers Local JSON backup. The user must explicitly copy to a new
-customer-specific identifier, verify it, and separately delete the old Local
-row before revalidating the Official revision. **No automatic rename, delete,
-merge, or promotion is permitted.** Collisions are checked again atomically
+and offers Local JSON backup. The user must first determine whether both
+records identify the **same physical IC**. If they do, do **not** invent a
+new Exact ICPN; the custom Profile must be preserved/rebound to the Official
+identity only under a separately authorized, reviewed migration (not implemented
+by this Gate 1). If the existing Local identity is genuinely wrong, the user
+may explicitly create a verified replacement, confirm its Profile, then remove
+the mistaken Local record. The Official revision remains blocked until each
+conflict is resolved. **No automatic rename, delete, merge, or promotion is
+permitted.** Collisions are checked again atomically
 inside Publish/Rollback to prevent a race after a successful preflight.
 Use SQLite online backup or equivalent consistent snapshot for recovery;
 copying just the live `.sqlite3` file without its WAL is not safe.
