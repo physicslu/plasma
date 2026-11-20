@@ -29,3 +29,24 @@ test("Pmod, Emode and global IC Selector expose one persistent Light Dark theme 
   assert.match(engineeringProgramming, /\.engineeringProgrammingV2Header \.engineeringGateway > b\s*\{[^}]*color:\s*var\(--text,/s);
   assert.match(engineeringProgramming, /\.engineeringProgrammingV2Header \.engineeringGateway input:disabled\s*\{[^}]*opacity:\s*1/s);
 });
+
+test("IC Management fields use theme tokens and never fall back to dark surfaces in light mode", async () => {
+  const css = await fs.readFile(new URL("../app/ic-management/style.css", import.meta.url), "utf8");
+  const globalCss = await fs.readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const controls = css.match(/\.icManagement input,\.icManagement textarea,\.icManagement select\s*\{([^}]*)\}/)?.[1];
+  assert.ok(controls, "shared IC Management input, textarea and select rule must exist");
+  assert.match(controls, /background:\s*var\(--panel-2\)/);
+  assert.match(controls, /color:\s*var\(--text\)/);
+  assert.match(controls, /caret-color:\s*var\(--text\)/);
+  assert.doesNotMatch(controls, /var\(--surface|background:\s*#[\da-f]+/i);
+  assert.match(css, /\.icManagement input::placeholder,\.icManagement textarea::placeholder\s*\{[^}]*color:\s*var\(--muted\);[^}]*opacity:\s*1/s);
+  for (const rule of [
+    globalCss.match(/:root\s*\{([^}]*)\}/)?.[1],
+    globalCss.match(/\[data-theme="dark"\]\s*\{([^}]*)\}/)?.[1],
+  ]) {
+    assert.ok(rule, "both Light and Dark palettes must exist");
+    for (const token of ["--panel-2", "--text", "--muted"]) {
+      assert.match(rule, new RegExp(`(?:^|\\s)${token}:\\s*#[0-9a-f]{3,8}`, "i"));
+    }
+  }
+});
