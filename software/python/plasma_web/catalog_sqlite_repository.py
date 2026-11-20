@@ -54,20 +54,6 @@ class CatalogShadowSnapshot:
         return self.catalog.size
 
 
-class CatalogLocalIdentityConflict(DeviceCatalogIntegrityError):
-    """Official publish is blocked until a customer resolves exact-ICPN collisions."""
-
-    code = "CATALOG_LOCAL_IDENTITY_CONFLICT"
-
-    def __init__(self, conflicts: list[dict[str, Any]], *, count: int) -> None:
-        self.conflicts = conflicts
-        self.conflict_count = count
-        super().__init__(
-            f"Official Catalog update blocked: {count} customer-owned local exact ICPN "
-            f"conflict(s); resolve the local identities explicitly before retrying"
-        )
-
-
 class CatalogSqliteShadowRepository:
     """Import a verified source revision and compare it without live cutover.
 
@@ -246,30 +232,6 @@ class CatalogSqliteShadowRepository:
         )
         return CatalogShadowSnapshot(revision, catalog, qualifications)
 
-    @staticmethod
-    def _reject_local_catalog_collisions(
-        conn: sqlite3.Connection, official_keys: set[tuple[str, str]],
-    ) -> None:
-        """Refuse an Official snapshot that would shadow customer-owned ICPNs."""
-        rows = conn.execute(
-            "SELECT vendor_key, icpn_key, profile_json FROM controller_overlays "
-            "WHERE namespace='user_catalog' ORDER BY vendor_key, icpn_key"
-        ).fetchall()
-        overlapping = [row for row in rows if (row[0], row[1]) in official_keys]
-        if not overlapping:
-            return
-        conflicts = []
-        for vendor_key, icpn_key, profile_json in overlapping[:100]:
-            data = json.loads(profile_json)
-            local = data.get("record", {})
-            conflicts.append({
-                "manufacturer": local.get("vendor", vendor_key),
-                "exact_icpn": local.get("identifier", icpn_key),
-                "local_revision": data.get("revision"),
-                "local_profile_id": data.get("profile", {}).get("profile_id"),
-            })
-        raise CatalogLocalIdentityConflict(conflicts, count=len(overlapping))
-
     def import_verified_manifest(
         self,
         manifest_path: Path,
@@ -288,9 +250,6 @@ class CatalogSqliteShadowRepository:
             self._init_schema(conn)
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute("BEGIN IMMEDIATE")
-            self._reject_local_catalog_collisions(
-                conn, {(row[0], row[1]) for row in rows}
-            )
             active = conn.execute("SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1").fetchone()
             if (active is not None and conn.execute(
                 "SELECT 1 FROM catalog_audit_events WHERE action='PUBLISH' LIMIT 1"
@@ -857,14 +816,11 @@ class CatalogSqliteShadowRepository:
             if key in seen:
                 raise DeviceCatalogIntegrityError("duplicate exact ICPN in staging")
             seen.add(key)
-        with sqlite3.connect(self.path) as conn:
-            self._reject_local_catalog_collisions(conn, seen)
         stage_id = _digest(staged_changes)
         with sqlite3.connect(self.path, timeout=10) as conn:
             self._init_schema(conn)
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute("BEGIN IMMEDIATE")
-            self._reject_local_catalog_collisions(conn, seen)
             parent = conn.execute("SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1").fetchone()
             if parent is None:
                 raise DeviceCatalogIntegrityError("no active Catalog revision")
@@ -904,8 +860,6 @@ class CatalogSqliteShadowRepository:
             if old and old.get("catalog_level") == 3 and (old != q or active.catalog.resolve(record.vendor, record.identifier) != record):
                 raise DeviceCatalogIntegrityError("L3 revision requires separately authorized revocation")
             preview.append({"vendor": record.vendor, "identifier": record.identifier, "status": "MODIFIED" if old else "ADDED"})
-        with sqlite3.connect(self.path) as conn:
-            self._reject_local_catalog_collisions(conn, seen)
         return preview
 
     def publish_staged(self, stage_id: str, *, actor: str) -> str:
@@ -968,7 +922,6 @@ class CatalogSqliteShadowRepository:
                 records[key], qualifications[key] = replace(
                     record, catalog_revision_sha256=source_revision
                 ), q
-            self._reject_local_catalog_collisions(conn, set(records))
             ordered = sorted(records.values(), key=lambda r: _identity(r))
             catalog = DeviceCatalog(ordered, catalog_id=parent.catalog.catalog_id,
                                     catalog_version=parent.catalog.catalog_version,
@@ -1008,7 +961,6 @@ class CatalogSqliteShadowRepository:
             self._verify_snapshot_evidence(target, strict=True)
             current_records = {_identity(row): row for row in current.catalog.records}
             target_records = {_identity(row): row for row in target.catalog.records}
-            self._reject_local_catalog_collisions(conn, set(target_records))
             if any(
                 target.qualifications.get(key) != qualification
                 or target_records.get(key) != current_records.get(key)
@@ -1064,7 +1016,7 @@ class CatalogSqliteShadowRepository:
             conn.execute("INSERT INTO catalog_audit_events(action,actor,predecessor,revision_sha256,detail) VALUES (?,?,?,?,?)", ("LOCAL_DELETE", actor, None, None, f"{vendor.casefold()}:{icpn.casefold()}"))
 
     def save_local_records(self, entries: list[dict[str, Any]], *, actor: str, dry_run: bool = False) -> list[dict[str, Any]]:
-        """Validate the entire import before a single atomic local write."""
+        """Persist LOCAL identities independently from same-key Official records."""
         if not actor.strip() or not entries or len(entries) > 1000:
             raise DeviceCatalogIntegrityError("actor and 1-1000 local records required")
         prepared = []
@@ -1115,10 +1067,6 @@ class CatalogSqliteShadowRepository:
             active = conn.execute("SELECT revision_sha256 FROM active_catalog_revision WHERE singleton=1").fetchone()
             if active is None:
                 raise DeviceCatalogIntegrityError("no active official Catalog revision")
-            official = self._read_revision(conn, active[0])
-            official_keys = {_identity(row) for row in official.catalog.records}
-            if any(key in official_keys for key, _ in prepared):
-                raise DeviceCatalogIntegrityError("local exact ICPN conflicts with official Catalog")
             output = []
             for key, data in prepared:
                 old = conn.execute("SELECT profile_json FROM controller_overlays WHERE namespace='user_catalog' AND vendor_key=? AND icpn_key=?", key).fetchone()
