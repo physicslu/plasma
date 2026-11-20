@@ -791,7 +791,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 result = {"revision": snapshot.revision_sha256, "total_count": len(matches), "official": [{"vendor": record.vendor, "identifier": record.identifier, "family": record.family, "source": record.source_authority, "level": snapshot.qualifications.get((record.vendor.casefold(), record.identifier.casefold()), {}).get("catalog_level")} for record in matches[:100]]}
             elif self.command == "GET" and action == "export":
                 snapshot = repo.read_active()
-                result = {"local": repo.local_records(), "linked_profiles": repo.linked_customer_profiles(), "official": [{"record": asdict(record), "qualification": snapshot.qualifications.get((record.vendor.casefold(), record.identifier.casefold()))} for record in snapshot.catalog.records]}
+                result = {"local": repo.local_records(), "official": [{"record": asdict(record), "qualification": snapshot.qualifications.get((record.vendor.casefold(), record.identifier.casefold()))} for record in snapshot.catalog.records]}
             elif self.command == "GET" and action == "diff":
                 revision = parse_qs(raw_query).get("revision", [""])[0]
                 result = {"changes": repo.diff_revision(revision)}
