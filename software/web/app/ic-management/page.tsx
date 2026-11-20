@@ -12,6 +12,13 @@ type LocalEntry = {
   revision?: number;
   change?: string;
 };
+type LinkedProfileEntry = LocalEntry & {
+  origin: "CUSTOMER";
+  ic_origin: "OFFICIAL" | "CUSTOMER";
+  profile_origin: "CUSTOMER";
+  link_status: "ACTIVE" | "PENDING_OFFICIAL";
+  verification: "UNVERIFIED";
+};
 type History = { active_revision: string | null; revisions: Array<{ revision: string; count: number }>; audit: Array<{ action: string; actor: string; revision: string; detail: string; created_at: string }> };
 type OfficialEntry = { record: Record<string, unknown>; qualification: Record<string, unknown>; revision: string };
 type Evidence = { evidence_id: string; authority: string; reference: string; source_revision: string; acquired_at: string };
@@ -57,6 +64,8 @@ function parseCsv(text: string): LocalEntry[] {
 
 function ManagementContent() {
   const [local, setLocal] = useState<LocalEntry[]>([]);
+  const [linkedProfiles, setLinkedProfiles] = useState<LinkedProfileEntry[]>([]);
+  const [sameIcConfirmed, setSameIcConfirmed] = useState(false);
   const [history, setHistory] = useState<History | null>(null);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [form, setForm] = useState<LocalEntry>(empty);
@@ -77,12 +86,12 @@ function ManagementContent() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const reload = useCallback(async () => {
-    const result = await api<{ local: LocalEntry[]; history: History; evidence: Evidence[] }>();
-    setLocal(result.local); setHistory(result.history); setEvidence(result.evidence);
+    const result = await api<{ local: LocalEntry[]; linked_profiles?: LinkedProfileEntry[]; history: History; evidence: Evidence[] }>();
+    setLocal(result.local); setLinkedProfiles(result.linked_profiles ?? []); setHistory(result.history); setEvidence(result.evidence);
   }, []);
   useEffect(() => {
-    void api<{ local: LocalEntry[]; history: History; evidence: Evidence[] }>()
-      .then(result => { setLocal(result.local); setHistory(result.history); setEvidence(result.evidence); })
+    void api<{ local: LocalEntry[]; linked_profiles?: LinkedProfileEntry[]; history: History; evidence: Evidence[] }>()
+      .then(result => { setLocal(result.local); setLinkedProfiles(result.linked_profiles ?? []); setHistory(result.history); setEvidence(result.evidence); })
       .catch(error => setMessage(String(error)));
   }, []);
   async function run(task: () => Promise<void>) {
@@ -127,12 +136,18 @@ function ManagementContent() {
     <section><h2>Controller-local ICs <small>LOCAL / UNVERIFIED</small></h2>
       <input aria-label="Search local ICs" placeholder="Search vendor or ICPN" value={search} onChange={event => setSearch(event.target.value)} />
       <div className="managementList">{local.filter(item => `${item.record.vendor} ${item.record.identifier}`.toLowerCase().includes(search.toLowerCase())).map(item =>
-        <button type="button" key={`${item.record.vendor}:${item.record.identifier}`} onClick={() => { setForm(item); setBatch([]); setPreview([]); }}>
-          <b>{item.record.identifier}</b><span>{item.record.vendor} · {item.record.family}</span><em>LOCAL / UNVERIFIED · r{item.revision}</em>
+        <button type="button" key={`${item.record.vendor}:${item.record.identifier}`} onClick={() => { setForm(item); setBatch([]); setPreview([]); setSameIcConfirmed(false); }}>
+          <b>{item.record.identifier}</b><span>{item.record.vendor} · {item.record.family}</span><em>CUSTOMER IC / UNVERIFIED · r{item.revision}</em>
         </button>)}</div>
       <button type="button" onClick={() => { setForm(empty); setBatch([]); }}>New IC</button>
       <button type="button" onClick={() => { setForm({ ...form, record: { ...form.record, identifier: "" } }); setBatch([]); }}>Copy as new</button>
       {form.revision && <button disabled={busy} type="button" onClick={() => void run(async () => { await api("delete-local", { vendor: form.record.vendor, icpn: form.record.identifier }); setForm(empty); setPreview([]); await reload(); setMessage("Local IC deleted."); })}>Delete selected local IC</button>}
+    </section>
+    <section><h2>Official IC with Customer Profile <small>OFFICIAL IC · CUSTOMER PROFILE</small></h2>
+      <p>IC identity and Qualification belong to the Official Catalog. Linked customer Profiles remain CUSTOMER / UNVERIFIED, not Job authorization.</p>
+      <div className="managementList" aria-label="Customer Profiles linked to Official ICs">{linkedProfiles.map(item => <p key={`${item.record.vendor}:${item.record.identifier}`}>
+        <b>{item.record.identifier}</b> · {item.record.vendor} · <strong>{item.link_status === "ACTIVE" ? "OFFICIAL IC" : "CUSTOMER IC · OFFICIAL PENDING"}</strong> · CUSTOMER PROFILE <code>{String(item.profile.profile_id ?? "—")}</code> · r{item.revision} · UNVERIFIED
+      </p>)}</div>
     </section>
     <section id="local-ic-editor"><h2>Record &amp; Custom Programming Profile</h2>
       <div className="managementGrid">{(["vendor", "identifier", "family", "package", "flash_size"] as const).map(key => <label key={key}>{key.replace("_", " ")}<input value={form.record[key]} onChange={event => setRecord(key, event.target.value)} /></label>)}
@@ -142,6 +157,18 @@ function ManagementContent() {
         <label>Source Evidence references<input value={Array.isArray(form.profile.source_evidence) ? form.profile.source_evidence.join(", ") : ""} onChange={event => setProfile("source_evidence", event.target.value.split(",").map(value => value.trim()).filter(Boolean))} /></label>
       </div>
       <details><summary>Advanced profile fields and Source Evidence</summary><textarea aria-label="Advanced profile JSON" value={JSON.stringify(form.profile, null, 2)} onChange={event => { try { const profile = JSON.parse(event.target.value); setPreview([]); setForm(current => ({ ...current, profile })); } catch { /* Keep the last valid object. */ } }} /></details>
+      {form.revision && <div className="managementLinkReview">
+        <p><strong>Link to Official IC:</strong> only for the same physical chip and exact Manufacturer/ICPN already published in the Official Catalog. Customer Profile never becomes Official Qualification.</p>
+        <label><input type="checkbox" checked={sameIcConfirmed} onChange={event => setSameIcConfirmed(event.target.checked)} />I verified that this CUSTOMER IC and the published OFFICIAL IC are the same physical device.</label>
+        <button type="button" disabled={busy || !sameIcConfirmed} onClick={() => void run(async () => {
+          const result = await api<{ link: { profile_id: string } }>("link-local-official", {
+            vendor: form.record.vendor, icpn: form.record.identifier,
+            expected_local_revision: form.revision, confirmed_same_ic: true,
+          });
+          setForm(empty); setSameIcConfirmed(false); setPreview([]); setBatch([]);
+          await reload(); setMessage(`Linked OFFICIAL IC to CUSTOMER Profile ${result.link.profile_id}. No programming qualification changed.`);
+        })}>Link to Official IC (preserve Customer Profile)</button>
+      </div>}
       <div className="managementActions"><button disabled={busy} onClick={() => void run(async () => { const result = await api<{ changes: LocalEntry[] }>("validate", { entries: selectedBatch }); setPreview(result.changes); setMessage("Validation passed. Review the changes below."); })}>Validate</button>
       <button disabled={busy || !preview.length} onClick={() => void run(async () => { await api("local", { entries: selectedBatch }); setBatch([]); setPreview([]); await reload(); setMessage("Local records saved atomically."); })}>Save local changes</button></div>
     </section>
@@ -162,7 +189,7 @@ function ManagementContent() {
       <div className="managementActions"><input aria-label="Search official ICs" placeholder="Vendor, family or exact ICPN" value={officialSearch} onChange={event => setOfficialSearch(event.target.value)} />
         <button disabled={busy || officialSearch.trim().length < 2} onClick={() => void run(async () => { const result = await api<{ official: OfficialSummary[]; total_count: number }>("search", undefined, `?q=${encodeURIComponent(officialSearch)}`); setOfficialMatches(result.official); setMessage(`${result.total_count} official matches`); })}>Search official</button></div>
       <div className="managementList">{officialMatches.map(item => <button key={`${item.vendor}:${item.identifier}`} onClick={() => void run(() => loadOfficial(item.vendor, item.identifier))}>
-        <b>{item.identifier}</b><span>{item.vendor} · {item.family} · L{item.level}</span><em>OFFICIAL · {item.source} · {history?.active_revision?.slice(0, 12)}</em>
+        <b>{item.identifier}</b><span>{item.vendor} · {item.family} · L{item.level}</span><em>OFFICIAL IC{linkedProfiles.some(link => link.link_status === "ACTIVE" && link.record.vendor.toLowerCase() === item.vendor.toLowerCase() && link.record.identifier.toLowerCase() === item.identifier.toLowerCase()) ? " · CUSTOMER PROFILE" : ""} · {item.source} · {history?.active_revision?.slice(0, 12)}</em>
       </button>)}</div>
       <div className="managementGrid"><label>Manufacturer<input value={officialVendor} onChange={event => setOfficialVendor(event.target.value)} /></label><label>Exact ICPN<input value={officialICPN} onChange={event => setOfficialICPN(event.target.value)} /></label></div>
       <button disabled={busy} onClick={() => void run(() => loadOfficial(officialVendor, officialICPN))}>Load official record</button>
