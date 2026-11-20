@@ -130,6 +130,12 @@ def _m3_outcome(manager, job_id, kind, *, active=False):
         manager._execution_lease = lease
 
 
+def _m3_logged_reasons(manager) -> list[tuple[str, str]]:
+    import re
+    return re.findall(r"(ppu_resource_reservation_\w+) .*?reason='(\w+)'",
+                      manager.server_log.path.read_text())
+
+
 def _m3_b3_refused(manager) -> bool:
     try:
         lease = manager.acquire_asset_set_quiesce()
@@ -239,6 +245,8 @@ def test_ttl_expiry_with_an_active_job_keeps_every_exclusion(tmp_path: Path) -> 
     _m3_outcome(manager, "job-run", "pass_safe")
     manager._release_execution_job("job-run")
     assert manager.resource_reservation_snapshot()["state"] == "NONE"
+    assert _m3_logged_reasons(manager) == [
+        ("ppu_resource_reservation_released", "RESERVATION_EXPIRED_SAFE_OFF_PROVEN")]
     assert not _m3_b3_refused(manager)
 
 
@@ -299,6 +307,9 @@ def test_partial_fail_cancel_and_denial_still_release_when_each_site_is_safe(tmp
         _m3_outcome(manager, job, kind)
     assert manager.resource_reservation("release", owner_id="batch-1",
                                         token=token)["state"] == "RELEASED"
+    # The log states the proof outcome (HIL 2026-11-20 logged NOT_PROVEN here).
+    assert _m3_logged_reasons(manager) == [
+        ("ppu_resource_reservation_released", "RELEASE_SAFE_OFF_PROVEN")]
     assert not _m3_b3_refused(manager)
 
 
