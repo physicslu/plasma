@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import os
 import tempfile
 import unittest
 
