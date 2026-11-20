@@ -626,12 +626,18 @@ def _wp07_proc(tmp_path, r, pids):
     proc.mkdir()
     for pid, (fds, maps) in pids.items():
         (proc / pid / "fd").mkdir(parents=True)
+        _wp07_stat(proc, pid, 1000 + int(pid))
         for n, target in enumerate(fds, start=3):
             os.symlink(target, proc / pid / "fd" / str(n))
         (proc / pid / "maps").write_text("".join(
             f"b6f00000-{0xb6f00000 + size:08x} rw-s {offset:08x} 00:06 1 {device}\n"
             for offset, size, device in maps))
     return proc
+
+
+def _wp07_stat(proc, pid, start):
+    """``/proc/<pid>/stat`` whose field 22 (start time) is ``start``."""
+    (proc / pid / "stat").write_text(f"{pid} (x) S " + "0 " * 18 + f"{start} 0 0\n")
 
 
 def _wp07_locks(proc, entries):
@@ -748,6 +754,230 @@ def test_wp07_owner_attaching_during_the_census_is_proven_at_observation(tmp_pat
     _wp07_locks(proc, [])
     assert g.scan_proc_consumers(procroot=proc, release=r.release,
                                  cooperating=lambda: stale)[1] == ["100"]
+
+# --- Stale owner evidence (2-Site HIL 2026-11-20, Site 1 Cycle 98) ----------
+# The native owner closes /dev/mem BEFORE dropping its locks, and the census
+# proves an owner a little AFTER reading its fds/VMAs. Each race is injected
+# deterministically from inside the census' own proof call (no sleeps).
+
+def _c98(tmp_path, monkeypatch, fds=("/dev/mem",), maps=((0x43C02000, 0x1000, "/dev/mem"),)):
+    r = _wp07_root(tmp_path, monkeypatch)
+    g = r.guard
+    site2_lock = g.site_lock_path(2)
+    site2_lock.touch(); r.fence.touch()
+    proc = _wp07_proc(tmp_path, r, {"100": (list(fds), list(maps)), "300": (["/dev/null"], [])})
+    owner_locks = [("WRITE", "100", site2_lock), ("READ", "100", r.fence)]
+    _wp07_locks(proc, owner_locks)
+    r.record(2)
+    bound = dict(release=r.release, admitting_site=1, boot_id="boot-a",
+                 session_id="fpga-s1", procroot=proc)
+    return r, g, proc, owner_locks, bound
+
+
+def _census(g, r, proc, bound, race=None):
+    """Run Site 1's census; ``race(n)`` mutates /proc before proof call n."""
+    calls = []
+
+    def cooperating():
+        calls.append(1)
+        if race is not None:
+            race(len(calls))
+        return g.cooperating_site_owners(**bound)
+
+    detail = {}
+    result = g.scan_proc_consumers(procroot=proc, release=r.release, diagnostic=detail,
+                                   cooperating=cooperating, vanished_pids="skip")
+    return result, detail, len(calls)
+
+
+def _close_devmem(proc, pid="100"):
+    for fd in (proc / pid / "fd").iterdir():
+        fd.unlink()
+    (proc / pid / "maps").write_text("")
+
+
+def test_c98_peer_owner_exit_between_observation_and_proof_is_not_a_conflict(tmp_path, monkeypatch):
+    """Case 1: peer OpenOCD closes /dev/mem, then releases its locks."""
+    r, g, proc, _, bound = _c98(tmp_path, monkeypatch)
+
+    def teardown(n):
+        if n == 1:  # observed holding /dev/mem; now munmap+close, then flock UN
+            _close_devmem(proc)
+            _wp07_locks(proc, [])
+    assert _census(g, r, proc, bound, teardown)[:2] == ((True, []), {
+        "status": "COMPLETE", "attempt": 1, "observed": 2, "conflicts": 0,
+        "rescans": 0, "vanished_skipped": 0})
+
+
+def test_c98_peer_owner_exits_entirely_before_proof_is_not_a_conflict(tmp_path, monkeypatch):
+    """Case 6: the PID is gone when re-read (confirmed exit)."""
+    r, g, proc, _, bound = _c98(tmp_path, monkeypatch)
+
+    def exit_(n):
+        if n == 1:
+            _close_devmem(proc)
+            for leaf in ("maps", "stat", "fd"):
+                path = proc / "100" / leaf
+                path.rmdir() if leaf == "fd" else path.unlink()
+            (proc / "100").rmdir()
+            _wp07_locks(proc, [])
+    (complete, conflicts), detail, _ = _census(g, r, proc, bound, exit_)
+    assert (complete, conflicts) == (True, []) and detail["vanished_skipped"] == 1
+
+
+def test_c98_peer_owner_still_holding_its_page_is_allowed(tmp_path, monkeypatch):
+    """Case 2: a live, proven Site 2 owner; also when the first proof missed it."""
+    r, g, proc, owner_locks, bound = _c98(tmp_path, monkeypatch)
+    assert _census(g, r, proc, bound)[0] == (True, [])
+    _wp07_locks(proc, [])
+
+    def locks_back(n):
+        if n == 2:  # fresh proof finds the owner's Site lock + fence SH
+            _wp07_locks(proc, owner_locks)
+    (result, detail, calls) = _census(g, r, proc, bound, locks_back)
+    assert result == (True, []) and calls == 2
+
+
+@pytest.mark.parametrize("case", ["no_locks", "locks_vanish_fd_kept"])
+def test_c98_unproven_devmem_holder_still_conflicts_after_revalidation(tmp_path, monkeypatch, case):
+    """Cases 3 and 9: an illegal holder, or lock evidence gone while /dev/mem is held."""
+    r, g, proc, _, bound = _c98(tmp_path, monkeypatch)
+    if case == "no_locks":
+        _wp07_locks(proc, [])
+
+    def drop_locks(n):
+        _wp07_locks(proc, [])  # never closes /dev/mem
+    (result, detail, calls) = _census(g, r, proc, bound, drop_locks)
+    assert result == (True, ["100"]) and calls == 2
+    assert detail["status"] == "PROC_CONFLICT" and detail["conflict"] == {
+        "pid": "100", "start_time": "1100", "device": "DEVMEM",
+        "reason": "OWNER_UNPROVEN", "stage": "LOCK", "revalidation": "STILL_HELD"}
+
+
+def test_c98_proven_owner_mapping_outside_its_page_still_conflicts(tmp_path, monkeypatch):
+    """Case 4: proof holds, but the VMA spills past the Site 2 page."""
+    r, g, proc, _, bound = _c98(tmp_path, monkeypatch, maps=((0x43C02000, 0x2000, "/dev/mem"),))
+    (result, detail, calls) = _census(g, r, proc, bound)
+    assert result == (True, ["100"]) and calls == 2
+    assert detail["conflict"]["reason"] == "MAPPING_OUTSIDE_SITE_PAGE"
+    assert detail["conflict"]["stage"] == "MAPS"
+
+
+@pytest.mark.parametrize("fds,maps,device,stage", [
+    (["/dev/uio0"], [], "UIO", "FD"),
+    (["/dev/null"], [(0x0, 0x1000, "/dev/uio1")], "UIO", "MAPS"),
+    (["/dev/mem", "/dev/xdevcfg"], [(0x43C02000, 0x1000, "/dev/mem")], "XDEVCFG", "FD"),
+    (["/dev/fpga0"], [], "FPGA0", "FD"),
+])
+def test_c98_hard_devices_are_never_revalidated(tmp_path, monkeypatch, fds, maps, device, stage):
+    """Case 5: /dev/uio*, xdevcfg and fpga0 stay immediate conflicts."""
+    r, g, proc, _, bound = _c98(tmp_path, monkeypatch, fds=fds, maps=maps)
+
+    def release_everything(n):
+        _close_devmem(proc)  # would hide the evidence if a re-read happened
+    (result, detail, calls) = _census(g, r, proc, bound, release_everything)
+    assert result == (True, ["100"]) and calls == 0
+    assert detail["conflict"] == {"pid": "100", "start_time": "1100", "device": device,
+                                  "reason": "HARD_DEVICE", "stage": stage,
+                                  "revalidation": "NOT_RUN"}
+
+
+def test_c98_pid_reused_before_revalidation_fails_closed(tmp_path, monkeypatch):
+    """Case 7: a different process now owns PID 100 (start time changed)."""
+    r, g, proc, _, bound = _c98(tmp_path, monkeypatch)
+
+    def reuse(n):
+        if n == 1:
+            _close_devmem(proc)  # the new process holds nothing: still refused
+            _wp07_locks(proc, [])
+            _wp07_stat(proc, "100", 777777)
+    (result, detail, _) = _census(g, r, proc, bound, reuse)
+    assert result == (False, ["100"])
+    assert (detail["status"], detail["pid"], detail["phase"]) == (
+        "PID_REUSED_DURING_SCAN", "100", "REVALIDATE_STAT")
+
+
+@pytest.mark.parametrize("what", ["fd", "maps", "stat"])
+def test_c98_unreadable_live_pid_on_revalidation_fails_closed(tmp_path, monkeypatch, what):
+    """Case 8: FD/MAPS (or start time) of a live PID cannot be re-read."""
+    from pathlib import Path
+    r, g, proc, _, bound = _c98(tmp_path, monkeypatch)
+    armed = []
+    real_iterdir, real_read_text = Path.iterdir, Path.read_text
+
+    def iterdir(self):
+        if armed and what == "fd" and self == proc / "100" / "fd":
+            raise PermissionError("denied")
+        return real_iterdir(self)
+
+    def read_text(self, *a, **k):
+        if armed and self == proc / "100" / what and what != "fd":
+            raise PermissionError("denied")
+        return real_read_text(self, *a, **k)
+
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+    monkeypatch.setattr(Path, "read_text", read_text)
+
+    def arm(n):
+        _wp07_locks(proc, [])
+        armed.append(1)
+    (result, detail, _) = _census(g, r, proc, bound, arm)
+    assert result == (False, ["100"])
+    assert detail["status"] == "PROC_VISIBILITY_DENIED"
+    assert detail["phase"] == "REVALIDATE_" + what.upper()
+
+
+def test_c98_missing_start_time_cannot_prove_no_reuse(tmp_path, monkeypatch):
+    r, g, proc, _, bound = _c98(tmp_path, monkeypatch)
+    (proc / "100" / "stat").unlink()
+    _wp07_locks(proc, [])
+    (result, detail, _) = _census(g, r, proc, bound)
+    assert result == (False, ["100"]) and detail["error"] == "TargetSafetyDenied"
+
+
+def test_c98_two_sites_admitting_while_each_peer_runs_or_exits(tmp_path, monkeypatch):
+    """Case 10: Site 1 and Site 2 census each other, interleaved deterministically:
+    Site 2's census runs inside Site 1's proof while Site 2's owner tears down."""
+    r, g, proc, owner_locks, bound = _c98(tmp_path, monkeypatch)
+    site1_lock = g.site_lock_path(1)
+    site1_lock.touch()
+    (proc / "200" / "fd").mkdir(parents=True)
+    _wp07_stat(proc, "200", 1200)
+    import os
+    os.symlink("/dev/mem", proc / "200" / "fd" / "3")
+    (proc / "200" / "maps").write_text(
+        "b6f00000-b6f01000 rw-s 43c01000 00:06 1 /dev/mem\n")
+    site1_owner = [("WRITE", "200", site1_lock), ("READ", "200", r.fence)]
+    _wp07_locks(proc, owner_locks + site1_owner)
+    r.record(1)
+    bound2 = dict(bound, admitting_site=2)
+    inner = {}
+
+    def site2_admits_then_site2_owner_exits(n):
+        if n == 1:
+            inner["site2"] = g.scan_proc_consumers(
+                procroot=proc, release=r.release, vanished_pids="skip",
+                cooperating=lambda: g.cooperating_site_owners(**bound2))
+            _close_devmem(proc, "100")
+            _wp07_locks(proc, site1_owner)
+
+    calls = []
+
+    def site1_cooperating():
+        calls.append(1)
+        site2_admits_then_site2_owner_exits(len(calls))
+        return g.cooperating_site_owners(**bound)
+
+    # Site 2's admission sees its peer (Site 1 owner, PID 200) and passes; it
+    # treats its own still-running PID 100 as not cooperating with itself,
+    # exactly as before (the same Site cannot be admitted twice).
+    site1 = g.scan_proc_consumers(procroot=proc, release=r.release,
+                                  cooperating=site1_cooperating, vanished_pids="skip")
+    assert inner["site2"] == (True, ["100"])
+    # Site 1's admission: PID 100 exited mid-proof -> no conflict; PID 200 is
+    # Site 1's own owner without a Site 1 proof -> still a conflict.
+    assert site1 == (True, ["200"])
+
 
 def test_wp07_unbound_site_admission_exempts_nothing(tmp_path, monkeypatch):
     r = _wp07_root(tmp_path, monkeypatch)

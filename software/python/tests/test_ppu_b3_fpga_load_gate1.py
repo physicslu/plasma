@@ -511,7 +511,9 @@ def test_root_bundle_load_census_incomplete_keeps_bounded_detail(tmp_path):
     ("fpga manager", "AdmissionDenied"),
     ("PROC_SCAN_INCOMPLETE:/proc/1/cmdline", "AdmissionDenied"),
     ("PROC_SCAN_INCOMPLETE:python3 -c secret", "AdmissionDenied"),
-    ("PROC_SCAN_INCOMPLETE:a:b:c:d:e", "AdmissionDenied"),          # > 4 detail fields
+    ("PROC_RESOURCE_OWNER_CONFLICT:4242:913377:DEVMEM:OWNER_UNPROVEN:LOCK:STILL_HELD",
+     "PROC_RESOURCE_OWNER_CONFLICT:4242:913377:DEVMEM:OWNER_UNPROVEN:LOCK:STILL_HELD"),
+    ("PROC_SCAN_INCOMPLETE:a:b:c:d:e:f:g", "AdmissionDenied"),      # > 6 detail fields
     ("PROC_SCAN_INCOMPLETE:" + "x" * 41, "AdmissionDenied"),        # over-long token
     ("lowercase_code", "AdmissionDenied"),
     ("PROC_SCAN_INCOMPLETE:", "AdmissionDenied"),

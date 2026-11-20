@@ -941,6 +941,15 @@ class RootAdmissionFailureClassificationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "MANAGER_LOAD_PROVENANCE_UNPROVEN"):
             admission.check_exact(**dict(common, passive=facts,
                                          original_manager_load="no load"))
+        # Same code, now attributable: numeric PID/start time and fixed tokens.
+        conflict = {"pid": "4242", "start_time": "913377", "device": "DEVMEM",
+                    "reason": "OWNER_UNPROVEN", "stage": "LOCK", "revalidation": "STILL_HELD"}
+        with self.assertRaisesRegex(
+                ValueError, "^PROC_RESOURCE_OWNER_CONFLICT:4242:913377:DEVMEM:"
+                            "OWNER_UNPROVEN:LOCK:STILL_HELD$"):
+            admission.check_exact(**dict(common, passive=facts | {
+                "proc_conflicts": ["4242"],
+                "proc_scan_diagnostic": {"status": "PROC_CONFLICT", "conflict": conflict}}))
 
     def test_mmio_still_denies_wrong_aperture_or_owner(self):
         release, facts = self.facts()

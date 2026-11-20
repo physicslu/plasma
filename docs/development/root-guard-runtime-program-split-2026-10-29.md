@@ -119,3 +119,34 @@ Host-only proof: `scripts/tests/test_fpga_image_root.py`
 This changes **protected Root executable bytes**: a separately authorized
 protected Root deployment and 2-Site HIL are required before any hardware
 claim. **NOT_RUN** here: protected Root install, Z2 HIL.
+
+## Stale `/dev/mem` owner evidence (2026-11-20, Site 1 Cycle 98)
+
+**Hypothesis (timing-supported, conflicting PID not recorded).** Site 1's
+census read Site 2's OpenOCD fds/VMAs while it still held `/dev/mem`; Site 2
+then quit normally (munmap → close → Site lock UN → fence UN), and Site 1's
+later `/proc/locks` proof no longer showed it, so the stale observation was
+refused as `PROC_RESOURCE_OWNER_CONFLICT`
+(`plasma-evidence/wo2-m2-2site-100-20261120/ROOT-CAUSE-C98.md`).
+
+**Change (Site admission only — `cooperating` given).** An unproven
+`/dev/mem` holder is re-read **once** (start time, fds, VMAs) and judged on
+that fresh read:
+
+| Fresh read | Result |
+|---|---|
+| PID gone (confirmed) or no `/dev/mem` fd/VMA any more | not a conflict |
+| still holds; proven other-Site owner mapping only its page | allowed (existing contract) |
+| still holds; unproven or mapping outside its page | `PROC_RESOURCE_OWNER_CONFLICT` |
+| start time changed / unavailable, live PID unreadable, malformed | fail closed (`PROC_SCAN_INCOMPLETE:…`) |
+
+Hard devices (`/dev/uio*`, `xdevcfg`, `fpga0`) are never revalidated. The
+FPGA Manager strict census (`site=None`) is unchanged. No PID or process-name
+allowlist. The refusal keeps its code and adds token-only detail:
+`PROC_RESOURCE_OWNER_CONFLICT:<pid>:<start time>:<DEVMEM|UIO|XDEVCFG|FPGA0>:<HARD_DEVICE|OWNER_UNPROVEN|MAPPING_OUTSIDE_SITE_PAGE>:<FD|MAPS|LOCK>:<NOT_RUN|STILL_HELD>`
+(the Root and Site Adapter code filters accept up to six fields).
+
+Host-only proof: `software/python/tests/test_swd_native_c_compilation.py`
+(`test_c98_*`, races injected from inside the proof call, no sleeps).
+Protected Root executable bytes change again: Root deployment and 2-Site HIL
+are **NOT_RUN**.
