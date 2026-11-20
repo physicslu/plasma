@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+from plasma_web.device_catalog import default_catalog_manifest_path
+from plasma_web.programming_qualification import get_default_programming_qualification_registry
 from plasma_web.backend_candidate_registry import BackendCandidateRegistry
 from plasma_web.backend_source_reference import (
     backend_source_reference, load_pinned_upstream,
@@ -21,6 +25,17 @@ class BackendSourceReferenceTests(unittest.TestCase):
         cls.catalog = get_default_device_catalog()
         cls.candidates = BackendCandidateRegistry(cls.catalog)
         cls.upstream = load_pinned_upstream()
+        # Offline test fixture: runtime Selector always consumes a qualified SQLite revision.
+        cls._sqlite_temporary = tempfile.TemporaryDirectory(prefix="plasma-selector-regression-")
+        cls.addClassCleanup(cls._sqlite_temporary.cleanup)
+        database = Path(cls._sqlite_temporary.name) / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
+        cls._sqlite_environment = patch.dict(os.environ, {"PLASMA_CATALOG_SQLITE_DB": str(database)})
+        cls._sqlite_environment.start()
+        cls.addClassCleanup(cls._sqlite_environment.stop)
 
     def row(self, icpn):
         result = self.catalog.resolve("STMicroelectronics", icpn)
@@ -95,8 +110,7 @@ class BackendSourceReferenceTests(unittest.TestCase):
             backend_source_reference(row, c, self.upstream)
 
     def test_gateway_exposes_source_reference_without_authorizing_runtime(self):
-        with (patch("plasma_web.legacy_device_selector.get_default_device_catalog", return_value=self.catalog),
-              patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=self.candidates),
+        with (patch("plasma_web.legacy_device_selector.get_default_backend_candidate_registry", return_value=self.candidates),
               patch("plasma_web.legacy_device_selector.default_pinned_upstream", return_value=self.upstream)):
             for icpn, provider in (("STM32F103C8T6", "openocd-upstream"),
                                    ("STM32H503CBT6", "openocd-st-h5-research"),
