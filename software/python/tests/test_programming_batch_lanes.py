@@ -11,12 +11,12 @@ import pytest
 from plasma_manager.programming import ProgrammingError
 from plasma_manager.programming_batch import ProgrammingBatchCoordinator
 from .test_bundle_programming_workflow import FakeGateway, image
-from .test_programming_batch_targets import rig, one, with_start
+from .test_programming_batch_targets import MultiplexGateway, rig, one, with_start
 
 WAIT = 10
 
 
-class EventGateway(FakeGateway):
+class EventGateway(MultiplexGateway):
     """Multiplex Job IDs and model the existing PPU REST execution owner."""
     def __init__(self, base, sites):
         super().__init__(image=image(), coordinator=base.coordinator, resource_for=base.resource_for)

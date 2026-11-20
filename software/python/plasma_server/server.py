@@ -280,6 +280,15 @@ class PlasmaServer:
         if metadata.get("message_type") == DIAGNOSTIC_REQUEST_MESSAGE_TYPE:
             return self._dispatch_diagnostic(frame, peer)
 
+        if metadata.get("message_type") == "resource_reservation":
+            if (frame.binary or frame.map_data
+                    or set(metadata) != {"protocol_version", "message_type", "action",
+                                        "owner_id", "token", "expected"}):
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "reservation request is invalid")
+            return self._success(self.manager.resource_reservation(
+                metadata["action"], owner_id=metadata["owner_id"],
+                token=metadata["token"], expected=metadata["expected"]))
+
         try:
             operation = Operation(str(metadata["operation"]))
         except (KeyError, ValueError) as exc:

@@ -52,6 +52,11 @@ class PPUStatusTests(unittest.TestCase):
                         "ppu_id": "ppu-42",
                         "facility_id": "factory-a",
                     },
+                    "resource_reservation": {
+                        "state": "NONE",
+                        "epoch": status["ppu"]["resource_reservation"]["epoch"],
+                        "ppu_id": "ppu-42",
+                    },
                     "capabilities": {
                         "max_supported_sites": 8,
                         "operations": ["erase", "program", "verify", "read"],

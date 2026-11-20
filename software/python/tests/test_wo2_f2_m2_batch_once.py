@@ -113,30 +113,15 @@ def test_immutable_preparation_runs_once_per_batch_not_per_cycle(tmp_path, repea
 
 @pytest.mark.parametrize("repeat", [3, 20])
 def test_per_cycle_call_counts_before_and_after(tmp_path, repeat):
-    """The measured regression: counts per Cycle, before (pre-M2 call shape)
-    and after. Mock sleeps are not shortened; only calls disappear."""
-    before = Counted(tmp_path / "before", repeat=repeat, legacy=True)
-    after = Counted(tmp_path / "after", repeat=repeat)
-    assert before.run()["outcome"] == after.run()["outcome"] == "PASS"
-    per_cycle = {}
-    for name, b in (("before", before), ("after", after)):
-        calls = b.bootstrap_calls()
-        per_cycle[name] = {
-            "site_status": b.http["GET /api/status?site"] / repeat,
-            "health": b.http["GET /api/health/ready"] / repeat,
-            "bootstrap_status": calls["status"] / repeat,
-            "bootstrap_assets": calls["assets"] / repeat,
-            "route_loads": b.local["routes"],
-            "image_decodes": b.local["_parse_request"],
-        }
-    assert per_cycle["before"] == {
-        "site_status": 4, "health": 3, "bootstrap_status": 1, "bootstrap_assets": 3,
-        "route_loads": repeat, "image_decodes": 1 + repeat}
-    # Plan reuses the admission's Active Set + Site status read; PREFLIGHT,
-    # the pre-submit Active Set and the pre-submit readiness all remain.
-    assert per_cycle["after"] == {
-        "site_status": 3, "health": 3, "bootstrap_status": 1, "bootstrap_assets": 2,
-        "route_loads": 1, "image_decodes": 2}
+    """M3: one assets read and one reservation pair per PPU/Batch."""
+    b = Counted(tmp_path / "after", repeat=repeat)
+    assert b.run()["outcome"] == "PASS"
+    calls = b.bootstrap_calls()
+    assert calls["assets"] == 1 and calls["status"] == repeat
+    assert b.http["GET /api/status?site"] == 3 * repeat + 1
+    assert b.http["GET /api/health/ready"] == 3 * repeat
+    assert b.http["POST /api/resource-reservations"] == 2
+    assert b.local["routes"] == 1 and b.local["_parse_request"] == 2
 
 
 def test_two_sites_share_one_preparation_with_their_own_bindings(tmp_path):
@@ -214,6 +199,35 @@ def test_resource_change_after_plan_is_refused_before_submit(tmp_path):
     batch = b.run()
     assert batch["outcome"] in ("FAIL", "BLOCKED") and b.gateway.posts == []
     assert batch["units"][0]["reason"] == "RESOURCE_IDENTITY_NOT_CONFIRMED"
+
+
+def test_runtime_epoch_change_refuses_submit_without_bootstrap_reread(tmp_path):
+    b = Counted(tmp_path, repeat=3)
+    plan = b.workflow.plan
+
+    def restart_after_plan(alias, body, **kw):
+        result = plan(alias, body, **kw)
+        b.gateway.resource_reservation["epoch"] = "restarted-runtime"
+        return result
+
+    b.workflow.plan = restart_after_plan
+    batch = b.run()
+    assert batch["outcome"] in ("FAIL", "BLOCKED") and b.gateway.posts == []
+    assert batch["units"][0]["reason"] == "RESOURCE_RESERVATION_CHANGED"
+    assert b.bootstrap_calls()["assets"] == 1
+
+
+def test_heartbeat_detects_changed_reservation_and_invalidates_snapshot(tmp_path):
+    _batches, workflow, gateways, _coordinators = rig(tmp_path, sites=(1,))
+    prepared = workflow.prepare(_plan_body(1))
+    workflow.begin_batch_resource("z2", "batch-a", prepared.resources[1], 1)
+    assert workflow._batch_session("z2", "batch-a") is not None
+    workflow.renew_batch_resource("z2", "batch-a")
+    assert gateways["z2"].reservation_calls == ["acquire", "check"]
+    gateways["z2"].resource_reservation["epoch"] = "other-runtime"
+    with pytest.raises(wf.ProgrammingError, match="Batch Resource changed"):
+        workflow.renew_batch_resource("z2", "batch-a")
+    assert workflow._batch_session("z2", "batch-a") is None
 
 
 def _plan_body(site=1, image=FW_A):
@@ -350,6 +364,38 @@ def test_tamper_with_same_size_and_mtime_fails_after_a_hit(staged):
     assert victim.stat().st_size == info.st_size and victim.stat().st_mtime_ns == info.st_mtime_ns
     with pytest.raises(assets.AssetSetError, match="ASSET_SET_FILE_MISMATCH"):
         assets.read_active_resource_identity(root)
+
+
+def test_m3_reservation_check_catches_same_size_mtime_tamper_and_isolates(staged, tmp_path):
+    """M3 P1-10: a reserved Batch reuses no stat identity; each PPU Check and
+    each Job admission fully verifies, and a tamper isolates the PPU."""
+    from functools import partial
+    from plasma_core.errors import PlasmaError
+    from plasma_server.site_manager import SiteManager
+    from .helpers import make_config
+    root, built = staged
+    manager = SiteManager(make_config(tmp_path / "ppu"))
+    manager._active_resource_resolver = partial(assets.read_active_resource_identity, root)
+    identity = assets.read_active_resource_identity(root)
+    token = manager.resource_reservation("acquire", owner_id="batch-1", expected={
+        "ppu_id": manager.config.ppu.id, "asset_set_sha256": identity["asset_set_sha256"],
+        "generation": identity["generation"],
+        "resource_set_sha256": identity["resource_set_sha256"]})["token"]
+    manager.resource_reservation("check", owner_id="batch-1", token=token)  # Snapshot hit
+    stage = root / "assets/staged" / built.archive_sha256
+    victim = next(p for p in (stage / "payload/packages").rglob("*.json"))
+    info = victim.stat()
+    raw = bytearray(victim.read_bytes())
+    raw[-2] = ord(" ") if raw[-2] != ord(" ") else ord("\t")
+    victim.write_bytes(bytes(raw))
+    os.utime(victim, ns=(info.st_atime_ns, info.st_mtime_ns))
+    with pytest.raises(PlasmaError):
+        manager.resource_reservation("check", owner_id="batch-1", token=token)
+    snap = manager.resource_reservation_snapshot()
+    assert (snap["state"], snap["reason"]) == (
+        "RECOVERY_REQUIRED", "RESERVED_RESOURCE_IDENTITY_UNVERIFIABLE")
+    with pytest.raises(PlasmaError):
+        manager.acquire_asset_set_quiesce()
 
 
 @pytest.mark.parametrize("target", ["file", "staged_dir"])

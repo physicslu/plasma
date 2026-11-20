@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import secrets
 from types import SimpleNamespace
 
 import pytest
@@ -85,9 +86,37 @@ class MultiplexGateway(FakeGateway):
         self.job_lock = threading.RLock()
         self.job_kwargs = kwargs
         self.jobs = {}
+        self.resource_reservation = None
+        self.reservation_calls = []
 
     def relay(self, method, path, **kwargs):
         with self.job_lock:
+            if method == 'POST' and path == '/api/resource-reservations':
+                request = json.loads(kwargs['body'])
+                self.reservation_calls.append(request['action'])
+                if request['action'] == 'acquire':
+                    if self.resource_reservation is not None:
+                        return self._resp(409, {'ok': False})
+                    self.resource_reservation = {'state': 'ACTIVE', **request['expected'],
+                                                 'owner_id': request['owner_id'],
+                                                 'token': secrets.token_hex(16), 'epoch': 'test-epoch'}
+                elif (self.resource_reservation is None or
+                      request['owner_id'] != self.resource_reservation['owner_id'] or
+                      request.get('token') != self.resource_reservation['token']):
+                    return self._resp(409, {'ok': False})
+                if request['action'] == 'release':
+                    self.resource_reservation = None
+                    return self._resp(200, {'reservation': {'state': 'RELEASED'}})
+                return self._resp(200, {'reservation': dict(self.resource_reservation)})
+            if method == 'GET' and path.startswith('/api/status?site='):
+                status, headers, raw = super().relay(method, path, **kwargs)
+                if status == 200 and self.resource_reservation is not None:
+                    payload = json.loads(raw)
+                    payload['ppu']['resource_reservation'] = {
+                        key: value for key, value in self.resource_reservation.items()
+                        if key != 'token'}
+                    return self._resp(status, payload)
+                return status, headers, raw
             if method == 'POST' and path == '/api/jobs':
                 options = dict(self.job_kwargs)
                 if isinstance(self.job_final, list):

@@ -27,12 +27,12 @@ import pytest
 
 from plasma_manager.bootstrap_server import BootstrapPlasmaManagerHandler
 from .test_bundle_programming_workflow import FakeGateway, image
-from .test_programming_batch_targets import one, rig, with_start
+from .test_programming_batch_targets import MultiplexGateway, one, rig, with_start
 
 WAIT = 20.0
 
 
-class AuthoritativePPU(FakeGateway):
+class AuthoritativePPU(MultiplexGateway):
     """The PPU side of admission: lease, Site rows, release, refusals."""
 
     def __init__(self, base, sites, *, job_s=0.05, release_s=0.0):

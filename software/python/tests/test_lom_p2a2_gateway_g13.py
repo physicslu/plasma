@@ -160,6 +160,14 @@ def test_engineering_ticket_enrollment_then_signed_gateway_write(lab):
     assert status == 202 and json.loads(body)["ok"] is True
     assert manager_auth.RESPONSE_HEADER in headers                       # proven by the PPU
     assert _Routes.recorded == [("/api/jobs", json.dumps(JOB).encode())]
+    reservation = {"action": "acquire", "owner_id": "batch-test",
+                   "expected": {"ppu_id": "ppu-test", "asset_set_sha256": "a" * 64,
+                                "generation": 1, "resource_set_sha256": "b" * 64}}
+    status, headers, _body = _post(_gateway_client(coordinator, gateway),
+                                   "/api/resource-reservations", reservation)
+    assert status == 202 and manager_auth.RESPONSE_HEADER in headers
+    assert _Routes.recorded[-1] == ("/api/resource-reservations",
+                                     json.dumps(reservation).encode())
 
 
 def test_button_enrollment_binds_the_requesting_manager(lab):
@@ -192,6 +200,9 @@ def test_unsigned_wrong_or_unclassified_writes_fail_closed_before_dispatch(lab):
     store, coordinator = _manager(tmp_path, ppu, gateway, "a")
     coordinator.enrollment("z2", {"entry": "ticket", "ticket": _ticket(ppu)})
     status, payload = _raw(gateway, "POST", "/api/jobs", json.dumps(JOB).encode(),
+                           {"Content-Type": "application/json"})
+    assert status == 401 and payload["error"]["code"] == "CONTROLLER_UNAUTHENTICATED"
+    status, payload = _raw(gateway, "POST", "/api/resource-reservations", b"{}",
                            {"Content-Type": "application/json"})
     assert status == 401 and payload["error"]["code"] == "CONTROLLER_UNAUTHENTICATED"
     assert payload["error"]["controller_generation"] == 1
@@ -314,6 +325,7 @@ def test_every_manager_forwarded_post_route_is_classified():
         "/api/settings/gateway": "ppu.settings.write", "/api/settings/ppu-network": "ppu.settings.write",
         "/api/settings/sites/activation": "site.activation", "/api/settings/sites/2": "site.settings.write",
         "/api/mock/runtime": "ppu.settings.write", "/api/jobs": "site.job.submit",
+        "/api/resource-reservations": "site.job.submit",
         "/api/jobs/job-1/cancel": "site.job.cancel",
         "/api/settings/ppu-network/activation": "ppu.settings.write",
         "/api/settings/ppu-network/activation/act-1/commit": "ppu.settings.write",

@@ -218,6 +218,12 @@ class RuntimeControlServer:
                     if set(request) != {"operation"}:
                         raise RuntimeControlError("execution_lease request fields are invalid")
                     result = self.manager.execution_lease_snapshot()
+                elif operation == "recover_resource_reservation":
+                    # Local, explicit recovery of a RECOVERY_REQUIRED Batch
+                    # Resource Reservation. Never exposed over public HTTP.
+                    if set(request) != {"operation", "recovery_id"}:
+                        raise RuntimeControlError("recovery request fields are invalid")
+                    result = self.manager.recover_resource_reservation(request["recovery_id"])
                 elif operation == "package_action":
                     result = await self._package_action(request, reader, writer)
                 elif operation == "release":

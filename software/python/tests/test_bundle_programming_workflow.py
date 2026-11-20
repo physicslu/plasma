@@ -144,24 +144,45 @@ class FakeGateway:
         # ``site_worker_result`` (key "context" tampers the context instead).
         self.worker_failure: bool | dict = False
         self.polls = 0
+        self.resource_reservation = None
 
     def _resp(self, status, payload):
         return status, {"Content-Type": "application/json"}, json.dumps(payload).encode()
 
     def relay(self, method, path, *, headers, body, timeout_s, max_response_bytes):
+        if method == "POST" and path == "/api/resource-reservations":
+            request = json.loads(body)
+            if request["action"] == "acquire":
+                if self.resource_reservation is not None:
+                    return self._resp(409, {"ok": False})
+                self.resource_reservation = {"state": "ACTIVE", **request["expected"],
+                                             "owner_id": request["owner_id"],
+                                             "token": "fake-reservation-token", "epoch": "fake-epoch"}
+            elif (self.resource_reservation is None or
+                  request["owner_id"] != self.resource_reservation["owner_id"] or
+                  request.get("token") != self.resource_reservation["token"]):
+                return self._resp(409, {"ok": False})
+            if request["action"] == "release":
+                self.resource_reservation = None
+                return self._resp(200, {"reservation": {"state": "RELEASED"}})
+            return self._resp(200, {"reservation": dict(self.resource_reservation)})
         if method == "GET" and path == "/api/health/ready":
             return self._resp(200, {"ok": True, "execution": "ready"})
         if method == "GET" and path.startswith("/api/status?site="):
             if self.status_raises:
                 raise TimeoutError("status read lost")
-            return self._resp(200, {
+            response = {
                 "ppu": {"ppu_id": self.ppu_id,
                         "execution": {"busy": self.busy, "active_job_count": 0},
                         "runtime_activation": {"active": False},
                         "active_resources": self._resources()},
                 "sites": [{"site_id": int(path.rsplit("=", 1)[1]), "enabled": True,
                            "state": "idle", "current_job_id": None, "queued_jobs": 0,
-                           "interface": self.status_interface, "target": self.status_target}]})
+                           "interface": self.status_interface, "target": self.status_target}]}
+            if self.resource_reservation is not None:
+                response["ppu"]["resource_reservation"] = {
+                    key: value for key, value in self.resource_reservation.items() if key != "token"}
+            return self._resp(200, response)
         if method == "POST" and path == "/api/jobs":
             self.posts.append(json.loads(body))
             if self.post_raises:

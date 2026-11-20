@@ -117,3 +117,32 @@ Remaining trust gap: removing the per-call full SHA/tree walk itself needs a sto
 ### 6.5 Unchanged per-Job invariants
 
 Site Ready/Enabled, PPU execution lease/ownership, Root Guard, SAFE_OFF/Seal/recovery, Job Binding verification, full Active Set integrity, fresh Plan/Run/Job identity, durable journals, `OUTCOME_UNKNOWN` no-blind-resend, terminal + SAFE_OFF before the next Cycle, B1/B2/B3 fences; independent Site lanes with no PPU-wide Cycle barrier (8-Site regression test).
+
+## 7. WO-2 F2 M3 — Batch Resource Reservation
+
+The Manager Batch ID is the PPU `rest_client` execution owner on each selected PPU. At Batch execution start the Manager reads that PPU's MACed Bootstrap `/v1/assets` once, reads the PPU verified Resource report, and acquires a PPU Runtime Reservation with the exact PPU ID, Active Set SHA-256, generation, Resource Set SHA-256 and Batch owner. Acquisition re-verifies the PPU Resource contents *under the same SiteManager `_execution_lock`* that guards Job admission and Runtime/Asset Set quiesce. A conflicting B3 activation is refused. One Reservation covers all Sites of that PPU; a multi-PPU Batch has one independent Reservation per PPU.
+
+The PPU returns a random owner token and a fresh process epoch. The Manager keeps the token and Bootstrap asset snapshot only for the running Batch, never in the restart journal or a browser response. Each Job carries that token with its existing execution owner. PPU Job admission rejects a missing, foreign or expired token while a Reservation exists, and rejects a stale token after expiry. The Manager's existing Site status reads also check owner, PPU, epoch, Active Set, generation and Resource identity before Submit; the PPU still verifies the full staged bytes and Job Binding at admission. The Resource Snapshot remains a derived-data optimization, never integrity evidence.
+
+The PPU Reservation TTL is 90 seconds. The Manager checks and renews it every 30 seconds while lanes are running or waiting for manual Continue; renewal fully re-verifies PPU contents. Manager restart closes interrupted Batches from the journal without resubmission and never reuses a former token.
+
+### 7.1 PPU Reservation state machine (Gate 2 fix)
+
+SAFE_OFF evidence for a release comes only from **this PPU's own terminal Job result** for every Job admitted under the token: `details.<kind>.safe_off == true`, the C-3 failure `site_worker_result.safe_off == true`, a C-3 refusal `TRANSPORT_DENIED:` (before any I/O) or `OPERATION_FAILED_SAFE:` (SAFE_OFF verified) per `ppu_site_worker.py`, or no interface attempt at all. `outcome_unknown`, `OUTCOME_UNKNOWN_SITE_SEALED`, missing evidence or an unknown Job are not proof. An empty lease (`active_job_count == 0`) and TTL expiry are never SAFE_OFF evidence.
+
+| State | Entered by | Refuses | Leaves by |
+|---|---|---|---|
+| `NONE` | — | — | Acquire (identity verified under `_execution_lock`) |
+| `ACTIVE` | Acquire | other owners' Jobs, B3/Asset quiesce, Package Actions, other Acquires | Release (proof) → `NONE`; Release (no proof) → `RECOVERY_REQUIRED`; TTL → `EXPIRED`; Check with changed/unverifiable identity → `RECOVERY_REQUIRED` |
+| `EXPIRED` | TTL while a reserved Job is active | everything `ACTIVE` refuses, plus the owner's Jobs and Check | last reserved Job ends: proof → `NONE`, no proof → `RECOVERY_REQUIRED` |
+| `RECOVERY_REQUIRED` | above, or Runtime restart with a record on disk (`RUNTIME_RESTARTED`), or an unreadable record | every Job, Acquire, B3/Asset quiesce, Package Action | `recover_resource_reservation` |
+
+The record is persisted (`<output_root>/ppu-resource-reservation.json`, atomic write + fsync, no token) on Acquire and on every transition and removed on safe release; Acquire is refused unless the write succeeds. B3 cannot run without this Runtime: Asset Set activation requires the Runtime's connection-held quiesce on its local control socket, and both quiesce paths are refused while any record exists. So neither a TTL, a Manager crash nor a Runtime restart can re-open B3 over an unproven Batch.
+
+**Recovery** is explicit and local: Runtime control socket operation `{"operation":"recover_resource_reservation","recovery_id":"<from status>"}` (mode-0600 Runtime socket, never public HTTP). It is refused while any Job lease exists or when the `recovery_id` is not the current one, logs `ppu_resource_reservation_recovered`, and does **not** claim SAFE_OFF: the operator confirms the reserved Sites are physically safe (the existing Site seal / Root Guard still applies to sealed Sites). After recovery a new Batch can Acquire again, so no state is a permanent lock.
+
+The Manager always sends Release at Batch end; the PPU decides between `RELEASED` and `RECOVERY_REQUIRED`. A lost Release leaves the PPU to apply the same rule at TTL.
+
+The Batch start path requires an already Active, PPU-verified Resource Set matching the prepared Route. It fails closed when activation is required; this avoids performing B1/B2/B3 behind an unreserved Batch. The existing one-Job workflow still owns B1/B2/B3. Status/health GET remains independent of the Reservation. Reservation POST uses the Gateway's existing Controller Write Admission and is mapped to `site.job.submit`; the public Gateway offers only Acquire/Check/Release, and the PPU validates exact owner/token for Check/Release. The Manager calls it internally; it is not added to the managed browser relay allowlist.
+
+Counted Host-only M3 path for one already Active PPU with N same-IC Cycles: Bootstrap assets `2N → 1` (the left side is the observed M2 call shape); Bootstrap status remains `N`; Site status `3N → 3N+1`; health `3N`; Reservation POSTs `2` (Acquire/Release) plus one Check per 30 seconds of Batch duration. There is no Check POST per Cycle. Each Site status and Job Binding still pays its full staged SHA-256 verification, so the cost of 30-second Check is additional and real net Z2 latency remains NOT_RUN. Job polling stays at 1000 ms. Host-only 8-Site overlap is software evidence, not a Z2 throughput claim.
