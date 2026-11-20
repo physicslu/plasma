@@ -252,7 +252,9 @@ def _device_search_payload(
     versioned_providers = get_default_openocd_provider_registry() if needs_legacy_enrichment else None
     ic_support = get_default_ic_support_resolver() if needs_legacy_enrichment else None
     device_basic = get_default_manufacturer_device_basic_resolver() if needs_legacy_enrichment else None
-    linked_profiles = CatalogSqliteShadowRepository(Path(database_path)).linked_customer_profiles()
+    linked_profiles = CatalogSqliteShadowRepository(Path(database_path)).linked_customer_profiles(
+        {(record.vendor.casefold(), record.identifier.casefold()) for record in catalog.records}
+    )
     linked_by_key = {
         (entry["record"]["vendor"].casefold(), entry["record"]["identifier"].casefold()): entry
         for entry in linked_profiles
