@@ -138,7 +138,8 @@ def plan_engine_execution(requirements, descriptors, host):
     if not compatible:
         return "NO_COMPATIBLE_ENGINE"
     for engine in compatible:
-        if engine.get("loaded") and engine.get("verified"):
+        if (engine.get("loaded") and engine.get("verified")
+                and engine.get("identity_source") == "hardware_observed"):
             return "REUSE_ENGINE"
     for engine in compatible:
         if not engine.get("loadable"):
@@ -191,8 +192,25 @@ class TestOpfFirstResolution(unittest.TestCase):
     def test_reuse_loaded_verified_engine(self):
         host = HostSpy()
         self.assertEqual(plan_engine_execution(self.req, [
-            self.engine, {**self.engine, "loaded": True, "verified": True}], host),
+            self.engine, {**self.engine, "loaded": True, "verified": True,
+                          "identity_source": "hardware_observed"}], host),
             "REUSE_ENGINE")
+        self.assertEqual(host.calls, [])
+
+    def test_manifest_only_identity_cannot_reuse_loaded_engine(self):
+        host = HostSpy()
+        declared = {**self.engine, "loaded": True, "verified": True,
+                    "identity_source": "declared", "loadable": False}
+        self.assertEqual(plan_engine_execution(self.req, [declared], host),
+                         "NO_COMPATIBLE_ENGINE")
+        self.assertEqual(host.calls, [])
+
+    def test_host_verified_files_do_not_prove_fpga_runtime_identity(self):
+        host = HostSpy()
+        files_verified = {**self.engine, "loaded": True, "verified": True,
+                          "identity_source": "host_verified", "loadable": False}
+        self.assertEqual(plan_engine_execution(self.req, [files_verified], host),
+                         "NO_COMPATIBLE_ENGINE")
         self.assertEqual(host.calls, [])
 
     def test_preflight_before_load(self):
