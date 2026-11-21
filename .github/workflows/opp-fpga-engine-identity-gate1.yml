@@ -1,0 +1,26 @@
+name: OPP FPGA Engine Identity Gate 1
+on:
+  pull_request:
+    paths:
+      - 'docs/architecture/opp-open-fpga-engine-identity-standard-v1-gate1.md'
+      - 'pl/verification/opp_fpga_engine_identity_v1_candidate.json'
+      - 'pl/tests/test_opp_fpga_engine_identity_v1_candidate.py'
+      - '.github/workflows/opp-fpga-engine-identity-gate1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-only-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify candidate JSON
+        run: python -m json.tool pl/verification/opp_fpga_engine_identity_v1_candidate.json > /dev/null
+      - name: Run focused OPP candidate tests
+        run: python -m unittest discover -s pl/tests -p 'test_opp_fpga_engine_identity_v1_candidate.py' -v
