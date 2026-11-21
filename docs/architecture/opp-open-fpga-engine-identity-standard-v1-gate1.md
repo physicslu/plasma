@@ -147,6 +147,15 @@ The `docs/architecture/runtime-fpga-hardware-abi-v1.md` register map is explicit
 
 **Current verified evidence:** architecture document reconciliation and candidate Host-only tests authored; actual production call-site integration, GitHub Actions PASS, Z2 readback and physical conformance are **NOT_VERIFIED**. These are not implied by a proposed register layout.
 
+### Actual code boundary inventory (read-only, main branch)
+
+- `scripts/ppu_opf_reference_openocd.py`: `ReferenceBinding` carries a `ppu_site_engine.EngineSelection`; `load_engine_verified()` invokes `ppu_site_engine.load_engine()` and caches verified **software/Bundle engine files**. Despite the name, this is not proof that an FPGA bitstream was loaded or independently read back.
+- `software/python/plasma_interfaces/base.py`: `BaseInterface` is a per-Site programming hardware boundary with `bind_runtime_job()` trust checks and erase/program/verify/read operations. It is not an FPGA image discovery or configuration API; do not retrofit universal Engine loading into it.
+- `software/python/plasma_interfaces/configuration_owner.py`: `ConfigurationOwner` is explicitly a **synthetic Host-only** configuration model. Its `MODEL_LOAD` state never calls a real FPGA Manager and cannot provide live hardware admission evidence.
+- The concrete product integration seam to investigate next is the `ppu_site_engine.EngineSelection` / reference route before the existing authorized C-3 worker. Verify the full call graph and actual asset provenance before adding compatibility checks; do not assume `EngineSelection` means PL Engine.
+
+**Naming collision warning:** existing `ppu_site_engine` describes the verified OpenOCD execution engine/toolchain; an OPP **FPGA Engine** is a different resource. Never equate their IDs, ABI, image digest or admission evidence. The smallest safe change may be a separate optional FPGA capability binding, not modifications to `load_engine_verified()`.
+
 ## Gate 1 implementation plan (not completed by this document)
 
 1. Reconcile this document with ADR-0009, `runtime_fpga_abi_v1_proposal.json`, `fixed_image_abi_v1_gate1.json`, SWD ABI v5 and existing Image Manifest; identify which contracts are historical or candidates.
