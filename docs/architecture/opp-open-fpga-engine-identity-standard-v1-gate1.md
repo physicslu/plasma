@@ -1,0 +1,90 @@
+# PLASMA OPP Open FPGA Engine Identity & Compatibility Standard v1 — Gate 1
+
+> Status: Gate 1 design candidate; NOT a deployed ABI, accepted conformance certification, or HIL result.
+> Scope: OPP hardware standard and optional OPF Host adapter. Existing SWD ABI v5 and existing runtime/fixed ABI candidates are unchanged.
+
+## Normative architectural boundary
+
+- OPP defines the public FPGA Engine identity, image naming, compatibility and diagnostics rules.
+- OPF Core remains usable without FPGA, PPU, Bundle v3, AXI, SPI or USB. Optional OPF Hardware Adapters translate host/engine discovery and transport.
+- PPU/Host Hardware Owner exclusively controls image load, actual hardware identity, resource mapping, electrical interlocks and programming admission. No Provider can bypass these controls.
+- Third-party implementations may use any FPGA vendor/board and may implement AXI/MMIO, SPI or USB. Conformance is determined by reproducible tests, not a vendor approval list.
+
+## Identities (do not conflate)
+
+| Identity | Meaning | Authority |
+| --- | --- | --- |
+| engine_id | Stable logical engine function (e.g. `plasma.swd.independent`) | Engine descriptor |
+| image_name | Human-readable artifact name containing FPGA device | Artifact metadata |
+| image_id | Stable logical image variant, not a filename or chip ID | Versioned manifest / runtime identity |
+| build_id | Exact 128-bit build correlation token, never a substitute for SHA256 | Reproducible build record + runtime identity |
+| target_fpga_part | Exact implementation part, package and speed grade | Build manifest |
+| actual_fpga_device | Observed silicon device identity | Trusted platform-specific Host adapter |
+| board_hardware_id/revision | Actual PCB identity/topology, if available | Independent EEPROM/OTP/controlled board descriptor; not image constants |
+| engine_abi | Functional command contract version | Engine/adapter pair |
+| identity_abi | Identity discovery format version | Discovery contract |
+
+### Image naming
+
+`plasma-<fpga-device>-<engine>-v<semver>` (e.g. `plasma-xc7z020-swd-v1.0.0`).
+Do not include `z2` or `pynq` in the logical product image name. Names are for operators, never trusted admission evidence. A build artifact must have an immutable digest and exact part/board/pinout compatibility metadata. Distinct builds may share the same logical image name/version only if the immutable artifact identity distinguishes them unambiguously.
+
+## Minimum common logical identity response
+
+An Engine adapter MUST expose: magic, identity_abi, engine_id/type, engine_abi, image_id, build_id, declared target FPGA part, capability set, implemented site count/presence, health/fault state, and diagnostic read/write capability where supported. Unknown/absent identity must fail closed for programming. A declared FPGA part is not an actual silicon measurement. Capabilities and site count are declarations, not physical qualification.
+
+The common logical response is transport-neutral; **do not mandate AXI registers for SPI/USB Engines**. Where an Engine cannot safely implement writable diagnostics, the adapter MUST report unsupported and the relevant conformance profile must say whether it is mandatory. No diagnostic command may actuate DUT pins, power, reset or erase/program operations.
+
+## MMIO reference identity profile — reuse before extending
+
+For MMIO engines, reuse the existing *candidate* fixed-image identity block from `docs/architecture/fixed-fpga-hardware-abi-v1-gate1.md` rather than allocating a conflicting second map:
+
+| Offset | Existing candidate | Access |
+| --- | --- | --- |
+| 0x000 | MAGIC = 0x4D534C50 | RO |
+| 0x004 | ABI_VERSION = 0x00010000 | RO |
+| 0x008..0x014 | IMAGE_ID_W0..W3 | RO |
+| 0x018..0x024 | BUILD_ID_W0..W3 | RO |
+| 0x028..0x02C | CAPABILITIES_LO/HI | RO |
+| 0x030 | SITE_PRESENT_BITMAP | RO |
+| 0x034 | SITE_READY_BITMAP | RO |
+| 0x038 | PPU_STATUS | RO |
+| 0x03C | HW_REVISION (declared, not independently trusted PCB identity) | RO |
+| 0x040..0x050 | PPU_ERROR / MAP_REVISION / SITE_STRIDE_BYTES / MAX_TRANSFER_BITS / RESET_CAUSE | RO |
+
+**Open decisions before register freeze:** exact image/build ID word ordering and encoding; how to expose full FPGA part/engine type without breaking legacy offsets; separate identity_abi from existing ABI_VERSION; optional SCRATCH RW offset and no-side-effect semantics; capability enumeration and forward compatibility. These fields are NOT yet standardized in the existing candidate. Do not issue speculative reads/writes to proposed offsets.
+
+SCRATCH is recommended for MMIO conformance only if independently decoded, bounded and side-effect-free; loopback beyond basic transport diagnostics is optional and protocol-specific. A new register addition must be reviewed against actual AXI decode, existing reserved offsets and Linux resource ownership; do not silently claim +0x030 or +0x034 are free.
+
+## Compatibility admission
+
+1. **Pre-load:** obtain actual silicon ID through trusted Host mechanism; verify immutable bitstream digest, exact part/package/speed requirements, board pin mapping, clocks, I/O banks/voltage, and authorized hardware ownership. Missing essential evidence => deny, not guess.
+2. **Load:** Host owns the bounded FPGA configuration procedure; this standard grants no reload permission.
+3. **Post-load:** read supported identity through a validated resource/transport, verify image/build/ABI/capabilities/site mapping against admitted manifest and load receipt.
+4. **Before programming:** independently verify electrical/DIB safety, Site ownership, Provider/Profile compatibility and fault/recovery state. Identity PASS is never a Flash PASS.
+5. **Failure codes:** FPGA_DEVICE_MISMATCH, HW_PLATFORM_MISMATCH, IMAGE_BUILD_MISMATCH, ENGINE_ABI_MISMATCH, ENGINE_IDENTITY_UNAVAILABLE, CAPABILITY_UNAVAILABLE; map them to existing public error contracts before introducing wire changes.
+
+## Conformance profiles
+
+- **Identity Conformant:** normative identity semantics and negative compatibility tests pass.
+- **Engine Compatible:** advertised operation ABI and capability-specific negative tests pass.
+- **Hardware Qualified:** exact physical board/DIB/power/pinout/operation evidence exists. This is independent from interface conformance and cannot be inferred from Host-only tests.
+
+A non-FPGA Provider remains fully valid OPF Core. Conformance test suites should be public, deterministic and vendor-neutral.
+
+## Gate 1 implementation plan (not completed by this document)
+
+1. Reconcile this document with ADR-0009, `runtime_fpga_abi_v1_proposal.json`, `fixed_image_abi_v1_gate1.json`, SWD ABI v5 and existing Image Manifest; identify which contracts are historical or candidates.
+2. Freeze minimal transport-neutral identity descriptor and MMIO mapping only after resolving the explicit open decisions above.
+3. Add schema/host-only positive and negative tests: wrong XC7Z010/XC7Z020 part, same part/wrong PCB, wrong image digest, stale build ID, ABI major mismatch, unknown capabilities, absent identity, no scratch, third-party non-Xilinx transport.
+4. Add optional MMIO RTL identity/scratch only in an independent approved implementation delta; do not change SWD v5, deploy, reload or touch DUT.
+5. Run focused tests and exact-head CI; report Gate 2 readiness. Gate 2 approval is required for merge.
+
+## Existing references
+
+- `docs/adr/0009-open-programming-platform.md`
+- `docs/architecture/opf-architecture.md`
+- `docs/architecture/runtime-fpga-hardware-abi-v1.md`
+- `docs/architecture/fixed-fpga-hardware-abi-v1-gate1.md`
+- `docs/architecture/ppu-canonical-bundle-packages.md`
+- `AGENTS.md`
