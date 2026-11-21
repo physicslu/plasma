@@ -56,7 +56,29 @@ For MMIO engines, reuse the existing *candidate* fixed-image identity block from
 
 SCRATCH is recommended for MMIO conformance only if independently decoded, bounded and side-effect-free; loopback beyond basic transport diagnostics is optional and protocol-specific. A new register addition must be reviewed against actual AXI decode, existing reserved offsets and Linux resource ownership; do not silently claim +0x030 or +0x034 are free.
 
-## Compatibility admission
+## OPF-first resolution and admission (normative)
+
+**Do not load an image that is already known unable to execute the requested operations.** OPF Core reasons only about the required programming operations and abstract Engine capabilities. It does not know FPGA part numbers, PCB revisions, bitstream digests, AXI addresses or Golden images.
+
+1. **OPF compatibility resolution, before any load:** resolve Provider/Profile/Operations into required Engine type, operation ABI, capabilities, capacity and Site/resource needs. Ask the optional Hardware Adapter for available Engine descriptors (running or loadable). Reject an incompatible descriptor with `NO_COMPATIBLE_ENGINE`; do not attempt configuration.
+2. **Adapter selection:** prefer an already loaded, independently verified compatible Engine. If none is ready, select a loadable Image whose declared capabilities and ABI satisfy the request. This selection does not itself authorize a hardware load.
+3. **PPU Host pre-load validation:** validate actual FPGA part, board/pinout/electrical compatibility, artifact digest, resource ownership, safety and recovery prerequisites. These checks belong to the Host, not OPF Core.
+4. **Load only if needed:** the Host performs configuration only after both compatibility resolution and hardware admission pass. A programming request does not automatically authorize runtime reload; fixed-image deployments can report `NO_COMPATIBLE_ENGINE` instead.
+5. **Post-load verification:** verify observed Engine identity/ABI/build/capabilities against the selected descriptor and receipt. If inconsistent, deny execution; preserve the image for diagnosis only if hardware/electrical ownership and safety remain known.
+6. **Execution admission:** OPF confirms the operation contract is still satisfied; Host independently admits exact Site, electrical state and ownership. `FPGA_LOAD_SUCCESS` is not `ENGINE_READY`, and neither proves programming success.
+
+The Host can report an image as loaded but not executable; this is a **diagnostic outcome**, not a reason to knowingly load an incompatible image. Runtime readback may reveal a mismatch that cannot be proven from static metadata alone.
+
+### Responsibility split
+
+| Owner | Normative decision | Not its responsibility |
+| --- | --- | --- |
+| OPF Core | Operations → abstract Engine requirements, compatibility, execution contract | FPGA model, PCB ID, bitstream load |
+| OPF Hardware Adapter | Discover loaded/loadable Engine descriptors and map operations to Engine-specific ABI | Independently authorizing hardware safety |
+| PPU Host | Physical platform/image validation, FPGA load, readback, electrical safety, Site ownership | Changing Provider operation semantics |
+| OPP Standard | Public Engine descriptor, discovery semantics and conformance | Forcing every vendor to implement AXI |
+
+## Hardware admission details
 
 1. **Pre-load:** obtain actual silicon ID through trusted Host mechanism; verify immutable bitstream digest, exact part/package/speed requirements, board pin mapping, clocks, I/O banks/voltage, and authorized hardware ownership. Missing essential evidence => deny, not guess.
 2. **Load:** Host owns the bounded FPGA configuration procedure; this standard grants no reload permission.
