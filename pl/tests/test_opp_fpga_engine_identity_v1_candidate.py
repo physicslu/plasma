@@ -139,7 +139,8 @@ def plan_engine_execution(requirements, descriptors, host):
         return "NO_COMPATIBLE_ENGINE"
     for engine in compatible:
         if (engine.get("loaded") and engine.get("verified")
-                and engine.get("identity_source") == "hardware_observed"):
+                and engine.get("identity_source") == "hardware_observed"
+                and host.verify_loaded(engine)):
             return "REUSE_ENGINE"
     for engine in compatible:
         if not engine.get("loadable"):
@@ -152,9 +153,14 @@ def plan_engine_execution(requirements, descriptors, host):
 
 
 class HostSpy:
-    def __init__(self, allowed=True):
+    def __init__(self, allowed=True, observed=True):
         self.calls = []
         self.allowed = allowed
+        self.observed = observed
+
+    def verify_loaded(self, engine):
+        self.calls.append("verify_loaded")
+        return self.observed
 
     def preflight(self, engine):
         self.calls.append("preflight")
@@ -195,7 +201,15 @@ class TestOpfFirstResolution(unittest.TestCase):
             self.engine, {**self.engine, "loaded": True, "verified": True,
                           "identity_source": "hardware_observed"}], host),
             "REUSE_ENGINE")
-        self.assertEqual(host.calls, [])
+        self.assertEqual(host.calls, ["verify_loaded"])
+
+    def test_hardware_observed_label_without_host_proof_is_denied(self):
+        host = HostSpy(observed=False)
+        claimed = {**self.engine, "loaded": True, "verified": True,
+                   "identity_source": "hardware_observed", "loadable": False}
+        self.assertEqual(plan_engine_execution(self.req, [claimed], host),
+                         "NO_COMPATIBLE_ENGINE")
+        self.assertEqual(host.calls, ["verify_loaded"])
 
     def test_manifest_only_identity_cannot_reuse_loaded_engine(self):
         host = HostSpy()
