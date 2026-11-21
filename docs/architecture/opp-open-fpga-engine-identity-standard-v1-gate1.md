@@ -86,6 +86,28 @@ The Host can report an image as loaded but not executable; this is a **diagnosti
 4. **Before programming:** independently verify electrical/DIB safety, Site ownership, Provider/Profile compatibility and fault/recovery state. Identity PASS is never a Flash PASS.
 5. **Failure codes:** FPGA_DEVICE_MISMATCH, HW_PLATFORM_MISMATCH, IMAGE_BUILD_MISMATCH, ENGINE_ABI_MISMATCH, ENGINE_IDENTITY_UNAVAILABLE, CAPABILITY_UNAVAILABLE; map them to existing public error contracts before introducing wire changes.
 
+## One standard for first-party and third-party Engines
+
+PLASMA-owned RTL and external FPGA implementations MUST pass the same OPP descriptor, adapter and conformance requirements. The PLASMA SWD v5 implementation is a **reference integration candidate**, not automatically OPP conformant and not exempt from validation. No implementation-specific shortcut may be embedded in OPF Core.
+
+### Minimum integration sequence
+
+1. Declare required operations and Engine capabilities independently of FPGA vendor.
+2. Implement an Engine and an OPF Hardware Adapter (or use a proven standard Adapter).
+3. Publish a versioned Engine Descriptor and paired immutable Image Manifest; the descriptor must be available for **pre-load compatibility resolution**.
+4. Run common host-only identity, operation/ABI, resource and negative admission tests.
+5. Validate real board/pinout, electrical safety, fault handling and protocol behavior on actual hardware; software-only PASS is not Hardware Qualified.
+6. Admit a compatible loaded Engine, or authorize a safe load only when necessary, then verify runtime identity before programming.
+
+### Contract versus optional profiles
+
+- **Common mandatory interface:** discovery, Engine identity and ABI, declared capabilities and Site/resource limits, lifecycle/error semantics, safe failure reporting.
+- **Protocol-specific profile:** SWD, SPI, JTAG etc. Only required when that capability is advertised; a device need not implement every protocol.
+- **Transport-specific profile:** MMIO, SPI, USB etc. A fixed AXI register map is not a universal OPP requirement.
+- **Physical qualification:** board power, pinout, voltage, safe-off and fault isolation require separate actual-hardware evidence.
+
+**Current implementation boundary:** PR #1527 is a Gate 1 identity/compatibility candidate, not a complete public SDK or certified command ABI. The common lifecycle, command ABI, error enumeration and electrical conformance remain to be frozen separately; no claim of plug-and-play interoperability is authorized.
+
 ## Conformance profiles
 
 - **Identity Conformant:** normative identity semantics and negative compatibility tests pass.
