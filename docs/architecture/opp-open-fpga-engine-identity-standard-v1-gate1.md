@@ -129,6 +129,24 @@ A future ATE, DSP or motion-control application MAY use the same Engine contract
 
 A non-FPGA Provider remains fully valid OPF Core. Conformance test suites should be public, deterministic and vendor-neutral.
 
+## Existing OPF runtime reconciliation (Gate 1 evidence boundary)
+
+The current `docs/architecture/opf-architecture.md` establishes a **portable Provider contract**, not a mandatory FPGA Engine loader. A Provider with its own transport (e.g. OpenOCD/ST-LINK USB or vendor CLI) must remain usable without a new Hardware Adapter. The optional adapter applies only to a Provider that needs Host-provided Engine capabilities. No universal Router/Runner/Executor, extra Site lock or cross-domain scheduler is introduced here.
+
+For the PPU product route, the existing single authorized Bundle v3 Active Asset Set selects Provider/Profile/FPGA assets; the Host owns Site leases, fencing, image provenance, electrical state, and UNKNOWN recovery. The new OPP descriptor is **not** a second independent asset source or an authorization bypass. An independently hosted OPF application need not use Bundle v3.
+
+The `docs/architecture/runtime-fpga-hardware-abi-v1.md` register map is explicitly **proposed and not present on the current PYNQ Base or deployed SWD ABI v5**. The fixed-image ABI candidate is also not frozen. Consequently, this PR MUST NOT attempt a global identity MMIO read or claim that SWD v5 already supplies `IMAGE_ID`/`BUILD_ID` readback. A bridge for existing SWD v5 may expose verified Host/Bundle metadata as **declared provenance**, but MUST NOT mislabel it as independently observed FPGA runtime identity.
+
+### Smallest real integration delta after candidate acceptance
+
+1. Locate the actual Provider-to-Host capability boundary and its current call sites; reuse it rather than inventing an OPF-wide loader.
+2. Represent a selected Engine descriptor separately from Host-observed runtime identity and immutable Image receipt; define which fields are `declared`, `host_verified` or `hardware_observed`.
+3. Add a pure compatibility decision ahead of any existing authorized configuration path, with negative tests proving no Host load call on known mismatch.
+4. Bind the result to the existing Host ownership and exact-Site admission; no new bypass or reload permission.
+5. Only after the real adapter exists, run integration tests against that adapter rather than treating this PR's local Mock functions as product implementation.
+
+**Current verified evidence:** architecture document reconciliation and candidate Host-only tests authored; actual production call-site integration, GitHub Actions PASS, Z2 readback and physical conformance are **NOT_VERIFIED**. These are not implied by a proposed register layout.
+
 ## Gate 1 implementation plan (not completed by this document)
 
 1. Reconcile this document with ADR-0009, `runtime_fpga_abi_v1_proposal.json`, `fixed_image_abi_v1_gate1.json`, SWD ABI v5 and existing Image Manifest; identify which contracts are historical or candidates.
