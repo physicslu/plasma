@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "proposal_id": "openocd-tier-a-backend-promotion-proposal-v6.6",
+  "record_state": "RESEARCH_PROPOSAL_REQUIRES_OWNER_APPROVAL",
+  "production_write_authorized": false,
+  "source_qualification_id": "openocd-tier-a-identifier-qualification-v6.5",
+  "promotion_exact_count": 320,
+  "promotion_exact_set_sha256": "32ca466183a44288c903c923b20df36ad25de0824397a98625550e53e245f69e",
+  "promotion_delta_csv_sha256": "b6671cdd17d9e6755920bd2d69a827891b70b02b697178640de009066a796d81",
+  "family_promotion_counts": {
+    "STM32C0": 1,
+    "STM32F2": 72,
+    "STM32F3": 168,
+    "STM32F7": 62,
+    "STM32H7": 14,
+    "STM32L1": 1,
+    "STM32L4": 1,
+    "STM32U3": 1
+  },
+  "identifier_kind_counts": {
+    "cmsis_device_name": 13,
+    "ordering_pattern": 307
+  },
+  "affected_family_source_bindings_after_if_approved": {
+    "STM32C0": {
+      "row_count": 226,
+      "git_blob_sha": "cacbf81ea71e07304f197000d18a74dbadbddac2",
+      "sha256": "1c552a085fd32a53cc07acd77bac1db18d96e75a70e55eeaac4f00728ee70bb8"
+    },
+    "STM32F2": {
+      "row_count": 105,
+      "git_blob_sha": "528072232c498d1599c89c84b487f27718423e08",
+      "sha256": "74c7eb15e360c5c5e1c1b174156b9fe5eb0137e406d9ff909d3b30399d640de9"
+    },
+    "STM32F3": {
+      "row_count": 192,
+      "git_blob_sha": "b8c5566e99fca66dad402a01d9fc0d97922bb127",
+      "sha256": "3761e2e2552d9801ba16e185ea243e43b4eef916ee34d173ec57813bf71c0922"
+    },
+    "STM32F7": {
+      "row_count": 173,
+      "git_blob_sha": "b2367ac8b8120f86ef4da33966f08c9e80955305",
+      "sha256": "cb23c11bcdb166ad7bb083d98ec0e19a2117a8d923bf23382a19747f7bf60538"
+    },
+    "STM32H7": {
+      "row_count": 205,
+      "git_blob_sha": "511840493c716016cddc99ac6c71f34196479d11",
+      "sha256": "47ff2d7d19de3e21ecaba9ade44280d99657749def23c3c37bf79ad075ccb2c6"
+    },
+    "STM32L1": {
+      "row_count": 146,
+      "git_blob_sha": "3addf804d35382cadca3e54060c05c0d3084116c",
+      "sha256": "f11dc8486348e3625d5129ee61cb29679b6597ee8ef0a28bc45bd817f0957434"
+    },
+    "STM32L4": {
+      "row_count": 449,
+      "git_blob_sha": "081aeaa80ed558785ba062255cd322fdfa505ff4",
+      "sha256": "d6275027b8dae3d53a78963c1d03643ffea25fb2190515e7c5fbc6f7f4d11f89"
+    },
+    "STM32U3": {
+      "row_count": 107,
+      "git_blob_sha": "950d70579c5bfa61b94bb917386ca36c230bca61",
+      "sha256": "806b444886f5ac8fd774009be0c53bd9245420478ee6cd6d5b029b7949f92956"
+    }
+  },
+  "production_exact_total_before": 4629,
+  "production_exact_total_after_if_approved": 4629,
+  "production_source_count_before": 28,
+  "production_source_count_after_if_approved": 28,
+  "catalog_backend_partition_before": {
+    "mapped": 3673,
+    "no_mapping": 956
+  },
+  "catalog_backend_partition_after_if_approved": {
+    "mapped": 3993,
+    "no_mapping": 636
+  },
+  "active_openocd_route_before": 3594,
+  "active_openocd_route_after_if_approved": 3914,
+  "scoped_active_denominator": 4550,
+  "active_openocd_route_coverage_after_if_approved_percent": 86.022,
+  "active_openocd_route_gap_after_if_approved": 636,
+  "programming_profile_state_for_promotions": "unresolved",
+  "route_evidence_validation_status": "not_verified",
+  "claims": {
+    "programming_verified": false,
+    "engineering_verified": false,
+    "hil_verified": false,
+    "erase_program_verify_success_claimed": false,
+    "production_write_authorized": false
+  },
+  "source_pr": 753,
+  "source_workflow_run_id": 37590758341,
+  "source_workflow_head_sha": "8b4e5aad14d55d5ceb0a8c088ac73219ba059e51",
+  "source_artifact_id": 11469080022,
+  "source_artifact_sha256": "e66a9882e972e6c8458fcaa18e1070ab87485a7398af248ec1f0f4e7dcf9faa9",
+  "upstream_identifier_qualification_pr": 752,
+  "upstream_identifier_qualification_merge_commit": "1bc5ea8c38851f7ffa7f5c0244adb77b9727b2a8"
+}
