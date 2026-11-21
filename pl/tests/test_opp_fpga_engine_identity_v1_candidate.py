@@ -112,5 +112,107 @@ class TestCandidate(unittest.TestCase):
         self.assertEqual(admit(self.manifest, self.actual), "INVALID_IMAGE_NAME")
 
 
+
+
+def resolve_engine(requirements, descriptors):
+    """Pure OPF-first selection; no FPGA or Host API is called."""
+    for engine in descriptors:
+        if engine.get("engine_id") != requirements["engine_id"]:
+            continue
+        if engine.get("engine_abi") != requirements["engine_abi"]:
+            continue
+        if not set(requirements["capabilities"]).issubset(engine.get("capabilities", [])):
+            continue
+        if engine.get("site_count", 0) < requirements["site_count"]:
+            continue
+        return engine
+    return None
+
+
+def plan_engine_execution(requirements, descriptors, host):
+    """Resolve before any host preflight/load; prefer a verified loaded Engine."""
+    compatible = [
+        e for e in descriptors
+        if resolve_engine(requirements, [e]) is not None
+    ]
+    if not compatible:
+        return "NO_COMPATIBLE_ENGINE"
+    for engine in compatible:
+        if engine.get("loaded") and engine.get("verified"):
+            return "REUSE_ENGINE"
+    for engine in compatible:
+        if not engine.get("loadable"):
+            continue
+        if not host.preflight(engine):
+            return "HOST_PRELOAD_DENIED"
+        host.load(engine)
+        return "LOAD_REQUIRES_RUNTIME_VERIFICATION"
+    return "NO_COMPATIBLE_ENGINE"
+
+
+class HostSpy:
+    def __init__(self, allowed=True):
+        self.calls = []
+        self.allowed = allowed
+
+    def preflight(self, engine):
+        self.calls.append("preflight")
+        return self.allowed
+
+    def load(self, engine):
+        self.calls.append("load")
+
+
+class TestOpfFirstResolution(unittest.TestCase):
+    def setUp(self):
+        self.req = {"engine_id": "plasma.swd.independent", "engine_abi": 5,
+                    "capabilities": ["swd"], "site_count": 2}
+        self.engine = {**self.req, "loaded": False, "verified": False,
+                       "loadable": True}
+
+    def test_no_compatible_engine_never_touches_host(self):
+        host = HostSpy()
+        self.assertEqual(plan_engine_execution(self.req, [
+            {**self.engine, "engine_abi": 6}], host), "NO_COMPATIBLE_ENGINE")
+        self.assertEqual(host.calls, [])
+
+    def test_missing_capability_never_loads(self):
+        host = HostSpy()
+        self.assertEqual(plan_engine_execution(self.req, [
+            {**self.engine, "capabilities": []}], host), "NO_COMPATIBLE_ENGINE")
+        self.assertEqual(host.calls, [])
+
+    def test_insufficient_sites_never_loads(self):
+        host = HostSpy()
+        self.assertEqual(plan_engine_execution(self.req, [
+            {**self.engine, "site_count": 1}], host), "NO_COMPATIBLE_ENGINE")
+        self.assertEqual(host.calls, [])
+
+    def test_reuse_loaded_verified_engine(self):
+        host = HostSpy()
+        self.assertEqual(plan_engine_execution(self.req, [
+            self.engine, {**self.engine, "loaded": True, "verified": True}], host),
+            "REUSE_ENGINE")
+        self.assertEqual(host.calls, [])
+
+    def test_preflight_before_load(self):
+        host = HostSpy()
+        self.assertEqual(plan_engine_execution(self.req, [self.engine], host),
+                         "LOAD_REQUIRES_RUNTIME_VERIFICATION")
+        self.assertEqual(host.calls, ["preflight", "load"])
+
+    def test_host_denial_blocks_load(self):
+        host = HostSpy(allowed=False)
+        self.assertEqual(plan_engine_execution(self.req, [self.engine], host),
+                         "HOST_PRELOAD_DENIED")
+        self.assertEqual(host.calls, ["preflight"])
+
+    def test_non_xilinx_descriptor_same_resolution(self):
+        host = HostSpy()
+        third_party = {**self.engine, "fpga_vendor": "intel", "transport": "usb"}
+        self.assertEqual(plan_engine_execution(self.req, [third_party], host),
+                         "LOAD_REQUIRES_RUNTIME_VERIFICATION")
+        self.assertEqual(host.calls, ["preflight", "load"])
+
 if __name__ == "__main__":
     unittest.main()
