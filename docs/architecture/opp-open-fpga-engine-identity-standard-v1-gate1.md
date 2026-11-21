@@ -108,6 +108,19 @@ PLASMA-owned RTL and external FPGA implementations MUST pass the same OPP descri
 
 **Current implementation boundary:** PR #1527 is a Gate 1 identity/compatibility candidate, not a complete public SDK or certified command ABI. The common lifecycle, command ABI, error enumeration and electrical conformance remain to be frozen separately; no claim of plug-and-play interoperability is authorized.
 
+## Cross-application reuse boundary (non-normative direction)
+
+The discovery → requirements resolution → compatibility → Host admission → activation → execution → evidence sequence is **domain-independent in principle**, but this Gate 1 does not create a new generic execution framework. OPP FPGA Engine Identity and compatibility remain reusable building blocks; OPF remains the **programming application** and keeps its existing Provider/Profile/Erase/Program/Verify semantics.
+
+| Reusable boundary | Programming-specific responsibility |
+| --- | --- |
+| Engine descriptor, immutable build identity and declared capabilities | SWD/SPI/JTAG programming operation semantics |
+| Compatibility resolution and already-loaded Engine reuse | Programming Profile, target and route selection |
+| Host ownership, image integrity and safe activation | DUT voltage, programming fixture and exact Site admission |
+| Lifecycle outcomes and verifiable execution evidence | Erase/Program/Verify results and Flash receipts |
+
+A future ATE, DSP or motion-control application MAY use the same Engine contract and resolution pattern, but MUST define its own operation, timing, safety and result contracts. A generic `ExecutionRequest`, cross-domain scheduler or new universal runtime API is **out of scope** for PR #1527. Do not rename existing OPF APIs or insert an extra abstraction layer solely for hypothetical reuse. Reassess shared interfaces against a second real application before freezing them as platform-wide contracts.
+
 ## Conformance profiles
 
 - **Identity Conformant:** normative identity semantics and negative compatibility tests pass.
