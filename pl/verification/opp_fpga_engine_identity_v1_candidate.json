@@ -1,0 +1,95 @@
+{
+  "contract": "plasma.opp.fpga-engine-identity.v1",
+  "status": "gate1_candidate_not_implemented",
+  "ownership": {
+    "standard": "OPP Hardware Standard",
+    "opf_core_required": false,
+    "host_controls_fpga_load": true
+  },
+  "naming": {
+    "pattern": "^plasma-[a-z0-9]+-[a-z0-9]+-v[0-9]+\\.[0-9]+\\.[0-9]+$",
+    "board_names_prohibited": [
+      "z2",
+      "pynq"
+    ],
+    "examples": [
+      "plasma-xc7z010-swd-v1.0.0",
+      "plasma-xc7z020-swd-v1.0.0"
+    ]
+  },
+  "required_manifest_fields": [
+    "engine_id",
+    "image_id",
+    "image_name",
+    "build_id",
+    "engine_abi",
+    "target_fpga_part",
+    "artifact_sha256",
+    "capabilities",
+    "site_count",
+    "board_compatibility"
+  ],
+  "id_rules": {
+    "build_id": "32 lowercase hex digits; build-system assigned immutable 128-bit token; exact encoding into MMIO words requires separate ABI freeze",
+    "artifact_sha256": "64 lowercase hex digits, exact bytes of artifact",
+    "target_fpga_part": "nonempty exact manufacturer part; platform-specific parser",
+    "board_compatibility": "nonempty explicit board/pinout compatibility descriptors"
+  },
+  "mmio_candidate": {
+    "magic": 1297304656,
+    "register_width_bits": 32,
+    "endianness": "little",
+    "existing_offsets": {
+      "MAGIC": 0,
+      "ABI_VERSION": 4,
+      "IMAGE_ID_W0": 8,
+      "IMAGE_ID_W1": 12,
+      "IMAGE_ID_W2": 16,
+      "IMAGE_ID_W3": 20,
+      "BUILD_ID_W0": 24,
+      "BUILD_ID_W1": 28,
+      "BUILD_ID_W2": 32,
+      "BUILD_ID_W3": 36,
+      "CAPABILITIES_LO": 40,
+      "CAPABILITIES_HI": 44,
+      "SITE_PRESENT_BITMAP": 48,
+      "SITE_READY_BITMAP": 52,
+      "PPU_STATUS": 56,
+      "HW_REVISION": 60
+    },
+    "scratch_offset": null,
+    "identity_extension_offset": null
+  },
+  "admission": {
+    "preload": [
+      "actual_fpga_device",
+      "target_fpga_part",
+      "artifact_sha256",
+      "board_pinout_compatibility"
+    ],
+    "postload": [
+      "image_id",
+      "build_id",
+      "engine_abi",
+      "capabilities",
+      "site_count"
+    ],
+    "hardware_qualification_separate": true
+  },
+  "tests": {
+    "positive": [
+      "xc7z010",
+      "xc7z020",
+      "non_xilinx"
+    ],
+    "negative": [
+      "wrong_device",
+      "wrong_board",
+      "wrong_digest",
+      "wrong_build",
+      "abi_major_mismatch",
+      "missing_identity",
+      "unsupported_capability"
+    ]
+  }
+}
