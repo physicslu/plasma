@@ -156,6 +156,24 @@ The `docs/architecture/runtime-fpga-hardware-abi-v1.md` register map is explicit
 
 **Naming collision warning:** existing `ppu_site_engine` describes the verified OpenOCD execution engine/toolchain; an OPP **FPGA Engine** is a different resource. Never equate their IDs, ABI, image digest or admission evidence. The smallest safe change may be a separate optional FPGA capability binding, not modifications to `load_engine_verified()`.
 
+### SWD ABI v5 first-reference migration boundary
+
+The current `scripts/ppu_site_engine.py` defines `SUPPORTED_DRIVER_ABI = {"plasma_swd": {5}}`, but its `EngineSelection` stores the selected OpenOCD executable digest, Site admission script digest, adapter driver/ABI/speed, and selection-record digest. **None of those fields is an FPGA bitstream identity or FPGA hardware readback.**
+
+For the first SWD v5 OPP reference, preserve the current working programming route and report these separately:
+
+| Evidence | Source | Permitted assertion |
+| --- | --- | --- |
+| OpenOCD driver ABI v5 | verified root-owned Site Worker Engine selection | `software_driver_abi_verified`, not FPGA Engine ABI |
+| OpenOCD binary and admission SHA256 | `ppu_site_engine.load_engine()` | verified software toolchain bytes only |
+| FPGA artifact SHA256 | authorized Bundle/Host artifact receipt, if present | expected/loaded artifact provenance, not hardware-observed identity |
+| FPGA runtime image/build/ABI | registered, safe, actually implemented hardware readback only | `hardware_observed` only after Host-owned verification |
+| Site electrical and job admission | existing C-3 Runtime/Site Worker | independent of OPP metadata; never waived |
+
+**Fail-closed compatibility rule:** on the deployed v5 path without a qualified identity readback, the new OPP adapter must report `RUNTIME_IDENTITY_NOT_AVAILABLE` rather than manufacture `hardware_observed`. This does not retrospectively invalidate the already authorized legacy C-3 programming route; OPP conformance and legacy product operation are distinct claims. Do not issue speculative MMIO reads to discover registers. Do not relabel `driver_abi=5` as an FPGA Engine ABI version.
+
+**First integration acceptance:** use the existing admitted SWD v5 route as a regression baseline; verify an optional OPP compatibility decision in Host-only tests and ensure it cannot trigger FPGA reload or bypass Site admission. Real OPP runtime identity conformance requires a separately authorized hardware implementation/readback experiment.
+
 ## Gate 1 implementation plan (not completed by this document)
 
 1. Reconcile this document with ADR-0009, `runtime_fpga_abi_v1_proposal.json`, `fixed_image_abi_v1_gate1.json`, SWD ABI v5 and existing Image Manifest; identify which contracts are historical or candidates.
