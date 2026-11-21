@@ -48,6 +48,28 @@
       ]
     },
     {
+      "source_id": "st_ds5936_rev7",
+      "manufacturer": "STMicroelectronics",
+      "document_number": "DS5936",
+      "revision": "7",
+      "document_date": "2015-06",
+      "title": "STM32F103x4/x6 low-density 16/32 KiB datasheet",
+      "authority": "manufacturer_official",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f103c6.pdf",
+      "integrity": {
+        "status": "not_content_pinned",
+        "sha256": null
+      },
+      "used_for": [
+        "device_scope",
+        "flash_capacity",
+        "package_family",
+        "temperature_grade",
+        "exact_ordering_grammar"
+      ],
+      "note": "Official document identity, revision, URL, sections and relevant facts independently reviewed; original PDF bytes/hash NOT_ATTESTED, separately from documentary L2 qualification."
+    },
+    {
       "source_id": "st_pm0075_rev2",
       "manufacturer": "STMicroelectronics",
       "document_number": "PM0075",

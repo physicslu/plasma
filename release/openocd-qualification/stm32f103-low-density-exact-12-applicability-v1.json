@@ -1,0 +1,476 @@
+{
+  "schema_version": 1,
+  "applicability_id": "st-stm32f103-low-density-exact-12-v1",
+  "adr": "ADR-0002",
+  "status": "reviewed_source_only",
+  "manufacturer_source": {
+    "path": "release/openocd-qualification/stm32f103-low-density-ds5936-source-lock-v1.json",
+    "git_blob_sha1": "9efb62f463e9180457f7afbc63a30aabdb75b7de"
+  },
+  "production_catalog": {
+    "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+    "git_blob_sha1": "c3219788d61591a63aae8cd8df3d25ef15d5c8f3"
+  },
+  "documented_package_groups": {
+    "C4/C6": "LQFP48 or UFQFPN48",
+    "R4/R6": "LQFP64 or TFBGA64",
+    "T4/T6": "VFQFPN36"
+  },
+  "records": [
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C4T6A",
+      "base_device": "STM32F103C4",
+      "package": "LQFP",
+      "pin_count": 48,
+      "flash_size_bytes": 16384,
+      "temperature_grade": "-40 to 85 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": false,
+      "source_nontr_exact_icpn": null,
+      "geometry_profile_id": "stm32f103c4-16k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c4-16k-v0.json",
+      "geometry_git_blob_sha1": "0371ab67d3067827b63d7369b93a4e5c57192a30",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6T6A",
+      "base_device": "STM32F103C6",
+      "package": "LQFP",
+      "pin_count": 48,
+      "flash_size_bytes": 32768,
+      "temperature_grade": "-40 to 85 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": false,
+      "source_nontr_exact_icpn": null,
+      "geometry_profile_id": "stm32f103c6-32k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6T6ATR",
+      "base_device": "STM32F103C6",
+      "package": "LQFP",
+      "pin_count": 48,
+      "flash_size_bytes": 32768,
+      "temperature_grade": "-40 to 85 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": true,
+      "source_nontr_exact_icpn": "STM32F103C6T6A",
+      "geometry_profile_id": "stm32f103c6-32k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6T7A",
+      "base_device": "STM32F103C6",
+      "package": "LQFP",
+      "pin_count": 48,
+      "flash_size_bytes": 32768,
+      "temperature_grade": "-40 to 105 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": false,
+      "source_nontr_exact_icpn": null,
+      "geometry_profile_id": "stm32f103c6-32k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6T7ATR",
+      "base_device": "STM32F103C6",
+      "package": "LQFP",
+      "pin_count": 48,
+      "flash_size_bytes": 32768,
+      "temperature_grade": "-40 to 105 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": true,
+      "source_nontr_exact_icpn": "STM32F103C6T7A",
+      "geometry_profile_id": "stm32f103c6-32k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6U6A",
+      "base_device": "STM32F103C6",
+      "package": "UFQFPN",
+      "pin_count": 48,
+      "flash_size_bytes": 32768,
+      "temperature_grade": "-40 to 85 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": false,
+      "source_nontr_exact_icpn": null,
+      "geometry_profile_id": "stm32f103c6-32k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103c6-32k-v0.json",
+      "geometry_git_blob_sha1": "ae42a417682a501cfce1a0579a749e096571ec80",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R4H6A",
+      "base_device": "STM32F103R4",
+      "package": "TFBGA",
+      "pin_count": 64,
+      "flash_size_bytes": 16384,
+      "temperature_grade": "-40 to 85 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": false,
+      "source_nontr_exact_icpn": null,
+      "geometry_profile_id": "stm32f103r4-16k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r4-16k-v0.json",
+      "geometry_git_blob_sha1": "836b54e3e0823a5286cf01d50699f729a50c8241",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R4T6A",
+      "base_device": "STM32F103R4",
+      "package": "LQFP",
+      "pin_count": 64,
+      "flash_size_bytes": 16384,
+      "temperature_grade": "-40 to 85 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": false,
+      "source_nontr_exact_icpn": null,
+      "geometry_profile_id": "stm32f103r4-16k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r4-16k-v0.json",
+      "geometry_git_blob_sha1": "836b54e3e0823a5286cf01d50699f729a50c8241",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R6H6A",
+      "base_device": "STM32F103R6",
+      "package": "TFBGA",
+      "pin_count": 64,
+      "flash_size_bytes": 32768,
+      "temperature_grade": "-40 to 85 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": false,
+      "source_nontr_exact_icpn": null,
+      "geometry_profile_id": "stm32f103r6-32k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r6-32k-v0.json",
+      "geometry_git_blob_sha1": "8731d025ae52c22f01062934da3b67003b10f0f4",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R6T6A",
+      "base_device": "STM32F103R6",
+      "package": "LQFP",
+      "pin_count": 64,
+      "flash_size_bytes": 32768,
+      "temperature_grade": "-40 to 85 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": false,
+      "source_nontr_exact_icpn": null,
+      "geometry_profile_id": "stm32f103r6-32k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r6-32k-v0.json",
+      "geometry_git_blob_sha1": "8731d025ae52c22f01062934da3b67003b10f0f4",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R6T6ATR",
+      "base_device": "STM32F103R6",
+      "package": "LQFP",
+      "pin_count": 64,
+      "flash_size_bytes": 32768,
+      "temperature_grade": "-40 to 85 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": true,
+      "source_nontr_exact_icpn": "STM32F103R6T6A",
+      "geometry_profile_id": "stm32f103r6-32k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r6-32k-v0.json",
+      "geometry_git_blob_sha1": "8731d025ae52c22f01062934da3b67003b10f0f4",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R6T7A",
+      "base_device": "STM32F103R6",
+      "package": "LQFP",
+      "pin_count": 64,
+      "flash_size_bytes": 32768,
+      "temperature_grade": "-40 to 105 C",
+      "manufacturer_internal_code": "A",
+      "tape_and_reel": false,
+      "source_nontr_exact_icpn": null,
+      "geometry_profile_id": "stm32f103r6-32k-v0",
+      "geometry_profile_path": "data/ic-support/profiles/memory-geometry/stm32f103r6-32k-v0.json",
+      "geometry_git_blob_sha1": "8731d025ae52c22f01062934da3b67003b10f0f4",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "software_state": "SUPPORTED",
+      "supported_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "requested_operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "blockers": [],
+      "runtime_execution_authorized": false,
+      "documentary_basis": [
+        "DS5936 Rev7 Tables 1, 2, 58",
+        "PM0075 Rev2 Table 2 and sections 2.3-2.4"
+      ]
+    }
+  ],
+  "excluded_exact_icpns": [
+    "STM32F103T4U6A",
+    "STM32F103T6U6A",
+    "STM32F103T6U7A"
+  ],
+  "blocked_package_reason": "Production UFQFPN36 conflicts with manufacturer DS5936 VFQFPN36",
+  "acceptance_boundary": {
+    "qualification_state": "SUPPORTED",
+    "supported_count": 12,
+    "execution_authorized": false
+  }
+}

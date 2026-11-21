@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0.0",
+  "qualification_id": "adr0002-phase2-openocd-012-stm32f103-v10",
+  "adr": "ADR-0002",
+  "status": "reviewed_source_only",
+  "predecessor_qualification": {
+    "path": "release/openocd-qualification/openocd-0.12.0-stm32f103-v9.json",
+    "git_blob_sha1": "43b973728aa72a8801fdeb549e0d55f5ed842b69",
+    "qualification_id": "adr0002-phase2-openocd-012-stm32f103-v9",
+    "supported_exact_icpn_count": 77
+  },
+  "pending_cohort": {
+    "path": "release/openocd-qualification/openocd-0.12.0-stm32f103-low-density-12-v1.json",
+    "git_blob_sha1": "e43c7e3cfa84219de7113ba21757bb0062e71ea3",
+    "candidate_exact_icpn_count": 12,
+    "supported_exact_icpn_count": 12,
+    "blocked": false
+  },
+  "supported_exact_icpn_count": 89,
+  "possible_supported_after_all_gates": 89,
+  "excluded_exact_icpns": [
+    "STM32F103T4U6A",
+    "STM32F103T6U6A",
+    "STM32F103T6U7A"
+  ],
+  "active_provider_registry_changed": true,
+  "production_catalog_changed": false,
+  "reason": "Twelve exact C/R low-density parts qualified by official DS5936 Rev7 documentary evidence, PM0075 Rev2 and pinned OpenOCD 0.12.0 source review; original datasheet bytes remain NOT_ATTESTED",
+  "acceptance_boundary": {
+    "l2_promotion_authorized": true,
+    "job_batch_execution_changed": false,
+    "installed_runtime_attested": false,
+    "hardware_runtime_ready": false,
+    "physical_programming_qualified": false
+  },
+  "documentary_review_source_sha": "0c379bdbda64b2dc9f774e970202162cb27e696f"
+}
