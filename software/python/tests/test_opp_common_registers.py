@@ -10,10 +10,13 @@ class FakePort:
         self.regs = {base: MAGIC, base + 4: ABI_VERSION, base + 0x40: 0xABCDEF12}
         self.writes = []
         self.fail_readback = False
+        self.scratch_reads = 0
 
     def read32(self, addr):
-        if self.fail_readback and addr == self.base + 0x40:
-            return 0xDEADBEEF
+        if addr == self.base + 0x40:
+            self.scratch_reads += 1
+            if self.fail_readback and self.scratch_reads == 2:
+                return 0xDEADBEEF
         return self.regs.get(addr, 0)
 
     def write32(self, addr, value):
