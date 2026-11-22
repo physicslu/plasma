@@ -6,6 +6,7 @@
 
 static uint32_t regs[17];
 static int corrupt_scratch;
+static int scratch_reads;
 static int reads, writes, barriers;
 
 static int fake_read(void *ctx, uint32_t offset, uint32_t *value)
@@ -13,7 +14,7 @@ static int fake_read(void *ctx, uint32_t offset, uint32_t *value)
     (void)ctx;
     if (offset > 0x40 || (offset & 3)) return -1;
     *value = regs[offset / 4];
-    if (corrupt_scratch && offset == 0x40) *value ^= 1;
+    if (offset == 0x40 && corrupt_scratch && ++scratch_reads == 2) *value ^= 1;
     ++reads;
     return 0;
 }
@@ -49,6 +50,7 @@ int main(void)
     assert(opp_common_self_test(&io) == 0);
     assert(regs[16] == 0x1234abcd && writes == 6 && barriers == 6);
     corrupt_scratch = 1;
+    scratch_reads = 0;
     assert(opp_common_self_test(&io) != 0);
     assert(regs[16] == 0x1234abcd);
     corrupt_scratch = 0;
