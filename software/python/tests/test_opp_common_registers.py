@@ -62,7 +62,7 @@ def test_scratch_restored_after_success():
 def test_scratch_restored_after_failed_comparison():
     p = FakePort()
     p.fail_readback = True
-    with pytest.raises(RuntimeError, match="restore mismatch"):
+    with pytest.raises(RuntimeError, match="readback mismatch"):
         OPPCommonRegisters(p, base=p.base).register_self_test()
     assert p.regs[p.base + 0x40] == 0xABCDEF12
     assert p.writes[-1] == (p.base + 0x40, 0xABCDEF12)
