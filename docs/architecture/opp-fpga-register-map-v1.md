@@ -1,6 +1,6 @@
 # OPP FPGA Register Map v1 — new ABI, four Site windows (Gate 1)
 
-Status: **candidate, source-only**. This is a breaking new design, not a deployed image or a claim of four implemented SWD engines. No legacy SWD-v5 register offsets, driver allowlists or compatibility shim are inherited.
+Status: **candidate, source-only**. The Common Registers ABI v1 is a new, independent ABI, not a deployed image or a claim of four implemented SWD engines. **Existing, validated SWD-v5 registers, physical Site bases and OpenOCD path are preserved unchanged**; the candidate Common map must not be interpreted as a replacement for SWD-v5. No legacy SWD-v5 offsets are reused inside the new Common register block.
 
 ## Addressing and ownership
 
@@ -15,7 +15,7 @@ All offsets below are relative to **one FPGA image MMIO aperture**. The actual P
 | SWD Site 4 | 0x4000–0x4FFF | 4 KiB | Site 4 independent engine, reserved |
 | Future expansion | 0x5000–0xFFFF | 44 KiB | Not implemented; reject accesses |
 
-Site window formula: `site_offset(n) = 0x1000 * n`, n=1..4. Each Site window is **reserved, not populated** until its SWD register contract and engine exist. No aliasing of unimplemented Sites to Site 1, no implicit multiplexing or shared Site FSM. Software must not probe reserved windows to detect hardware.
+Candidate four-Site-only window formula: `site_offset(n) = 0x1000 * n`, n=1..4. This is **not** the product-wide 8-Site allocation contract and does not constrain later IP families. Each Site window is **reserved, not populated** until its SWD register contract and engine exist. No aliasing of unimplemented Sites to Site 1, no implicit multiplexing or shared Site FSM. Software must not probe reserved windows to detect hardware.
 
 ## Global registers (32-bit aligned, little-endian)
 
@@ -61,3 +61,11 @@ This section records an **approved planning convention**, not a new physical AXI
 - The earlier 64 KiB candidate map in this document remains a **source-only, unintegrated proposal**. Its `0x0000–0x0FFF` Common and `0x1000–0x4FFF` Site offsets are **not** a frozen product-wide allocation and must be reconciled against the above policy and actual hardware map before RTL/bitstream integration. No physical address or 16 MiB decoder is assigned by this decision.
 
 **PR #1528 Gate 2 implication:** review this policy as a compatibility constraint; do not expand the PR into I2C/SPI IP implementation, 8-Site hardware, SWD-v5 remapping, deployment, or Z2/DUT operation. Any future allocation table must explicitly identify actual physical bases, window sizes, owners and ABI versions before implementation.
+
+## Gate 2 delta review (2026-11-23; source inspection only)
+
+- **Observed:** `opp_common_axi_lite_v1.sv` implements a 12-bit AXI4-Lite register slave with independent AW/W buffering, WSTRB writes to SCRATCH, and SLVERR for unimplemented offsets. The Python `OPPCommonRegisters` and C `plasma_opp_common` APIs implement identity checks and SCRATCH save/test/restore.
+- **Observed CI:** commit `54d5e75d3aad98cbfb254443c5c549a0521479ae` has ten completed successful GitHub Actions workflows. This establishes workflow status, **not** that each workflow executed the new Common RTL simulation or that the RTL is physically integrated.
+- **Not verified:** Common RTL-specific AXI simulation coverage and executed results; board-specific PS7 Address Editor / XSA / HWH / Device Tree physical mapping; a single synthesized bitstream containing both Common and the unchanged SWD-v5 IP; target ARMv7 MMIO access-width and real Z2 HIL.
+- **Scope guard:** do not treat candidate four-Site window reservations as implemented engines, do not infer 8-Site support from the product-wide policy, and do not merge/deploy/load FPGA or access DUT under this documentation review.
+- **Gate 2 readiness:** **NOT READY** for physical-integration claims. A source-only Gate 2 may be considered only after the Common-specific regression is identified and its actual execution evidence reviewed, with all unperformed physical stages explicitly NOT_RUN.
