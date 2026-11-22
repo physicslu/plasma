@@ -1,6 +1,7 @@
 // OPP Common Register v1 candidate: isolated register slave, NOT wired to SWD v5.
-// This is a DISTINCT common-register aperture, never an SWD Site-v5 aperture.
-// SWD v5 offsets 0x3c/0x40 remain forbidden; no protocol or DUT pins are touched.
+// This candidate defines a NEW OPP ABI; no legacy SWD-v5 offset compatibility is required.
+// Address decoding and scratch ownership must be verified before AXI integration.
+// No protocol or DUT pins are touched.
 module opp_common_regs_v1 #(
   parameter logic [127:0] IMAGE_ID = 128'h0,
   parameter logic [127:0] BUILD_ID = 128'h0,
