@@ -48,3 +48,16 @@ After validating actual image load provenance and the global MAGIC/ABI, save SCR
 - The new C and Python APIs must use this new ABI consistently; no old ABI v5 offsets or compatibility fallback.
 - An unimplemented window must return an AXI error once a full AXI decoder exists. The present RTL common-register candidate is **not** an AXI-Lite slave and does not establish that behavior.
 - Physical base, reset/clock, AXI4-Lite handshakes, WSTRB, interconnect mapping, build metadata, simulation and ARMv7 hardware verification remain integration work. No deploy/merge/hardware access is authorized by this document.
+
+## Owner decision (2026-11-22): product-wide reserved address-space policy
+
+This section records an **approved planning convention**, not a new physical AXI decode, a change to the SWD-v5 ABI, or a claim that a 16 MiB aperture is currently available on PYNQ-Z2.
+
+- Plan a **16 MiB logical PLASMA FPGA MMIO address budget** for the product family, subject to checking the actual PS7 Address Editor, XSA/HWH, Linux device tree and existing mappings before choosing any physical base or implementing decode. The 16 MiB figure is a planning target, not an already assigned contiguous physical aperture.
+- Use **64 KiB as the preferred planning allocation granularity for peripheral IP families**, with larger reserved regions when justified (e.g. multi-Site SWD, I2C, SPI, UART/ISP, power control and pin matrix). A reserved window consumes address space, not necessarily BRAM or instantiated hardware.
+- Keep a **single globally governed, non-overlapping logical address allocation** for Common and each peripheral family, even across mutually exclusive bitstreams, to maintain stable software bindings. Each loaded image must also have unambiguous AXI decoding. Reuse across images is technically possible but is **not** the PLASMA product convention.
+- Separate **global allocation**, **peripheral register offsets**, and **per-Site windows**. Common identity/capability ABI is independent of SWD/I2C/SPI engine ABIs; an absent IP must be declared absent and must not be probed through an unmapped address.
+- **Preserve the validated SWD-v5 PS-local OpenOCD path and its physical Site 1/2 bases** (`0x43C01000`, `0x43C02000`) unchanged. Do not reinterpret this document's candidate relative offsets as an authorization to remap those sites or to rebuild OpenOCD.
+- The earlier 64 KiB candidate map in this document remains a **source-only, unintegrated proposal**. Its `0x0000–0x0FFF` Common and `0x1000–0x4FFF` Site offsets are **not** a frozen product-wide allocation and must be reconciled against the above policy and actual hardware map before RTL/bitstream integration. No physical address or 16 MiB decoder is assigned by this decision.
+
+**PR #1528 Gate 2 implication:** review this policy as a compatibility constraint; do not expand the PR into I2C/SPI IP implementation, 8-Site hardware, SWD-v5 remapping, deployment, or Z2/DUT operation. Any future allocation table must explicitly identify actual physical bases, window sizes, owners and ABI versions before implementation.
