@@ -648,13 +648,21 @@ class ProgrammingBatchCoordinator:
         records = self._ledger_records(batch["batch_id"])
         for unit in units:
             cycle = unit["cycle"]
+            # A crash after a segment append and before the main write leaves
+            # those attempts in the unit too: they are not archived yet.
+            held = {attempt.get("plan_id") for attempt in unit.get("attempts") or []}
+
+            def archived(record: Mapping[str, Any]) -> bool:
+                if (record.get("ppu_alias") != unit["ppu_alias"]
+                        or record.get("site_id") != unit["site_id"]):
+                    return False
+                if any(a.get("plan_id") in held for a in record.get("attempts") or []):
+                    return False
+                return (record.get("type") == "blocked_dispatch"
+                        or (record.get("type") == "cycle"
+                            and record.get("cycle_id") != cycle.get("cycle_id")))
             cycle["attempts_archived"] = sum(
-                len(record.get("attempts") or []) for record in records
-                if record.get("ppu_alias") == unit["ppu_alias"]
-                and record.get("site_id") == unit["site_id"]
-                and (record.get("type") == "blocked_dispatch"
-                     or (record.get("type") == "cycle"
-                         and record.get("cycle_id") != cycle.get("cycle_id"))))
+                len(record.get("attempts") or []) for record in records if archived(record))
 
     def _close_interrupted(self, batch: dict[str, Any]) -> None:
         """A Batch the Manager was stopped in: decide from the run journal,
@@ -815,6 +823,8 @@ class ProgrammingBatchCoordinator:
             else:
                 index.append(end)
         except Exception as exc:
+            # The line may be on disk without its index entry: rescan on next read.
+            self._ledger_index.pop(batch_id, None)
             self._control_failure = f"BATCH_CYCLE_JOURNAL_{type(exc).__name__}"
             with self.workflow._lock:
                 self.workflow._control_failure = self._control_failure

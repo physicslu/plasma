@@ -485,7 +485,9 @@ export default function FactoryConsoleV2() {
   // Site run lines read from the Manager by run_id; the TERMINAL line waits for them.
   const unitLogsRef = useRef<Promise<unknown>>(Promise.resolve());
   // Cycle History reader of the observed Repeat Batch (Batch Statistics v1).
-  const cycleHistoryRef = useRef<{ batchId: string; settled: number; sync: () => Promise<void> } | null>(null);
+  const cycleHistoryRef = useRef<{
+    batchId: string; settled: number; topology: ManagedTopology | null; sync: () => Promise<void>;
+  } | null>(null);
   const initialProductionSet = useRef(productionSet);
   const initialBatchSelection = useRef(batchSelection);
 
@@ -515,15 +517,17 @@ export default function FactoryConsoleV2() {
       if (history?.batchId !== batch.batch_id) {
         const repeat = batch.policy.repeat;
         const reader = managedCycleHistory(batch.batch_id, record => {
-          const ppu = topology?.ppus.find(item => item.alias === record.ppu_alias);
+          // The latest topology, not the one of the first poll (may be null).
+          const ppu = cycleHistoryRef.current?.topology?.ppus.find(item => item.alias === record.ppu_alias);
           const label = `PPU ${record.ppu_alias} · PPU ID ${ppu?.ppuId ?? "unknown"} · ${siteLabel(record.site_id)}`;
           for (const line of cycleHistoryLogLines(record, repeat, label)) {
             appendLog(line.text, line.failed ? "WARN" : "INFO");
           }
         });
-        history = { batchId: batch.batch_id, settled: -1, sync: () => reader.sync() };
+        history = { batchId: batch.batch_id, settled: -1, topology, sync: () => reader.sync() };
         cycleHistoryRef.current = history;
       }
+      if (topology) history.topology = topology;
       const settled = batch.cycles?.settled ?? 0;
       if (settled !== history.settled || batch.outcome != null) {
         history.settled = settled;

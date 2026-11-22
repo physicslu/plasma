@@ -111,7 +111,9 @@ export function managedProductionSnapshot(
     if (judged.verdict === "PASS") return "success";
     if (judged.verdict === "FAIL") return "faulted";
     // An operator Stop / Stop Policy ends a Site as STOPPED, or PARTIAL when
-    // it had settled Cycles: a stop, never an equipment error.
+    // it had settled Cycles: a stop, never an equipment error. A PARTIAL for
+    // any other reason (SAFE_OFF not proven, Manager restart, shared control
+    // failure) stays "error" on purpose; its PASS Cycles still count.
     const outcome: string | null = unit.outcome;
     if (outcome === "STOPPED"
         || ((outcome === "BLOCKED" || outcome === "PARTIAL")
