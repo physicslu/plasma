@@ -35,3 +35,69 @@ def _provision_legacy_phase_rest_catalog(
         return
     database = request.getfixturevalue("_phase_rest_qualified_catalog")
     monkeypatch.setenv("PLASMA_CATALOG_SQLITE_DB", str(database))
+
+
+# CI routing keeps slow packaging and ICPN/SQLite qualification out of the
+# ordinary SW/PPU regression. Local pytest (no --plasma-ci-suite) still runs all
+# tests. The categories are disjoint and own the test selection in one place.
+from fnmatch import fnmatchcase
+
+_CI_PACKAGING_FILES = frozenset({
+    "test_control_station_runtime.py",
+    "test_control_station_release.py",
+    "test_macos_control_station_installer.py",
+    "test_windows_control_station_installer.py",
+    "test_product_release.py",
+    "test_product_release_canonical_paths.py",
+})
+_CI_PACKAGING_MANAGER_CASES = frozenset({
+    "test_packaged_manager_serves_selector_from_its_own_catalog",
+    "test_catalog_export_is_raw_git_blob_bytes_even_with_autocrlf",
+})
+_CI_ICPN_SQLITE_PATTERNS = (
+    "test_catalog_*.py",
+    "test_device_catalog*.py",
+    "test_ic_selector_*.py",
+    "test_icpn_*.py",
+    "test_manager_sqlite_selector.py",
+    "test_manager_device_selector.py",
+    "test_manufacturer_device_basic.py",
+    "test_microchip_*.py",
+    "test_nxp_*.py",
+    "test_programming_qualification.py",
+    "test_route_evidence_admission.py",
+    "test_physical_compatibility_l3.py",
+)
+
+
+def _plasma_ci_test_suite(item: pytest.Item) -> str:
+    filename = item.path.name
+    test_name = getattr(item, "originalname", None) or item.name.split("[", 1)[0]
+    if filename in _CI_PACKAGING_FILES or (
+        filename == "test_manager_device_selector.py"
+        and test_name in _CI_PACKAGING_MANAGER_CASES
+    ):
+        return "packaging"
+    if any(fnmatchcase(filename, pattern) for pattern in _CI_ICPN_SQLITE_PATTERNS):
+        return "icpn-sqlite"
+    return "general"
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--plasma-ci-suite",
+        choices=("general", "icpn-sqlite", "packaging"),
+        default=None,
+        help="Select a disjoint PLASMA CI test suite; absent means all tests",
+    )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    suite = config.getoption("--plasma-ci-suite")
+    if suite is None:
+        return
+    selected = [item for item in items if _plasma_ci_test_suite(item) == suite]
+    deselected = [item for item in items if _plasma_ci_test_suite(item) != suite]
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+    items[:] = selected

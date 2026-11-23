@@ -146,7 +146,9 @@ jobs:
           fi
           grep -F '"code": "REVOKE_DENIED"' "$RUNNER_TEMP/site-revoke.json"
       - name: Run pytest (PS / Python only; PL covered by pl-*.yml)
-        run: python -m pytest -q software/python/tests --durations=30
+        # CI suite routing is owned by software/python/tests/conftest.py.
+        # Packaging runs explicitly; ICPN/SQLite has a dedicated path-filtered job.
+        run: python -m pytest -q software/python/tests --plasma-ci-suite=general --durations=30
 
 
   # Existing hosted source-test workflow; source-locked native OpenOCD

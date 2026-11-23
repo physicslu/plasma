@@ -1,53 +1,8 @@
 name: Control Station runtime packaging acceptance
 
+# Explicit packaging acceptance: opt in through Actions > Run workflow.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "scripts/control-station-runtime.py"
-      - "scripts/control-station-release.py"
-      - "scripts/control-station-runtime-smoke.py"
-      - "scripts/control-station-runtime-acceptance.py"
-      - "scripts/product-release.py"
-      - "scripts/render-build.sh"
-      - "scripts/render-start.sh"
-      - "scripts/tests/test-render-runtime.py"
-      - "render.yaml"
-      - "software/web/**"
-      - "!software/web/e2e/**"
-      - "!software/web/tests/**"
-      - "software/python/plasma_manager/**"
-      - "software/python/plasma_web/legacy_device_selector.py"
-      - "data/device-catalog/production/**"
-      - "software/python/pyproject.toml"
-      - "software/python/tests/test_control_station_runtime.py"
-      - "software/python/tests/test_control_station_release.py"
-      - "software/python/tests/test_render_deployment.py"
-      - "release/product.json"
-      - ".github/workflows/control-station-runtime.yml"
-  pull_request:
-    paths:
-      - "scripts/control-station-runtime.py"
-      - "scripts/control-station-release.py"
-      - "scripts/control-station-runtime-smoke.py"
-      - "scripts/control-station-runtime-acceptance.py"
-      - "scripts/product-release.py"
-      - "scripts/render-build.sh"
-      - "scripts/render-start.sh"
-      - "scripts/tests/test-render-runtime.py"
-      - "render.yaml"
-      - "software/web/**"
-      - "!software/web/e2e/**"
-      - "!software/web/tests/**"
-      - "software/python/plasma_manager/**"
-      - "software/python/plasma_web/legacy_device_selector.py"
-      - "data/device-catalog/production/**"
-      - "software/python/pyproject.toml"
-      - "software/python/tests/test_control_station_runtime.py"
-      - "software/python/tests/test_control_station_release.py"
-      - "software/python/tests/test_render_deployment.py"
-      - "release/product.json"
-      - ".github/workflows/control-station-runtime.yml"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -97,6 +52,12 @@ jobs:
           software/python/tests/test_control_station_release.py
           software/python/tests/test_product_release.py
           software/python/tests/test_render_deployment.py
+      - name: Verify packaged Manager Selector and committed Catalog (Linux)
+        if: runner.os == 'Linux'
+        run: >-
+          python -m pytest -q
+          software/python/tests/test_manager_device_selector.py::test_packaged_manager_serves_selector_from_its_own_catalog
+          software/python/tests/test_manager_device_selector.py::test_catalog_export_is_raw_git_blob_bytes_even_with_autocrlf
       - name: Build release, clean-extract, and run Console/BFF + Manager smoke
         run: >-
           python scripts/control-station-runtime-acceptance.py

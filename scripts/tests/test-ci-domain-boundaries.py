@@ -206,20 +206,30 @@ def validate_p1_path_filter_contracts() -> None:
     ):
         forbid(read(name), "docs/README.md", owner=f"P1 docs trigger: {name}")
 
-    # Product release version changes require packaging acceptance. Research
-    # qualification data under release/ must not rebuild Control Station.
-    for name in ("control-station-runtime.yml", "product-release.yml"):
+    # Packaging acceptance must be explicit, never transitively triggered by
+    # ordinary Web/Manager/ICPN changes. Product release format stays gated on
+    # the narrow release manifest/source contract.
+    for name in (
+        "control-station-runtime.yml",
+        "macos-control-station-installer.yml",
+        "windows-control-station-installer.yml",
+    ):
         source = read(name)
-        trigger_count = sum(
-            line.strip() == '- "release/product.json"'
-            for line in source.splitlines()
+        require(source, "  workflow_dispatch:", owner=f"Explicit packaging: {name}")
+        forbid(source, "  push:", owner=f"Explicit packaging: {name}")
+        forbid(source, "  pull_request:", owner=f"Explicit packaging: {name}")
+
+    source = read("product-release.yml")
+    trigger_count = sum(
+        line.strip() == '- "release/product.json"'
+        for line in source.splitlines()
+    )
+    if trigger_count != 2:
+        raise SystemExit(
+            "P1 release: product-release.yml: expected 2 product manifest path entries, "
+            f"got {trigger_count}"
         )
-        if trigger_count != 2:
-            raise SystemExit(
-                f"P1 release: {name}: expected 2 product manifest path entries, "
-                f"got {trigger_count}"
-            )
-        forbid(source, '"release/**"', owner=f"P1 release: {name}")
+    forbid(source, '"release/**"', owner="P1 release: product-release.yml")
 
     # Changes to every P1-owned workflow must exercise this guard.
     repository_contracts = read("repository-contracts.yml")
@@ -301,6 +311,21 @@ def main() -> int:
         '".github/workflows/persistent-integration-host.yml"',
         3,
         owner="REPO persistent L4 governance",
+    )
+
+    # Python CI suites must be disjoint; generic SW/PPU tests cannot silently
+    # absorb product packaging or ICPN/SQLite qualification.
+    require(python_tests, "--plasma-ci-suite=general", owner="Python CI suite routing")
+    icpn_tests = read("python-icpn-sqlite.yml")
+    require(icpn_tests, "--plasma-ci-suite=icpn-sqlite", owner="ICPN SQLite suite")
+    for token in ('"data/device-catalog/**"', '"software/python/plasma_web/catalog_sqlite*.py"'):
+        require(icpn_tests, token, owner="ICPN SQLite path-filtered ownership")
+    forbid(icpn_tests, '"software/python/**"', owner="ICPN SQLite no blanket PS trigger")
+    require_count(
+        repository_contracts,
+        '".github/workflows/python-icpn-sqlite.yml"',
+        2,
+        owner="ICPN SQLite workflow governance",
     )
 
     # Preserve positive ownership so trigger cleanup cannot be satisfied by

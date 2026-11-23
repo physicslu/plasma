@@ -1,0 +1,77 @@
+name: Python ICPN SQLite tests
+
+# ICPN/SQLite selection is independent of routine SW/PPU Python tests.
+# Only an explicit Catalog, qualification, SQLite or its test/CI change runs it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog*.py"
+      - "software/python/plasma_web/catalog_sqlite*.py"
+      - "software/python/plasma_web/legacy_device_selector.py"
+      - "software/python/plasma_web/programming_qualification.py"
+      - "software/python/plasma_web/runtime_evidence_root.py"
+      - "software/python/plasma_core/manufacturer_device_basic.py"
+      - "software/python/tests/conftest.py"
+      - "software/python/tests/test_catalog_*.py"
+      - "software/python/tests/test_device_catalog*.py"
+      - "software/python/tests/test_ic_selector_*.py"
+      - "software/python/tests/test_icpn_*.py"
+      - "software/python/tests/test_manager_sqlite_selector.py"
+      - "software/python/tests/test_manager_device_selector.py"
+      - "software/python/tests/test_manufacturer_device_basic.py"
+      - "software/python/tests/test_microchip_*.py"
+      - "software/python/tests/test_nxp_*.py"
+      - "software/python/tests/test_programming_qualification.py"
+      - "software/python/tests/test_route_evidence_admission.py"
+      - "software/python/tests/test_physical_compatibility_l3.py"
+      - ".github/workflows/python-icpn-sqlite.yml"
+  pull_request:
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog*.py"
+      - "software/python/plasma_web/catalog_sqlite*.py"
+      - "software/python/plasma_web/legacy_device_selector.py"
+      - "software/python/plasma_web/programming_qualification.py"
+      - "software/python/plasma_web/runtime_evidence_root.py"
+      - "software/python/plasma_core/manufacturer_device_basic.py"
+      - "software/python/tests/conftest.py"
+      - "software/python/tests/test_catalog_*.py"
+      - "software/python/tests/test_device_catalog*.py"
+      - "software/python/tests/test_ic_selector_*.py"
+      - "software/python/tests/test_icpn_*.py"
+      - "software/python/tests/test_manager_sqlite_selector.py"
+      - "software/python/tests/test_manager_device_selector.py"
+      - "software/python/tests/test_manufacturer_device_basic.py"
+      - "software/python/tests/test_microchip_*.py"
+      - "software/python/tests/test_nxp_*.py"
+      - "software/python/tests/test_programming_qualification.py"
+      - "software/python/tests/test_route_evidence_admission.py"
+      - "software/python/tests/test_physical_compatibility_l3.py"
+      - ".github/workflows/python-icpn-sqlite.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  icpn-sqlite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: software/python/pyproject.toml
+      - name: Install Python tests
+        run: python -m pip install -e "./software/python[dev]"
+      - name: Run ICPN SQLite pytest suite
+        run: python -m pytest -q software/python/tests --plasma-ci-suite=icpn-sqlite --durations=30
