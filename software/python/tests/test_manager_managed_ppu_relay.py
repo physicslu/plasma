@@ -228,41 +228,23 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
         self.assertEqual(observed["body"], asset)
         self.assertIn("session_id=s1", observed["path"])
 
-    def test_batch_asset_envelope_is_relayed_byte_for_byte(self):
-        body = json.dumps(
-            {
-                "session_id": "session-1",
-                "targets": [{"facility_id": "fac-a", "ppu_id": "ppu-01", "site_ids": [1]}],
-                "operations": ["program", "verify"],
-                "execution_policy": {
-                    "repeat_count": 1,
-                    "site_retry_limit": 0,
-                    "failed_site_stop_threshold": None,
-                },
-                "asset": {
-                    "asset_name": "image.bin",
-                    "asset_type": "image",
-                    "asset_format": "binary",
-                    "asset_size": 3,
-                    "asset_sha256": "0" * 64,
-                    "asset_base64": "AAEC",
-                },
-                "read": {"offset": 0, "length": 256},
-            },
-            separators=(",", ":"),
-        ).encode("utf-8")
-        status, _, data = self.relay(
-            "POST",
+    def test_legacy_batch_post_routes_are_denied_before_ppu_contact(self):
+        # A Manager-owned Batch is started through /api/programming/batches,
+        # never by forwarding a legacy Gateway /api/batches write.
+        before = len(FakeManagedPPUGatewayHandler.requests)
+        for path in (
             "/api/batches",
-            body=body,
-            headers={"Content-Type": "application/json", "Idempotency-Key": "batch-1"},
-        )
-        self.assertEqual(status, 200)
-        self.assertTrue(json.loads(data)["ok"])
-        observed = FakeManagedPPUGatewayHandler.requests[-1]
-        self.assertEqual(observed["path"], "/api/batches")
-        self.assertEqual(observed["body"], body)
-        self.assertEqual(observed["idempotency_key"], "batch-1")
+            "/api/batches/batch-1/cancel",
+            "/api/batches/batch-1/targets/ppu-01/1/cancel",
+        ):
+            with self.subTest(path=path):
+                status, _, data = self.relay(
+                    "POST", path, body=b"{}",
+                    headers={"Content-Type": "application/json"},
+                )
+                self.assertEqual(status, 404, data)
+                self.assertEqual(json.loads(data)["error"]["code"], "managed_route_not_allowed")
+                self.assertEqual(len(FakeManagedPPUGatewayHandler.requests), before)
 
     def test_managed_workspace_settings_routes_preserve_security_headers(self):
         for path in ("/api/settings/gateway", "/api/settings/ppu-network", "/api/mock/runtime"):
