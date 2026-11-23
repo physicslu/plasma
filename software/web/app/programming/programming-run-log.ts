@@ -1,11 +1,13 @@
 import type { ProgrammingRun } from "../engineering/bundle-programming-api";
 import { runVerdict } from "./managed-programming";
+import { safeOffLabel, type SafeOffState } from "./batch-statistics";
 
 const hex = (value: number) => `0x${value.toString(16).toUpperCase().padStart(8, "0")}`;
 
 /** SAFE_OFF as the Manager receipt reports it; never inferred from a PASS. */
-export function safeOffLogLabel(safeOff: boolean | null | undefined, finished: boolean): string {
-  return safeOff === true ? "VERIFIED" : finished ? "NOT VERIFIED" : "—";
+export function safeOffLogLabel(safeOff: boolean | null | undefined, finished: boolean,
+  state?: SafeOffState | string | null): string {
+  return safeOffLabel(state, safeOff, finished);
 }
 
 /**
@@ -27,7 +29,7 @@ export function programmingRunLogLines(
   const finished = run.outcome != null;
   const lines = [
     `[RUN] ${verdict.replace("_", " ")}${reason ? ` · ${reason}` : ""} · Run ${run.run_id} · Job ${receipt?.job_id ?? run.job?.job_id ?? "—"}`
-      + ` · SAFE_OFF ${safeOffLogLabel(receipt?.safe_off, finished)}`
+      + ` · SAFE_OFF ${safeOffLogLabel(receipt?.safe_off, finished, receipt?.safe_off_state)}`
       + ` · attempts ${run.job_submission_count} · auto retry ${run.auto_retry}`,
   ];
   if (run.steps.length) {

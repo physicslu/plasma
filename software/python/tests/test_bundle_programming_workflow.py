@@ -114,7 +114,8 @@ class FakeGateway:
     def __init__(self, *, image: bytes, safe_off=True, readback_ok=True,
                  post_status=202, post_raises=False, busy=False, job_final="success",
                  status_target=ICPN, status_interface="openocd", coordinator=None, resource_for=None,
-                 resources_state=None, status_raises=False, echo=True, ppu_id="z2-hil"):
+                 resources_state=None, status_raises=False, echo=True, ppu_id="z2-hil",
+                 worker_refusal=None):
         self.image = image
         self.coordinator = coordinator
         self.resource_for = resource_for or (lambda _active: ROUTE_RESOURCE_SHA)
@@ -143,6 +144,10 @@ class FakeGateway:
         # empty ``details``, Worker result in ``error.context``. A dict tampers
         # ``site_worker_result`` (key "context" tampers the context instead).
         self.worker_failure: bool | dict = False
+        # The real C-3 PPU shape of a refused ``run`` (site_worker_c3._refusal):
+        # "denied" (TransportDenied), "failed_safe" (TransportFailed) or a dict
+        # {"mode": ..., "safety": {tamper} | None, "context": {tamper}}.
+        self.worker_refusal = worker_refusal
         self.polls = 0
         self.resource_reservation = None
 
@@ -245,6 +250,8 @@ class FakeGateway:
             error, details = None, {kind: evidence}
             if self.worker_failure and state in ("failed", "error"):
                 error, details = self._worker_error(post, kind, binding), {}
+            if self.worker_refusal and state in ("failed", "error"):
+                error, details = self._refusal_error(post, kind, binding), {}
             return self._resp(200, {"job": {
                 "job_id": self._job_id(), "state": state,
                 # The Site the Job was submitted for, not a fixed one: a Batch
@@ -286,6 +293,36 @@ class FakeGateway:
                 "failure_source": "infrastructure", "site_id": site,
                 "job_id": self._job_id(), "operation": kind, "retry_count": 0,
                 "context": context}
+
+    def _refusal_error(self, post, kind, binding):
+        site = post.get("site_id", 2)
+        spec = (dict(self.worker_refusal) if isinstance(self.worker_refusal, dict)
+                else {"mode": self.worker_refusal})
+        denied = spec["mode"] == "denied"
+        code = ("ADMISSION_DENIED:PROC_SCAN_INCOMPLETE:PROC_VISIBILITY_DENIED:5704:MAPS:"
+                "ProcessLookupError" if denied else "OPERATION_TIMEOUT")
+        full = ("TRANSPORT_DENIED:" if denied else "OPERATION_FAILED_SAFE:") + code
+        safety = {"schema": "plasma.ppu.site-safety.v1",
+                  "class": "PRE_HARDWARE_DENIED" if denied else "FAILED_SAFE_OFF_VERIFIED",
+                  "job_id": self._job_id(), "session_id": "5" * 32, "site": site,
+                  "operation": kind, "stage": "run", "code": code,
+                  "hardware_touched": not denied, "safe_off": None if denied else True}
+        if spec.get("safety", {}) is None:
+            safety = None
+        else:
+            safety.update(spec.get("safety") or {})
+        context = {"site_worker_stage": "run", "site_worker_code": full,
+                   "outcome_unknown": False, "job_id": self._job_id(), "site_id": site,
+                   "icpn": ICPN, "operation": kind,
+                   **({"operations": post["operations"], "address": binding["range"]["address"],
+                       "length": binding["range"]["length"]} if kind == "programming" else {}),
+                   **({"site_worker_safety": safety} if safety is not None else {}),
+                   **spec.get("context", {})}
+        return {"error_code": "E5002", "error_type": "INTERFACE_FAILURE",
+                "message": "C-3 Site Worker run refused: " + full,
+                "recoverable": not denied, "failure_source": "infrastructure",
+                "site_id": site, "job_id": self._job_id(), "operation": kind,
+                "retry_count": 0, "context": context}
 
     def _job_id(self):
         # Every submitted Job has its own identity.

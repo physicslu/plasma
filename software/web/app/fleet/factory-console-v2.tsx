@@ -22,6 +22,7 @@ import type {
 } from "../plasma-api";
 import { programmingRunLogLines } from "../programming/programming-run-log";
 import {
+  safeOffLabel,
   batchStatistics, cycleHistoryLogLines, snapshotStatistics, statisticsKpis, statisticsLogLine,
   statisticsMeta, type BatchStatistics,
 } from "../programming/batch-statistics";
@@ -562,7 +563,7 @@ export default function FactoryConsoleV2() {
         } else if (loadFailed) {
           appendLog(`[RUN] Run ${last?.run_id ?? "—"} · receipt not loaded from the Manager · ${label}`, "WARN");
         }
-        appendLog(`[SITE] ${label} · ${verdict.verdict} · Run ${last?.run_id ?? "—"} · Job ${last?.job_id ?? "—"} · SAFE_OFF ${last?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${verdict.reason ?? unit.reason ? " · " + (verdict.reason ?? unit.reason) : ""}`,
+        appendLog(`[SITE] ${label} · ${verdict.verdict} · Run ${last?.run_id ?? "—"} · Job ${last?.job_id ?? "—"} · SAFE_OFF ${safeOffLabel(last?.safe_off_state, last?.safe_off)}${verdict.reason ?? unit.reason ? " · " + (verdict.reason ?? unit.reason) : ""}`,
           verdict.verdict === "PASS" ? "INFO" : "WARN");
         if ((unit.outcome === "PASS" || unit.outcome === "FAIL") && !evidenceLogged) {
           appendLog(interfaceName === "mock"

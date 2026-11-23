@@ -927,6 +927,52 @@ def test_c98_unreadable_live_pid_on_revalidation_fails_closed(tmp_path, monkeypa
     assert detail["phase"] == "REVALIDATE_" + what.upper()
 
 
+@pytest.mark.parametrize("what", ["fd", "maps", "stat"])
+@pytest.mark.parametrize("gone", [True, False])
+def test_c98_esrch_on_revalidation_needs_a_confirmed_exit(tmp_path, monkeypatch, what, gone):
+    """ESRCH (task reaped between open and read) while re-reading the peer owner:
+    skipped only when the PID entry is confirmed gone; otherwise fail closed."""
+    from pathlib import Path
+    r, g, proc, _, bound = _c98(tmp_path, monkeypatch)
+    armed = []
+    real_iterdir, real_read_text = Path.iterdir, Path.read_text
+
+    def esrch():
+        armed.clear()
+        if gone:  # the harness patches os.stat, so no shutil.rmtree here
+            pid = proc / "100"
+            for fd in real_iterdir(pid / "fd"):
+                fd.unlink()
+            (pid / "fd").rmdir(); (pid / "maps").unlink(); (pid / "stat").unlink()
+            pid.rmdir()
+        raise ProcessLookupError("synthetic reaped task")
+
+    def iterdir(self):
+        if armed and what == "fd" and self == proc / "100" / "fd":
+            esrch()
+        return real_iterdir(self)
+
+    def read_text(self, *a, **k):
+        if armed and what != "fd" and self == proc / "100" / what:
+            esrch()
+        return real_read_text(self, *a, **k)
+
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+    monkeypatch.setattr(Path, "read_text", read_text)
+
+    def arm(n):
+        if n == 1:
+            _wp07_locks(proc, [])
+            armed.append(1)
+    (result, detail, _) = _census(g, r, proc, bound, arm)
+    if gone:
+        assert result == (True, []) and detail["vanished_skipped"] == 1
+    else:
+        assert result == (False, ["100"])
+        assert (detail["status"], detail["phase"], detail["error"]) == (
+            "PROC_VISIBILITY_DENIED", "REVALIDATE_" + what.upper(), "ProcessLookupError")
+
+
 def test_c98_missing_start_time_cannot_prove_no_reuse(tmp_path, monkeypatch):
     r, g, proc, _, bound = _c98(tmp_path, monkeypatch)
     (proc / "100" / "stat").unlink()

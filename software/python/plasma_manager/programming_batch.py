@@ -93,7 +93,7 @@ from typing import Any, Callable, Generator, Mapping
 from .programming import (
     SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
     TARGET_TRANSACTION_UNKNOWN, BatchPreparation, BundleProgrammingWorkflow, JOB_TERMINAL,
-    ProgrammingError, _m0_timing,
+    SITE_DENIED_BEFORE_HARDWARE, ProgrammingError, _m0_timing,
 )
 from .bootstrap import BootstrapManagerError
 from .client import PPUHTTPError
@@ -261,6 +261,16 @@ def retry_eligibility(run: Mapping[str, Any]) -> tuple[bool, str]:
     return (True, "DEFINITE_FAIL_SAFE_OFF_VERIFIED") if trusted else (False, why)
 
 
+def _denied_before_hardware(run: Mapping[str, Any]) -> bool:
+    """The Manager's own trusted verdict that this Run's Job touched nothing
+    (``programming._job_site_safety``): the Site is left as it was."""
+    receipt = run.get("receipt") if isinstance(run.get("receipt"), dict) else {}
+    return (run.get("outcome") == "BLOCKED" and run.get("reason") == SITE_DENIED_BEFORE_HARDWARE
+            and receipt.get("safe_off_state") == "NOT_TOUCHED"
+            and isinstance(receipt.get("site_safety"), dict)
+            and receipt["site_safety"].get("class") == "PRE_HARDWARE_DENIED")
+
+
 def terminal_evidence(run: Mapping[str, Any] | None) -> tuple[bool, str]:
     """Did this run end in a trusted terminal state with SAFE_OFF verified?
 
@@ -276,13 +286,15 @@ def terminal_evidence(run: Mapping[str, Any] | None) -> tuple[bool, str]:
         return False, "JOB_SUBMISSION_NOT_EXACTLY_ONE"
     if type(receipt.get("job_id")) is not str or receipt.get("job_state") not in JOB_TERMINAL:
         return False, "NO_TRUSTED_TERMINAL_JOB_STATE"
-    if receipt.get("safe_off") is not True:
+    if receipt.get("safe_off") is not True and not _denied_before_hardware(run):
         return False, "SAFE_OFF_NOT_VERIFIED"
     if (receipt.get("observed_job_binding_sha256") != receipt.get("expected_job_binding_sha256")
             or receipt.get("observed_resource_set_sha256")
             != receipt.get("expected_resource_set_sha256")):
         # The PPU did not prove it ran the Job that was planned.
         return False, "JOB_IDENTITY_NOT_CONFIRMED"
+    if receipt.get("safe_off") is not True:
+        return True, "TERMINAL_HARDWARE_NOT_TOUCHED"
     return True, "TERMINAL_SAFE_OFF_VERIFIED"
 
 
@@ -400,6 +412,8 @@ def _receipt_summary(run: Mapping[str, Any] | None) -> dict[str, Any] | None:
         "job_id": receipt.get("job_id"), "job_state": receipt.get("job_state"),
         "flash_result": receipt.get("flash_result"), "safe_off": receipt.get("safe_off"),
         "safe_off_source": receipt.get("safe_off_source"),
+        "safe_off_state": receipt.get("safe_off_state"),
+        "site_safety": receipt.get("site_safety"),
         "job_binding_confirmed": (receipt.get("observed_job_binding_sha256") is not None
                                   and receipt.get("observed_job_binding_sha256")
                                   == receipt.get("expected_job_binding_sha256")),
@@ -987,7 +1001,8 @@ class ProgrammingBatchCoordinator:
             run_id=run.get("run_id"), state="finished" if run.get("outcome") else "running",
             outcome=run.get("outcome"), reason=run.get("reason"),
             job_id=receipt.get("job_id") or job.get("job_id"),
-            safe_off=receipt.get("safe_off"), finished_at=run.get("updated_at"))
+            safe_off=receipt.get("safe_off"), safe_off_state=receipt.get("safe_off_state"),
+            finished_at=run.get("updated_at"))
 
     def _unit_progress(self, unit: Mapping[str, Any]) -> dict[str, Any] | None:
         """Read-only PPU progress of this Site's latest attempt.
@@ -1692,11 +1707,18 @@ class ProgrammingBatchCoordinator:
                     return self._conclude(unit, None, stopped)
                 self._begin_next_cycle(batch, unit)
                 continue
-            if outcome == "BLOCKED" and cycle["settled"]:
-                # The next Cycle was not submitted. It is neither failed nor
-                # skipped: it waits, with its reason, for the operator.
-                self._record_blocked_dispatch(batch, unit, reason)
-                stopped = yield from self._await_continue(batch, unit, f"NEXT_CYCLE_{reason}")
+            denied = outcome == "BLOCKED" and reason == SITE_DENIED_BEFORE_HARDWARE
+            if outcome == "BLOCKED" and (cycle["settled"] or denied):
+                # The next Cycle was not submitted, or its Job was refused
+                # before any hardware access. It is neither failed nor
+                # settled: it waits, with its reason, for the operator. Continue
+                # runs this Cycle again through every admission gate with a
+                # new plan, Run and Job (never a resend), this Site only.
+                attempts = unit.get("attempts") or []
+                last = self._run_of(alias, attempts[-1]) if denied and attempts else None
+                self._record_blocked_dispatch(batch, unit, reason, last)
+                stopped = yield from self._await_continue(
+                    batch, unit, reason if denied else f"NEXT_CYCLE_{reason}")
                 if stopped is not None:
                     return self._conclude(unit, None, stopped)
                 continue
@@ -1738,7 +1760,8 @@ class ProgrammingBatchCoordinator:
             self._persist_locked()
 
     def _record_blocked_dispatch(self, batch: dict[str, Any], unit: dict[str, Any],
-                                 reason: str | None) -> None:
+                                 reason: str | None,
+                                 run: Mapping[str, Any] | None = None) -> None:
         with self._lock:
             attempts = unit.get("attempts") or []
             if attempts:
@@ -1746,7 +1769,10 @@ class ProgrammingBatchCoordinator:
                     "type": "blocked_dispatch", "batch_id": batch["batch_id"],
                     "ppu_alias": unit["ppu_alias"], "site_id": unit["site_id"],
                     "cycle_index": unit["cycle"]["index"], "cycle_id": unit["cycle"]["cycle_id"],
-                    "reason": reason, "attempts": [dict(a) for a in attempts], "at": _now()})
+                    "reason": reason, "attempts": [dict(a) for a in attempts],
+                    # The refused Job's evidence (SITE_DENIED_BEFORE_HARDWARE).
+                    **({"receipt": _receipt_summary(run)} if run is not None else {}),
+                    "at": _now()})
             unit["cycle"]["attempts_archived"] = (
                 unit["cycle"].get("attempts_archived", 0) + len(attempts))
             unit["attempts"] = []
@@ -1927,6 +1953,11 @@ class ProgrammingBatchCoordinator:
                 self._record_attempt(attempt, run)
                 self._persist_locked()
             outcome = run["outcome"]
+            if outcome == "BLOCKED" and number > 1:
+                # A Retry the Site Worker refused before any hardware access:
+                # the earlier definite FAIL of this Cycle stands (never erased
+                # by a pause); the refused Retry touched nothing.
+                return "FAIL", f"RETRY_{run.get('reason')}"
             if outcome != "FAIL":
                 # PASS ends this Site; OUTCOME_UNKNOWN and BLOCKED are never retried.
                 return outcome, run.get("reason")

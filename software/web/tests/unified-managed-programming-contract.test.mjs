@@ -460,7 +460,7 @@ test("concurrent lanes: each Site's run is read by run_id and each attempt is ke
   assert.match(core, /export async function loadAttemptRun\(/);
   assert.match(core, /run\.run_id === runId && run\.ppu_alias === alias && run\.site_id === siteId \? run : null/);
   // Attempts are keyed by Site AND Repeat Cycle: attempt 1 recurs every Cycle.
-  assert.match(emode, /const attemptKey = `\$\{attemptSite\}:\$\{attempt\.cycle_index \?\? 1\}:\$\{attempt\.attempt\}`;/);
+  assert.match(emode, /const attemptKey = `\$\{attemptSite\}:\$\{attempt\.cycle_index \?\? 1\}:\$\{attempt\.attempt\}:\$\{attempt\.plan_id\}`;/);
   assert.match(emode, /loadAttemptRun\(next, request\.alias, attemptSite, attempt\.run_id\)/);
   assert.match(emode, /await Promise\.allSettled\(pendingRunLogs\);/);
   assert.match(factory, /loadUnitRun\(batch, unit\)/);
@@ -621,4 +621,71 @@ test("T17 PMode: Factory Log reads the Cycle History by cursor and keeps TERMINA
   // P Mode's existing PASS / FAIL Cycle counters are kept, now via the shared tally.
   assert.match(factoryBackend, /unitCycleTally/);
   assert.match(factoryBackend, /: batch\.outcome === "PARTIAL" \? "partial"/);
+});
+
+// ------------------------------- Site safety evidence v1 (SAFE_OFF state vs result)
+
+test("SAFE_OFF label quotes the Manager state and never confuses it with the result", () => {
+  assert.equal(stats.safeOffLabel("VERIFIED", true), "VERIFIED");
+  assert.equal(stats.safeOffLabel(undefined, true), "VERIFIED");  // older receipts
+  assert.equal(stats.safeOffLabel("NOT_TOUCHED", null), "N/A · hardware not touched");
+  assert.equal(stats.safeOffLabel("NOT_VERIFIED", null), "NOT VERIFIED");
+  assert.equal(stats.safeOffLabel(null, null), "NOT VERIFIED");
+  assert.equal(stats.safeOffLabel(null, null, false), "—");
+  // A PASS-looking or reason-looking value never upgrades the state.
+  assert.equal(stats.safeOffLabel("PASS", false), "NOT VERIFIED");
+});
+
+test("A pre-hardware denial is a BLOCKED history line, not a Cycle FAIL", () => {
+  const [line] = stats.cycleHistoryLogLines({
+    seq: 3, type: "blocked_dispatch", ppu_alias: "z2", site_id: 2, cycle_index: 15,
+    reason: stats.SITE_DENIED_BEFORE_HARDWARE,
+    attempts: [{ attempt: 1, run_id: "c5de59", job_id: "job-x", outcome: "BLOCKED",
+      reason: stats.SITE_DENIED_BEFORE_HARDWARE, safe_off: null, safe_off_state: "NOT_TOUCHED" }],
+    receipt: { run_id: "c5de59", job_id: "job-x", job_state: "error", safe_off: null,
+      safe_off_state: "NOT_TOUCHED", job_binding_confirmed: true,
+      site_safety: { class: "PRE_HARDWARE_DENIED", code: "ADMISSION_DENIED:PROC_SCAN_INCOMPLETE" } },
+  }, 20, "Site 2");
+  assert.match(line.text, /^\[BLOCKED\] Cycle 15\/20 Site 2 · denied before hardware · ADMISSION_DENIED:PROC_SCAN_INCOMPLETE/);
+  assert.match(line.text, /SAFE_OFF N\/A · hardware not touched · not counted as a Cycle · press Start to re-run admission/);
+  assert.doesNotMatch(line.text, /FAIL|NOT VERIFIED/);
+  // The existing next-Cycle dispatch block keeps its own wording.
+  const [next] = stats.cycleHistoryLogLines({ seq: 4, type: "blocked_dispatch", ppu_alias: "z2",
+    site_id: 2, cycle_index: 3, reason: "EXECUTION_PPU_BUSY", attempts: [] }, 20, "Site 2");
+  assert.match(next.text, /NEXT CYCLE BLOCKED · EXECUTION_PPU_BUSY · nothing submitted/);
+});
+
+test("Cycle and attempt lines show SAFE_OFF from the receipt state", () => {
+  const lines = stats.cycleHistoryLogLines({
+    seq: 0, type: "cycle", ppu_alias: "z2", site_id: 1, cycle_index: 1, outcome: "FAIL",
+    reason: "JOB_NOT_SUCCESS",
+    attempts: [{ attempt: 2, run_id: "r", job_id: "j", outcome: "FAIL", reason: "JOB_NOT_SUCCESS",
+      safe_off: true, safe_off_state: "VERIFIED", retry: null }],
+    receipt: { run_id: "r", job_id: "j", job_state: "error", safe_off: true,
+      safe_off_state: "VERIFIED", job_binding_confirmed: true },
+  }, 2, "Site 1");
+  assert.ok(lines.every(entry => !/NOT VERIFIED/.test(entry.text)));
+  assert.match(lines[1].text, /\[CYCLE 1\/2\] Site 1 · FAIL · JOB_NOT_SUCCESS .* SAFE_OFF VERIFIED/);
+});
+
+test("Console surfaces use the one SAFE_OFF label; READY stays the PPU Site capability", async () => {
+  const core = await read("app/programming/managed-programming.ts");
+  const runLog = await read("app/programming/programming-run-log.ts");
+  const workspace = await read("app/engineering/managed-programming-workspace.tsx");
+  const factory = await read("app/fleet/factory-console-v2.tsx");
+  const view = await read("app/operator-ui/programming-run-view.tsx");
+  assert.match(core, /cycle\.wait_reason === SITE_DENIED_BEFORE_HARDWARE\s*\? "BLOCKED · denied before hardware · not counted · press Start to re-run admission"/);
+  assert.match(core, /`SAFE_OFF \$\{safeOffLabel\(receipt\?\.safe_off_state, receipt\?\.safe_off\)\}`/);
+  assert.match(runLog, /return safeOffLabel\(state, safeOff, finished\);/);
+  assert.match(workspace, /safeOffLogLabel\(attempt\.safe_off, true, attempt\.safe_off_state\)/);
+  // A re-run Cycle restarts at attempt 1: its Log key includes the plan.
+  assert.match(workspace, /`\$\{attemptSite\}:\$\{attempt\.cycle_index \?\? 1\}:\$\{attempt\.attempt\}:\$\{attempt\.plan_id\}`/);
+  assert.match(factory, /SAFE_OFF \$\{safeOffLabel\(last\?\.safe_off_state, last\?\.safe_off\)\}/);
+  assert.match(view, /\{safeOffLabel\(receipt\.safe_off_state, receipt\.safe_off\)\}/);
+  for (const source of [core, workspace, factory, view]) {
+    assert.doesNotMatch(source, /safe_off === true \? "VERIFIED" : "NOT VERIFIED"/);
+  }
+  // Site READY is the PPU's own idle Site + Profile, never a Batch or SAFE_OFF guess.
+  assert.match(core, /if \(site\.current_job_id \|\| site\.state !== "idle"\) \{/);
+  assert.match(core, /return \{ programmable: true, label: "READY", reason: "" \};/);
 });

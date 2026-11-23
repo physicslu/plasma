@@ -35,7 +35,7 @@ import {
 import { getManagerFleet, getManagerRegistry, type ManagerRegistryPayload } from "../engineering/ppu-registry-api";
 import type { FleetPPUView, FleetSiteView, FleetWebPayload } from "../fleet/fleet-contract";
 import {
-  batchStatistics, cycleHistoryReader, unitCycleTally,
+  batchStatistics, cycleHistoryReader, safeOffLabel, SITE_DENIED_BEFORE_HARDWARE, unitCycleTally,
   type BatchStatistics, type CycleHistoryRecord,
 } from "./batch-statistics";
 
@@ -703,6 +703,8 @@ export function unitCycleLabel(unit: ProgrammingBatchUnit): string | null {
   const state = cycle.state === "AWAITING_CONTINUE"
     ? (cycle.wait_reason === "REPLACE_IC" ? "REPLACE IC · press Start"
       : cycle.wait_reason === "FAIL_REVIEW" ? "FAIL · replace IC · press Start"
+      : cycle.wait_reason === SITE_DENIED_BEFORE_HARDWARE
+        ? "BLOCKED · denied before hardware · not counted · press Start to re-run admission"
       : `WAITING · ${cycle.wait_reason ?? ""} · press Start`)
     : cycle.state === "ENDED" ? (cycle.disposition ?? "ENDED") : "RUNNING";
   return `Cycle ${Math.min(cycle.index, cycle.planned)}/${cycle.planned} · PASS ${cycle.pass} · FAIL ${cycle.fail}`
@@ -717,7 +719,7 @@ export function unitFailDetail(unit: ProgrammingBatchUnit): string | null {
   return [`Cycle ${last.cycle_index} FAIL`, last.reason, receipt?.job_id ? `Job ${receipt.job_id}` : null,
     receipt?.job_state ? `state ${receipt.job_state}` : null,
     receipt?.flash_result ? `result ${receipt.flash_result}` : null,
-    `SAFE_OFF ${receipt?.safe_off === true ? "verified" : "NOT verified"}`,
+    `SAFE_OFF ${safeOffLabel(receipt?.safe_off_state, receipt?.safe_off)}`,
     `${last.attempts} attempt${last.attempts === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
 }
 

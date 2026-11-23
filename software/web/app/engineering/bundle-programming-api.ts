@@ -1,5 +1,5 @@
 import { BootstrapApiError } from "./ppu-bootstrap-api";
-import type { CycleHistoryPage } from "../programming/batch-statistics";
+import type { CycleHistoryPage, SafeOffState } from "../programming/batch-statistics";
 
 // Console-driven Bundle programming (owner Gate 1, 2026-11-09; OFE-1B).
 // Browser -> same-origin BFF -> Manager. The Manager resolves the
@@ -180,7 +180,11 @@ export type ProgrammingRun = {
     safe_off: boolean | null;
     // Where SAFE_OFF was read: the Job details (any outcome) or, for a
     // definite Site Worker FAIL, the PPU Job error. Absent on older receipts.
-    safe_off_source?: "job_details" | "site_worker_failure" | null;
+    safe_off_source?: "job_details" | "site_worker_failure" | "site_worker_safety" | null;
+    /** The Site's end state, apart from the result (absent on older receipts). */
+    safe_off_state?: SafeOffState | null;
+    /** The Worker's trusted refusal class and code, when the Job was refused. */
+    site_safety?: { class: string; code: string } | null;
     flash_result: string | null;
     elapsed_ms: number | null;
   } | null;
@@ -360,6 +364,7 @@ export type ProgrammingBatchCycle = {
     receipt: {
       run_id: string | null; job_id: string | null; job_state: string | null;
       flash_result: string | null; safe_off: boolean | null;
+      safe_off_state?: SafeOffState | null;
       job_binding_confirmed: boolean; reason: string | null;
     } | null;
   } | null;
@@ -382,6 +387,7 @@ export type ProgrammingBatchAttempt = {
   outcome: ProgrammingRunOutcome | null;
   reason: string | null;
   safe_off: boolean | null;
+  safe_off_state?: SafeOffState | null;
   /** Why a FAIL was or was not followed by another attempt. */
   retry: { eligible: boolean; reason: string; decision: "RETRY" | "NO_RETRY" } | null;
 };

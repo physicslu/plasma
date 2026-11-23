@@ -128,7 +128,7 @@ The PPU Reservation TTL is 90 seconds. The Manager checks and renews it every 30
 
 ### 7.1 PPU Reservation state machine (Gate 2 fix)
 
-SAFE_OFF evidence for a release comes only from **this PPU's own terminal Job result** for every Job admitted under the token: `details.<kind>.safe_off == true`, the C-3 failure `site_worker_result.safe_off == true`, a C-3 refusal `TRANSPORT_DENIED:` (before any I/O) or `OPERATION_FAILED_SAFE:` (SAFE_OFF verified) per `ppu_site_worker.py`, or no interface attempt at all. `outcome_unknown`, `OUTCOME_UNKNOWN_SITE_SEALED`, missing evidence or an unknown Job are not proof. An empty lease (`active_job_count == 0`) and TTL expiry are never SAFE_OFF evidence.
+SAFE_OFF evidence for a release comes only from **this PPU's own terminal Job result** for every Job admitted under the token: `details.<kind>.safe_off == true`, the C-3 failure `site_worker_result.safe_off == true`, a C-3 refusal whose structured Worker statement (`plasma.ppu.site-safety.v1`, class `PRE_HARDWARE_DENIED` or `FAILED_SAFE_OFF_VERIFIED`) matches this Job, Site, operation and the `run` stage — never the `TRANSPORT_DENIED:` / `OPERATION_FAILED_SAFE:` code text alone (see [Site Safety Evidence v1](site-safety-evidence-v1.md)), or no interface attempt at all. `outcome_unknown`, `OUTCOME_UNKNOWN_SITE_SEALED`, missing evidence or an unknown Job are not proof. An empty lease (`active_job_count == 0`) and TTL expiry are never SAFE_OFF evidence.
 
 | State | Entered by | Refuses | Leaves by |
 |---|---|---|---|
