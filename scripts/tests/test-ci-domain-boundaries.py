@@ -328,6 +328,33 @@ def main() -> int:
         owner="ICPN SQLite workflow governance",
     )
 
+    # Long-session Repeat / History / Journal performance contracts belong to
+    # their own SW/PPU Batch Stress suite, not the routine Python PR suite.
+    batch_stress = read("python-batch-stress.yml")
+    require(batch_stress, "--plasma-ci-suite=batch-stress", owner="Batch Stress suite")
+    require(batch_stress, "  workflow_dispatch:", owner="Batch Stress manual entry")
+    for source_path in (
+        "software/python/plasma_manager/programming_batch.py",
+        "software/python/plasma_manager/programming.py",
+        "software/python/tests/test_programming_batch_repeat.py",
+        "software/python/tests/test_programming_batch_coordinator.py",
+    ):
+        require(batch_stress, f'"{source_path}"', owner="Batch Stress source routing")
+    forbid(batch_stress, '"software/python/**"', owner="Batch Stress no blanket PS trigger")
+    require_count(
+        repository_contracts,
+        '".github/workflows/python-batch-stress.yml"',
+        2,
+        owner="Batch Stress workflow governance",
+    )
+    suite_config = (ROOT / "software/python/tests/conftest.py").read_text(encoding="utf-8")
+    for case in (
+        "test_t04_repeat_100_accumulates_every_cycle",
+        "test_long_session_keeps_every_cycle_with_bounded_memory_and_journal",
+        "test_t21_status_and_history_reads_stay_bounded",
+    ):
+        require(suite_config, f'"{case}"', owner="Batch Stress selection")
+
     # Preserve positive ownership so trigger cleanup cannot be satisfied by
     # accidentally deleting the workflows' real source boundaries.
     # PS ownership: python-tests listens to software/python/** only.

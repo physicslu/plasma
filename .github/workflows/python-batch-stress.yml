@@ -1,0 +1,60 @@
+name: Python Batch Stress tests
+
+# Long-session Batch correctness/performance runs only for Batch/Journal
+# implementation or supporting test changes, or by explicit manual dispatch.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "software/python/plasma_manager/programming_batch.py"
+      - "software/python/plasma_manager/programming.py"
+      - "software/python/tests/test_programming_batch_repeat.py"
+      - "software/python/tests/test_programming_batch_coordinator.py"
+      - "software/python/tests/conftest.py"
+      - ".github/workflows/python-batch-stress.yml"
+  pull_request:
+    paths:
+      - "software/python/plasma_manager/programming_batch.py"
+      - "software/python/plasma_manager/programming.py"
+      - "software/python/tests/test_programming_batch_repeat.py"
+      - "software/python/tests/test_programming_batch_coordinator.py"
+      - "software/python/tests/conftest.py"
+      - ".github/workflows/python-batch-stress.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  batch-stress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: software/python/pyproject.toml
+      - name: Install Python tests
+        run: python -m pip install -e "./software/python[dev]"
+      - name: Assert exactly three long Batch tests are selected
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pytest --collect-only -q software/python/tests/test_programming_batch_repeat.py --plasma-ci-suite=batch-stress > "$RUNNER_TEMP/batch-stress-selected.txt"
+          cat "$RUNNER_TEMP/batch-stress-selected.txt"
+          for test in \
+            test_t04_repeat_100_accumulates_every_cycle \
+            test_long_session_keeps_every_cycle_with_bounded_memory_and_journal \
+            test_t21_status_and_history_reads_stay_bounded; do
+            grep -Fq "tests/test_programming_batch_repeat.py::${test}" "$RUNNER_TEMP/batch-stress-selected.txt"
+          done
+          test "$(grep -Ec '^tests/test_programming_batch_repeat.py::test_' "$RUNNER_TEMP/batch-stress-selected.txt")" -eq 3
+      - name: Run Batch Stress pytest (Host-only, 600/200/120 Cycles)
+        run: python -m pytest -q software/python/tests/test_programming_batch_repeat.py --plasma-ci-suite=batch-stress --durations=10
