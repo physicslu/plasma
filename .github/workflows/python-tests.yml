@@ -3,7 +3,7 @@ name: Python PS source tests
 on:
   push:
     branches:
-      - "**"
+      - main
     paths:
       - ".gitignore"
       - ".clineignore"
