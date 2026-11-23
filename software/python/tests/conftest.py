@@ -60,6 +60,7 @@ _CI_ICPN_SQLITE_PATTERNS = (
     "test_ic_selector_*.py",
     "test_icpn_*.py",
     "test_manager_sqlite_selector.py",
+    "test_manager_device_selector.py",
     "test_manufacturer_device_basic.py",
     "test_microchip_*.py",
     "test_nxp_*.py",
