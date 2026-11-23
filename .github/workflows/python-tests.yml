@@ -146,7 +146,7 @@ jobs:
           fi
           grep -F '"code": "REVOKE_DENIED"' "$RUNNER_TEMP/site-revoke.json"
       - name: Run pytest (PS / Python only; PL covered by pl-*.yml)
-        run: python -m pytest -q software/python/tests
+        run: python -m pytest -q software/python/tests --durations=30
 
 
   # Existing hosted source-test workflow; source-locked native OpenOCD
