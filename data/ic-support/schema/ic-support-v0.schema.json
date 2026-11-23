@@ -25,7 +25,7 @@
         "schema_version": {"const": "0.1.0"},
         "profile_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
         "kind": {"enum": ["programming", "memory_geometry", "package_hardware", "option", "security"]},
-        "status": {"type": "string", "pattern": "^pilot"},
+        "status": {"type": "string", "pattern": "^(pilot.*|reviewed_source_only)$"},
         "scope": {"type": "object", "minProperties": 1},
         "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence_ref"}},
         "data": {"type": "object", "minProperties": 1}
