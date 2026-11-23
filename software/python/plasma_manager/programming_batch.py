@@ -1587,33 +1587,72 @@ class ProgrammingBatchCoordinator:
         prepared = self.workflow._prepared_for(preparation, {**plan_body, "site_id": 1})
         resource_sha = prepared.resources[1]
         reserved: list[str] = []
+
+        def refuse(alias: str, exc: Exception) -> None:
+            """A PPU-local refusal blocks that PPU; anything else is shared."""
+            if hasattr(exc, "failure_domain") and hasattr(exc, "reason"):
+                blocks[alias] = (exc.failure_domain, exc.reason)
+            elif isinstance(exc, ProgrammingError):
+                blocks[alias] = (TARGET_NOT_READY, exc.code.upper())
+            elif isinstance(exc, (BootstrapManagerError, PPUHTTPError,
+                                  TimeoutError, ConnectionError)):
+                blocks[alias] = (TARGET_STATE_UNAVAILABLE,
+                                 f"PPU_STATE_UNREADABLE_{type(exc).__name__}")
+            else:
+                for held_alias in reserved:
+                    try:
+                        self.workflow.end_batch_resource(held_alias, owner_id)
+                    except Exception:
+                        pass
+                self._reservation_blocks.pop(owner_id, None)
+                raise _SharedControlFailure(
+                    f"SITE_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}") from exc
+
+        observed: dict[str, tuple | None] = {}
+        # U1: every PPU's Resources are made Active (or found Active) BEFORE
+        # any Reservation, so no Reservation waits on another PPU's B3.
         for target in batch["targets"]:
             alias = target["ppu_alias"]
+            if self.workflow._unknown_latched(alias) is not None:
+                blocks[alias] = (TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED")
+                continue
+            if batch["stop_requested"]:
+                # Stop queuing: start no Platform mutation. The lanes report
+                # the stop exactly as they always have.
+                continue
+            steps: list[dict[str, Any]] = []
+
+            def record_step(name: str, result: str, _steps=steps, **detail: Any) -> None:
+                _steps.append({"step": name, "result": result, "at": _now(), **detail})
+
             try:
-                if self.workflow._unknown_latched(alias) is not None:
-                    blocks[alias] = (TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED")
-                    continue
+                observed[alias] = self.workflow.activate_batch_resource(
+                    alias, prepared, target["site_ids"][0], step=record_step,
+                    platform_block=lambda alias=alias: self._platform_block(alias))
+            except Exception as exc:
+                refuse(alias, exc)
+            finally:
+                if steps:   # B1 was reached: keep its evidence whatever followed
+                    done = alias in observed
+                    with self._lock:
+                        batch.setdefault("resource_activation", {})[alias] = {
+                            "steps": steps, "fpga_load": False,
+                            "result": "PASS" if done else "BLOCKED",
+                            "reason": None if done else blocks.get(
+                                alias, (None, "SHARED_CONTROL_FAILURE"))[1]}
+                        batch["updated_at"] = _now()
+                        self._persist_locked()
+        for target in batch["targets"]:
+            alias = target["ppu_alias"]
+            if alias in blocks:
+                continue
+            try:
                 self.workflow.begin_batch_resource(alias, owner_id, resource_sha,
-                                                   target["site_ids"][0])
+                                                   target["site_ids"][0],
+                                                   observed=observed.get(alias))
                 reserved.append(alias)
             except Exception as exc:
-                if hasattr(exc, "failure_domain") and hasattr(exc, "reason"):
-                    blocks[alias] = (exc.failure_domain, exc.reason)
-                elif isinstance(exc, ProgrammingError):
-                    blocks[alias] = (TARGET_NOT_READY, exc.code.upper())
-                elif isinstance(exc, (BootstrapManagerError, PPUHTTPError,
-                                      TimeoutError, ConnectionError)):
-                    blocks[alias] = (TARGET_STATE_UNAVAILABLE,
-                                     f"PPU_STATE_UNREADABLE_{type(exc).__name__}")
-                else:
-                    for held_alias in reserved:
-                        try:
-                            self.workflow.end_batch_resource(held_alias, owner_id)
-                        except Exception:
-                            pass
-                    self._reservation_blocks.pop(owner_id, None)
-                    raise _SharedControlFailure(
-                        f"SITE_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}") from exc
+                refuse(alias, exc)
         for unit in batch["units"]:
             if unit["outcome"] is not None:
                 continue

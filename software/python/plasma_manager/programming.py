@@ -776,9 +776,57 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(409, "resource_reservation_refused", "PPU refused Resource Reservation")
         return reservation
 
-    def begin_batch_resource(self, alias: str, owner_id: str,
-                             resource_sha: str, site: int) -> None:
-        """One Bootstrap asset read, then atomic PPU reservation on that identity."""
+    def activate_batch_resource(self, alias: str, prepared: _Prepared, site: int, *,
+                                step: Callable[..., None],
+                                platform_block: Callable[[], tuple[str, str] | None]
+                                = lambda: None) -> tuple | None:
+        """Make this Batch's Programming Resources Active BEFORE its Reservation (U1).
+
+        Returns the identity it read when the Resources are already Active and
+        verified by the PPU (reused untouched, and handed to the Reservation so
+        a Batch still reads it once), or None when B1/B2/B3 ran. Otherwise the Batch must carry its own
+        Bundle or Image and the PPU must be released (no run, no lease, Site
+        idle); then the one Manager activation runs, never with an FPGA load.
+        Nothing here touches a DUT. The Reservation acquired afterwards
+        re-derives the identity under the PPU's own lock, so a change in
+        between fails closed, and B3 needs the asset quiesce lease that a held
+        Reservation refuses, so no activation can happen inside a Batch run.
+        """
+        _resource, resource_sha, built, _image, _asset = prepared.resources
+        observed = self._batch_resource_identity(alias, site)
+        active, _ppu_id, report = observed
+        if report.get("state") == "VERIFIED":
+            if not (active.get("state") == "ACTIVE"
+                    and report.get("asset_set_sha256") == active.get("asset_set_sha256")):
+                raise ProgrammingError(409, "active_set_report_inconsistent",
+                                       "PPU Runtime and Bootstrap report different Active Sets")
+            if report.get("resource_set_sha256") == resource_sha:
+                return observed
+        elif report.get("state") != "UNAVAILABLE":
+            raise ProgrammingError(409, "ppu_runtime_resource_identity_unsupported",
+                                   "PPU Resource identity report is not recognized")
+        if built is None:
+            raise ProgrammingError(409, "resource_activation_requires_image",
+                                   "these Programming Resources must already be Active; "
+                                   "program an Image first")
+        if self._active_run(alias) is not None:
+            raise _StepFailure("RUN_IN_PROGRESS", outcome="BLOCKED")
+        # The existing gates, asked only when a Platform mutation is needed.
+        blocked = platform_block() or self.target_block(alias, site)
+        if blocked is not None:
+            raise _StepFailure(blocked[1], outcome="BLOCKED", failure_domain=blocked[0])
+        try:
+            self._activate_bundle(alias, built, step=step)
+        except _OutcomeUnknown as exc:
+            # B3 may have run: never resubmitted. The Bootstrap refuses a
+            # second deployment while one runs, and the next Batch re-reads
+            # the Active Set instead of assuming either result.
+            raise _StepFailure(exc.reason, outcome="OUTCOME_UNKNOWN",
+                               failure_domain=TARGET_TRANSACTION_UNKNOWN) from exc
+        return None
+
+    def _batch_resource_identity(self, alias: str, site: int) -> tuple:
+        """One Bootstrap asset read and one PPU status read: (Active Set, ppu_id, report)."""
         active = self._timed_bootstrap_read(alias, self.coordinator.assets, "assets")
         if active.get("state") == "RECOVERY_REQUIRED":
             raise _StepFailure("PPU_RECOVERY_REQUIRED", outcome="BLOCKED")
@@ -787,6 +835,14 @@ class BundleProgrammingWorkflow:
         status = self._gateway_get(client, f"/api/status?site={site}")
         ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
         ppu_id, report = self._resource_report(ppu.get("ppu_id"), ppu.get("active_resources"))
+        return active, ppu_id, report
+
+    def begin_batch_resource(self, alias: str, owner_id: str,
+                             resource_sha: str, site: int, *,
+                             observed: tuple | None = None) -> None:
+        """One identity read (or the one ``activate_batch_resource`` just made),
+        then atomic PPU reservation on that identity."""
+        active, ppu_id, report = observed or self._batch_resource_identity(alias, site)
         expected = {"ppu_id": ppu_id, "asset_set_sha256": active.get("asset_set_sha256"),
                     "generation": report.get("generation"),
                     "resource_set_sha256": resource_sha}
@@ -1183,6 +1239,12 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(409, "ppu_runtime_resource_identity_unsupported",
                                    "PPU Resource identity report is not recognized")
         activation_required = not resource_reuse
+        if activation_required and preparation is not None:
+            # A Batch activates before its Reservation (U1); inside the Batch
+            # run its Resources must still be the Active ones.
+            raise ProgrammingError(409, "batch_resource_not_active",
+                                   "the Batch's Programming Resources are no longer Active "
+                                   "on this PPU; nothing was submitted")
         if activation_required and built is None:
             raise ProgrammingError(409, "resource_activation_requires_image",
                                    f"{label} needs these Programming Resources already Active; "
@@ -1652,12 +1714,29 @@ class BundleProgrammingWorkflow:
 
 
     def _activate(self, run: _Run, plan: _Plan) -> None:
-        alias, archive = run.alias, plan.bundle.archive
-        digest = plan.bundle.archive_sha256
+        """The alias-scoped single run's activation (retires with that route, U2)."""
+        def step(name: str, result: str, **detail: Any) -> None:
+            self._step(run, name, result, **detail)
+
+        self._activate_bundle(
+            run.alias, plan.bundle, step=step,
+            began=lambda: self._update(run, state="activating"),
+            on_queued=lambda activation: self._update(run, activation=activation))
+
+    def _activate_bundle(self, alias: str, bundle: bundle_v3.ProgrammingBundle, *,
+                         step: Callable[..., None], began: Callable[[], None] = lambda: None,
+                         on_queued: Callable[[dict[str, Any]], None] = lambda _a: None) -> None:
+        """B1 upload -> B2 admit -> B3 activate one Bundle (never an FPGA load).
+
+        The one implementation of Manager-driven activation. A failure up to
+        B2 is definitive (``_StepFailure``); once B3 may have been submitted
+        a failure is ``_OutcomeUnknown`` and is never resubmitted.
+        """
+        archive, digest = bundle.archive, bundle.archive_sha256
         if not self.gate.try_begin_platform_launch(alias):
             raise _StepFailure("PPU_CONTROL_PLANE_BUSY", outcome="BLOCKED")
         try:
-            self._update(run, state="activating")
+            began()
             try:
                 status, created = self.coordinator.create_upload(
                     alias, {"size": len(archive), "sha256": digest})
@@ -1678,7 +1757,7 @@ class BundleProgrammingWorkflow:
                 if status != 200 or not isinstance(got, dict) or got.get("state") != "committed" \
                         or got.get("sha256") != digest:
                     raise _StepFailure("B1_COMMIT_REJECTED")
-                self._step(run, "B1_UPLOAD", "PASS", upload_id=upload_id, size=len(archive))
+                step("B1_UPLOAD", "PASS", upload_id=upload_id, size=len(archive))
                 status, admitted = self.coordinator.start_deployment(
                     alias, {"kind": "bundle", "upload_id": upload_id, "archive_sha256": digest})
                 b2 = admitted.get("deployment") if isinstance(admitted, dict) else None
@@ -1686,7 +1765,7 @@ class BundleProgrammingWorkflow:
                         or type(b2.get("transaction_id")) is not str:
                     raise _StepFailure("B2_ADMISSION_REJECTED")
                 admission_tx = b2["transaction_id"]
-                self._step(run, "B2_ADMIT", "PASS", transaction_id=admission_tx)
+                step("B2_ADMIT", "PASS", transaction_id=admission_tx)
             except _StepFailure:
                 raise
             except Exception as exc:  # B1/B2 never activate anything: definitive failure.
@@ -1703,10 +1782,9 @@ class BundleProgrammingWorkflow:
             if status not in (200, 202) or not isinstance(b3, dict) or type(b3.get("transaction_id")) is not str:
                 raise _OutcomeUnknown("B3_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT")
             b3_tx = b3["transaction_id"]
-            self._update(run, activation={"upload_id": upload_id, "admission_transaction_id": admission_tx,
-                                          "b3_transaction_id": b3_tx, "mode": "activate",
-                                          "fpga_load": False})
-            self._step(run, "B3_SUBMIT", "QUEUED", transaction_id=b3_tx)
+            on_queued({"upload_id": upload_id, "admission_transaction_id": admission_tx,
+                    "b3_transaction_id": b3_tx, "mode": "activate", "fpga_load": False})
+            step("B3_SUBMIT", "QUEUED", transaction_id=b3_tx)
         finally:
             self.gate.end_platform_launch(alias)
         deadline = self.monotonic() + self.deployment_deadline_s
@@ -1723,7 +1801,7 @@ class BundleProgrammingWorkflow:
                 result = deployment.get("result")
                 if not isinstance(result, dict) or result.get("result") != "PASS":
                     raise _OutcomeUnknown("B3_SUCCESS_EVIDENCE_MISSING")
-                self._step(run, "B3_ACTIVATE", "PASS", transaction_id=b3_tx)
+                step("B3_ACTIVATE", "PASS", transaction_id=b3_tx)
                 return
             if state in ("failed",):
                 raise _StepFailure("B3_FAILED")
