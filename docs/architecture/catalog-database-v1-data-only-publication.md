@@ -161,15 +161,16 @@ Provider source lock and target, the locked
 datasheet/programming-manual geometry sources, and the qualified programming
 group. Arbitrary reviewer prose cannot stand in for those references.
 
-The current data-only applicability validator is deliberately bounded to the
-source-validated OpenOCD 0.12.0 STM32F103 medium-density programming group.
-It checks the existing Provider release, driver/target, Programming Profile
-schema, geometry units and supported operation scopes, then derives the exact
-flash size and page count from the ordering code and group. New Geometry IDs
-are scoped to the base device and versioned in the immutable publication
-packet. Other Provider/group combinations fail closed until their existing
-source-backed contracts can be validated by a Publisher implementation. A
-reviewed packet cannot authorize an installed Runtime or a Job.
+The data-only applicability validator accepts the source-validated OpenOCD
+0.12.0 STM32F103 medium-density route and the independently source-locked
+low-density documentary cohort. The low-density route verifies the Provider,
+manufacturer source, exact applicability, Programming Profile, per-base Flash
+Geometry and operation scope from locked data files and durable Evidence IDs.
+It does not consult the Python exact-ICPN qualification list or require that
+the Profile already occur in the previous Active Revision. Other Provider/group
+combinations fail closed until their source-backed contracts can be validated
+by the Publisher. A reviewed packet cannot authorize an installed Runtime or a
+Job.
 The first data-only package route is bounded to STM32F103 medium-density
 VFQFPN36. Its packet must match the source-locked DS5319 Rev 20 Table 5 SWD
 pins (PA13/25 and PA14/28). This is a fresh applicability review for a package
@@ -197,9 +198,12 @@ data-only L2 rows must first replace those rows with durable Evidence IDs.
 The packet hash attests the reviewed packet bytes, **not** the original PDF bytes;
 unavailable original-document custody must not be represented as a PDF digest.
 The trusted Publisher OS identity is the admission authority; the reviewer's
-name in the packet is an audit claim, not authentication by itself. The Publisher uses only
-Provider release/Profile locks already admitted in the active Catalog. A new
-Provider implementation, Profile schema or release requires a code/schema change.
+name in the packet is an audit claim, not authentication by itself. The Publisher
+checks the Provider release/Profile source locks directly, including a valid
+Profile absent from the previous Active Revision. A new Provider implementation,
+Profile schema or release requires a code/schema change. Ordinary data-only
+Stage/Publish writes the Manager SQLite revision outside a GitHub software
+release; the Publisher code/schema PR uses focused Catalog CI.
 
 ```bash
 python3 -m plasma_web.catalog_sqlite_repository --db /manager-data/catalog.sqlite3 --acquire-evidence source-request.json --actor catalog-owner
@@ -215,6 +219,8 @@ official Selector. Their payload must have `official=false`,
 authorization and Job policy remain separate. The publisher does not call PPU,
 Provider, FPGA or Job execution code. No PR #1147 candidate is published by this
 Milestone D implementation.
+
+**2026-11-23 Gate 1 implementation acceptance — Catalog publication decoupling:** Implement and prove an existing-Manager SQLite data-only L0–L2 promotion path where reviewed exact-ICPN evidence, Provider/Profile source locks and supported operation scope are validated from durable versioned Catalog publication authority, **not** a Python static exact-ICPN registry, a pre-existing exact Profile in the previous active revision, or a per-IC Python release. Reuse existing Stage/Publish/Rollback and Manager Selector routes; add only the smallest necessary source-backed Provider/Profile admission handling. Demonstrate the already merged PR #1147 12 Low-density Exact ICPNs as an isolated SQLite revision fixture (12 L1→L2, 77 L3 unchanged, three T4/T6 excluded, 5,885 total if source identity matches), with immutable Evidence IDs, negative/rollback/concurrency checks and no PPU/FPGA/DUT execution. Separate code/schema CI from future ordinary Catalog data-only releases. This is a Gate 1 target, not evidence that the decoupling or SWPC publication has occurred. No merge or deployment is authorized by this paragraph.
 
 **Milestone E — Remove duplicated static coupling.**
 After parity and rollback evidence, retire dynamic per-IC Python registration, global count assertions and Catalog data-triggered product pipelines. Temporary legacy/SQLite parallel reading must exist only in the shadow-comparison phase and be removed when the canonical read path switches, consistent with Replace-by-Default. Keep versioned manufacturer/Provider evidence available for audits and repeatable snapshots.
