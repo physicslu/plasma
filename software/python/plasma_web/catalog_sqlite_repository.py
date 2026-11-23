@@ -672,6 +672,7 @@ class CatalogSqliteShadowRepository:
                 or record.temperature_grade != exact["temperature_grade"]
                 or record.target_config != qualification["provider"]["target_config"]
                 or exact["software_state"] != "SUPPORTED"
+                or exact["programming_profile_id"] != profile["profile_id"]
                 or exact["blockers"] or exact["runtime_execution_authorized"]
                 or geom["main_flash_size_bytes"] != exact["flash_size_bytes"]
                 or geom["page_count"] * geom["page_size_bytes"] != exact["flash_size_bytes"]
