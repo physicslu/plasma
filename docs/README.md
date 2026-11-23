@@ -35,6 +35,8 @@
 - **Plan** · `Claude Code handoff` · `no implementation` — [OPF Local Owner Mode Claude 完整工作包](development/opf-local-owner-mode-claude-handoff-20261109.md)：D1–D8 技術決策、P2A/P2B/P1/P3/P4 的 PR 分解、程式修改候選、正負向驗收、網路／硬體停止條件；尚未交由 Claude 執行。
 - **Current** — [Glossary — current terms and retired codes](glossary.md)
 
+- **Plan** · `Gate 1` · `Draft PR #1528` · `Host-only` — [OPP FPGA Register Map v1](architecture/opp-fpga-register-map-v1.md)：全新 Common ABI、四組獨立 SWD Site 位址預留；尚未完成 AXI/C Driver/RTL HIL，不能視為已部署硬體。
+
 ## Architecture Decision Records
 
 - **Current** — [ADR Index](adr/README.md)：所有 ADR 與其 Proposed／Accepted／Superseded 狀態。
