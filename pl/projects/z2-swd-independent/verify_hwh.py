@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed HWH/BIT/Timing qualification for TWO independent SWD AXI Sites.
+"""Fail-closed HWH/BIT/Timing qualification for Common and two SWD Sites.
 
 No device IO. Never use F1-B's internal synthetic DPIDR verifier.
 A positive receipt means actual files satisfy checked HOST-BUILD contracts,
@@ -12,10 +12,15 @@ import hashlib
 import json
 import math
 import re
+import sys
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
 BASES = {"swd_site1": 0x43C01000, "swd_site2": 0x43C02000}
+COMMON_BASE = 0x43C03000
+SLAVE_INTERFACES = {"swd_site1": "S_AXI", "swd_site2": "S_AXI",
+                    "opp_common": "s_axi"}
+IMAGE_ID = 0x7a322d7377642d6f70702d76352d3031
 LENGTH = 0x1000
 PINS = {"swclk_site1": "Y18", "swdio_site1": "Y19",
         "swclk_site2": "W14", "swdio_site2": "Y14"}
@@ -61,27 +66,49 @@ def ports(module: ET.Element) -> dict[str, str | None]:
     return {p.get("NAME"): p.get("SIGNAME") for p in module.iter("PORT")}
 
 
-def validate_hwh(root: ET.Element) -> dict:
+def wide_number(value: str | None) -> int:
+    require(isinstance(value, str), "OPP_HWH_IDENTITY_MISSING")
+    raw = value.strip().lower().replace("_", "")
+    try:
+        literal = re.fullmatch(r"\d+'([hbd])([0-9a-f]+)", raw)
+        if literal:
+            radix = {"h": 16, "b": 2, "d": 10}[literal[1]]
+            raw = str(int(literal[2], radix))
+        result = int(raw, 0) if raw.startswith("0x") else int(raw, 10)
+    except ValueError as exc:
+        raise SWDBuildDenied("OPP_HWH_IDENTITY_INVALID") from exc
+    require(0 <= result < (1 << 128), "OPP_HWH_IDENTITY_INVALID")
+    return result
+
+
+def validate_hwh(root: ET.Element, source_sha: str | None = None) -> dict:
     modules = {m.get("INSTANCE"): m for m in root.iter("MODULE")}
     require({"ps7_0", "rst_ps7_0_100M", "axi_interconnect_0",
-             *BASES}.issubset(modules), "SWD_HWH_REQUIRED_MODULE_MISSING")
-    # HWH must describe exactly the two independently mapped AXI slaves.
-    # A composite MPE register aperture at 0x43C00000 is NEVER valid.
+             "opp_common", *BASES}.issubset(modules), "SWD_HWH_REQUIRED_MODULE_MISSING")
+    require(number(parameters(modules["axi_interconnect_0"]).get("NUM_MI")) == 3,
+            "OPP_HWH_INTERCONNECT_COUNT_MISMATCH")
+    # The Linux owner resource at 0x43C00000 is not an AXI slave.
     mem = list(root.iter("MEMRANGE"))
-    require(len(mem) == 2, "SWD_HWH_REQUIRES_TWO_AXI_REGIONS")
+    require(len(mem) == 3, "OPP_HWH_REQUIRES_THREE_AXI_REGIONS")
     mapped = {}
+    expected_bases = {**BASES, "opp_common": COMMON_BASE}
     for item in mem:
         require(item.get("MASTERBUSINTERFACE") == "M_AXI_GP0",
                 "SWD_HWH_UNEXPECTED_AXIMASTER")
         name = item.get("INSTANCE")
-        require(name in BASES and name not in mapped,
-                "SWD_HWH_UNEXPECTED_OR_DUPLICATE_SITE")
+        require(name in expected_bases and name not in mapped and
+                item.get("SLAVEBUSINTERFACE") == SLAVE_INTERFACES[name],
+                "OPP_HWH_UNEXPECTED_OR_DUPLICATE_SLAVE")
         start = number(item.get("BASEVALUE"))
         high = number(item.get("HIGHVALUE"))
-        require(start == BASES[name] and high == start + LENGTH - 1,
-                "SWD_HWH_SITE_WINDOW_MISMATCH")
+        require(start == expected_bases[name] and high == start + LENGTH - 1,
+                "OPP_HWH_WINDOW_MISMATCH")
         mapped[name] = (start, high)
-    require(set(mapped) == set(BASES), "SWD_HWH_SITE_ABSENT")
+    require(set(mapped) == set(expected_bases) and
+            all(hi < other_lo or other_hi < lo
+                for index, (lo, hi) in enumerate(mapped.values())
+                for other_lo, other_hi in list(mapped.values())[index + 1:]),
+            "OPP_HWH_WINDOW_OVERLAP_OR_ABSENT")
     ps = modules["ps7_0"]
     config = parameters(ps)
     for key, expected in (
@@ -112,6 +139,44 @@ def validate_hwh(root: ET.Element) -> dict:
                 wiring.get("s_axi_aresetn") ==
                 "rst_ps7_0_100M_peripheral_aresetn",
                 "SWD_HWH_SITE_CLOCK_RESET_MISMATCH")
+    common = modules["opp_common"]
+    common_params = parameters(common)
+    require(wide_number(common_params.get("IMAGE_ID")) == IMAGE_ID and
+            wide_number(common_params.get("SITE_PRESENT")) == 3 and
+            wide_number(common_params.get("SITE_READY")) == 0 and
+            wide_number(common_params.get("CAPABILITIES")) == 0 and
+            wide_number(common_params.get("PPU_STATUS")) == 0,
+            "OPP_HWH_COMMON_IDENTITY_OR_STATUS_MISMATCH")
+    if source_sha is not None:
+        require(SHA40.fullmatch(source_sha) is not None and
+                wide_number(common_params.get("BUILD_ID")) == int(source_sha[:32], 16),
+                "OPP_HWH_BUILD_ID_MISMATCH")
+    common_wiring = ports(common)
+    require(common_wiring.get("s_axi_aclk") == "ps7_0_FCLK_CLK0" and
+            common_wiring.get("s_axi_aresetn") ==
+            "rst_ps7_0_100M_peripheral_aresetn",
+            "OPP_HWH_COMMON_CLOCK_RESET_MISMATCH")
+    fabric_wiring = ports(modules["axi_interconnect_0"])
+    require(all(fabric_wiring.get(name) == "ps7_0_FCLK_CLK0"
+                for name in ("ACLK", "S00_ACLK", "M00_ACLK", "M01_ACLK",
+                             "M02_ACLK")) and
+            all(fabric_wiring.get(name) ==
+                "rst_ps7_0_100M_peripheral_aresetn"
+                for name in ("ARESETN", "S00_ARESETN", "M00_ARESETN",
+                             "M01_ARESETN", "M02_ARESETN")),
+            "OPP_HWH_INTERCONNECT_CLOCK_RESET_MISMATCH")
+    buses = {name: {b.get("NAME"): b.get("BUSNAME")
+                    for b in modules[name].iter("BUSINTERFACE")}
+             for name in ("ps7_0", "axi_interconnect_0", "opp_common", *BASES)}
+    fabric_buses = buses["axi_interconnect_0"]
+    require(buses["ps7_0"].get("M_AXI_GP0") == fabric_buses.get("S00_AXI") and
+            all(fabric_buses.get(port) ==
+                buses[slave].get(SLAVE_INTERFACES[slave]) and
+                fabric_buses.get(port) is not None
+                for port, slave in (("M00_AXI", "swd_site1"),
+                                    ("M01_AXI", "swd_site2"),
+                                    ("M02_AXI", "opp_common"))),
+            "OPP_HWH_INTERCONNECT_ROUTE_MISMATCH")
     exposed = []
     for ext in root.iter("EXTERNALPORTS"):
         exposed.extend(p.get("NAME") for p in ext.iter("PORT"))
@@ -123,7 +188,7 @@ def validate_hwh(root: ET.Element) -> dict:
             "SWD_HWH_WRONG_EXTERNAL_SWDPADS")
     return {
         "regions": {name: {"base": f"0x{value:08X}", "size": LENGTH}
-                    for name, value in BASES.items()},
+                    for name, value in expected_bases.items()},
         "external_swd_pads": sorted(actual),
         "ps7_fclk_hz": 100000000,
         "site_count_implemented": 2,
@@ -150,6 +215,56 @@ def check_xdc(xdc: Path) -> str:
     active = [x for x in body.splitlines() if x.startswith("set_property ")]
     require(len(active) == 4, "SWD_XDC_ADDITIONAL_PIN_DRIVE_DENIED")
     return sha256(xdc)
+
+
+def pair_manifest(build: Path, source_sha: str, verified_hwh: Path) -> dict:
+    """Write a Host-only candidate paired to the exact generated BIN and HWH."""
+    artifacts = build / "artifacts"
+    firmware = artifacts / "system_wrapper.bin"
+    bit = artifacts / "system_wrapper.bit"
+    hwh = artifacts / "system.hwh"
+    require(all(p.is_file() and not p.is_symlink() for p in (firmware, bit, hwh)),
+            "OPP_PAIRED_ARTIFACT_MISSING")
+    project = build / "project/z2_swd_independent.runs/impl_1"
+    require(sha256(firmware) == sha256(project / "system_wrapper.bin") and
+            sha256(bit) == sha256(project / "system_wrapper.bit") and
+            sha256(hwh) == sha256(verified_hwh),
+            "OPP_PAIRED_ARTIFACT_MISMATCH")
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from pl.hil import fpga_image_guard as guard
+    manifest = {
+        "schema": "plasma.fpga.image.v1",
+        "image_id": f"z2-swd-opp-v1-{source_sha[:12]}",
+        "board_id": "pynq-z2", "fpga_part": "xc7z020clg400-1",
+        "soc_compatible": "xlnx,zynq-7000",
+        "firmware_name": "system_wrapper.bin",
+        "firmware_sha256": sha256(firmware),
+        "recovery_name": guard.GOLDEN_RECOVERY_NAME,
+        "recovery_sha256": guard.GOLDEN_RECOVERY_SHA256,
+        "abi_version": 0x00010000, "abi_offset": 0x2004,
+        "identity_words": [[0, 0x00050001, 0xFFFFFFFF],
+                           [0x1000, 0x00050002, 0xFFFFFFFF],
+                           [0x2000, 0x4D534C50, 0xFFFFFFFF],
+                           [0x2004, 0x00010000, 0xFFFFFFFF],
+                           [0x2030, 3, 0xFFFFFFFF]],
+        "site_bitmap": 3, "site_bitmap_offset": 0x2030,
+        "axi_base": 0x43C01000, "axi_bytes": 0x3000,
+        "owner_base": 0x43C00000, "owner_bytes": 0x10000,
+        "expected_uio": {"platform_node": "43c00000.audio-codec-ctrl",
+                         "driver": "uio_pdrv_genirq",
+                         "maps": [[0x43C00000, 0x10000]],
+                         "runtime": "suspended"},
+    }
+    # This source-only candidate is never an authorization to stage/load.
+    from pl.hil.fpga_image_root import parse_image_manifest_bytes, validate_hwh_bytes
+    raw = (json.dumps(manifest, indent=2) + "\n").encode()
+    parse_image_manifest_bytes(raw)
+    validate_hwh_bytes(hwh.read_bytes(), parse_image_manifest_bytes(raw))
+    path = artifacts / "plasma-image-manifest.json"
+    require(not path.exists(), "OPP_PAIRED_MANIFEST_ALREADY_EXISTS")
+    path.write_bytes(raw)
+    return {"bin_sha256": sha256(firmware), "manifest_sha256": sha256(path),
+            "manifest_path": str(path), "image_id": manifest["image_id"]}
 
 
 def audit_external_io_timing(reports: Path) -> dict:
@@ -273,7 +388,7 @@ def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
     require(bit.is_file() and not bit.is_symlink() and
             bit.stat().st_size > 1024, "SWD_BITSTREAM_MISSING_OR_UNSAFE")
     try:
-        hw = validate_hwh(ET.parse(hwh).getroot())
+        hw = validate_hwh(ET.parse(hwh).getroot(), source_sha)
     except ET.ParseError as exc:
         raise SWDBuildDenied("SWD_HWH_XML_INVALID") from exc
     report_hashes = {}
@@ -289,15 +404,17 @@ def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
     # evidence for reviewer. A positive exit alone does NOT qualify timing.
     require("SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS" in build_stdout,
             "SWD_BUILD_TCL_SIGNOFF_MARKER_MISSING")
+    paired = pair_manifest(build, source_sha, hwh) if build is not None else {}
     return {
-        "schema": "plasma.swd.independent.host-build.evidence.v1",
+        "schema": "plasma.opp.swd5.host-build.evidence.v1",
         "source_sha": source_sha,
         "board": "pynq-z2", "part": "xc7z020clg400-1",
-        "abi": "swd.independent.site.v1-candidate",
+        "abi": "opp.common.v1+swd.site.v5-candidate",
         "bit_sha256": sha256(bit), "hwh_sha256": sha256(hwh),
         "xdc_sha256": check_xdc(xdc),
         "report_sha256": report_hashes, "hwh": hw,
         "map": hw["regions"],
+        **paired,
         "external_swd_io_timing": io_timing,
         "fpga_only_swd_rx_ideal_budget": fpga_budget,
         "host_build_status": "SUPERVISOR_REVIEW_REQUIRED",

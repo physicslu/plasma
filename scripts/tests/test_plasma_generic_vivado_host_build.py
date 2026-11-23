@@ -45,7 +45,7 @@ class GenericVivadoContracts(unittest.TestCase):
         self.assertEqual(plan["vivado_project"], "z2_swd_independent")
         self.assertEqual(plan["build_env"], "PLASMA_SWD_BUILD")
         self.assertEqual(plan["success_marker"],
-                         "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED")
+                         "OPP_COMMON_SWD5_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED")
         self.assertEqual(set(plan["reports"]), {
             "timing_summary.rpt", "drc.rpt", "methodology.rpt",
             "utilization.rpt", "check_timing.rpt", "datasheet_io.rpt",

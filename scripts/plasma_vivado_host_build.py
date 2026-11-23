@@ -331,7 +331,8 @@ def run_generic(task: dict, *, workspace: Path, approval: dict,
     build = prepare_host_build_dir(workspace, prefix="vivado-")
     build_env = {"PATH": "/usr/bin:/bin", "HOME": os.environ.get("HOME", "/nonexistent"),
                  plan["build_env"]: str(build), "PLASMA_BOARD_REPO": str(board),
-                 "PLASMA_VIVADO_JOBS": "4", **license_env}
+                 "PLASMA_VIVADO_JOBS": "4", "PLASMA_SOURCE_SHA": plan["source_sha"],
+                 **license_env}
     if plan["prepare_artifact"]:
         prep = executor([sys.executable, str(plan["project_dir"] / "artifact.py"),
                          "prepare", "--build", str(build), "--version", "0.1.0"],

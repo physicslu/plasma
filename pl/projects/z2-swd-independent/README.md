@@ -1,4 +1,4 @@
-# PYNQ-Z2 two independent AXI SWD Sites — Gate 1 Host Build candidate
+# PYNQ-Z2 OPP Common and two independent AXI SWD Sites — Gate 1 Host Build candidate
 
 **Approved architecture:** [ADR-0006](../../../docs/adr/0006-independent-swd-engine-and-future-gpio-bus.md) (supersedes ADR-0005). **Build standard:** [ADR-0004](../../../docs/adr/0004-project-isolated-fpga-build-path2-operator-cli.md).
 
@@ -22,6 +22,22 @@ The receipt includes those hashes and the explicitly **unqualified** off-board
 SWD timing result. `TIMING-18` (historically 2 missing input delays and 4
 missing output delays) is never silently waived or transformed into HIL PASS.
 
+This integration adds one OPP Common v1 slave at `0x43C03000..0x43C03FFF`
+behind the existing PS7 GP0 AXI Interconnect. Site 1 and Site 2 remain at
+`0x43C01000` and `0x43C02000`. The exact source SHA supplies the first
+128 bits of Common `BUILD_ID`; fixed `IMAGE_ID` names this two-Site image
+family. `SITE_PRESENT=3` names the two instantiated engines, while
+`SITE_READY=0` conservatively advertises no admitted Site at reset; Common
+does not infer runtime readiness or DUT state. `CAPABILITIES=0` and
+`PPU_STATUS=0` make no unassigned capability/status claim. The verified
+HWH must contain exactly these three non-overlapping 4-KiB GP0 regions.
+
+The Host Build writes BIT, HWH, BIN and a source/firmware-hashed candidate
+`plasma-image-manifest.json` under its private build directory. The retained
+`d0add58c` release Manifest remains paired solely to its historical image.
+The candidate Manifest requires separate Linux owner and live Root admission
+before any use on Z2; this Gate does not grant either operation.
+
 The generic result is `HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED`; it is not
 a deployable FPGA Image or permission to load a bitstream. Z2, FPGA Manager,
 actual PS MMIO, OpenOCD, DUT and physical HIL remain `NOT_RUN` in this Gate.
@@ -30,7 +46,7 @@ actual PS MMIO, OpenOCD, DUT and physical HIL remain `NOT_RUN` in this Gate.
 
 Architecture:
 - PS7 100-MHz FCLK0, M_AXI_GP0, synchronised reset.
-- A conventional **1-input/2-output AXI Interconnect**. It routes MMIO requests only, not SWD bit clocks or job scheduling.
+- A conventional **1-input/3-output AXI Interconnect**. It routes MMIO requests only, not SWD bit clocks or job scheduling.
 - SWD Site 1 module `plasma_swd_site_axi_lite` at proposed `0x43C01000`; physical JA SWCLK Y18, SWDIO Y19.
 - SWD Site 2 same **independent AXI slave IP** at proposed `0x43C02000`; physical JB SWCLK W14, SWDIO Y14.
 - Each Site has its own transaction FSM, SWCLK divider, **16-entry command FIFO and 16-entry retained response FIFO**, tagged head-only consumption, completion-event IRQ (RW1C), fault latch, and **OFF/NORMAL only**; disabled mode drives SWCLK low and SWDIO Hi-Z. No SWD-specific Debug pad path is present.

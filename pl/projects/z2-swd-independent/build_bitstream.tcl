@@ -20,6 +20,7 @@ wait_on_run synth_1
 if {![string match "*Complete!*" [get_property STATUS [get_runs synth_1]]]} {
     error "SWD_VIVADO_SYNTHESIS_FAILED"
 }
+set_property STEPS.WRITE_BITSTREAM.ARGS.BIN_FILE true [get_runs impl_1]
 launch_runs impl_1 -to_step write_bitstream -jobs $jobs
 wait_on_run impl_1
 if {![string match "write_bitstream Complete!*" [get_property STATUS [get_runs impl_1]]]} {
@@ -57,13 +58,16 @@ set bitfiles [glob -nocomplain -types f \
     [file join $build_dir project z2_swd_independent.runs impl_1 *.bit]]
 set hwhfiles [glob -nocomplain -types f \
     [file join $build_dir project z2_swd_independent.gen sources_1 bd system hw_handoff *.hwh]]
-if {[llength $bitfiles] != 1 || [llength $hwhfiles] != 1} {
-    error "SWD_BIT_HWH_ARTIFACT_MISSING_OR_AMBIGUOUS"
+set binfiles [glob -nocomplain -types f \
+    [file join $build_dir project z2_swd_independent.runs impl_1 *.bin]]
+if {[llength $bitfiles] != 1 || [llength $hwhfiles] != 1 || [llength $binfiles] != 1} {
+    error "SWD_BIT_HWH_BIN_ARTIFACT_MISSING_OR_AMBIGUOUS"
 }
 set artifact_dir [file join $build_dir artifacts]
 file mkdir $artifact_dir
 file copy -force [lindex $bitfiles 0] [file join $artifact_dir system_wrapper.bit]
 file copy -force [lindex $hwhfiles 0] [file join $artifact_dir system.hwh]
+file copy -force [lindex $binfiles 0] [file join $artifact_dir system_wrapper.bin]
 # No blocking Methodology findings. Never waive design violations to force PASS.
 set blocking_methodology {}
 foreach issue [get_methodology_violations -quiet] {
@@ -80,5 +84,5 @@ puts "SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS setup=$setup_slack hold=$hold_slack"
 puts "SWD_HOST_BUILD_SOURCE_ONLY_REVIEW_REQUIRED setup=$setup_slack hold=$hold_slack"
 # Exact-line contract marker for the generic Path 2 build. It certifies
 # artifact availability for independent review, NOT off-board SWD timing.
-puts "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED"
+puts "OPP_COMMON_SWD5_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED"
 puts "SWD_NO_AUTOMATIC_DOWNLOAD_OR_DUT_OPERATION"

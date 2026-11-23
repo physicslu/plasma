@@ -1,5 +1,4 @@
-# Source-only PYNQ-Z2 PS7 GP0 -> ordinary AXI interconnect -> TWO
-# independently addressable SWD IP AXI4-Lite slaves. No PL MPE Manager.
+# PYNQ-Z2 PS7 GP0 -> one Common and two independent SWD AXI4-Lite slaves.
 # Do not claim this BD is valid HWH before actual Vivado implementation.
 create_bd_design system
 set ps [create_bd_cell -type ip -vlnv xilinx.com:ip:processing_system7:5.5 ps7_0]
@@ -14,15 +13,27 @@ set_property -dict [list \
     CONFIG.PCW_EN_CLK0_PORT {1} \
     CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {100}] $ps
 
-# An ordinary 1x2 AXI Interconnect only routes address/control accesses.
+# An ordinary 1x3 AXI Interconnect only routes address/control accesses.
 # It is NOT a shared SWD bit engine; the two Sites run concurrently in PL.
 set fabric [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0]
-set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {2}] $fabric
+set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {3}] $fabric
+set common [create_bd_cell -type module -reference opp_common_axi_lite_v1 opp_common]
+if {![info exists ::env(PLASMA_SOURCE_SHA)] ||
+    ![regexp {^[a-f0-9]{40}$} $::env(PLASMA_SOURCE_SHA)]} {
+    error "OPP_EXACT_SOURCE_SHA_REQUIRED"
+}
+# IMAGE_ID names this two-Site image family. BUILD_ID is the first 128 bits
+# of the exact source SHA supplied by the trusted Host Build entrypoint.
+set_property -dict [list \
+    CONFIG.IMAGE_ID {128'h7a322d7377642d6f70702d76352d3031} \
+    CONFIG.BUILD_ID "128'h[string range $::env(PLASMA_SOURCE_SHA) 0 31]" \
+    CONFIG.SITE_PRESENT {32'h00000003} \
+    CONFIG.SITE_READY {32'h00000000}] $common
 set site1 [create_bd_cell -type module -reference plasma_swd_site_axi_lite swd_site1]
 set site2 [create_bd_cell -type module -reference plasma_swd_site_axi_lite swd_site2]
 set_property -dict [list CONFIG.SITE_ID {1} CONFIG.SITE_BASE_ADDRESS {0x43C01000}] $site1
 set_property -dict [list CONFIG.SITE_ID {2} CONFIG.SITE_BASE_ADDRESS {0x43C02000}] $site2
-foreach cell {swd_site1 swd_site2} {
+foreach cell {opp_common swd_site1 swd_site2} {
     if {[llength [get_bd_intf_pins -quiet $cell/S_AXI]] != 1} {
         error "SWD_AXILITE_SLAVE_INFERENCE_FAILED:$cell"
     }
@@ -33,6 +44,8 @@ connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M00_AXI] \
     [get_bd_intf_pins swd_site1/S_AXI]
 connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M01_AXI] \
     [get_bd_intf_pins swd_site2/S_AXI]
+connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M02_AXI] \
+    [get_bd_intf_pins opp_common/S_AXI]
 
 set rst [create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ps7_0_100M]
 # Vivado 2026.1 exposes C_EXT_RESET_HIGH as read-only. Its actual value is
@@ -45,6 +58,8 @@ connect_bd_net [get_bd_pins ps7_0/FCLK_CLK0] \
     [get_bd_pins axi_interconnect_0/S00_ACLK] \
     [get_bd_pins axi_interconnect_0/M00_ACLK] \
     [get_bd_pins axi_interconnect_0/M01_ACLK] \
+    [get_bd_pins axi_interconnect_0/M02_ACLK] \
+    [get_bd_pins opp_common/s_axi_aclk] \
     [get_bd_pins swd_site1/s_axi_aclk] \
     [get_bd_pins swd_site2/s_axi_aclk]
 connect_bd_net [get_bd_pins ps7_0/FCLK_RESET0_N] \
@@ -54,6 +69,8 @@ connect_bd_net [get_bd_pins rst_ps7_0_100M/peripheral_aresetn] \
     [get_bd_pins axi_interconnect_0/S00_ARESETN] \
     [get_bd_pins axi_interconnect_0/M00_ARESETN] \
     [get_bd_pins axi_interconnect_0/M01_ARESETN] \
+    [get_bd_pins axi_interconnect_0/M02_ARESETN] \
+    [get_bd_pins opp_common/s_axi_aresetn] \
     [get_bd_pins swd_site1/s_axi_aresetn] \
     [get_bd_pins swd_site2/s_axi_aresetn]
 
@@ -63,6 +80,9 @@ assign_bd_address -offset 0x43C01000 -range 4K \
 assign_bd_address -offset 0x43C02000 -range 4K \
     -target_address_space [get_bd_addr_spaces ps7_0/Data] \
     [get_bd_addr_segs swd_site2/S_AXI/reg0] -force
+assign_bd_address -offset 0x43C03000 -range 4K \
+    -target_address_space [get_bd_addr_spaces ps7_0/Data] \
+    [get_bd_addr_segs opp_common/S_AXI/reg0] -force
 
 # Four *scalar* FPGA pad ports, physically independent JA/JB.
 foreach {cell pin external} {
@@ -80,10 +100,10 @@ foreach {cell pin external} {
 # IRQ register semantics and Linux interrupts require separate qualification.
 
 set regions [get_bd_addr_segs -of_objects [get_bd_addr_spaces ps7_0/Data]]
-if {[llength $regions] != 2} {
-    error "SWD_PS7_GP0_MUST_MAP_EXACTLY_TWO_SITE_SLAVES"
+if {[llength $regions] != 3} {
+    error "SWD_PS7_GP0_MUST_MAP_COMMON_AND_TWO_SITE_SLAVES"
 }
-foreach {instance start} {swd_site1 0x43C01000 swd_site2 0x43C02000} {
+foreach {instance start} {swd_site1 0x43C01000 swd_site2 0x43C02000 opp_common 0x43C03000} {
     set mapped [get_bd_addr_segs -of_objects [get_bd_addr_spaces ps7_0/Data] \
         -filter "NAME =~ *$instance*"]
     if {[llength $mapped] != 1 ||

@@ -69,3 +69,24 @@ This section records an **approved planning convention**, not a new physical AXI
 - **Not verified:** Common RTL-specific AXI simulation coverage and executed results; board-specific PS7 Address Editor / XSA / HWH / Device Tree physical mapping; a single synthesized bitstream containing both Common and the unchanged SWD-v5 IP; target ARMv7 MMIO access-width and real Z2 HIL.
 - **Scope guard:** do not treat candidate four-Site window reservations as implemented engines, do not infer 8-Site support from the product-wide policy, and do not merge/deploy/load FPGA or access DUT under this documentation review.
 - **Gate 2 readiness:** **NOT READY** for physical-integration claims. A source-only Gate 2 may be considered only after the Common-specific regression is identified and its actual execution evidence reviewed, with all unperformed physical stages explicitly NOT_RUN.
+
+## Z2 two-Site physical integration candidate (Gate 1 Host-only)
+
+The retained exact `d0add58c` HWH maps PS7 `M_AXI_GP0` Site 1 to
+`0x43C01000–0x43C01FFF` and Site 2 to `0x43C02000–0x43C02FFF`, with no
+other `MEMRANGE`. The paired historical Manifest records the enclosing Linux
+resource `0x43C00000–0x43C0FFFF`, named `43c00000.audio-codec-ctrl`; this
+resource is **not** proof of a Common slave at its base. The integration
+allocates Common to `0x43C03000–0x43C03FFF`, disjoint from both existing AXI
+slaves and within that recorded resource. The new HWH verifier requires
+exactly these three regions; actual new HWH and Linux ownership remain
+unverified until a source-pinned Host Build and separately authorized HIL.
+
+This image instantiates only Site 1 and Site 2. Its Common registers report
+`SITE_PRESENT=0x3`, `SITE_READY=0`, `CAPABILITIES=0`, and `PPU_STATUS=0`.
+Ready is conservatively false until live admission is proven; reserved Site
+3/4 logical windows in the earlier proposal are not physical AXI slaves.
+`IMAGE_ID` names the image family, and `BUILD_ID` is the first 128 bits of
+the exact Host Build source SHA. The paired candidate Manifest is emitted
+only after BIT/HWH/BIN verification; the installed `d0add58c` Manifest and
+protected Root/Golden Recovery remain unchanged.
