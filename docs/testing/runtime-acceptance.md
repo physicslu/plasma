@@ -44,6 +44,15 @@ Run the complete managed-software suite:
 python3 scripts/runtime_acceptance/run.py managed-software
 ```
 
+> **Status (U3, 2026-11-23):** Manager no longer relays the legacy PPU Gateway
+> `POST /api/batches`, `POST /api/batches/{id}/cancel` or the Batch Target cancel.
+> Through the managed prefix, `emode-programming`, `job-cancel`, `pmode-batch` and
+> `eight-site-batch` (and therefore `managed-software`) are refused before PPU contact with
+> `404 managed_route_not_allowed`. They are NOT_RUN until they are migrated to the
+> Manager-owned `/api/programming/batches` resource (Legacy Gateway Batch retirement,
+> PR-F). `ps-loopback` is unaffected. The scenario descriptions below record the retired
+> legacy contract.
+
 Default managed BFF prefix:
 
 ```text
