@@ -119,6 +119,12 @@ def test_hwh_common_and_two_real_slaves_are_not_f1b_composite():
     assert result["real_target_qualified"] is False
 
 
+def test_hwh_common_parameter_literal_formats():
+    assert swd.wide_number(f"128'h{swd.IMAGE_ID:032x}") == swd.IMAGE_ID
+    assert swd.wide_number("32'h00000003") == 3
+    assert swd.wide_number("64'd0") == 0
+
+
 @pytest.mark.parametrize("tamper,expected", [
     ("single_site", "OPP_HWH_REQUIRES_THREE_AXI_REGIONS"),
     ("old_composite", "OPP_HWH_UNEXPECTED_OR_DUPLICATE_SLAVE"),

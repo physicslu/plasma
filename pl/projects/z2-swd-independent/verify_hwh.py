@@ -67,10 +67,12 @@ def ports(module: ET.Element) -> dict[str, str | None]:
 def wide_number(value: str | None) -> int:
     require(isinstance(value, str), "OPP_HWH_IDENTITY_MISSING")
     raw = value.strip().lower().replace("_", "")
-    if raw.startswith("128'h"):
-        raw = "0x" + raw[5:]
     try:
-        result = int(raw, 0)
+        literal = re.fullmatch(r"\d+'([hbd])([0-9a-f]+)", raw)
+        if literal:
+            radix = {"h": 16, "b": 2, "d": 10}[literal[1]]
+            raw = str(int(literal[2], radix))
+        result = int(raw, 0) if raw.startswith("0x") else int(raw, 10)
     except ValueError as exc:
         raise SWDBuildDenied("OPP_HWH_IDENTITY_INVALID") from exc
     require(0 <= result < (1 << 128), "OPP_HWH_IDENTITY_INVALID")
@@ -138,10 +140,10 @@ def validate_hwh(root: ET.Element, source_sha: str | None = None) -> dict:
     common = modules["opp_common"]
     common_params = parameters(common)
     require(wide_number(common_params.get("IMAGE_ID")) == IMAGE_ID and
-            number(common_params.get("SITE_PRESENT")) == 3 and
-            number(common_params.get("SITE_READY")) == 0 and
+            wide_number(common_params.get("SITE_PRESENT")) == 3 and
+            wide_number(common_params.get("SITE_READY")) == 0 and
             wide_number(common_params.get("CAPABILITIES")) == 0 and
-            number(common_params.get("PPU_STATUS")) == 0,
+            wide_number(common_params.get("PPU_STATUS")) == 0,
             "OPP_HWH_COMMON_IDENTITY_OR_STATUS_MISMATCH")
     if source_sha is not None:
         require(SHA40.fullmatch(source_sha) is not None and
