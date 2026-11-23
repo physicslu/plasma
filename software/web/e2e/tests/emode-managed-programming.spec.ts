@@ -1035,15 +1035,6 @@ test("SAFE_OFF not verified is never PASS, even if a run record claims PASS", as
   await expect(first.workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("FAIL");
 });
 
-test("a PASS claim without verified SAFE_OFF in the receipt is shown as FAIL", async ({ page }) => {
-  await mockManager(page, { script: () => ({ outcome: "PASS", safeOff: false }) });
-  const { workspace, start } = await configure(page);
-  await start.click();
-  await expect(jobLog(workspace)).toContainText("[RUN] FAIL ·");
-  await expect(jobLog(workspace)).toContainText("[RUN] FAIL · SAFE_OFF_NOT_VERIFIED ·");
-  await expect(page.getByRole("region", { name: "Engineering Batch Summary" })).toContainText("0.0%");
-});
-
 const blockedCases: Array<{ name: string; ppu: MockPpu; label: string; reason: RegExp }> = [
   { name: "Offline", ppu: { ...Z2, transport: "unreachable" }, label: "PPU OFFLINE", reason: /cannot reach this PPU Gateway/ },
   { name: "Degraded", ppu: { ...Z2, execution: "unavailable" }, label: "PPU DEGRADED", reason: /not ready for execution/ },
@@ -1130,14 +1121,6 @@ test("Readback mismatch is FAIL, whether the Manager reports it or a PASS record
   await expect(jobLog(workspace)).toContainText("[RUN] FAIL · READBACK_SHA256_MISMATCH ·");
   await expect(jobLog(workspace)).toContainText(`Readback SHA256 ${"0".repeat(64)}`);
   await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("FAIL");
-});
-
-test("a PASS record whose readback differs from the expected Image is shown as FAIL", async ({ page }) => {
-  await mockManager(page, { script: () => ({ outcome: "PASS", readbackOk: false }) });
-  const { workspace, start } = await configure(page);
-  await start.click();
-  await expect(jobLog(workspace)).toContainText("[RUN] FAIL ·");
-  await expect(jobLog(workspace)).toContainText("[RUN] FAIL · READBACK_SHA256_MISMATCH ·");
 });
 
 test("switching the Programming Source cannot bypass an unresolved OUTCOME_UNKNOWN lock", async ({ page }) => {

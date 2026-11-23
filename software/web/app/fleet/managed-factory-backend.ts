@@ -105,8 +105,8 @@ export function managedProductionSnapshot(
   topology: ManagedTopology | null,
 ): ServerBatchSnapshot {
   const siteState = (unit: ProgrammingBatchUnit): ServerBatchSiteState => {
-    // Manager aggregate and raw unit outcome alone NEVER prove PASS. Require
-    // per-Site attempt identity, Binding, SAFE_OFF and receipt when available.
+    // The Manager's Site outcome is the verdict (U9: it alone judges the
+    // receipt); the projection only refuses a record of another Site.
     const judged = batchSiteVerdict(batch, unit, runOfUnit(batch, unit));
     if (judged.verdict === "PASS") return "success";
     if (judged.verdict === "FAIL") return "faulted";

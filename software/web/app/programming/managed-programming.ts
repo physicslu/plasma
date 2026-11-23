@@ -765,8 +765,6 @@ export function batchSiteVerdict(
 ): { verdict: BatchVerdict; reason: string | null } {
   if (unit.outcome == null) return { verdict: "RUNNING", reason: null };
   if (unit.outcome !== "PASS") return { verdict: unit.outcome, reason: unit.reason };
-  const attempt = unit.attempts[unit.attempts.length - 1];
-  if (attempt && attempt.outcome !== "PASS") return { verdict: "FAIL", reason: "LAST_ATTEMPT_NOT_PASS" };
   return attemptVerdict(batch, unit, run);
 }
 
@@ -782,51 +780,23 @@ export function attemptVerdict(
   const attempt = unit.attempts[unit.attempts.length - 1];
   if (!attempt) return { verdict: "FAIL", reason: "ATTEMPT_RECORD_MISSING" };
   if (attempt.outcome == null) return { verdict: "RUNNING", reason: null };
-  if (attempt.outcome !== "PASS") return { verdict: attempt.outcome, reason: attempt.reason };
+  // U9: the Manager judged the receipt (SAFE_OFF, Binding, Resources,
+  // readback, operations); its outcome is the verdict. The Browser checks only
+  // that the record it shows is THIS Site of THIS PPU in THIS Batch, so no
+  // other Site's evidence is ever displayed as this one's.
   const key = attempt.job_key;
-  // Site identity: the attempt must be the Manager's record of THIS Site of
-  // THIS PPU in THIS Batch, never another Site's evidence read across.
-  const failed = key == null || key.ppu_alias !== unit.ppu_alias || key.site_id !== unit.site_id
-      || key.batch_id !== batch.batch_id ? "ATTEMPT_IDENTITY_MISMATCH"
-    : attempt.safe_off !== true ? "SAFE_OFF_NOT_VERIFIED"
-    : !attempt.job_binding_sha256 ? "JOB_BINDING_MISSING"
-    : !attempt.run_id ? "RUN_ID_MISSING"
-    : null;
-  if (failed) return { verdict: "FAIL", reason: failed };
-  if (run) {
-    const judged = runVerdict(run);
-    if (judged.verdict !== "PASS") return { verdict: "FAIL", reason: judged.reason ?? "LAST_RUN_NOT_PASS" };
-    if (run.ppu_alias !== unit.ppu_alias || run.site_id !== unit.site_id
-      || JSON.stringify(run.receipt?.operations) !== JSON.stringify(batch.operations)) {
-      return { verdict: "FAIL", reason: "RUN_DOES_NOT_MATCH_BATCH" };
-    }
+  if (key == null || key.ppu_alias !== unit.ppu_alias || key.site_id !== unit.site_id
+      || key.batch_id !== batch.batch_id
+      || (run != null && (run.ppu_alias !== unit.ppu_alias || run.site_id !== unit.site_id))) {
+    return { verdict: "FAIL", reason: "ATTEMPT_IDENTITY_MISMATCH" };
   }
-  return { verdict: "PASS", reason: null };
+  return { verdict: attempt.outcome, reason: attempt.reason };
 }
 
-/**
- * Batch verdict, derived from the Sites and never instead of them.
- *
- * The Manager's aggregate is necessary but not sufficient: a PASS also needs
- * EVERY Site to pass `batchSiteVerdict`, and the Browser only ever holds the
- * run of the latest attempt, so a Site whose run it cannot see is not proven.
- * Worst wins, in the Manager's own priority order.
- */
+/** Batch verdict: the Manager's aggregate (U9: the Manager is the authority). */
 export function batchVerdict(batch: ProgrammingBatch): { verdict: BatchVerdict; reason: string | null } {
   if (batch.outcome == null) return { verdict: "RUNNING", reason: null };
-  if (batch.outcome !== "PASS" && batch.outcome !== "PARTIAL") {
-    return { verdict: batch.outcome, reason: batch.reason };
-  }
-  const order: BatchVerdict[] = ["OUTCOME_UNKNOWN", "FAIL", "BLOCKED", "PARTIAL", "RUNNING", "PASS"];
-  let worst: { verdict: BatchVerdict; reason: string | null } = { verdict: "PASS", reason: null };
-  for (const unit of batch.units) {
-    const judged = batchSiteVerdict(batch, unit, runOfUnit(batch, unit));
-    if (order.indexOf(judged.verdict) < order.indexOf(worst.verdict)) worst = judged;
-  }
-  if (batch.outcome === "PARTIAL" && worst.verdict === "PASS") {
-    return { verdict: "PARTIAL", reason: batch.reason };
-  }
-  return worst;
+  return { verdict: batch.outcome, reason: batch.reason };
 }
 
 /**
@@ -836,25 +806,24 @@ export function batchVerdict(batch: ProgrammingBatch): { verdict: BatchVerdict; 
  * totals, never the current Cycle's attempt list.
  */
 export function managedBatchStatistics(batch: ProgrammingBatch): BatchStatistics {
+  // U9: the Manager's own Cycle counters, never a second tally in the Browser.
   const tally = { settled: 0, pass: 0, fail: 0 };
-  let sitesCompleted = 0;
   for (const unit of batch.units) {
-    const site = unitCycleTally(unit.cycle, batchSiteVerdict(batch, unit, runOfUnit(batch, unit)).verdict);
+    const site = unitCycleTally(unit.cycle, unit.outcome ?? "RUNNING");
     tally.settled += site.settled;
     tally.pass += site.pass;
     tally.fail += site.fail;
-    // Same source as the Cycle counts (and as PMode), never a second opinion.
-    if (site.settled >= (unit.cycle?.planned ?? 1)) sitesCompleted += 1;
   }
   return batchStatistics({
     sites: batch.units.length,
     repeat: batch.policy.repeat,
     replaceIc: batch.policy.replace_ic_before_next_cycle ?? true,
-    tally,
+    tally: batch.cycles ? { settled: batch.cycles.settled, pass: batch.cycles.pass, fail: batch.cycles.fail } : tally,
     jobAttempts: batch.cycles?.attempts ?? batch.counts.attempts,
     retryAttempts: batch.cycles?.retry_attempts
       ?? batch.units.reduce((total, unit) => total + Math.max(0, unit.attempts.length - 1), 0),
-    sitesCompleted,
+    sitesCompleted: batch.cycles?.sites_completed
+      ?? batch.units.filter(unit => unit.outcome != null).length,
   });
 }
 
@@ -913,32 +882,14 @@ export function loadUnitRun(
 export type RunVerdict = "RUNNING" | "PASS" | "FAIL" | "BLOCKED" | "OUTCOME_UNKNOWN";
 
 /**
- * UI verdict. PASS needs the Manager outcome AND a receipt that proves a single
- * submission, verified SAFE_OFF, the bound Job Binding / Resources and, when an
- * Image was written, a matching readback. Anything short of that is not PASS.
+ * UI verdict of one run: the Manager's outcome. The Manager accepts a PASS
+ * only with its full receipt proof (single submission, verified SAFE_OFF,
+ * confirmed Job Binding / Resources, readback, operations, Read output);
+ * U9 removed the Browser's second copy of those checks.
  */
 export function runVerdict(run: ProgrammingRun): { verdict: RunVerdict; reason: string | null } {
   if (run.outcome == null) return { verdict: "RUNNING", reason: null };
-  if (run.outcome !== "PASS") return { verdict: run.outcome, reason: run.reason };
-  const receipt = run.receipt;
-  const failed = !receipt ? "RECEIPT_MISSING"
-    : receipt.safe_off !== true ? "SAFE_OFF_NOT_VERIFIED"
-    : run.job_submission_count !== 1 ? "JOB_SUBMISSION_COUNT_NOT_ONE"
-    : run.auto_retry !== "DISABLED" ? "AUTO_RETRY_NOT_DISABLED"
-    : !receipt.job_id ? "JOB_ID_MISSING"
-    : receipt.observed_job_binding_sha256 !== receipt.expected_job_binding_sha256 ? "JOB_BINDING_NOT_CONFIRMED"
-    : receipt.observed_resource_set_sha256 !== receipt.expected_resource_set_sha256 ? "RESOURCE_SET_NOT_CONFIRMED"
-    // A readback is owed only when the Job verifies: the legacy cycle or a list with Verify.
-    : receipt.operations?.includes("verify")
-      && (receipt.expected_image_sha256 == null || receipt.readback_sha256 !== receipt.expected_image_sha256)
-      ? "READBACK_SHA256_MISMATCH"
-    : receipt.operation === "programming"
-      && JSON.stringify(receipt.observed_operations) !== JSON.stringify(receipt.operations)
-      ? "OPERATIONS_NOT_CONFIRMED"
-    : receipt.operation === "read" && receipt.read_output?.available !== true
-      ? "READ_OUTPUT_UNAVAILABLE"
-    : null;
-  return failed ? { verdict: "FAIL", reason: failed } : { verdict: "PASS", reason: null };
+  return { verdict: run.outcome, reason: run.reason };
 }
 
 /** Real Manager / PPU progress only; null when the PPU has not reported any. */
