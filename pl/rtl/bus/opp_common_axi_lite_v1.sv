@@ -10,8 +10,8 @@ module opp_common_axi_lite_v1 #(
   parameter logic [31:0] PPU_STATUS = 32'h0,
   parameter logic [31:0] HW_REVISION = 32'h0
 ) (
-  input logic aclk,
-  input logic aresetn,
+  input logic s_axi_aclk,
+  input logic s_axi_aresetn,
   input logic [11:0] s_axi_awaddr,
   input logic s_axi_awvalid,
   output logic s_axi_awready,
@@ -70,8 +70,8 @@ module opp_common_axi_lite_v1 #(
     endcase
   end
 
-  always_ff @(posedge aclk or negedge aresetn) begin
-    if (!aresetn) begin
+  always_ff @(posedge s_axi_aclk or negedge s_axi_aresetn) begin
+    if (!s_axi_aresetn) begin
       aw_pending_q <= 1'b0;
       w_pending_q <= 1'b0;
       awaddr_q <= '0;

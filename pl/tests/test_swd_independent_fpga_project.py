@@ -9,16 +9,18 @@ PL = Path(__file__).resolve().parents[1]
 PROJECT = PL / "projects/z2-swd-independent"
 
 
-def test_vivado_uses_two_independent_axi_slaves_and_one_interconnect():
+def test_vivado_uses_common_and_two_independent_axi_slaves():
     t = (PROJECT / "create_block_design.tcl").read_text()
     assert "xilinx.com:ip:axi_interconnect:2.1" in t
-    assert "CONFIG.NUM_MI {2}" in t
+    assert "CONFIG.NUM_MI {3}" in t
     assert t.count("-type module -reference plasma_swd_site_axi_lite") == 2
+    assert t.count("-type module -reference opp_common_axi_lite_v1") == 1
     assert "CONFIG.SITE_BASE_ADDRESS {0x43C01000}" in t
     assert "CONFIG.SITE_BASE_ADDRESS {0x43C02000}" in t
     assert "assign_bd_address -offset 0x43C01000 -range 4K" in t
     assert "assign_bd_address -offset 0x43C02000 -range 4K" in t
-    assert "PS7_GP0_MUST_MAP_EXACTLY_TWO_SITE_SLAVES" in t
+    assert "assign_bd_address -offset 0x43C03000 -range 4K" in t
+    assert "SWD_PS7_GP0_MUST_MAP_COMMON_AND_TWO_SITE_SLAVES" in t
     assert "make_bd_pins_external" in t
     for sig in ("swclk_site1", "swdio_site1", "swclk_site2", "swdio_site2"):
         assert sig in t
@@ -28,6 +30,7 @@ def test_vivado_sources_standalone_new_swd_only_and_no_mpe_fallback():
     p = (PROJECT / "create_project.tcl").read_text()
     assert "rtl swd plasma_swd_transaction_engine.sv" in p
     assert "rtl swd plasma_swd_site_axi_lite.sv" in p
+    assert "rtl bus opp_common_axi_lite_v1.sv" in p
     assert "z2-swd-independent.xdc" in p
     for banned in ("plasma_mpe_", "fixed_ppu_", "z2-fixed-unified-site1",
                    "swd03_dpidr_responder", "swd_waveform_engine",

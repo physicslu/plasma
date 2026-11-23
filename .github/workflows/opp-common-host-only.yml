@@ -5,6 +5,10 @@ on:
     paths:
       - 'pl/rtl/bus/opp_common_axi_lite_v1.sv'
       - 'pl/sim/tb_opp_common_axi_lite_v1.sv'
+      - 'pl/projects/z2-swd-independent/**'
+      - 'pl/tests/test_swd_host_build_operator.py'
+      - 'pl/tests/test_swd_independent_fpga_project.py'
+      - 'scripts/plasma_vivado_host_build.py'
       - 'software/python/plasma_interfaces/opp_common_registers.py'
       - 'software/python/tests/test_opp_common_registers.py'
       - '.github/workflows/opp-common-host-only.yml'
@@ -35,4 +39,4 @@ jobs:
           PYTHONPATH: software/python
         run: |
           python -m pip install pytest pytest-asyncio PyYAML
-          python -m pytest -q software/python/tests/test_opp_common_registers.py
+          python -m pytest -q software/python/tests/test_opp_common_registers.py pl/tests/test_swd_independent_fpga_project.py pl/tests/test_swd_host_build_operator.py

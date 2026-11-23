@@ -10,7 +10,7 @@ module tb;
   wire [1:0] bresp,rresp;
   wire [31:0] rdata;
   opp_common_axi_lite_v1 dut(
-    .aclk(clk),.aresetn(rstn),
+    .s_axi_aclk(clk),.s_axi_aresetn(rstn),
     .s_axi_awaddr(awaddr),.s_axi_awvalid(awvalid),.s_axi_awready(awready),
     .s_axi_wdata(wdata),.s_axi_wstrb(wstrb),.s_axi_wvalid(wvalid),.s_axi_wready(wready),
     .s_axi_bresp(bresp),.s_axi_bvalid(bvalid),.s_axi_bready(bready),
