@@ -335,10 +335,16 @@ test("READ sits on the qualified Site row, reads the whole Flash and writes the 
   const digest = createHash("sha256").update(FULL_FLASH).digest("hex");
   await expect(log).toContainText(`[READ] SAVED · SITE-02 · dump.bin · 65536 B · SHA256 ${digest}`);
   await expect(log).toContainText(/\[READ\] PASS · SITE-02 · Run \S+ · Job \S+ · SAFE_OFF VERIFIED/);
-  // Not a Batch: no Batch run, no PASS / FAIL / Yield, no E / P / V Site result.
+  // U2: READ is its own one-Site, one-Cycle Batch, never the programming Batch:
+  // no [RUN] / [ATTEMPT] lines, no PASS / FAIL / Yield, no E / P / V Site result.
   await expect(jobLog(workspace)).not.toContainText("[RUN] ");
   await expect(jobLog(workspace)).not.toContainText("[ATTEMPT");
-  expect(counters.batches).toHaveLength(0);
+  expect(counters.batches).toHaveLength(1);
+  const { start_id: readStart, ...readBatch } = counters.batches[0].body;
+  expect(typeof readStart).toBe("string");
+  expect(readBatch).toEqual({ icpn: "STM32F103C8T6", targets: [{ ppu_alias: "z2", site_ids: [2] }], operation: "read",
+    address: 0x08000000, length: 65536, retry_limit: 0, stop_policy: { kind: "never" }, repeat: 1,
+    replace_ic_before_next_cycle: true });
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary).toContainText("Run Preview");
   await expect(summary).not.toContainText("100.0%");
@@ -486,7 +492,7 @@ test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming
   await expect(hold).toContainText("the READ Start request on PPU z2 · SITE-02 got no answer");
   await expect(hold).toContainText("Nothing was resubmitted");
   // The hold names the Manager-issued start (the plan ID) it will reconcile.
-  await expect(hold).toContainText(`reconciles Start ${"1".padStart(32, "0")}`);
+  await expect(hold).toContainText(`reconciles Start ${"5a001".padStart(32, "0")}`);
   expect((await pickerProbe(page)).saves).toEqual([]);
   // The PPU is held: neither a second READ nor a Programming Start can be sent.
   await expect(button).toBeDisabled();
@@ -497,7 +503,8 @@ test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming
   await page.waitForTimeout(2500);
   expect(counters.plans).toHaveLength(1);
   expect(counters.starts).toHaveLength(1);
-  expect(counters.batches).toHaveLength(0);
+  // The one READ Batch request whose answer was lost; never a second one.
+  expect(counters.batches).toHaveLength(1);
   expect(counters.polls).toBe(0);
   // Nothing is reconciled, voided or acknowledged on its own.
   expect(counters.reconciles).toEqual([]);
@@ -545,7 +552,7 @@ test("a READ Start the Manager admitted whose answer was lost is reconciled to i
   // Later: the same run ended PASS. The hold is released against that run.
   await parts.reconcile.click();
   await expect(parts.hold).toHaveCount(0);
-  await expect(parts.log).toContainText(/reconciled with the Manager · the Manager admitted this Start as Run [0-9a-f]{32} and it ended PASS/);
+  await expect(parts.log).toContainText(/reconciled with the Manager · the Manager admitted this Start as Batch [0-9a-f]{32} and it ended PASS/);
   await expect(parts.read).toBeEnabled();
   // Exactly one start was ever sent; reconciling created no Job, no ack, no void.
   expect(counters.plans).toHaveLength(1);
@@ -1331,7 +1338,7 @@ test("a lost Batch response is OUTCOME UNKNOWN: the Browser never resends it", a
   expect(counters.polls).toBe(0);
 });
 
-test("READ ignores the Batch Policy: one Job, no Batch, no retry", async ({ page }) => {
+test("READ ignores the Batch Policy: one Job in its own Batch, no retry", async ({ page }) => {
   await stubSavePicker(page, "save");
   const counters = await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "READ_NOT_PASS" }) });
   const { workspace, job } = await configure(page);
@@ -1340,7 +1347,10 @@ test("READ ignores the Batch Policy: one Job, no Batch, no retry", async ({ page
   const status = workspace.getByRole("status", { name: "SITE 2 Read status" });
   await expect(status).toHaveText("FAIL");
   await expect(status).toHaveAttribute("title", "READ_NOT_PASS");
-  expect(counters.batches).toHaveLength(0);
+  // Its own Batch with Retry 0 / Repeat 1 / Stop never, whatever the Policy says.
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.batches[0].body).toMatchObject({ operation: "read", retry_limit: 0, repeat: 1,
+    stop_policy: { kind: "never" } });
   expect(counters.starts).toHaveLength(1);
   await expect(jobLog(workspace)).not.toContainText("[ATTEMPT");
   await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("—");

@@ -5,10 +5,11 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const read = path => readFile(new URL(path, root), "utf8");
 
-test("BFF allowlists only the Manager-owned programming plan/run/status routes", async () => {
+test("BFF allowlists only the PPU-scoped run status / acknowledge routes; no single plan or run", async () => {
   const bff = await read("app/api/manager/bootstrap-bff.ts");
-  assert.match(bff, /\/\^programming\\\/plans\$\//);
-  assert.match(bff, /\/\^programming\\\/runs\$\//);
+  // U2: the single plan + run retired; every Job is a Manager Batch attempt.
+  assert.doesNotMatch(bff, /\/\^programming\\\/plans\$\//);
+  assert.doesNotMatch(bff, /\/\^programming\\\/runs\$\//);
   assert.match(bff, /`\^programming\/runs\/\$\{RUN_ID\}\/acknowledge\$`/);
   assert.match(bff, /`\^programming\/runs\/\$\{RUN_ID\}\$`/);
   assert.match(bff, /\/\^programming\\\/routes\$\//);
@@ -26,13 +27,17 @@ test("Browser never builds/signs a Bundle or talks to the PPU directly", async (
     assert.doesNotMatch(source, /\/api\/manager\/ppu\/api\/jobs|:18080|:18081|\/v1\//);
   }
   assert.match(api, /\/api\/manager\/registry\/\$\{encodeURIComponent\(alias\)\}\/bootstrap\/programming/);
-  assert.match(api, /confirm: PROGRAMMING_CONFIRM_TOKEN/);
+  assert.doesNotMatch(api, /\/plans`|PROGRAMMING_CONFIRM_TOKEN|function (planProgramming|startProgramming)\(/);
 });
 
-test("Console starts a plan at most once and never auto-resubmits", async () => {
+test("Console starts one Manager Batch at most once and never auto-resubmits", async () => {
   const ui = await read("app/engineering/bundle-programming.tsx");
-  assert.match(ui, /if \(startedRef\.current === plan\.plan_id\) return;/);
-  assert.equal((ui.match(/startProgramming\(/g) ?? []).length, 1);
+  assert.match(ui, /if \(startedRef\.current\) return;/);
+  // U2: programming and Read Memory are each one Manager Batch (one Site, one Cycle).
+  assert.equal((ui.match(/runManagedBatch\(/g) ?? []).length, 1);
+  assert.equal((ui.match(/runManagedRead\(/g) ?? []).length, 1);
+  assert.match(ui, /retryLimit: 0, stopPolicy: \{ kind: "never" \}/);
+  assert.doesNotMatch(ui, /planProgramming|startProgramming\(/);
   // The run / receipt / OUTCOME_UNKNOWN view is the one shared with EMode and PMode.
   const view = await read("app/operator-ui/programming-run-view.tsx");
   assert.match(ui, /<ProgrammingRunView run=\{run\}/);

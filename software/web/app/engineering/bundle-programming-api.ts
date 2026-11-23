@@ -8,7 +8,6 @@ import type { CycleHistoryPage, SafeOffState } from "../programming/batch-statis
 // exactly one Job with the user-selected Operation and its Job Binding.
 // The Browser never builds or signs a Bundle and never talks to the PPU.
 
-export const PROGRAMMING_CONFIRM_TOKEN = "PROGRAM";
 export const PROGRAMMING_ACK_TOKEN = "OUTCOME_UNKNOWN_RECONCILED";
 
 export type ProgrammingRoute = {
@@ -243,50 +242,6 @@ export function bytesToBase64(bytes: Uint8Array): string {
 
 
 
-/** One programming Job (`operations`) or a single-operation Job (`operation`). */
-type JobSelector = { operations: readonly SequenceOperation[] };
-
-export type PlanInput =
-  | ({ icpn: string; siteId: number; image: Uint8Array; filename: string } & JobSelector)
-  | ({ icpn: string; siteId: number; bundle: Uint8Array } & JobSelector)
-  // No Image: an erase-only list or the independent read Job on an explicit range.
-  | { icpn: string; siteId: number; operations: readonly ["erase"]; address: number; length: number }
-  | { icpn: string; siteId: number; operation: "read"; address: number; length: number };
-
-export async function planProgramming(alias: string, input: PlanInput): Promise<ProgrammingPlan> {
-  // The user's selection is sent as chosen; the Manager never rewrites it.
-  const selector = "operations" in input
-    ? { operations: [...input.operations] } : { operation: input.operation };
-  const body = "image" in input
-    ? {
-      icpn: input.icpn, site_id: input.siteId, ...selector,
-      image_base64: bytesToBase64(input.image), image_filename: input.filename,
-    }
-    : "bundle" in input
-    ? {
-      // The user's own Bundle bytes, unchanged; the Manager admits or refuses them.
-      icpn: input.icpn, site_id: input.siteId, ...selector,
-      bundle_base64: bytesToBase64(input.bundle),
-    }
-    : {
-      icpn: input.icpn, site_id: input.siteId, ...selector,
-      address: input.address, length: input.length,
-    };
-  const payload = await request<{ ok: true; plan: ProgrammingPlan }>(`${base(alias)}/plans`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  return payload.plan;
-}
-
-export async function startProgramming(alias: string, planId: string): Promise<ProgrammingRun> {
-  const payload = await request<{ ok: true; run: ProgrammingRun }>(`${base(alias)}/runs`, {
-    method: "POST",
-    body: JSON.stringify({ plan_id: planId, confirm: PROGRAMMING_CONFIRM_TOKEN }),
-  });
-  return payload.run;
-}
-
 export async function getProgrammingRun(alias: string, runId: string): Promise<ProgrammingRun> {
   const payload = await request<{ ok: true; run: ProgrammingRun }>(`${base(alias)}/runs/${runId}`);
   return payload.run;
@@ -448,7 +403,10 @@ export type ProgrammingBatch = {
   ppu_alias?: string;
   site_id?: number;
   icpn: string;
-  operations: SequenceOperation[];
+  /** The ordered E/P/V list; null for a Read Memory Batch. */
+  operations: SequenceOperation[] | null;
+  /** "read" for a Read Memory Batch; absent or null otherwise. */
+  operation?: "read" | null;
   source: ProgrammingSource | "range";
   policy: BatchPolicy;
   state: string;
@@ -483,6 +441,8 @@ export type BatchInput = (
   | { icpn: string; operations: readonly SequenceOperation[]; image: Uint8Array; filename: string }
   | { icpn: string; operations: readonly SequenceOperation[]; bundle: Uint8Array }
   | { icpn: string; operations: readonly ["erase"]; address: number; length: number }
+  // Read Memory (U2): the independent read Job is a one-Site Batch attempt.
+  | { icpn: string; operation: "read"; address: number; length: number }
 ) & {
   alias: string;
   siteIds: readonly number[];
@@ -509,7 +469,7 @@ export async function startProgrammingBatch(
     targets: input.targets
       ? input.targets.map(target => ({ ppu_alias: target.ppu_alias, site_ids: [...target.site_ids] }))
       : [{ ppu_alias: input.alias, site_ids: [...input.siteIds] }],
-    operations: [...input.operations],
+    ...("operation" in input ? { operation: input.operation } : { operations: [...input.operations] }),
     retry_limit: input.retryLimit, stop_policy: input.stopPolicy,
     repeat: input.repeat ?? 1, replace_ic_before_next_cycle: input.replaceIc ?? true,
     // Manager-issued: admits at most one Batch and can be reconciled later.

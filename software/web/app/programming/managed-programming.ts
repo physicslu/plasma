@@ -16,9 +16,7 @@ import {
   getProgrammingRun,
   getReadOutput,
   issueBatchStart,
-  planProgramming,
   SEQUENCE_OPERATIONS,
-  startProgramming,
   startProgrammingBatch,
   type BatchInput,
   type ProgrammingBatch,
@@ -397,7 +395,11 @@ export function decideStartReconciliation(
   }
   const identity = answer.identity;
   if (identity) {
-    const wantedKind = hold.kind === "READ" ? "run" : "batch";
+    // U2: Read Memory is a Batch too. A READ hold taken before the upgrade
+    // named a run Start with its Job Binding, and still reconciles as that run.
+    const wantedKind = hold.kind === "READ" && hold.jobBindingSha256 != null ? "run" : "batch";
+    // A Batch start not yet admitted records no Operation of its own.
+    const admitted = !(answer.state === "ACCEPTANCE_PENDING" || answer.state === "NOT_ACCEPTED");
     const wantedSites = [...hold.siteIds].sort((left, right) => left - right);
     const recorded = recordedSites(identity, hold.alias);
     const sitesKnown = recorded !== null;
@@ -407,7 +409,7 @@ export function decideStartReconciliation(
       || (sitesKnown && JSON.stringify(recorded) !== JSON.stringify(wantedSites))
       // Only a Batch that was never admitted has no Site on record yet.
       || (!sitesKnown && !(wantedKind === "batch" && (answer.state === "ACCEPTANCE_PENDING" || answer.state === "NOT_ACCEPTED")))
-      || (hold.kind === "READ" && identity.operation !== "read")
+      || (hold.kind === "READ" && identity.operation !== "read" && (admitted || wantedKind === "run"))
       || (hold.kind === "PROGRAMMING" && identity.operation !== "programming")
       || (hold.jobBindingSha256 != null && identity.job_binding_sha256 !== hold.jobBindingSha256)) {
       return blocked("the Manager record does not match this PPU, Site, Operation or Job Binding");
@@ -451,27 +453,6 @@ function errorParts(reason: unknown): { status: number | null; code: string | nu
   };
 }
 
-async function observeRun(
-  alias: string,
-  started: ProgrammingRun,
-  events: ManagedRunEvents,
-  signal?: AbortSignal,
-): Promise<ProgrammingRun> {
-  let run = started;
-  while (run.outcome == null) {
-    await new Promise(resolve => setTimeout(resolve, MANAGED_POLL_MS));
-    if (signal?.aborted) return run;
-    try {
-      run = await getProgrammingRun(alias, run.run_id);
-      events.onRun?.(run);
-    } catch (reason) {
-      // Reads are safe to repeat; the run itself is never resubmitted.
-      events.onPollError?.(`${errorParts(reason).message}; the run was NOT resubmitted`);
-    }
-  }
-  return run;
-}
-
 export type ManagedReadRequest = { alias: string; siteId: number; icpn: string; address: number; length: number };
 export type ManagedReadResult = {
   run: ProgrammingRun;
@@ -482,50 +463,92 @@ export type ManagedReadResult = {
 };
 
 /**
- * Read Memory: an independent Job (never part of a Batch, never counted in
- * PASS / FAIL / Yield). Plan -> exactly one start -> observe -> fetch the
- * binary through the Manager and re-hash it against the receipt.
+ * Read Memory: its own one-Site, one-Cycle Batch (U2), separate from any
+ * programming Batch and never counted in its PASS / FAIL / Yield. Manager
+ * start -> exactly one Batch request -> observe -> fetch the binary through
+ * the Manager and re-hash it against the receipt. Nothing is ever resent.
  */
 export async function runManagedRead(
   request: ManagedReadRequest,
   events: ManagedRunEvents = {},
   signal?: AbortSignal,
 ): Promise<ManagedReadResult> {
-  let plan: ProgrammingPlan;
+  let startId: string;
   try {
-    plan = await planProgramming(request.alias, {
-      icpn: request.icpn, siteId: request.siteId, operation: "read",
-      address: request.address, length: request.length,
-    });
+    startId = await issueBatchStart(request.alias);
+    if (!/^[0-9a-f]{32}$/.test(startId)) throw new Error("the Manager issued no start ID");
   } catch (reason) {
     const { code, message } = errorParts(reason);
-    throw new ManagedProgrammingBlocked("plan", code, message);
+    throw new ManagedProgrammingBlocked("plan", code,
+      `The Manager did not issue a start ID (${message}); nothing was started.`);
   }
-  const range = plan.job_binding.range;
-  if (plan.ppu_alias !== request.alias || plan.site_id !== request.siteId || plan.operation !== "read"
-    || plan.operations != null || plan.source !== "range" || plan.image_asset != null
-    || plan.activation_required !== false || plan.fpga_load !== false
-    || plan.route.icpn !== request.icpn
-    || range.address !== request.address || range.length !== request.length) {
-    throw new ManagedProgrammingBlocked("plan", "plan_echo_mismatch",
-      "The Manager plan is not exactly this Read Memory request; nothing was started.");
-  }
-  events.onPlan?.(plan);
-  let run: ProgrammingRun;
+  const identity: StartIdentity = { startId, kind: "batch", siteIds: [request.siteId],
+    operation: "read", jobBindingSha256: null };
+  let batch: ProgrammingBatch;
   try {
-    run = await startProgramming(request.alias, plan.plan_id);
+    batch = await startProgrammingBatch({
+      icpn: request.icpn, alias: request.alias, siteIds: [request.siteId], operation: "read",
+      address: request.address, length: request.length,
+      retryLimit: 0, stopPolicy: { kind: "never" }, repeat: 1, replaceIc: true,
+    }, startId);
   } catch (reason) {
     const { status, code, message } = errorParts(reason);
+    // A 4xx is a definite refusal: no Batch exists and no Job was submitted.
     if (status != null && status >= 400 && status < 500) {
-      throw new ManagedProgrammingBlocked("start", code, message);
+      throw new ManagedProgrammingBlocked("plan", code, message);
     }
-    throw new ManagedStartOutcomeUnknown(plan.plan_id,
-      `The Read Memory start outcome is unknown (${message}). Nothing was resubmitted.`,
-      { startId: plan.plan_id, kind: "run", siteIds: [plan.site_id], operation: "read",
-        jobBindingSha256: plan.job_binding_sha256 });
+    throw new ManagedStartOutcomeUnknown(startId,
+      `The Read Memory start outcome is unknown (${message}). Nothing was resubmitted.`, identity);
   }
-  events.onRun?.(run);
-  run = await observeRun(request.alias, run, events, signal);
+  const [target] = batch.targets;
+  if (batch.start_id !== startId || batch.operation !== "read" || batch.operations != null
+    || batch.icpn !== request.icpn || batch.targets.length !== 1 || target.ppu_alias !== request.alias
+    || target.site_ids.length !== 1 || target.site_ids[0] !== request.siteId) {
+    throw new ManagedStartOutcomeUnknown(startId,
+      "The Manager Batch reply is not exactly this Read Memory request; do not resubmit.", identity);
+  }
+  let planned = false;
+  const observe = (next: ProgrammingBatch) => {
+    const run = next.current_run;
+    if (!run) return;
+    if (!planned && run.plan) {
+      const plan = run.plan;
+      const range = plan.job_binding.range;
+      if (plan.ppu_alias !== request.alias || plan.site_id !== request.siteId || plan.operation !== "read"
+        || plan.operations != null || plan.source !== "range" || plan.image_asset != null
+        || plan.activation_required !== false || plan.fpga_load !== false
+        || plan.route.icpn !== request.icpn
+        || range.address !== request.address || range.length !== request.length) {
+        throw new ManagedStartOutcomeUnknown(startId,
+          "The Manager plan is not exactly this Read Memory request; do not resubmit.", identity);
+      }
+      planned = true;
+      events.onPlan?.(plan);
+    }
+    events.onRun?.(run);
+  };
+  observe(batch);
+  while (batch.outcome == null) {
+    await new Promise(resolve => setTimeout(resolve, MANAGED_POLL_MS));
+    if (signal?.aborted) break;
+    try {
+      batch = await getProgrammingBatch(batch.batch_id);
+      observe(batch);
+    } catch (reason) {
+      if (reason instanceof ManagedStartOutcomeUnknown) throw reason;
+      events.onPollError?.(`${errorParts(reason).message}; the Read was NOT resubmitted`);
+    }
+  }
+  const run = batch.current_run;
+  if (!run) {
+    if (batch.outcome == null) {
+      throw new ManagedStartOutcomeUnknown(startId,
+        "Observation stopped before the Read Memory Job was visible; do not resubmit.", identity);
+    }
+    const reason = batch.units[0]?.reason ?? batch.reason ?? "read_not_submitted";
+    throw new ManagedProgrammingBlocked("plan", reason,
+      `The Read Memory Batch submitted no Job (${reason}); nothing was read.`);
+  }
   if (runVerdict(run).verdict !== "PASS") return { run, data: null, downloadError: null };
   const output = run.receipt?.read_output;
   try {
@@ -968,7 +991,7 @@ export function unitStageStatuses(batch: ProgrammingBatch, unit: ProgrammingBatc
   for (const event of events) {
     if (event.attempt !== jobAttempt) continue; // PPU retries have separate Sessions.
     if (event.job_id !== jobId || event.site_id !== unit.site_id
-        || !batch.operations.includes(event.stage)
+        || !(batch.operations ?? []).includes(event.stage)
         || !event.session_id || (session !== null && session !== event.session_id)
         || event.sequence !== sequence + 1) break;
     session = event.session_id;
@@ -982,7 +1005,8 @@ export function unitStageStatuses(batch: ProgrammingBatch, unit: ProgrammingBatc
   // Old Manager/PPU snapshots have no event list; their terminal Receipt is
   // still authoritative and no in-flight stage is invented.
   const verdict = batchSiteVerdict(batch, unit, held).verdict;
-  return batch.operations.map(name => {
+  // A Read Memory Batch (operations null) has no E/P/V stage rows.
+  return (batch.operations ?? []).map(name => {
     const event = states[name];
     const state = verdict === "PASS" ? "completed"
       : event === "completed" ? "completed"

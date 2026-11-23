@@ -29,7 +29,7 @@ import ppu_unified_deployment  # noqa: E402
 from test_bundle_programming_workflow import (  # noqa: E402
     ALIAS, FakeCoordinator, FakeGateway, image, make, plan_body, run_once,
 )
-from plasma_manager.programming import CONFIRM_TOKEN  # noqa: E402
+from plasma_manager.programming import ProgrammingError  # noqa: E402
 
 ROUTES = ROOT / "data/opf/programming-routes"
 FW_A = bytes(range(256)) * 4
@@ -684,11 +684,11 @@ def test_active_set_reporting_resource_identity_is_not_trusted(tmp_path):
 
     workflow, coord, _gateway = make(tmp_path, coordinator=coord,
                                      gateway=PPU(image=image(), coordinator=coord))
-    planned = workflow.plan(ALIAS, plan_body())["plan"]
-    assert planned["activation_required"] is True and planned["resource"]["reuse"] is False
-    started = workflow.start(ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
-    run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
-    assert "B3" in coord.calls and run["outcome"] == "PASS"
+    # Not reused on trust: the plan refuses (a Batch would activate first, U1).
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.plan(ALIAS, plan_body())
+    assert caught.value.code == "batch_resource_not_active"
+    assert "B3" not in coord.calls
 
 
 def test_user_bundle_still_passes_host_only_b3_verifier(tmp_path):

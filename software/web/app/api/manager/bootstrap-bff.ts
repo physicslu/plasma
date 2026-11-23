@@ -23,15 +23,11 @@ const BOOTSTRAP_POST_ACTIONS = [
   /^deployments$/,
   new RegExp(`^uploads/${UPLOAD_ID}/chunks$`),
   new RegExp(`^uploads/${UPLOAD_ID}/commit$`),
-  // Console-driven Bundle programming (Gate 1, 2026-11-09). The Manager builds
-  // the Bundle and owns B1/B2/B3 + programming; the Browser only plans,
-  // confirms, starts once and reads the run.
-  /^programming\/plans$/,
-  /^programming\/runs$/,
+  // The OUTCOME_UNKNOWN acknowledgement of one PPU-scoped run.
   new RegExp(`^programming/runs/${RUN_ID}/acknowledge$`),
-  // The EMode Batch and its start are NOT here: a Batch is owned by the
-  // Manager, not by a PPU, and lives at /api/manager/programming (PR-C,
-  // ADR 5.8). A PPU-scoped run, plan and acknowledgement still belong here.
+  // Programming is NOT here: every Job, Read Memory included, belongs to a
+  // Manager-owned Batch at /api/manager/programming (PR-C, ADR 5.8).
+  // The single plan + run retired in U2.
 ];
 // Read Memory binary of a PASS read run. The Manager re-hashes the bytes
 // against the run receipt; the Browser never reads from a PPU.

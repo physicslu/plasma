@@ -53,6 +53,10 @@ RETIRED_PROGRAMMING_ACTIONS = (
     re.compile(r"^programming/starts$"),
     re.compile(r"^programming/starts/[0-9a-f]{32}$"),
     re.compile(r"^programming/starts/[0-9a-f]{32}/void$"),
+    # Retired in U2: the single plan + run. Every programming Job, Read
+    # Memory included, is a Batch attempt at /api/programming/batches.
+    re.compile(r"^programming/plans$"),
+    re.compile(r"^programming/runs$"),
 )
 
 
@@ -359,7 +363,8 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                 f"Runtime state {runtime_state!r} is not eligible for normal Platform maintenance")
 
     def _retired_programming_route(self, action: str) -> bool:
-        """The alias-scoped Batch and start routes retired in PR-C (ADR 5.8).
+        """The alias-scoped Batch and start routes retired in PR-C (ADR 5.8),
+        and the single plan + run retired in U2.
 
         410 rather than 404: the route existed and is gone, so a Console
         still running the pre-upgrade JavaScript can say so instead of
@@ -371,8 +376,9 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             return False
         self._json(HTTPStatus.GONE, {"ok": False, "error": {
             "code": "programming_route_retired",
-            "message": ("this alias-scoped programming route retired: a Batch and its "
-                        "start are owned by the Manager, not by a PPU, and live at "
+            "message": ("this alias-scoped programming route retired: every programming "
+                        "Job (Read Memory included) is an attempt of a Manager-owned Batch; "
+                        "a Batch and its start live at "
                         "/api/programming/batches and /api/programming/starts. Nothing "
                         "was started. Reload the Console to load the current version."),
         }})
@@ -667,17 +673,6 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
                     return
                 finally:
                     gate.end_platform_launch(alias)
-            if action == "programming/plans":
-                self._programming_call(
-                    lambda: (HTTPStatus.OK, self._programming().plan(alias, body)))
-                return
-            if action == "programming/runs":
-                # Same Platform safety gate as manual B2/B3 (idle, no recovery).
-                if not self._bootstrap_mutation_allowed(alias):
-                    return
-                self._programming_call(
-                    lambda: (HTTPStatus.ACCEPTED, self._programming().start(alias, body)))
-                return
             if self._retired_programming_route(action):
                 return
             ack_match = PROGRAMMING_ACK_RE.fullmatch(action)

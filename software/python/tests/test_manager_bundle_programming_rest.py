@@ -142,36 +142,31 @@ def manager(tmp_path: Path):
 BASE = "/api/registry/z2/bootstrap/programming"
 
 
-def test_routes_plan_run_status_and_ack_are_wired(manager):
+def test_routes_status_and_ack_are_wired(manager):
     call, workflow, _poller, _batches = manager
     assert call("GET", f"{BASE}/routes")[0] == 200
-    status, payload = call("POST", f"{BASE}/plans", {"icpn": "X", "site_id": 2, "firmware_base64": "AA=="})
-    assert status == 200 and payload["plan"]["plan_id"] == "e" * 32
-    status, payload = call("POST", f"{BASE}/runs", {"plan_id": "e" * 32, "confirm": "PROGRAM"})
-    assert status == 202 and payload["run"]["run_id"] == RUN_ID
     assert call("GET", f"{BASE}/runs/{RUN_ID}")[0] == 200
     status, _ = call("POST", f"{BASE}/runs/{RUN_ID}/acknowledge", {"acknowledge": "OUTCOME_UNKNOWN_RECONCILED"})
     assert status == 200
-    assert [c[0] for c in workflow.calls] == ["routes", "plan", "start", "run", "ack"]
+    assert [c[0] for c in workflow.calls] == ["routes", "run", "ack"]
 
 
-def test_workflow_errors_keep_their_status_and_code(manager):
-    call, _workflow, _poller, _batches = manager
-    status, payload = call("POST", f"{BASE}/plans", {"icpn": "missing", "site_id": 2, "firmware_base64": "AA=="})
-    assert status == 422 and payload["error"]["code"] == "programming_route_not_found"
-
-
-def test_run_requires_platform_idle_gate(manager):
-    call, workflow, poller, _batches = manager
-    poller.active = True
-    status, payload = call("POST", f"{BASE}/runs", {"plan_id": "e" * 32, "confirm": "PROGRAM"})
-    assert status == 409 and payload["error"]["code"] == "ppu_busy"
-    assert not any(c[0] == "start" for c in workflow.calls)
+@pytest.mark.parametrize("method, path, body", [
+    ("POST", f"{BASE}/plans", {"icpn": "X", "site_id": 2, "operations": ["erase"]}),
+    ("POST", f"{BASE}/runs", {"plan_id": "e" * 32, "confirm": "PROGRAM"}),
+    ("GET", f"{BASE}/plans", None),
+    ("GET", f"{BASE}/runs", None),
+])
+def test_the_single_plan_and_run_are_retired(manager, method, path, body):
+    """U2: every programming Job is a Batch attempt; nothing is planned or started."""
+    call, workflow, _poller, batches = manager
+    status, payload = call(method, path, body)
+    assert status == 410 and payload["error"]["code"] == "programming_route_retired"
+    assert workflow.calls == [] and batches.calls == []
 
 
 @pytest.mark.parametrize("method, path", [
     ("GET", f"{BASE}/runs/not-a-run-id"),
-    ("GET", f"{BASE}/plans"),
     ("POST", f"{BASE}/runs/{RUN_ID}/retry"),
 ])
 def test_unlisted_programming_paths_are_not_allowlisted(manager, method, path):

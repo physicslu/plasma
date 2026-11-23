@@ -927,7 +927,7 @@ export default function ManagedProgrammingWorkspace() {
       abortRef.current = abort;
       setReadPhase("planning");
       appendLog(`[READ] START · PPU ${alias} · ${label} · ${icpn} · ${hex(address)} + ${length} B (whole Flash) · ${
-        handle ? `save to ${handle.name}` : "Browser download"} · independent Job, not part of the Batch`, false, "USR");
+        handle ? `save to ${handle.name}` : "Browser download"} · its own one-Site Batch, not part of the programming Batch`, false, "USR");
       const result = await runManagedRead({ alias, siteId: id, icpn, address, length }, {
         onPlan: next => appendLog(`[READ] PLAN ${next.plan_id} · Route ${next.route.route_id} · Job Binding SHA256 ${next.job_binding_sha256}`, false, "DAT"),
         onRun: next => setReadPhase(next.outcome == null ? "running" : "saving"),

@@ -276,13 +276,9 @@ export async function mockManager(page: Page, options: {
     return { payload };
   }
 
-  await page.route(/\/bootstrap\/programming\/plans$/, async (r: Route) => {
-    const alias = new URL(r.request().url()).pathname.split("/")[4];
-    const body = r.request().postDataJSON() as Record<string, unknown>;
-    counters.plans.push({ alias, body });
-    const made = makePlan(alias, body, 1);
-    if (!made.payload) return r.fulfill(json({ ok: false, error: made.error }, made.status));
-    await r.fulfill(json({ ok: true, plan: made.payload }));
+  // U2: the single plan + run retired; `legacyRequests` reports any call to them.
+  await page.route(/\/bootstrap\/programming\/(plans|runs)$/, async (r: Route) => {
+    await r.fulfill(json({ ok: false, error: { code: "programming_route_retired", message: "retired" } }, 410));
   });
 
   function runRecord(runId: string) {
@@ -360,27 +356,6 @@ export async function mockManager(page: Page, options: {
     };
   }
 
-  await page.route(/\/bootstrap\/programming\/runs$/, async (r: Route) => {
-    const alias = new URL(r.request().url()).pathname.split("/")[4];
-    const body = r.request().postDataJSON() as Record<string, unknown>;
-    counters.starts.push({ alias, body });
-    const planned = plans.get(String(body.plan_id));
-    if (!planned || runs.has(`run:${body.plan_id}`) || startRecords.get(String(body.plan_id))?.state === "VOIDED") {
-      return r.fulfill(json({ ok: false, error: { code: "programming_plan_not_found", message: "plan is missing or already consumed" } }, 404));
-    }
-    if (planned.script.startError) {
-      return r.fulfill(json({ ok: false, error: planned.script.startError }, planned.script.startStatus ?? 409));
-    }
-    const runId = hex32(0xf000 + counters.starts.length);
-    runs.set(runId, { alias, planId: String(body.plan_id), polls: 0, acknowledged: false });
-    runs.set(`run:${body.plan_id}`, runs.get(runId)!);
-    Object.assign(startRecords.get(String(body.plan_id))!, { state: "CONSUMED", runId });
-    if (planned.script.startLost) {
-      // Admitted and journalled; only the answer is lost.
-      return r.fulfill(json({ ok: false, error: { code: "manager_unavailable", message: "Manager Bootstrap path is unavailable" } }, 504));
-    }
-    await r.fulfill(json({ ok: true, run: runRecord(runId) }, 202));
-  });
   await page.route(/\/bootstrap\/programming\/runs\/[0-9a-f]{32}$/, async (r: Route) => {
     counters.polls += 1;
     const runId = new URL(r.request().url()).pathname.split("/").pop()!;
@@ -412,9 +387,9 @@ export async function mockManager(page: Page, options: {
   }
 
   function planBodyFor(batch: MockBatch, siteId: number) {
-    const { operations, image_base64, image_filename, bundle_base64, address, length, icpn } = batch.body;
+    const { operations, operation, image_base64, image_filename, bundle_base64, address, length, icpn } = batch.body;
     return Object.fromEntries(Object.entries({
-      icpn, site_id: siteId, operations, image_base64, image_filename, bundle_base64, address, length,
+      icpn, site_id: siteId, operations, operation, image_base64, image_filename, bundle_base64, address, length,
     }).filter(([, value]) => value !== undefined));
   }
 
@@ -591,7 +566,8 @@ export async function mockManager(page: Page, options: {
     const record: Record<string, unknown> = {
       schema: "plasma.manager.programming-batch.v1", batch_id: batchId, start_id: batch.startId,
       targets: batch.body.targets, units,
-      icpn: "STM32F103C8T6", operations: batch.body.operations,
+      // A Read Memory Batch (U2) carries `operation: "read"` and no operations list.
+      icpn: "STM32F103C8T6", operations: batch.body.operations ?? null, operation: batch.body.operation ?? null,
       source: "bundle_base64" in batch.body ? "bundle" : "image_base64" in batch.body ? "image" : "range",
       policy: { repeat: 1, retry_limit: Number(batch.body.retry_limit ?? 0), stop_policy: batch.body.stop_policy ?? { kind: "never" } },
       started_at: options.batchTiming?.startedAt ?? "2026-11-16T12:00:00+00:00",
@@ -656,6 +632,8 @@ export async function mockManager(page: Page, options: {
     Object.assign(startRecords.get(startId)!, {
       state: "CONSUMED", batchId, alias, targets: body.targets,
       siteId: sites.length === 1 ? sites[0].siteId : null,
+      // A Read Memory Batch is admitted as "read" (U2).
+      operation: body.operation ?? "programming",
     });
     batches.set(batchId, batch);
     submitAttempt(batch, batch.units[0], String(first.payload.plan_id));
@@ -672,7 +650,7 @@ export async function mockManager(page: Page, options: {
         }
       }
     }
-    if (options.batchLost) {
+    if (options.batchLost || planned.script.startLost) {
       return r.fulfill(json({ ok: false, error: { code: "manager_unavailable", message: "Manager unavailable" } }, 504));
     }
     await r.fulfill(json({ ok: true, batch: batchRecord(batchId) }, 202));
@@ -804,5 +782,5 @@ export async function mockManager(page: Page, options: {
 /** No request may ever reach a PPU Gateway relay, the Mock provider or the Batch runtime. */
 export function legacyRequests(counters: Counters): string[] {
   return counters.requests.filter(entry =>
-    /\/api\/manager\/ppu\/|\/api\/engineering\/|\/api\/jobs|\/api\/batches|\/api\/status|\/api\/programming-assets/.test(entry));
+    /\/api\/manager\/ppu\/|\/api\/engineering\/|\/api\/jobs|\/api\/batches|\/api\/status|\/api\/programming-assets|\/bootstrap\/programming\/(plans|runs)$/.test(entry));
 }
