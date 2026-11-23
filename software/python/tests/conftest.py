@@ -50,6 +50,13 @@ _CI_PACKAGING_FILES = frozenset({
     "test_product_release.py",
     "test_product_release_canonical_paths.py",
 })
+# Dedicated long-session Batch Coordinator / Journal stress cases; ordinary
+# programming CI still covers short Repeat/Retry/Stop/SAFE_OFF regressions.
+_CI_BATCH_STRESS_CASES = frozenset({
+    "test_t04_repeat_100_accumulates_every_cycle",
+    "test_long_session_keeps_every_cycle_with_bounded_memory_and_journal",
+    "test_t21_status_and_history_reads_stay_bounded",
+})
 _CI_PACKAGING_MANAGER_CASES = frozenset({
     "test_packaged_manager_serves_selector_from_its_own_catalog",
     "test_catalog_export_is_raw_git_blob_bytes_even_with_autocrlf",
@@ -73,6 +80,8 @@ _CI_ICPN_SQLITE_PATTERNS = (
 def _plasma_ci_test_suite(item: pytest.Item) -> str:
     filename = item.path.name
     test_name = getattr(item, "originalname", None) or item.name.split("[", 1)[0]
+    if filename == "test_programming_batch_repeat.py" and test_name in _CI_BATCH_STRESS_CASES:
+        return "batch-stress"
     if filename in _CI_PACKAGING_FILES or (
         filename == "test_manager_device_selector.py"
         and test_name in _CI_PACKAGING_MANAGER_CASES
@@ -86,7 +95,7 @@ def _plasma_ci_test_suite(item: pytest.Item) -> str:
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--plasma-ci-suite",
-        choices=("general", "icpn-sqlite", "packaging"),
+        choices=("general", "icpn-sqlite", "packaging", "batch-stress"),
         default=None,
         help="Select a disjoint PLASMA CI test suite; absent means all tests",
     )
