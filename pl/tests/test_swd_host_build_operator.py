@@ -100,12 +100,12 @@ def fixture_hwh() -> ET.Element:
                   SIGNAME="ps7_0_FCLK_CLK0")
     ET.SubElement(common, "PORT", NAME="s_axi_aresetn",
                   SIGNAME="rst_ps7_0_100M_peripheral_aresetn")
-    ET.SubElement(common, "BUSINTERFACE", NAME="S_AXI",
+    ET.SubElement(common, "BUSINTERFACE", NAME="s_axi",
                   BUSNAME="axi_interconnect_0_M02_AXI")
     ET.SubElement(fabric, "BUSINTERFACE", NAME="M02_AXI",
                   BUSNAME="axi_interconnect_0_M02_AXI")
     ET.SubElement(root, "MEMRANGE", INSTANCE="opp_common",
-                  MASTERBUSINTERFACE="M_AXI_GP0", SLAVEBUSINTERFACE="S_AXI",
+                  MASTERBUSINTERFACE="M_AXI_GP0", SLAVEBUSINTERFACE="s_axi",
                   BASEVALUE="0x43c03000", HIGHVALUE="0x43c03fff")
     return root
 
@@ -126,7 +126,10 @@ def test_hwh_common_parameter_literal_formats():
 
 
 @pytest.mark.parametrize("tamper,expected", [
-    ("single_site", "OPP_HWH_REQUIRES_THREE_AXI_REGIONS"),
+    ("missing_common", "OPP_HWH_REQUIRES_THREE_AXI_REGIONS"),
+    ("missing_site", "OPP_HWH_REQUIRES_THREE_AXI_REGIONS"),
+    ("wrong_common_mem_intf", "OPP_HWH_UNEXPECTED_OR_DUPLICATE_SLAVE"),
+    ("wrong_common_bus_intf", "OPP_HWH_INTERCONNECT_ROUTE_MISMATCH"),
     ("old_composite", "OPP_HWH_UNEXPECTED_OR_DUPLICATE_SLAVE"),
     ("wrong_base", "OPP_HWH_WINDOW_MISMATCH"),
     ("duplicate_site", "OPP_HWH_UNEXPECTED_OR_DUPLICATE_SLAVE"),
@@ -144,8 +147,15 @@ def test_reject_unsafe_or_fabricated_hwh(tamper, expected):
     h = fixture_hwh()
     mem = list(h.iter("MEMRANGE"))
     modules = {m.get("INSTANCE"): m for m in h.iter("MODULE")}
-    if tamper == "single_site":
+    if tamper == "missing_common":
         h.remove(mem[-1])
+    elif tamper == "missing_site":
+        h.remove(mem[1])
+    elif tamper == "wrong_common_mem_intf":
+        mem[-1].set("SLAVEBUSINTERFACE", "S_AXI")
+    elif tamper == "wrong_common_bus_intf":
+        next(b for b in modules["opp_common"].iter("BUSINTERFACE")
+             if b.get("NAME") == "s_axi").set("NAME", "S_AXI")
     elif tamper == "old_composite":
         mem[0].set("INSTANCE", "mpe_0")
     elif tamper == "wrong_base":
@@ -154,7 +164,7 @@ def test_reject_unsafe_or_fabricated_hwh(tamper, expected):
         mem[1].set("INSTANCE", "swd_site1")
     elif tamper == "wrong_route":
         next(b for b in modules["opp_common"].iter("BUSINTERFACE")
-             if b.get("NAME") == "S_AXI").set("BUSNAME", "unrelated")
+             if b.get("NAME") == "s_axi").set("BUSNAME", "unrelated")
     elif tamper == "wrong_fabric_reset":
         next(p for p in modules["axi_interconnect_0"].iter("PORT")
              if p.get("NAME") == "M02_ARESETN").set("SIGNAME", "unrelated")

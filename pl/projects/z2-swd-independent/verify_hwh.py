@@ -18,6 +18,8 @@ import xml.etree.ElementTree as ET
 
 BASES = {"swd_site1": 0x43C01000, "swd_site2": 0x43C02000}
 COMMON_BASE = 0x43C03000
+SLAVE_INTERFACES = {"swd_site1": "S_AXI", "swd_site2": "S_AXI",
+                    "opp_common": "s_axi"}
 IMAGE_ID = 0x7a322d7377642d6f70702d76352d3031
 LENGTH = 0x1000
 PINS = {"swclk_site1": "Y18", "swdio_site1": "Y19",
@@ -95,7 +97,7 @@ def validate_hwh(root: ET.Element, source_sha: str | None = None) -> dict:
                 "SWD_HWH_UNEXPECTED_AXIMASTER")
         name = item.get("INSTANCE")
         require(name in expected_bases and name not in mapped and
-                item.get("SLAVEBUSINTERFACE") == "S_AXI",
+                item.get("SLAVEBUSINTERFACE") == SLAVE_INTERFACES[name],
                 "OPP_HWH_UNEXPECTED_OR_DUPLICATE_SLAVE")
         start = number(item.get("BASEVALUE"))
         high = number(item.get("HIGHVALUE"))
@@ -168,7 +170,8 @@ def validate_hwh(root: ET.Element, source_sha: str | None = None) -> dict:
              for name in ("ps7_0", "axi_interconnect_0", "opp_common", *BASES)}
     fabric_buses = buses["axi_interconnect_0"]
     require(buses["ps7_0"].get("M_AXI_GP0") == fabric_buses.get("S00_AXI") and
-            all(fabric_buses.get(port) == buses[slave].get("S_AXI") and
+            all(fabric_buses.get(port) ==
+                buses[slave].get(SLAVE_INTERFACES[slave]) and
                 fabric_buses.get(port) is not None
                 for port, slave in (("M00_AXI", "swd_site1"),
                                     ("M01_AXI", "swd_site2"),
