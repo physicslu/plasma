@@ -194,6 +194,6 @@ cd software/python
 
 Erase / Program / Verify run as ONE `programming` Job with an ordered `operations` list (one Job ID, lease, Job Binding and receipt); `read` is an independent Job; `flash_cycle` is retired and rejected by current admission. Normative detail: [OPF Programming Operations v1](../architecture/opf-programming-operations-v1.md). Host-only tests are not a hardware qualification of any operation.
 
-EMode Batch Retry / Stop Policy is Manager-owned (`programming_batch.py`): [EMode Batch Retry / Stop Policy v1](../architecture/emode-batch-retry-stop-policy-v1.md). Repeat is not implemented.
+EMode Batch Retry / Stop Policy is Manager-owned (`programming_batch.py`): [EMode Batch Retry / Stop Policy v1](../architecture/emode-batch-retry-stop-policy-v1.md). Manual Repeat and its statistics (cumulative attempt counters, cursor-paged Cycle History `GET programming/batches/{id}/cycles`): [Batch Statistics v1](../architecture/unified-8site-scheduler-repeat-work-order-v1.md) §4.2.
 
 A Start whose HTTP answer was lost is reconciled against the Manager journal by its Manager-issued `start_id` (read-only `GET programming/starts/{start_id}`): [Programming Start Outcome Reconciliation v1](../architecture/programming-start-reconciliation-v1.md).

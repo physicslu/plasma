@@ -1236,7 +1236,7 @@ test("a definite FAIL is retried by the Manager with a new plan, run and Job; th
   await setPolicy(job, "2");
   await start.dblclick();
   await expect(jobLog(workspace)).toContainText(
-    /\[RESULT\] PASS · Batch \S+ · 1 Site\(s\) · PASS 1 · FAIL 0 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\) · one IC per Site/,
+    /\[RESULT\] PASS · Batch \S+ · 1 Site\(s\) · Site final PASS 1 · FAIL 0 · PARTIAL 0 · BLOCKED 0 · UNKNOWN 0 · Job Attempts 2 · Retry 1/,
     { timeout: 20_000 });
   // Exactly one Batch request from the Browser; the Manager submitted two Jobs.
   expect(counters.batches).toHaveLength(1);
@@ -1363,7 +1363,7 @@ test("EMode programs many Sites of one PPU as ONE Batch, and each Site is judged
   await job.getByRole("button", { name: /START PROGRAMMING/ }).click();
 
   await expect(jobLog(workspace)).toContainText(
-    /\[RESULT\] FAIL · \S+ · Batch \S+ · 2 Site\(s\) · PASS 1 · FAIL 1 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\) · one IC per Site/,
+    /\[RESULT\] FAIL · \S+ · Batch \S+ · 2 Site\(s\) · Site final PASS 1 · FAIL 1 · PARTIAL 0 · BLOCKED 0 · UNKNOWN 0 · Job Attempts 2 · Retry 0/,
     { timeout: 20_000 });
   // ONE Batch carrying ONE Target Set, and one Job per Site: the Manager
   // runs every Site of the Target Set and the Browser never starts a second Batch.
@@ -1405,7 +1405,7 @@ test("concurrent Site lanes: every Site's attempt and Manager run receipt is log
 
   const log = jobLog(workspace);
   await expect(log).toContainText(
-    /\[RESULT\] PASS · Batch \S+ · 2 Site\(s\) · PASS 2 · FAIL 0 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\)/,
+    /\[RESULT\] PASS · Batch \S+ · 2 Site\(s\) · Site final PASS 2 · FAIL 0 · PARTIAL 0 · BLOCKED 0 · UNKNOWN 0 · Job Attempts 2 · Retry 0/,
     { timeout: 20_000 });
   for (const site of ["SITE-02", "SITE-03"]) {
     await expect(log).toContainText(`[ATTEMPT 1/1] ${site} · PASS`);
@@ -1510,7 +1510,7 @@ test("Manual Repeat: a paused Site is continued by the same START, once, with it
     cycle: {
       planned: 2, index: settled + (state === "ENDED" ? 0 : 1), cycle_id: "d".repeat(32), state,
       disposition: state === "ENDED" ? "COMPLETED_WITH_FAILURES" : null, settled,
-      pass: settled > 1 ? 1 : 0, fail: 1, retry_attempts: 0, remaining: 2 - settled,
+      pass: settled > 1 ? 1 : 0, fail: 1, retry_attempts: 0, attempts: settled, remaining: 2 - settled,
       continue_seq: seq, continued_seq: state === "ENDED" ? seq : 0,
       wait_reason: state === "AWAITING_CONTINUE" ? "FAIL_REVIEW" : null,
       last: { cycle_index: 1, cycle_id: "e".repeat(32), outcome: "FAIL", reason: "JOB_NOT_SUCCESS", attempts: 1,
@@ -1525,9 +1525,10 @@ test("Manual Repeat: a paused Site is continued by the same START, once, with it
     state: u.outcome ? "finished" : "running", execution_status: u.outcome ? "COMPLETED" : "RUNNING",
     outcome: u.outcome, reason: u.reason, failure_domain: null, stop_requested: false,
     units: [u], attempts: [], current_run: null, ppu_alias: "z2", site_id: 2,
-    counts: { pass: 0, fail: u.outcome ? 1 : 0, blocked: 0, unknown: 0, sites: 1, attempts: 0 },
+    counts: { pass: 0, fail: u.outcome ? 1 : 0, partial: 0, blocked: 0, unknown: 0, sites: 1, attempts: u.cycle.attempts },
     cycles: { planned: 2, settled: u.cycle.settled, pass: u.cycle.pass, fail: 1, retry_attempts: 0,
-      remaining: u.cycle.remaining, awaiting_continue: u.cycle.state === "AWAITING_CONTINUE" ? 1 : 0 },
+      remaining: u.cycle.remaining, awaiting_continue: u.cycle.state === "AWAITING_CONTINUE" ? 1 : 0,
+      attempts: u.cycle.attempts, sites_completed: u.cycle.remaining === 0 ? 1 : 0 },
     auto_retry: "DISABLED", created_at: null, started_at: null, finished_at: null,
   });
   let started: Record<string, unknown> = {};
@@ -1544,6 +1545,26 @@ test("Manual Repeat: a paused Site is continued by the same START, once, with it
     view = record(started, unit("ENDED", 2, 1));
     await route.fulfill({ json: { ok: true, duplicate: false, batch: view } });
   });
+  // Batch Statistics v1: the Manager's Cycle History, read by cursor.
+  const cycleRecord = (seq: number, index: number, outcome: string) => ({
+    seq, type: "cycle", batch_id: batchId, ppu_alias: "z2", site_id: 2, cycle_index: index,
+    cycle_id: `${index}`.repeat(32), outcome, reason: outcome === "PASS" ? null : "JOB_NOT_SUCCESS",
+    attempts: [{ attempt: 1, cycle_index: index, run_id: `${index}`.repeat(32), job_id: `job-cycle-${index}`,
+      outcome, reason: null, safe_off: true, retry: null }],
+    receipt: { run_id: `${index}`.repeat(32), job_id: `job-cycle-${index}`, job_state: outcome === "PASS" ? "completed" : "failed",
+      safe_off: true, job_binding_confirmed: true, readback_sha256: `${index}a`.repeat(32), job_binding_sha256: "b".repeat(64) },
+  });
+  const cursors: string[] = [];
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}\/cycles\?/, async route => {
+    const url = new URL(route.request().url());
+    cursors.push(url.search);
+    const all = (view as { cycles?: { settled: number } } | null)?.cycles?.settled === 2
+      ? [cycleRecord(0, 1, "FAIL"), cycleRecord(1, 2, "PASS")] : [cycleRecord(0, 1, "FAIL")];
+    const offset = Number(url.searchParams.get("offset"));
+    const records = all.slice(offset);
+    await route.fulfill({ json: { ok: true, batch_id: batchId, total: all.length, offset,
+      next_offset: offset + records.length, records } });
+  });
   await start.click();
   const resume = job.getByRole("button", { name: /CONTINUE SITE-02/ });
   await expect(resume).toBeEnabled();
@@ -1553,7 +1574,17 @@ test("Manual Repeat: a paused Site is continued by the same START, once, with it
   await expect(workspace.locator('[data-site-fail-detail="2"]')).toContainText("Cycle 1 FAIL · JOB_NOT_SUCCESS · Job job-cycle-1");
   await expect(workspace.locator('[data-site-cycle="2"]')).toContainText("Cycle 2/2 · PASS 0 · FAIL 1");
   await resume.dblclick();
-  await expect(jobLog(workspace)).toContainText("[CYCLES] planned 2 · settled 2");
+  const log = jobLog(workspace);
+  await expect(log).toContainText("[STATISTICS] Replace IC · Sites 1 (completed 1) · Cycles PASS 1 · FAIL 1 · settled 2/2 · remaining 0 · Job Attempts 2 · Retry 0");
+  // Every settled Cycle is in the Log once, from the History, with its evidence.
+  await expect(log).toContainText("[CYCLE 1/2] SITE-02 · FAIL · JOB_NOT_SUCCESS · Run");
+  await expect(log).toContainText("[CYCLE 2/2] SITE-02 · PASS · Run");
+  await expect(log).toContainText(`Readback SHA256 ${"2a".repeat(32)}`);
+  const text = await log.textContent() ?? "";
+  expect(text.split("[CYCLE 1/2]").length - 1).toBe(1);
+  expect(text.split("[CYCLE 2/2]").length - 1).toBe(1);
+  expect(cursors[0]).toBe("?offset=0&limit=200");
+  expect(cursors.every(cursor => /^\?offset=[0-9]+&limit=200$/.test(cursor))).toBe(true);
   // One Continue, echoing the pause it answers; no actor is ever sent by the Browser.
   expect(continues).toEqual([{ ppu_alias: "z2", site_id: 2, continue_seq: 1 }]);
 });

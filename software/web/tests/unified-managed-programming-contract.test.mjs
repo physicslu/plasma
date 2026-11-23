@@ -306,12 +306,15 @@ test("PMode retains Factory UI and no Mock is presented as HIL acceptance", () =
   assert.match(factory, /MOCK RESULT/);
   // P1: a Repeat Site's rounds are its settled Cycles (PASS + FAIL); PASS,
   // FAIL and Retry stay separate, and same-IC Debug never reads as IC output.
-  assert.match(factoryBackend, /completed_rounds: unit\.cycle && unit\.cycle\.planned > 1 \? unit\.cycle\.settled : passed \? 1 : 0/);
-  assert.match(factoryBackend, /pass_rounds: unit\.cycle && unit\.cycle\.planned > 1 \? unit\.cycle\.pass : passed \? 1 : 0/);
-  assert.match(factoryBackend, /final_failures: unit\.cycle && unit\.cycle\.planned > 1\s*\? unit\.cycle\.fail/);
-  assert.match(factory, /site\.pass_rounds \?\? site\.completed_rounds/);
-  assert.match(factory, /"total-ic": "TOTAL CYCLES · SAME IC"/);
-  assert.match(factory, /const sameIcDebug = batchSnapshot\?\.execution_policy\.replace_ic_before_next_cycle === false;/);
+  // Batch Statistics v1: the same per-Site Cycle tally as EMode, and the
+  // cumulative Manager attempt counters - never the current attempt list.
+  assert.match(factoryBackend, /const tally = unitCycleTally\(unit\.cycle, judged\.verdict\);/);
+  assert.match(factoryBackend, /completed_rounds: tally\.settled,\s*pass_rounds: tally\.pass,/);
+  assert.match(factoryBackend, /final_failures: tally\.fail,/);
+  assert.match(factoryBackend, /total_attempts: unit\.cycle\?\.attempts \?\? unit\.attempts\.length,/);
+  assert.doesNotMatch(factoryBackend, /total_attempts: unit\.attempts\.length,/);
+  assert.match(factory, /const kpis = statisticsKpis\(statistics, formatBatchTime\(batchSnapshot, clockNow\), "production-sites"\);/);
+  assert.match(factory, /const sameIcDebug = statistics\.mode === "SAME_IC_DEBUG";/);
 });
 
 // ------------------------------------------- EMode / PMode UI cleanup (Gate 1)
@@ -408,7 +411,11 @@ test("PR-C: the Console reaches the canonical Batch resource, never an alias-sco
   // Fail closed: an operation whose PPU cannot be established is refused.
   assert.match(bff, /if \(aliases === null \|\| aliases\.length === 0\)/);
   // The claim is never forwarded to the Manager.
-  assert.match(bff, /`\$\{managerApiBase\(\)\}\/api\/programming\/\$\{normalizedResource\}`/);
+  // Only the validated Cycle History cursor is forwarded as a query.
+  assert.match(bff, /`\$\{managerApiBase\(\)\}\/api\/programming\/\$\{normalizedResource\}\$\{query\}`/);
+  assert.match(bff, /const CYCLE_HISTORY_RESOURCE = new RegExp\(`\^batches\/\$\{RUN_ID\}\/cycles\$`\);/);
+  assert.match(bff, /for \(const name of \["offset", "limit"\]\)/);
+  assert.match(bff, /\/\^\\d\{1,9\}\$\/\.test\(value\)/);
 });
 
 test("PR-C: EMode selects many Sites of one PPU and sends one Target Set", () => {
@@ -482,4 +489,136 @@ test("E Mode stage-only progress uses per-Site events and reduced-motion styling
   assert.match(factory, /const POLL_INTERVAL_MS = 250;/);
   assert.match(styles, /engineeringStagePulse 1s ease-in-out infinite/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
+});
+
+// ------------------------------------------ Batch Statistics v1 (T16-T19, T10-T12)
+
+const ts = (await import("typescript")).default;
+const statisticsSource = await read("app/programming/batch-statistics.ts");
+const stats = await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(statisticsSource, {
+  compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+}).outputText).toString("base64")}`);
+const kpi = (items, key) => items.find(item => item.key === key)?.value;
+
+test("T19 Replace IC: 2 Sites x Repeat 10 all PASS is IC-oriented with YIELD", () => {
+  const s = stats.batchStatistics({ sites: 2, repeat: 10, replaceIc: true,
+    tally: { settled: 20, pass: 20, fail: 0 }, jobAttempts: 20, retryAttempts: 0, sitesCompleted: 2 });
+  const items = stats.statisticsKpis(s, "00:01:40");
+  assert.deepEqual(items.map(item => item.label),
+    ["SITES", "TOTAL IC", "PROCESSED IC", "PASS IC", "FAIL IC", "YIELD", "BATCH TIME"]);
+  assert.deepEqual([kpi(items, "total-ic"), kpi(items, "processed-ic"), kpi(items, "pass"), kpi(items, "fail"),
+    kpi(items, "yield")], [20, 20, 20, 0, "100.0%"]);
+  assert.match(stats.statisticsMeta(s), /Job Attempts 20 · Retry 0/);
+  assert.match(stats.statisticsLogLine(s), /operator-replaced, not identified/);
+});
+
+test("T18 Same-IC Debug: 2 Sites x Repeat 10 is Cycle-oriented and never shows YIELD", () => {
+  const s = stats.batchStatistics({ sites: 2, repeat: 10, replaceIc: false,
+    tally: { settled: 20, pass: 20, fail: 0 }, jobAttempts: 20, retryAttempts: 0, sitesCompleted: 2 });
+  const items = stats.statisticsKpis(s, "00:01:40");
+  assert.deepEqual(items.map(item => item.label), ["SITES", "PHYSICAL IC", "TOTAL CYCLES", "SETTLED CYCLES",
+    "PASS CYCLES", "FAIL CYCLES", "CYCLE PASS RATE", "BATCH TIME"]);
+  assert.deepEqual([kpi(items, "physical-ic"), kpi(items, "total-cycles"), kpi(items, "settled-cycles"),
+    kpi(items, "pass"), kpi(items, "fail"), kpi(items, "cycle-pass-rate")], [2, 20, 20, 20, 0, "100.0%"]);
+  assert.equal(items.some(item => /YIELD|TOTAL IC|PROCESSED IC/.test(item.label)), false);
+  assert.match(stats.statisticsLogLine(s), /no YIELD/);
+});
+
+test("rates are N/A without a settled Cycle, never 100%", () => {
+  for (const replaceIc of [true, false]) {
+    const s = stats.batchStatistics({ sites: 2, repeat: 10, replaceIc });
+    const items = stats.statisticsKpis(s, "00:00:00");
+    assert.equal(kpi(items, replaceIc ? "yield" : "cycle-pass-rate"), "N/A");
+  }
+  assert.equal(stats.passRate(1, 1), "50.0%");
+});
+
+test("T06/T07 Stop after the first Cycle: PARTIAL keeps 2 PASS Cycles, 18 remaining, 0/2 Sites completed", () => {
+  const s = stats.batchStatistics({ sites: 2, repeat: 10, replaceIc: true,
+    tally: { settled: 2, pass: 2, fail: 0 }, jobAttempts: 2, retryAttempts: 0, sitesCompleted: 0 });
+  assert.equal(s.passCycles, 2);
+  assert.equal(s.remainingCycles, 18);
+  assert.match(stats.statisticsMeta(s), /Cycles 2\/20 settled · 18 remaining · Sites completed 0\/2/);
+  assert.match(stats.statisticsLogLine(s), /Cycles PASS 2 · FAIL 0 · settled 2\/20 · remaining 18/);
+});
+
+test("T03/T09 one-Cycle Sites use the verified verdict; OUTCOME_UNKNOWN never counts as PASS", () => {
+  assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 1, pass: 1, fail: 0 }, "PASS"), { settled: 1, pass: 1, fail: 0 });
+  // A Manager PASS the Browser's receipt check rejects is a FAIL, never a PASS.
+  assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 1, pass: 1, fail: 0 }, "FAIL"), { settled: 1, pass: 0, fail: 1 });
+  assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 0, pass: 0, fail: 0 }, "OUTCOME_UNKNOWN"), { settled: 0, pass: 0, fail: 0 });
+  // Repeat: the Manager's settled counters; an unknown Cycle is not settled.
+  assert.deepEqual(stats.unitCycleTally({ planned: 3, settled: 1, pass: 1, fail: 0 }, "OUTCOME_UNKNOWN"), { settled: 1, pass: 1, fail: 0 });
+});
+
+test("T17 PMode snapshot statistics: same definitions, summed per Site, attempts cumulative", () => {
+  const site = (pass, fail, attempts, retries) => ({
+    completed_rounds: pass + fail, pass_rounds: pass, final_failures: fail, total_attempts: attempts, retry_count: retries });
+  const s = stats.snapshotStatistics({ sites: [site(9, 1, 11, 1), site(10, 0, 10, 0)], repeat: 10, replaceIc: true });
+  assert.deepEqual([s.settledCycles, s.passCycles, s.failCycles, s.jobAttempts, s.retryAttempts, s.sitesCompleted],
+    [20, 19, 1, 21, 1, 2]);
+  assert.equal(stats.passRate(s.passCycles, s.failCycles), "95.0%");
+});
+
+test("T10/T11/T12 Cycle History reader: cursor, order, no duplicate, catch-up and rebuild", async () => {
+  const records = Array.from({ length: 25 }, (_, seq) => ({ seq, type: "cycle", ppu_alias: "z2", site_id: 1 + (seq % 2), cycle_index: 1 + (seq >> 1) }));
+  let visible = 3;
+  const loads = [];
+  const load = async (offset, limit) => {
+    loads.push([offset, limit]);
+    const page = records.slice(offset, Math.min(visible, offset + limit));
+    return { total: visible, offset, next_offset: offset + page.length, records: page };
+  };
+  const seen = [];
+  const reader = stats.cycleHistoryReader(load, record => seen.push(record.seq), 4);
+  await reader.sync();
+  assert.deepEqual(seen, [0, 1, 2]);
+  await Promise.all([reader.sync(), reader.sync(), reader.sync()]);   // repeated polls
+  assert.deepEqual(seen, [0, 1, 2]);
+  visible = 25;                                                       // many polls missed
+  await reader.sync();
+  assert.deepEqual(seen, [...Array(25).keys()]);
+  assert.equal(reader.cursor, 25);
+  assert.ok(loads.every(([, limit]) => limit === 4));                 // bounded pages only
+  const rebuilt = [];
+  await stats.cycleHistoryReader(load, record => rebuilt.push(record.seq), 10).sync();   // browser refresh
+  assert.deepEqual(rebuilt, seen);
+});
+
+test("Cycle History lines carry Run / Job / SAFE_OFF / Readback / Job Binding and Retry history", () => {
+  const lines = stats.cycleHistoryLogLines({
+    seq: 4, type: "cycle", ppu_alias: "z2", site_id: 2, cycle_index: 3, outcome: "PASS",
+    attempts: [
+      { attempt: 1, run_id: "r1", job_id: "j1", outcome: "FAIL", reason: "VERIFY_MISMATCH", safe_off: true, retry: { decision: "RETRY", reason: "ELIGIBLE" } },
+      { attempt: 2, run_id: "r2", job_id: "j2", outcome: "PASS", reason: null, safe_off: true, retry: null },
+    ],
+    receipt: { run_id: "r2", job_id: "j2", job_state: "completed", safe_off: true, job_binding_confirmed: true,
+      readback_sha256: "ab".repeat(32), job_binding_sha256: "cd".repeat(32) },
+  }, 10, "Site 2").map(line => line.text);
+  assert.match(lines.join("\n"), /\[ATTEMPT 1\] Cycle 3\/10 Site 2 · FAIL · VERIFY_MISMATCH · Run r1 · Job j1 · SAFE_OFF VERIFIED · RETRY/);
+  assert.match(lines.join("\n"), /\[CYCLE 3\/10\] Site 2 · PASS · Run r2 · Job j2 · SAFE_OFF VERIFIED · attempts 2/);
+  assert.match(lines.join("\n"), new RegExp(`Readback SHA256 ${"ab".repeat(32)} · Job Binding confirmed ${"cd".repeat(32)}`));
+});
+
+test("T16 EMode: KPIs, Log totals and Cycle History come from the shared statistics, not the attempt list", () => {
+  assert.match(emode, /const kpis = statisticsKpis\(statistics, formatElapsed\(elapsed\)\);/);
+  assert.match(emode, /\? managedBatchStatistics\(batch\)/);
+  assert.doesNotMatch(emode, /final\.attempts\.length|\{ key: "total-ic", label: "TOTAL IC", value: siteCount \}/);
+  assert.match(emode, /cycle\?\.attempts \?\? unit\.attempts\.length\} attempt\(s\)/);
+  assert.match(emode, /appendLog\(statisticsLogLine\(stats\)/);
+  assert.match(emode, /managedCycleHistory\(next\.batch_id, record => logHistoryRecord/);
+  assert.match(emode, /await history\.reader\?\.sync\(\)/);
+  assert.match(core, /jobAttempts: batch\.cycles\?\.attempts \?\? batch\.counts\.attempts/);
+  assert.match(api, /`\$\{PROGRAMMING\}\/batches\/\$\{batchId\}\/cycles\?offset=\$\{offset\}&limit=\$\{limit\}`/);
+  assert.match(bff, /new RegExp\(`\^batches\/\$\{RUN_ID\}\/cycles\$`\),/);
+});
+
+test("T17 PMode: Factory Log reads the Cycle History by cursor and keeps TERMINAL after it", () => {
+  assert.match(factory, /const reader = managedCycleHistory\(batch\.batch_id, record => \{/);
+  assert.match(factory, /cycleHistoryLogLines\(record, repeat, label\)/);
+  assert.match(factory, /unitLogsRef\.current = Promise\.allSettled\(\[unitLogsRef\.current, read\]\);/);
+  assert.match(factory, /Job Attempts \$\{stats\.jobAttempts \?\? "—"\} · Retry \$\{stats\.retryAttempts \?\? "—"\}/);
+  // P Mode's existing PASS / FAIL Cycle counters are kept, now via the shared tally.
+  assert.match(factoryBackend, /unitCycleTally/);
+  assert.match(factoryBackend, /: batch\.outcome === "PARTIAL" \? "partial"/);
 });

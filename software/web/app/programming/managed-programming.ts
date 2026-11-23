@@ -11,6 +11,7 @@ import { getManagerPpuBootstrap, sha256Hex, type ManagerBootstrapStatus } from "
 import {
   continueProgrammingBatch,
   getProgrammingBatch,
+  getProgrammingBatchCycles,
   getProgrammingRoutes,
   getProgrammingRun,
   getReadOutput,
@@ -33,6 +34,10 @@ import {
 } from "../engineering/bundle-programming-api";
 import { getManagerFleet, getManagerRegistry, type ManagerRegistryPayload } from "../engineering/ppu-registry-api";
 import type { FleetPPUView, FleetSiteView, FleetWebPayload } from "../fleet/fleet-contract";
+import {
+  batchStatistics, cycleHistoryReader, unitCycleTally,
+  type BatchStatistics, type CycleHistoryRecord,
+} from "./batch-statistics";
 
 export type { ProgrammingBatch, ProgrammingOperation, ProgrammingPlan, ProgrammingRoute, ProgrammingRun, ProgrammingSource, StopPolicy };
 
@@ -782,6 +787,46 @@ export function batchVerdict(batch: ProgrammingBatch): { verdict: BatchVerdict; 
     return { verdict: "PARTIAL", reason: batch.reason };
   }
   return worst;
+}
+
+/**
+ * Batch Statistics v1 of a Manager Batch - the one projection both Consoles
+ * show. Cycles come from each Site's Manager counters (a one-Cycle Site from
+ * its verified verdict); Job / Retry attempts are the Manager's cumulative
+ * totals, never the current Cycle's attempt list.
+ */
+export function managedBatchStatistics(batch: ProgrammingBatch): BatchStatistics {
+  const tally = { settled: 0, pass: 0, fail: 0 };
+  let sitesCompleted = 0;
+  for (const unit of batch.units) {
+    const site = unitCycleTally(unit.cycle, batchSiteVerdict(batch, unit, runOfUnit(batch, unit)).verdict);
+    tally.settled += site.settled;
+    tally.pass += site.pass;
+    tally.fail += site.fail;
+    // Same source as the Cycle counts (and as PMode), never a second opinion.
+    if (site.settled >= (unit.cycle?.planned ?? 1)) sitesCompleted += 1;
+  }
+  return batchStatistics({
+    sites: batch.units.length,
+    repeat: batch.policy.repeat,
+    replaceIc: batch.policy.replace_ic_before_next_cycle ?? true,
+    tally,
+    jobAttempts: batch.cycles?.attempts ?? batch.counts.attempts,
+    retryAttempts: batch.cycles?.retry_attempts
+      ?? batch.units.reduce((total, unit) => total + Math.max(0, unit.attempts.length - 1), 0),
+    sitesCompleted,
+  });
+}
+
+/**
+ * Incremental reader of one Batch's Cycle History through the BFF: each
+ * record once, in Manager order, resuming at its cursor after missed polls
+ * or a reconnect. A new reader (browser refresh) rebuilds from the start.
+ */
+export function managedCycleHistory(
+  batchId: string, deliver: (record: CycleHistoryRecord) => void,
+) {
+  return cycleHistoryReader((offset, limit) => getProgrammingBatchCycles(batchId, offset, limit), deliver);
 }
 
 /**

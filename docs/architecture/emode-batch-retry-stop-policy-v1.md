@@ -66,6 +66,9 @@ Batch outcome: `PASS`, `FAIL`, `PARTIAL`, `OUTCOME_UNKNOWN`, `BLOCKED`. Worst wi
 own final outcome (`counts.pass` / `counts.fail` / `counts.blocked` / `counts.unknown` over
 `counts.sites`); failed attempts that were retried are not FAIL ICs. Before PR-C a Batch was one
 Site, so the Batch outcome and the Site outcome were the same thing; they are not any more.
+Cycle and Job-attempt totals (Manual Repeat) are separate numbers: see
+[Batch Statistics v1](unified-8site-scheduler-repeat-work-order-v1.md) §4.2. `counts.attempts`
+is the cumulative attempt total of the Batch, never the current Cycle's attempt list.
 
 ## Restart
 

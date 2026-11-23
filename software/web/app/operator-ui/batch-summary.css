@@ -20,7 +20,8 @@
 
 .batchSummaryGrid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* One column per KPI: Replace IC has 7, Same-IC Debug 8 (Batch Statistics v1). */
+  grid-template-columns: repeat(var(--batch-summary-columns, 7), minmax(0, 1fr));
   gap: 6px;
 }
 

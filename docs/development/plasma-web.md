@@ -74,8 +74,8 @@ PPU Runtime → Provider/FPGA/DUT.
 - PMode retains Facility → PPU → Site Production Set/Batch Selection, Site LEDs,
   PASS/FAIL/Yield and Factory Log. EMode retains its engineering diagnostics,
   per-Site READ and Engineering Job Log. They share backend truth, not screens.
-- **Real Manager Batch Repeat is exactly 1.** The Standalone Mock may have
-  independent repetition capabilities but is not physical qualification.
+- **Real Manager Batch Repeat** is Manual Repeat v1 (1–10000 Cycles per Site);
+  the Standalone Mock's own repetition is not physical qualification.
 - Browser/Playwright and Mock PPU results are Host-only. Historical
   Site 1 2MHz/LA2016 and Site 2 real HIL evidence remain historical;
   multi-PPU/multi-Site v2 physical qualification is NOT_RUN.
@@ -108,5 +108,5 @@ npm run validate:artifact
 - **Programming Source** stays `[ Programming Image ] [ Bundle ]` (wire `image` / `bundle`). The picker shows the real file name (clipped, full name as tooltip), size and format, and `Change...` to re-select; no local path is shown. Switching the Source clears the file, the run and the plan state and submits nothing.
 - There is **no standing PROGRAMMING PLAN panel** and, since the 2026-11-12 cleanup, no BATCH ATTEMPTS table and no standing run view in EMode. Start still locks the inputs and runs the Backend plan; Plan ID, Route, Source, Operations, Range, Resource SHA256 and Job Binding SHA256 are written to the Log.
 - **The Log is the only on-screen operation record** in both modes. Removing the duplicated UI removed no evidence: the Manager keeps the complete Run / Job / Receipt, and `programmingRunLogLines` writes the traceable summary to the Log — `[RUN]` (verdict, reason, Run ID, Job ID, PPU / Site, SAFE_OFF, attempts, auto retry), `[STEPS]`, `[RECEIPT]` (Job ID, planned and observed Operations, Range, Resources Reused / Activated, verified bytes, Readback / Resource / Job Binding SHA256) and `[EVIDENCE]` (Site interface, with the Mock label). The whole JSON Receipt is never rendered back onto the page; `Download .log` exports the record. PMode writes the same lines per Site, plus `[SITE] … <note>` for a Site that was blocked, stopped or cancelled before any Job.
-- **Repeat** is fixed at 1 and disabled.
-- **Retry** (0–5) and **Stop Policy** (`Never` / `1 failed Site`) are sent with one Batch request; the Manager alone decides whether another attempt is submitted ([contract](../architecture/emode-batch-retry-stop-policy-v1.md)). The Browser has no retry loop. The stop button is **STOP QUEUING**: it never cancels a running Job. Batch Summary and the Site result count the Batch once, by its final verdict; the attempts are in the Engineering Job Log (`[BATCH]`, `[ATTEMPT n/m]`, `[RESULT]`).
+- **Repeat** is 1–10000 Cycles per Site (Manual Repeat v1), with Replace IC each Cycle (default) or Same-IC Debug.
+- **Retry** (0–5) and **Stop Policy** (`Never` / `1 failed Site`) are sent with one Batch request; the Manager alone decides whether another attempt is submitted ([contract](../architecture/emode-batch-retry-stop-policy-v1.md)). The Browser has no retry loop. The stop button is **STOP QUEUING**: it never cancels a running Job. Batch Summary KPIs follow [Batch Statistics v1](../architecture/unified-8site-scheduler-repeat-work-order-v1.md) §4.2 in both modes (Replace IC: IC KPIs with YIELD; Same-IC Debug: Cycle KPIs with CYCLE PASS RATE and no YIELD; `N/A` without a settled Cycle). Site final outcomes, Cycle counts and cumulative Job / Retry attempts are separate numbers (`[RESULT]`, `[STATISTICS]`); every settled Cycle of a Repeat Batch is logged from the Manager's Cycle History by cursor (`[CYCLE n/N]`, `[RECEIPT]`).

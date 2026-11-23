@@ -110,6 +110,7 @@ test("Engineering direct Jobs use client Gateway policy while server Batch freez
 test("manufacturing Yield is undefined until an IC has a PASS or FAIL outcome", () => {
   assert.match(engineeringWorkspace, /const yieldLabel = completedIc > 0/);
   assert.match(engineeringWorkspace, /:\s*"—"/);
-  assert.match(productionWorkspace, /manufacturing\.total > 0 \? .* : "—"/);
+  // PMode (Batch Statistics v1): N/A without a settled Cycle, never 100%.
+  assert.match(productionWorkspace, /statisticsKpis\(statistics,/);
   assert.match(productionWorkspace, /communicationState === "reconnecting"/);
 });

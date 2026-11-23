@@ -21,13 +21,17 @@ import type {
   SiteSnapshot,
 } from "../plasma-api";
 import { programmingRunLogLines } from "../programming/programming-run-log";
+import {
+  batchStatistics, cycleHistoryLogLines, snapshotStatistics, statisticsKpis, statisticsLogLine,
+  statisticsMeta, type BatchStatistics,
+} from "../programming/batch-statistics";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import {
   continueMarkKey, sitesToContinue,
   loadManagedTopology, loadProgrammingRoutes,
   ManagedProgrammingBlocked, ManagedStartOutcomeUnknown,
   PROGRAMMING_OPERATION_LABELS, batchSiteVerdict, routeDeclaring, routeSequenceOperations,
-  loadUnitRun, runManagedBatch, runOfUnit,
+  loadUnitRun, managedCycleHistory, runManagedBatch, runOfUnit,
   type ManagedTopology, type ProgrammingSource, type RoutesState,
 } from "../programming/managed-programming";
 import { getProgrammingBatch, getStartReconciliation, normalizeOperations,
@@ -415,13 +419,6 @@ function ppuState(sites: SiteRuntime[]): SiteRunState | "partial" {
   return "partial";
 }
 
-/** Same-IC Debug: the IC KPIs count Cycles on one IC per Site, never IC output. */
-const SAME_IC_DEBUG_KPI_LABELS: Record<string, string> = {
-  "total-ic": "TOTAL CYCLES · SAME IC",
-  "processed-ic": "SETTLED CYCLES",
-  pass: "PASS CYCLES",
-  fail: "FAIL CYCLES",
-};
 
 export default function FactoryConsoleV2() {
   const { locale, t } = useI18n();
@@ -487,6 +484,10 @@ export default function FactoryConsoleV2() {
   const terminalBatchRef = useRef<string | null>(null);
   // Site run lines read from the Manager by run_id; the TERMINAL line waits for them.
   const unitLogsRef = useRef<Promise<unknown>>(Promise.resolve());
+  // Cycle History reader of the observed Repeat Batch (Batch Statistics v1).
+  const cycleHistoryRef = useRef<{
+    batchId: string; settled: number; topology: ManagedTopology | null; sync: () => Promise<void>;
+  } | null>(null);
   const initialProductionSet = useRef(productionSet);
   const initialBatchSelection = useRef(batchSelection);
 
@@ -507,6 +508,34 @@ export default function FactoryConsoleV2() {
    * Site's lines are logged together once it is loaded.
    */
   const logManagedBatch = useCallback((batch: ProgrammingBatch, topology: ManagedTopology | null) => {
+    // Every settled Cycle of a Repeat Batch reaches the Factory Log from the
+    // Manager's Cycle History by cursor - also Cycles that started and ended
+    // between two polls, after a reconnect or after a reload (a new reader
+    // rebuilds from the first record).
+    if (batch.policy.repeat > 1) {
+      let history = cycleHistoryRef.current;
+      if (history?.batchId !== batch.batch_id) {
+        const repeat = batch.policy.repeat;
+        const reader = managedCycleHistory(batch.batch_id, record => {
+          // The latest topology, not the one of the first poll (may be null).
+          const ppu = cycleHistoryRef.current?.topology?.ppus.find(item => item.alias === record.ppu_alias);
+          const label = `PPU ${record.ppu_alias} · PPU ID ${ppu?.ppuId ?? "unknown"} · ${siteLabel(record.site_id)}`;
+          for (const line of cycleHistoryLogLines(record, repeat, label)) {
+            appendLog(line.text, line.failed ? "WARN" : "INFO");
+          }
+        });
+        history = { batchId: batch.batch_id, settled: -1, topology, sync: () => reader.sync() };
+        cycleHistoryRef.current = history;
+      }
+      if (topology) history.topology = topology;
+      const settled = batch.cycles?.settled ?? 0;
+      if (settled !== history.settled || batch.outcome != null) {
+        history.settled = settled;
+        const read = history.sync().catch(() => appendLog(
+          "[CYCLE HISTORY] not loaded from the Manager; the Manager keeps it", "WARN"));
+        unitLogsRef.current = Promise.allSettled([unitLogsRef.current, read]);
+      }
+    }
     for (const unit of batch.units) {
       const last = unit.attempts[unit.attempts.length - 1] ?? null;
       if (unit.outcome == null && last?.outcome == null) continue;
@@ -570,12 +599,19 @@ export default function FactoryConsoleV2() {
     if (terminalBatchRef.current === snapshot.batch_id) return;
     terminalBatchRef.current = snapshot.batch_id;
     pollGenerationRef.current += 1;
-    const terminal = `[BAT] TERMINAL · ${snapshot.state.toUpperCase()} · PASS ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.pass_rounds ?? site.completed_rounds), 0)} · FAIL ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0)} · ERROR ${snapshot.site_counts.error ?? 0} · CANCELLED ${snapshot.site_counts.cancelled ?? 0}`;
+    const stats = snapshotStatistics({
+      sites: snapshot.sites, repeat: snapshot.execution_policy.repeat_count,
+      replaceIc: snapshot.execution_policy.replace_ic_before_next_cycle !== false,
+    });
+    const terminal = `[BAT] TERMINAL · ${snapshot.state.toUpperCase()} · PASS ${stats.passCycles} · FAIL ${stats.failCycles} · ERROR ${snapshot.site_counts.error ?? 0} · CANCELLED ${snapshot.site_counts.cancelled ?? 0} · STOPPED ${snapshot.site_counts.stopped ?? 0} · Job Attempts ${stats.jobAttempts ?? "—"} · Retry ${stats.retryAttempts ?? "—"}`;
     const level = snapshot.state === "error" ? "ERROR" : snapshot.state === "cancelled" || snapshot.state === "partial" ? "WARN" : "INFO";
     // The terminal snapshot is applied just before its Site lines are logged in
     // the same handler; wait (one microtask, then any run_id reads) so the
     // TERMINAL line follows every Site's run lines.
-    void Promise.resolve().then(() => unitLogsRef.current).then(() => appendLog(terminal, level));
+    void Promise.resolve().then(() => unitLogsRef.current).then(() => {
+      appendLog(terminal, level);
+      appendLog(statisticsLogLine(stats), level);
+    });
   }, [appendLog, endActivity, managed]);
 
   const applyBatchSnapshot = useCallback((next: ServerBatchSnapshot, sourceCatalog: EngineeringTargetCatalog) => {
@@ -1026,14 +1062,6 @@ export default function FactoryConsoleV2() {
     })).filter(group => group.targets.length > 0);
   }, [catalog, productionTargets]);
 
-  const manufacturing = useMemo(() => {
-    if (!batchSnapshot) return { pass: 0, fail: 0, total: 0, yieldPercent: 0 };
-    // completed_rounds counts settled rounds/Cycles; PASS is reported on its own when known.
-    const pass = batchSnapshot.sites.reduce((total, site) => total + Math.max(0, site.pass_rounds ?? site.completed_rounds), 0);
-    const fail = batchSnapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0);
-    const total = pass + fail;
-    return { pass, fail, total, yieldPercent: total > 0 ? pass / total * 100 : 0 };
-  }, [batchSnapshot]);
 
   const repeatValue = parsePositiveInt(repeatCount);
   const waitingSites = managed ? batchSnapshot?.awaiting_continue ?? [] : [];
@@ -1170,23 +1198,18 @@ export default function FactoryConsoleV2() {
         ? serverBatchState.toUpperCase()
         : batchReadiness.label;
 
-  const plannedIcCount = batchSnapshot
-    ? batchSnapshot.sites.length * batchSnapshot.execution_policy.repeat_count
-    : batchCounts.sites * (repeatValue ?? 0);
-
-  // Same-IC Debug repeats one IC per Site: its Cycles are never IC output.
-  const sameIcDebug = batchSnapshot?.execution_policy.replace_ic_before_next_cycle === false;
+  // Batch Statistics v1, shared with EMode. Same-IC Debug repeats one IC per
+  // Site: its Cycles are never IC output, so it shows no YIELD.
+  const statistics: BatchStatistics = batchSnapshot
+    ? snapshotStatistics({
+      sites: batchSnapshot.sites,
+      repeat: batchSnapshot.execution_policy.repeat_count,
+      replaceIc: batchSnapshot.execution_policy.replace_ic_before_next_cycle !== false,
+    })
+    : batchStatistics({ sites: batchCounts.sites, repeat: repeatValue ?? 0, replaceIc: !managed || replaceIc });
+  const sameIcDebug = statistics.mode === "SAME_IC_DEBUG";
   const roundUnit = sameIcDebug ? "CYCLE" : "IC";
-  const kpis = [
-    { key: "production-sites", label: "SITES", value: batchSnapshot?.sites.length ?? batchCounts.sites },
-    { key: "total-ic", label: "TOTAL IC", value: plannedIcCount },
-    { key: "processed-ic", label: "PROCESSED IC", value: manufacturing.total },
-    { key: "pass", label: "PASS", value: manufacturing.pass, tone: "pass" as const },
-    { key: "fail", label: "FAIL", value: manufacturing.fail, tone: "fail" as const },
-    { key: "yield", label: "YIELD", value: manufacturing.total > 0 ? `${manufacturing.yieldPercent.toFixed(1)}%` : "—", tone: "info" as const },
-    { key: "batch-time", label: "BATCH TIME", value: formatBatchTime(batchSnapshot, clockNow) },
-  ].map(kpi => sameIcDebug && kpi.key in SAME_IC_DEBUG_KPI_LABELS
-    ? { ...kpi, label: SAME_IC_DEBUG_KPI_LABELS[kpi.key] } : kpi);
+  const kpis = statisticsKpis(statistics, formatBatchTime(batchSnapshot, clockNow), "production-sites");
 
   function productionTreeSiteIds(facilityId: string, ppuId: string): number[] {
     return draftSelection[facilityId]?.[ppuId] ?? [];
@@ -1611,7 +1634,7 @@ export default function FactoryConsoleV2() {
               items={kpis}
               ariaLabel="Production Batch Summary"
               title="BATCH SUMMARY"
-              meta={`${batchSnapshot ? "Current Batch" : "Batch Preview"} · ${batchSnapshot?.sites.length ?? batchCounts.sites} Sites · ${plannedIcCount} ICs`}
+              meta={`${batchSnapshot ? "Current Batch" : "Batch Preview"} · ${statisticsMeta(statistics)}`}
             />
 
             <OperatorPanel
