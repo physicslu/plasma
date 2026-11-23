@@ -223,11 +223,12 @@ test("Bundle source sends the user's bytes unchanged; the Browser builds nothing
   assert.doesNotMatch(core + emode + api, /manifest\.json|canonical_zip|owner_authorization/);
 });
 
-test("UI PASS needs the Manager receipt, single submission, verified SAFE_OFF and matching identities", () => {
-  assert.match(core, /if \(run\.outcome !== "PASS"\) return \{ verdict: run\.outcome, reason: run\.reason \}/);
-  for (const reason of ["RECEIPT_MISSING", "SAFE_OFF_NOT_VERIFIED", "JOB_SUBMISSION_COUNT_NOT_ONE",
-    "JOB_BINDING_NOT_CONFIRMED", "RESOURCE_SET_NOT_CONFIRMED", "READBACK_SHA256_MISMATCH"]) {
-    assert.match(core, new RegExp(reason));
+test("U9: the run verdict is the Manager's; the Browser keeps no second receipt check", () => {
+  // The Manager accepts a PASS only with its own full receipt proof.
+  assert.match(core, /export function runVerdict\(run: ProgrammingRun\): \{ verdict: RunVerdict; reason: string \| null \} \{\s*if \(run\.outcome == null\) return \{ verdict: "RUNNING", reason: null \};\s*return \{ verdict: run\.outcome, reason: run\.reason \};\s*\}/);
+  for (const reason of ["RECEIPT_MISSING", "JOB_SUBMISSION_COUNT_NOT_ONE", "JOB_BINDING_NOT_CONFIRMED",
+    "RESOURCE_SET_NOT_CONFIRMED", "READBACK_SHA256_MISMATCH", "LAST_ATTEMPT_NOT_PASS", "RUN_DOES_NOT_MATCH_BATCH"]) {
+    assert.doesNotMatch(core, new RegExp(reason));
   }
   // Progress is the PPU-reported value or nothing: no synthetic percentage.
   assert.match(core, /const value = run\.job\?\.progress_percent;/);
@@ -437,12 +438,11 @@ test("PR-C: EMode selects many Sites of one PPU and sends one Target Set", () =>
 test("PR-C: every Site is judged on its own, and the Batch verdict never replaces a Site's", () => {
   assert.match(core, /export function batchSiteVerdict\(/);
   assert.match(core, /export function runOfUnit\(/);
-  // The aggregate is necessary but not sufficient: every Site must pass too.
-  assert.match(core, /for \(const unit of batch\.units\) \{\s*const judged = batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\);/);
-  // A Site is judged on the Manager's record of it, and on the full receipt
-  // whenever the Browser still holds that Site's run.
+  // U9: the Batch verdict is the Manager's aggregate; a Site's is the Manager's
+  // record of THAT Site, refused only when it names another PPU / Site / Batch.
+  assert.match(core, /export function batchVerdict\(batch: ProgrammingBatch\): \{ verdict: BatchVerdict; reason: string \| null \} \{\s*if \(batch\.outcome == null\) return \{ verdict: "RUNNING", reason: null \};\s*return \{ verdict: batch\.outcome, reason: batch\.reason \};/);
   assert.match(core, /const attempt = unit\.attempts\[unit\.attempts\.length - 1\];/);
-  assert.match(core, /attempt\.safe_off !== true \? "SAFE_OFF_NOT_VERIFIED"/);
+  assert.match(core, /return \{ verdict: "FAIL", reason: "ATTEMPT_IDENTITY_MISMATCH" \};/);
   assert.match(core, /run\.run_id !== attempt\.run_id\) return null;/);
   // The Site row shows that Site's verdict, not the Batch aggregate.
   assert.match(emode, /const rowVerdict = batch && unit\s*\? batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\)\.verdict : null;/);
@@ -541,11 +541,14 @@ test("T06/T07 Stop after the first Cycle: PARTIAL keeps 2 PASS Cycles, 18 remain
   assert.match(stats.statisticsLogLine(s), /Cycles PASS 2 · FAIL 0 · settled 2\/20 · remaining 18/);
 });
 
-test("T03/T09 one-Cycle Sites use the verified verdict; OUTCOME_UNKNOWN never counts as PASS", () => {
+test("T03/T09 Cycles are the Manager's counters; OUTCOME_UNKNOWN never counts as PASS", () => {
   assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 1, pass: 1, fail: 0 }, "PASS"), { settled: 1, pass: 1, fail: 0 });
-  // A Manager PASS the Browser's receipt check rejects is a FAIL, never a PASS.
-  assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 1, pass: 1, fail: 0 }, "FAIL"), { settled: 1, pass: 0, fail: 1 });
+  // U9: the Manager's counters are the tally; the Browser never re-judges them.
+  assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 1, pass: 0, fail: 1 }, "FAIL"), { settled: 1, pass: 0, fail: 1 });
   assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 0, pass: 0, fail: 0 }, "OUTCOME_UNKNOWN"), { settled: 0, pass: 0, fail: 0 });
+  // A record from a Manager without counters falls back to its final outcome only.
+  assert.deepEqual(stats.unitCycleTally(null, "PASS"), { settled: 1, pass: 1, fail: 0 });
+  assert.deepEqual(stats.unitCycleTally(null, "OUTCOME_UNKNOWN"), { settled: 0, pass: 0, fail: 0 });
   // Repeat: the Manager's settled counters; an unknown Cycle is not settled.
   assert.deepEqual(stats.unitCycleTally({ planned: 3, settled: 1, pass: 1, fail: 0 }, "OUTCOME_UNKNOWN"), { settled: 1, pass: 1, fail: 0 });
 });

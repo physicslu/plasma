@@ -38,12 +38,13 @@ unclassified Adapter exceptions) carries a statement. `site_worker_c3`
 forwards it as `error.context.site_worker_safety` (never when
 `outcome_unknown`).
 
-## Judgment (identical on both sides)
+## Judgment (one shared function)
 
-`plasma_server.site_manager.site_safety_class` and
-`plasma_manager.programming.site_safety_class` trust a statement only when
-**all** hold; `tests/test_site_safety_evidence.py` runs one contract table
-through both:
+`plasma_opf.site_safety.site_safety_class` is the one judgment (U9, 2026-11-23);
+the PPU Runtime (`plasma_server.site_manager`, Reservation release) and the
+Manager (`plasma_manager.programming`, Receipt) both import it. It trusts a
+statement only when **all** hold; `tests/test_site_safety_evidence.py` runs one
+contract table through both callers:
 
 * `outcome_unknown` is exactly `false`;
 * schema, class and a non-empty `code` with `site_worker_code == prefix(class) + code`;

@@ -20,6 +20,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.job_logging import OutputManager, ServerEventLogger, atomic_write_json
 from plasma_core.models import JobRequest, JobResult, iso_now
 from plasma_core.protocol import PROTOCOL_VERSION
+from plasma_opf.site_safety import site_safety_class
 from plasma_interfaces.base import BaseInterface
 from plasma_interfaces.fpga import FPGAInterface
 from plasma_interfaces.mock import MockActivityTracker, MockInterface
@@ -78,52 +79,6 @@ class PPUExecutionLease:
 
 RESERVATION_FILE = "ppu-resource-reservation.json"
 RESERVATION_TTL_S = 90
-# Structured C-3 Site Worker safety evidence (ppu_site_worker._safety,
-# docs/architecture/site-safety-evidence-v1.md). The Manager judges the same
-# statement with the same rules (plasma_manager.programming.site_safety_class).
-SITE_SAFETY_SCHEMA = "plasma.ppu.site-safety.v1"
-PRE_HARDWARE_DENIED = "PRE_HARDWARE_DENIED"
-FAILED_SAFE_OFF_VERIFIED = "FAILED_SAFE_OFF_VERIFIED"
-_SITE_SAFETY_PREFIX = {PRE_HARDWARE_DENIED: "TRANSPORT_DENIED:",
-                       FAILED_SAFE_OFF_VERIFIED: "OPERATION_FAILED_SAFE:"}
-
-
-def site_safety_class(context: Any, *, job_id: Any, site_id: Any,
-                      operation: Any) -> str | None:
-    """PRE_HARDWARE_DENIED / FAILED_SAFE_OFF_VERIFIED, or None (unproven).
-
-    Trusted only when the Worker's structured statement names exactly this
-    Job, Site, operation and the ``run`` stage, the outcome is explicitly
-    known, and the refusal code matches the statement's class. A code text
-    alone (e.g. ``TRANSPORT_DENIED:``) proves nothing.
-    """
-    if not isinstance(context, dict) or context.get("outcome_unknown") is not False:
-        return None
-    safety = context.get("site_worker_safety")
-    if not isinstance(safety, dict) or safety.get("schema") != SITE_SAFETY_SCHEMA:
-        return None
-    kind, code = safety.get("class"), safety.get("code")
-    prefix = _SITE_SAFETY_PREFIX.get(kind) if type(kind) is str else None
-    if (prefix is None or type(code) is not str or not code
-            or context.get("site_worker_code") != prefix + code):
-        return None
-    if context.get("site_worker_stage") != "run" or safety.get("stage") != "run":
-        return None
-    if (type(job_id) is not str or safety.get("job_id") != job_id
-            or context.get("job_id") != job_id):
-        return None
-    if (type(site_id) is not int or type(safety.get("site")) is not int
-            or safety.get("site") != site_id or context.get("site_id") != site_id):
-        return None
-    if (type(operation) is not str or safety.get("operation") != operation
-            or context.get("operation") != operation):
-        return None
-    touched, safe_off = safety.get("hardware_touched"), safety.get("safe_off")
-    if kind == PRE_HARDWARE_DENIED:
-        return kind if touched is False and safe_off is None else None
-    return kind if touched is True and safe_off is True else None
-
-
 class SiteManager:
     """Own the Programming Sites local to exactly one physical PPU."""
 

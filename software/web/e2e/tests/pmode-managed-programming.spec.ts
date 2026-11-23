@@ -90,20 +90,6 @@ test("one Manager Start and ONE canonical Batch serves two PPUs with separate Jo
   await expect(page.locator("[data-receipt-site]")).toHaveCount(0);
 });
 
-test("a Manager-reported PASS without verified SAFE_OFF is NOT a PMode PASS", async ({ page }) => {
-  const counters = await mockManager(page, { script: () => ({ outcome: "PASS", safeOff: false }) });
-  const { job, start } = await prepare(page, [["z2", [2]]]);
-  await job.getByLabel("Site Retry Limit").fill("0");
-  await start.click();
-  await finished(page);
-  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "faulted");
-  await expect(summary(page)).not.toContainText("100.0%");
-  await expect(factoryLog(page)).toContainText("SAFE_OFF_NOT_VERIFIED");
-  await expect(factoryLog(page)).toContainText("MANAGER RUN PASS REJECTED");
-  expect(counters.batches).toHaveLength(1);
-  expect(counters.starts).toHaveLength(1);
-});
-
 test("Site PASS/FAIL is per-Unit, not inferred from Batch HTTP 200; yield counts once", async ({ page }) => {
   const script = (_alias: string, siteId: number): RunScript =>
     siteId === 2 ? { outcome: "FAIL", reason: "READBACK_SHA256_MISMATCH", safeOff: true } : {};
@@ -508,7 +494,7 @@ test("Manual Repeat: with two Sites waiting, START continues only the tile marke
 // Scripted Manager views at the Browser boundary - host-only, not hardware.
 // ---------------------------------------------------------------------------
 
-type Tamper = "receipt_missing" | "binding" | "readback" | "safe_off" | "identity";
+type Tamper = "identity";
 type ScriptedAttempt = { cycle: number; attempt: number; outcome: "PASS" | "FAIL" | "OUTCOME_UNKNOWN" | null;
   tamper?: Tamper; retry?: boolean };
 type ScriptedLane = { siteId: number; attempts: ScriptedAttempt[]; outcome: string | null;
@@ -543,14 +529,14 @@ async function repeatManager(page: Page, options: { repeat?: number; replaceIc?:
       created_at: "t", updated_at: "t", steps: [{ step: "PREFLIGHT", result: "PASS", at: "t" }], activation: {},
       job: { job_id: jobIdOf(lane.siteId, a), state: a.outcome ? "finished" : "running", stage: "programming",
         progress_percent: a.outcome ? 100 : 40, attempt: 1 },
-      receipt: a.outcome !== "PASS" && a.outcome !== "FAIL" || a.tamper === "receipt_missing" ? null : {
+      receipt: a.outcome !== "PASS" && a.outcome !== "FAIL" ? null : {
         schema: "plasma.manager.programming-receipt.v3", job_id: jobIdOf(lane.siteId, a), job_state: "success",
         operation: "programming", operations, observed_operations: operations, site_id: lane.siteId, target: "STM32F103C8T6",
         range: { address: 134217728, length: 4096 }, expected_image_sha256: IMAGE_SHA, expected_image_size: 4096,
-        readback_sha256: a.tamper === "readback" ? sha("0") : IMAGE_SHA, bytes_verified: 4096,
+        readback_sha256: IMAGE_SHA, bytes_verified: 4096,
         expected_resource_set_sha256: RESOURCE_SHA, observed_resource_set_sha256: RESOURCE_SHA,
-        expected_job_binding_sha256: binding, observed_job_binding_sha256: a.tamper === "binding" ? sha("f") : binding,
-        resource_reuse: true, safe_off: a.tamper !== "safe_off", safe_off_state: a.tamper === "safe_off" ? "NOT_VERIFIED" : "VERIFIED",
+        expected_job_binding_sha256: binding, observed_job_binding_sha256: binding,
+        resource_reuse: true, safe_off: true, safe_off_state: "VERIFIED",
         flash_result: a.outcome, elapsed_ms: 7000,
       },
       job_submission_count: 1, auto_retry: "DISABLED", acknowledged: false,
@@ -742,11 +728,10 @@ test("Repeat same-IC Debug: PASS Cycles continue without a Continue; each Cycle'
   manager.settle(2, "ACTIVE");
   await expect(factoryLog(page)).toContainText(/\[CYCLE 1\/3\] PPU z2 .* SITE-02 · PASS/);
   // Cycle 2 restarts at attempt 1: its run is a different record, judged on its own.
-  manager.finishAttempt(2, "PASS", "readback");
-  await expect(factoryLog(page)).toContainText(/MANAGER RUN PASS REJECTED · READBACK_SHA256_MISMATCH · PPU z2 .* SITE-02/);
+  manager.finishAttempt(2, "PASS");
   await settlePolls(page);
   expect(manager.continues).toEqual([]);
-  expect(await logLines(page, /PASS REJECTED/)).toHaveLength(1);
+  expect(await logLines(page, /PASS REJECTED/)).toHaveLength(0);
   expect((await errorLines(page)).filter(line => line.includes("SITE-01"))).toEqual([]);
   await expect(factoryLog(page)).not.toContainText("press Start");
 });
@@ -767,9 +752,9 @@ test("Repeat with Retry: a FAIL attempt then a legal Retry PASS keeps both in th
   expect(await logLines(page, /\[RUN\] FAIL · JOB_NOT_SUCCESS/)).toHaveLength(1);
 });
 
+// U9: the Manager judges the receipt; the Browser only refuses a record that
+// names another Site (ATTEMPT_IDENTITY_MISMATCH).
 for (const [tamper, reason] of [
-  ["receipt_missing", "RECEIPT_MISSING"], ["binding", "JOB_BINDING_NOT_CONFIRMED"],
-  ["readback", "READBACK_SHA256_MISMATCH"], ["safe_off", "SAFE_OFF_NOT_VERIFIED"],
   ["identity", "ATTEMPT_IDENTITY_MISMATCH"],
 ] as const) {
   test(`Repeat: an open Site Lane still rejects a Manager PASS with ${reason}, only on that Site`, async ({ page }) => {
