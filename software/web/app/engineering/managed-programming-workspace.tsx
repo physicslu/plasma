@@ -775,7 +775,8 @@ export default function ManagedProgrammingWorkspace() {
           // in the Log and in Receipts & Diagnostics, not in a standing panel.
           for (const attempt of next.attempts) {
             const attemptSite = attempt.job_key.site_id;
-            const attemptKey = `${attemptSite}:${attempt.cycle_index ?? 1}:${attempt.attempt}`;
+            // plan_id: a Cycle re-run after a BLOCKED pause restarts at attempt 1.
+            const attemptKey = `${attemptSite}:${attempt.cycle_index ?? 1}:${attempt.attempt}:${attempt.plan_id}`;
             const cycleLabel = next.policy.repeat > 1 ? ` Cycle ${attempt.cycle_index ?? 1}/${next.policy.repeat}` : "";
             const attemptLabel = `[ATTEMPT ${attempt.attempt}/${next.policy.retry_limit + 1}]${cycleLabel} ${siteLabel(attemptSite)}`;
             const seen = loggedAttempts.current.get(attemptKey);
@@ -789,7 +790,7 @@ export default function ManagedProgrammingWorkspace() {
             if (attempt.outcome && seen !== "finished") {
               loggedAttempts.current.set(attemptKey, "finished");
               const retry = attempt.retry ? ` · ${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} (${attempt.retry.reason})` : "";
-              appendLog(`${attemptLabel} · ${attempt.outcome.replace("_", " ")}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"} · SAFE_OFF ${safeOffLogLabel(attempt.safe_off, true)}${retry}`,
+              appendLog(`${attemptLabel} · ${attempt.outcome.replace("_", " ")}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"} · SAFE_OFF ${safeOffLogLabel(attempt.safe_off, true, attempt.safe_off_state)}${retry}`,
                 attempt.outcome !== "PASS", "PPU");
               // The Log is the only on-screen operation record: the Manager run
               // identities and its Receipt summary, never the whole JSON Receipt.
@@ -934,7 +935,7 @@ export default function ManagedProgrammingWorkspace() {
       const { verdict, reason } = runVerdict(result.run);
       const output = result.run.receipt?.read_output ?? null;
       appendLog(`[READ] ${verdict.replace("_", " ")}${reason ? ` · ${reason}` : ""} · ${label} · Run ${result.run.run_id} · Job ${result.run.receipt?.job_id ?? "—"} · SAFE_OFF ${
-        result.run.receipt?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${
+        safeOffLogLabel(result.run.receipt?.safe_off, true, result.run.receipt?.safe_off_state)}${
         output ? ` · ${output.bytes} B · SHA256 ${output.sha256 ?? "—"}` : ""}${result.downloadError ? ` · binary rejected: ${result.downloadError}` : ""}`,
         verdict !== "PASS" || Boolean(result.downloadError), "PPU");
       if (result.run.outcome === "OUTCOME_UNKNOWN") setUnresolved(result.run);

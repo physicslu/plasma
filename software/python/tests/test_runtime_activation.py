@@ -93,6 +93,15 @@ def _m3_job(identity, site, owner="batch-1", token=None):
     return replace(request, metadata=metadata)
 
 
+def _m3_safety(job_id, kind):
+    denied = kind == "transport_denied"
+    return {"schema": "plasma.ppu.site-safety.v1",
+            "class": "PRE_HARDWARE_DENIED" if denied else "FAILED_SAFE_OFF_VERIFIED",
+            "job_id": job_id, "session_id": "s" * 32, "site": 1, "operation": "programming",
+            "stage": "run", "code": "ADMISSION_DENIED:X" if denied else "VERIFY",
+            "hardware_touched": not denied, "safe_off": None if denied else True}
+
+
 def _m3_outcome(manager, job_id, kind, *, active=False):
     """Record ``job_id`` as a reserved Job of this PPU with a given outcome."""
     from types import SimpleNamespace
@@ -111,7 +120,27 @@ def _m3_outcome(manager, job_id, kind, *, active=False):
         code = {"transport_denied": "TRANSPORT_DENIED:ADMISSION_DENIED:X",
                 "operation_failed_safe": "OPERATION_FAILED_SAFE:VERIFY",
                 "site_sealed": "OUTCOME_UNKNOWN_SITE_SEALED:X"}[kind]
-        context = {"site_worker_code": code, "outcome_unknown": kind == "site_sealed"}
+        context = {"site_worker_code": code, "outcome_unknown": kind == "site_sealed",
+                   "site_worker_stage": "run", "job_id": job_id, "site_id": 1,
+                   "operation": "programming"}
+        if kind != "site_sealed":
+            # The Worker's structured statement (ppu_site_worker._safety).
+            context["site_worker_safety"] = _m3_safety(job_id, kind)
+    elif kind.startswith("safety_"):
+        # Structured evidence that does NOT match this Job: never a proof.
+        context = {"site_worker_code": "TRANSPORT_DENIED:ADMISSION_DENIED:X",
+                   "outcome_unknown": False, "site_worker_stage": "run",
+                   "job_id": job_id, "site_id": 1, "operation": "programming",
+                   "site_worker_safety": _m3_safety(job_id, "transport_denied")}
+        mutate = {"safety_code_only": lambda c: c.pop("site_worker_safety"),
+                  "safety_other_job": lambda c: c["site_worker_safety"].update(job_id="job-other"),
+                  "safety_other_site": lambda c: c["site_worker_safety"].update(site=2),
+                  "safety_open_stage": lambda c: c.update(site_worker_stage="open"),
+                  "safety_class_mismatch": lambda c: c["site_worker_safety"].update(
+                      **{"class": "FAILED_SAFE_OFF_VERIFIED"}),
+                  "safety_touched": lambda c: c["site_worker_safety"].update(hardware_touched=True),
+                  "safety_unknown": lambda c: c.update(outcome_unknown=True)}[kind]
+        mutate(context)
     elif kind == "outcome_unknown":
         context = {"site_worker_result": {"safe_off": True}, "outcome_unknown": True}
     elif kind == "cancelled_before_start":
@@ -214,6 +243,11 @@ def test_batch_reservation_spans_idle_cycles_and_releases_only_with_ppu_safe_off
     ("operation_failed_safe", True), ("cancelled_before_start", True),
     ("pass_no_evidence", False), ("fail_safe_off_false", False),
     ("site_sealed", False), ("outcome_unknown", False),
+    # A refusal code alone, or a statement about another Job / Site / stage,
+    # with a mismatched class, or under an unknown outcome proves nothing.
+    ("safety_code_only", False), ("safety_other_job", False), ("safety_other_site", False),
+    ("safety_open_stage", False), ("safety_class_mismatch", False),
+    ("safety_touched", False), ("safety_unknown", False),
 ])
 def test_safe_off_proof_comes_only_from_this_ppu_job_result(tmp_path: Path, kind, proven) -> None:
     manager, _identity, expected = _m3_manager(tmp_path)

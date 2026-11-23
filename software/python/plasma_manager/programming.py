@@ -304,6 +304,84 @@ def _strict_base64(value: object, field: str = "image") -> bytes:
 
 
 
+#: Structured C-3 Site Worker safety evidence (docs/architecture/
+#: site-safety-evidence-v1.md). Same rules as the PPU Runtime's
+#: ``plasma_server.site_manager.site_safety_class``; a shared contract table
+#: (tests/test_site_safety_evidence.py) keeps the two judgments identical.
+SITE_SAFETY_SCHEMA = "plasma.ppu.site-safety.v1"
+PRE_HARDWARE_DENIED = "PRE_HARDWARE_DENIED"
+FAILED_SAFE_OFF_VERIFIED = "FAILED_SAFE_OFF_VERIFIED"
+_SITE_SAFETY_PREFIX = {PRE_HARDWARE_DENIED: "TRANSPORT_DENIED:",
+                       FAILED_SAFE_OFF_VERIFIED: "OPERATION_FAILED_SAFE:"}
+#: A Run whose Job the Site Worker refused before any hardware access.
+SITE_DENIED_BEFORE_HARDWARE = "SITE_DENIED_BEFORE_HARDWARE"
+#: Receipt ``safe_off_state``: what is known about the Site's end state,
+#: kept apart from the programming result.
+SAFE_OFF_VERIFIED = "VERIFIED"
+SAFE_OFF_NOT_TOUCHED = "NOT_TOUCHED"
+SAFE_OFF_NOT_VERIFIED = "NOT_VERIFIED"
+
+
+def site_safety_class(context: Any, *, job_id: Any, site_id: Any,
+                      operation: Any) -> str | None:
+    """PRE_HARDWARE_DENIED / FAILED_SAFE_OFF_VERIFIED, or None (unproven).
+
+    Trusted only when the Worker's structured statement names exactly this
+    Job, Site, operation and the ``run`` stage, the outcome is explicitly
+    known, and the refusal code matches the statement's class. A code text
+    alone (e.g. ``TRANSPORT_DENIED:``) proves nothing.
+    """
+    if not isinstance(context, dict) or context.get("outcome_unknown") is not False:
+        return None
+    safety = context.get("site_worker_safety")
+    if not isinstance(safety, dict) or safety.get("schema") != SITE_SAFETY_SCHEMA:
+        return None
+    kind, code = safety.get("class"), safety.get("code")
+    prefix = _SITE_SAFETY_PREFIX.get(kind) if type(kind) is str else None
+    if (prefix is None or type(code) is not str or not code
+            or context.get("site_worker_code") != prefix + code):
+        return None
+    if context.get("site_worker_stage") != "run" or safety.get("stage") != "run":
+        return None
+    if (type(job_id) is not str or safety.get("job_id") != job_id
+            or context.get("job_id") != job_id):
+        return None
+    if (type(site_id) is not int or type(safety.get("site")) is not int
+            or safety.get("site") != site_id or context.get("site_id") != site_id):
+        return None
+    if (type(operation) is not str or safety.get("operation") != operation
+            or context.get("operation") != operation):
+        return None
+    touched, safe_off = safety.get("hardware_touched"), safety.get("safe_off")
+    if kind == PRE_HARDWARE_DENIED:
+        return kind if touched is False and safe_off is None else None
+    return kind if touched is True and safe_off is True else None
+
+
+def _job_site_safety(run: _Run, plan: _Plan, job: Mapping[str, Any],
+                     result: Mapping[str, Any], binding_confirmed: bool) -> str | None:
+    """The trusted safety class of ONE refused Job of this Run, or None.
+
+    Beyond the Worker statement itself: the PPU Job is this Run's single
+    terminal attempt, every identity (Job, Site, operation) agrees across the
+    Job, its result and its error, and the PPU echoed the planned Binding.
+    """
+    error = result.get("error")
+    context = error.get("context") if isinstance(error, dict) else None
+    job_id = job.get("job_id")
+    if not (isinstance(error, dict) and isinstance(context, dict)
+            and binding_confirmed
+            and job.get("state") in ("failed", "error")
+            and result.get("state") == job.get("state")
+            and type(result.get("attempts")) is int and result.get("attempts") == 1
+            and type(job_id) is str and error.get("job_id") == job_id
+            and job.get("site_id") == run.site and error.get("site_id") == run.site
+            and job.get("operation") == plan.operation):
+        return None
+    return site_safety_class(context, job_id=job_id, site_id=run.site,
+                             operation=plan.operation)
+
+
 def _site_worker_failure(run: _Run, plan: _Plan, job: Mapping[str, Any],
                          result: Mapping[str, Any]) -> dict[str, Any]:
     """The Site Worker result of ONE definite FAIL of this Job, or ``{}``.
@@ -1829,12 +1907,27 @@ class BundleProgrammingWorkflow:
         steps = evidence.get("steps") if isinstance(evidence.get("steps"), dict) else {}
         echo = job.get("job_binding") if isinstance(job.get("job_binding"), dict) else {}
         binding = plan.binding
+        job_range = binding["range"]
+        binding_confirmed = (
+            echo.get("job_binding_sha256") == plan.binding_sha256
+            and echo.get("resource_set_sha256") == plan.resource_set_sha256
+            and echo.get("image_asset_sha256") == binding["image_asset_sha256"]
+            and echo.get("operation") == plan.operation
+            and echo.get("operations") == plan.operations
+            and echo.get("range") == job_range
+            and echo.get("site_id") == run.site
+            and echo.get("ppu_id") == binding["ppu_id"])
+        # A refused run carries no details and no Worker result: its
+        # structured safety statement is the only evidence (never the code).
+        safety = (None if evidence or failure
+                  else _job_site_safety(run, plan, job, result, binding_confirmed))
+        if safety == FAILED_SAFE_OFF_VERIFIED:
+            safe_off = True
         expected_sha = None if plan.image is None else bundle_v3.sha256_hex(plan.image)
         expected_size = None if plan.image is None else len(plan.image)
         # The Job Binding range is the write window; flash_base is only the
         # bank start. The PPU reports the range it actually executed.
         unit = plan.route.flash_profile["erase_granularity"]
-        job_range = binding["range"]
         address, length = job_range["address"], job_range["length"]
         erase_length = -(-length // unit) * unit
         operations = plan.operations
@@ -1915,7 +2008,15 @@ class BundleProgrammingWorkflow:
             "resource_reuse": not plan.payload["activation_required"],
             "safe_off": safe_off,
             "safe_off_source": ("site_worker_failure" if failure
-                                else "job_details" if evidence else None),
+                                else "job_details" if evidence
+                                else "site_worker_safety" if safety else None),
+            # The Site's end state, separate from the programming result:
+            # NOT_TOUCHED only for a trusted refusal before any hardware access.
+            "safe_off_state": (SAFE_OFF_VERIFIED if safe_off is True
+                               else SAFE_OFF_NOT_TOUCHED if safety == PRE_HARDWARE_DENIED
+                               else SAFE_OFF_NOT_VERIFIED),
+            "site_safety": ({"class": safety, "code": result["error"]["context"]
+                             ["site_worker_safety"]["code"]} if safety else None),
             "flash_result": failure.get("result") if failure else evidence.get("result"),
             "attempts": result.get("attempts"), "error": result.get("error"),
             "elapsed_ms": result.get("elapsed_ms"),
@@ -1931,14 +2032,7 @@ class BundleProgrammingWorkflow:
             (job.get("state") == "success" and result.get("state") == "success", "JOB_NOT_SUCCESS"),
             (job.get("site_id") == run.site and job.get("operation") == plan.operation,
              "JOB_IDENTITY_MISMATCH"),
-            (echo.get("job_binding_sha256") == plan.binding_sha256
-             and echo.get("resource_set_sha256") == plan.resource_set_sha256
-             and echo.get("image_asset_sha256") == binding["image_asset_sha256"]
-             and echo.get("operation") == plan.operation
-             and echo.get("operations") == operations
-             and echo.get("range") == job_range
-             and echo.get("site_id") == run.site
-             and echo.get("ppu_id") == binding["ppu_id"], "JOB_BINDING_NOT_CONFIRMED"),
+            (binding_confirmed, "JOB_BINDING_NOT_CONFIRMED"),
             (image_ok, "IMAGE_IDENTITY_MISMATCH"),
             (result.get("attempts") == 1, "JOB_ATTEMPTS_NOT_ONE"),
         ]
@@ -1959,6 +2053,10 @@ class BundleProgrammingWorkflow:
             ]
         failed = [reason for ok, reason in checks if not ok]
         outcome = "PASS" if not failed else "FAIL"
+        if safety == PRE_HARDWARE_DENIED:
+            # Nothing was executed on the Site: not a programming FAIL and no
+            # Cycle result. The Batch pauses it for the operator (no resend).
+            outcome, failed = "BLOCKED", [SITE_DENIED_BEFORE_HARDWARE]
         if outcome == "PASS" and read_bytes is not None:
             try:
                 self._store_read_output(run, read_bytes)

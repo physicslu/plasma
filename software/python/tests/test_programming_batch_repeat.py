@@ -31,7 +31,9 @@ class ScriptedGateway(MultiplexGateway):
 
     ``success`` / ``failed`` / ``error`` are terminal Job states; ``lost``
     records the POST and loses its answer (OUTCOME_UNKNOWN); ``unsafe``
-    fails without verified SAFE_OFF.
+    fails without verified SAFE_OFF. ``denied`` / ``failed_safe`` are C-3
+    ``run`` refusals with the Worker's structured safety statement;
+    ``code_only`` is a denial code without one.
     """
 
     def __init__(self, script, **kwargs):
@@ -48,8 +50,12 @@ class ScriptedGateway(MultiplexGateway):
                     self.posts.append(json.loads(kwargs["body"]))
                     raise TimeoutError("job POST response lost")
                 saved = dict(self.job_kwargs)
-                self.job_kwargs.update(job_final="failed" if final == "unsafe" else final,
-                                       safe_off=final != "unsafe")
+                refusal = {"denied": "denied", "failed_safe": "failed_safe",
+                           "code_only": {"mode": "denied", "safety": None}}.get(final)
+                self.job_kwargs.update(
+                    job_final=("failed" if final == "unsafe" else
+                               "error" if refusal else final),
+                    safe_off=final != "unsafe", worker_refusal=refusal)
                 self.job_final = self.job_kwargs["job_final"]
                 try:
                     return super().relay(method, path, **kwargs)

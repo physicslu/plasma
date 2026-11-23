@@ -371,6 +371,29 @@ def _devmem_unproven(pid: str, devmem_maps, owners: dict, release) -> tuple[str,
     return None
 
 
+def _exit_confirmed(item: Path, exc: BaseException) -> bool:
+    """Did reading this PID fail because the process is gone?
+
+    procfs reports a vanished task in two ways: ENOENT (``FileNotFoundError``)
+    when the entry is already unlinked, and ESRCH (``ProcessLookupError``)
+    when the task was reaped between opening one of its files and reading it
+    (2-Site HIL 2026-11-23: ``MAPS:ProcessLookupError``). Either error is only
+    a hint. The exit is confirmed solely by a fresh ``stat`` of the PID entry
+    raising ENOENT. A present entry (live, zombie, or the PID already reused
+    by another process), any other stat error, and every other read error
+    (EACCES, malformed data, ...) are NOT an exit: the census fails closed.
+    """
+    if not isinstance(exc, (FileNotFoundError, ProcessLookupError)):
+        return False
+    try:
+        item.stat()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
 def scan_proc_consumers(*, procroot: Path, release,
                         diagnostic: dict | None = None,
                         cooperating=None,
@@ -436,7 +459,7 @@ def scan_proc_consumers(*, procroot: Path, release,
                     unproven = _devmem_unproven(item.name, devmem_maps, owners, release)
                     if unproven is not None and cooperating is not None:
                         # Bounded fresh revalidation of THIS PID, once. An
-                        # exit raises FileNotFoundError: confirmed below.
+                        # exit (ENOENT/ESRCH) is confirmed below.
                         again, targets, maps = _read_pid(item, where, "REVALIDATE_")
                         need(born is not None, "PID_START_TIME_UNAVAILABLE")
                         need(again == born, "PID_REUSED_DURING_SCAN")
@@ -460,16 +483,9 @@ def scan_proc_consumers(*, procroot: Path, release,
                               "device": device, "reason": reason, "stage": stage,
                               "revalidation": revalidation}
             except (FileNotFoundError, PermissionError, OSError, ValueError) as exc:
-                # Check for ENOENT explicitly; an inaccessible PID is NOT
-                # a confirmed exit and must never be skipped or rescanned.
-                vanished = False
-                if isinstance(exc, FileNotFoundError):
-                    try:
-                        item.stat()
-                    except FileNotFoundError:
-                        vanished = True
-                    except OSError:
-                        pass
+                # An inaccessible PID is NOT a confirmed exit and must never
+                # be skipped or rescanned; see _exit_confirmed.
+                vanished = _exit_confirmed(item, exc)
                 if vanished and (vanished_pids == "skip" or
                                  where[0].startswith("REVALIDATE_")):
                     # Exited: it holds no fd and no mapping any more. Any

@@ -192,8 +192,33 @@ export type CycleHistoryAttempt = {
   outcome: string | null;
   reason: string | null;
   safe_off: boolean | null;
+  safe_off_state?: SafeOffState | null;
   retry?: { decision: string; reason: string } | null;
 };
+
+/**
+ * The Site's end state as the Manager receipt states it, kept apart from the
+ * programming result: VERIFIED (SAFE_OFF observed), NOT_TOUCHED (a trusted
+ * refusal before any hardware access) or NOT_VERIFIED (nothing proves it).
+ */
+export type SafeOffState = "VERIFIED" | "NOT_TOUCHED" | "NOT_VERIFIED";
+
+/** The Manager reason of a Job the Site Worker refused before any hardware access. */
+export const SITE_DENIED_BEFORE_HARDWARE = "SITE_DENIED_BEFORE_HARDWARE";
+
+/**
+ * SAFE_OFF as every Console Log and view writes it. Only the Manager's own
+ * statement is quoted: never inferred from a PASS, a reason or a code.
+ */
+export function safeOffLabel(
+  state: SafeOffState | string | null | undefined,
+  safeOff: boolean | null | undefined,
+  finished = true,
+): string {
+  if (state === "NOT_TOUCHED") return "N/A · hardware not touched";
+  if (safeOff === true || state === "VERIFIED") return "VERIFIED";
+  return finished ? "NOT VERIFIED" : "—";
+}
 
 export type CycleHistoryRecord = {
   seq: number;
@@ -208,6 +233,8 @@ export type CycleHistoryRecord = {
   receipt?: {
     run_id: string | null; job_id: string | null; job_state: string | null;
     safe_off: boolean | null; job_binding_confirmed: boolean;
+    safe_off_state?: SafeOffState | null;
+    site_safety?: { class: string; code: string } | null;
     readback_sha256?: string | null; job_binding_sha256?: string | null;
     resource_set_sha256?: string | null; elapsed_ms?: number | null;
   } | null;
@@ -223,10 +250,6 @@ export type CycleHistoryPage = {
   records: CycleHistoryRecord[];
 };
 
-/** Safe-off as the Log always writes it. */
-function safeOff(value: boolean | null | undefined): string {
-  return value === true ? "VERIFIED" : "NOT VERIFIED";
-}
 
 /**
  * Log lines of one History record. Evidence is quoted from the Manager
@@ -240,6 +263,15 @@ export function cycleHistoryLogLines(
   if (record.type === "continue") {
     return [{ text: `[CONTINUE] ${siteLabel} · after Cycle ${record.after_cycle_index ?? "—"} · ${record.wait_reason ?? "—"} · seq ${record.continue_seq ?? "—"}`, failed: false }];
   }
+  if (record.type === "blocked_dispatch" && record.reason === SITE_DENIED_BEFORE_HARDWARE) {
+    // A submitted Job the Site Worker refused before any hardware access:
+    // BLOCKED, not a FAIL, and no Cycle result. It waits for the operator.
+    const receipt = record.receipt ?? null;
+    return [{ text: `[BLOCKED] Cycle ${record.cycle_index ?? "—"}/${repeat} ${siteLabel} · denied before hardware`
+      + `${receipt?.site_safety?.code ? ` · ${receipt.site_safety.code}` : ""} · Run ${receipt?.run_id ?? "—"} · Job ${receipt?.job_id ?? "—"}`
+      + ` · SAFE_OFF ${safeOffLabel(receipt?.safe_off_state, receipt?.safe_off)} · not counted as a Cycle · press Start to re-run admission`,
+    failed: true }];
+  }
   if (record.type === "blocked_dispatch") {
     return [{ text: `[CYCLE ${record.cycle_index ?? "—"}/${repeat}] ${siteLabel} · NEXT CYCLE BLOCKED · ${record.reason ?? "—"} · nothing submitted`, failed: true }];
   }
@@ -248,11 +280,11 @@ export function cycleHistoryLogLines(
   const attempts = record.attempts ?? [];
   const failed = record.outcome !== "PASS";
   const lines = attempts.filter(attemptLine).map(attempt => ({
-    text: `[ATTEMPT ${attempt.attempt}] Cycle ${record.cycle_index}/${repeat} ${siteLabel} · ${attempt.outcome ?? "—"}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"} · SAFE_OFF ${safeOff(attempt.safe_off)}${attempt.retry ? ` · ${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} (${attempt.retry.reason})` : ""}`,
+    text: `[ATTEMPT ${attempt.attempt}] Cycle ${record.cycle_index}/${repeat} ${siteLabel} · ${attempt.outcome ?? "—"}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"} · SAFE_OFF ${safeOffLabel(attempt.safe_off_state, attempt.safe_off)}${attempt.retry ? ` · ${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} (${attempt.retry.reason})` : ""}`,
     failed: attempt.outcome !== "PASS",
   }));
   lines.push({
-    text: `[CYCLE ${record.cycle_index}/${repeat}] ${siteLabel} · ${record.outcome ?? "—"}${record.reason && failed ? ` · ${record.reason}` : ""} · Run ${receipt?.run_id ?? "—"} · Job ${receipt?.job_id ?? "—"} · SAFE_OFF ${safeOff(receipt?.safe_off)} · attempts ${attempts.length}`,
+    text: `[CYCLE ${record.cycle_index}/${repeat}] ${siteLabel} · ${record.outcome ?? "—"}${record.reason && failed ? ` · ${record.reason}` : ""} · Run ${receipt?.run_id ?? "—"} · Job ${receipt?.job_id ?? "—"} · SAFE_OFF ${safeOffLabel(receipt?.safe_off_state, receipt?.safe_off)} · attempts ${attempts.length}`,
     failed,
   });
   lines.push({

@@ -36,9 +36,12 @@ DEFAULT_IMAGE_ROOT = Path("/run/plasma-server/normalized-images")
 
 
 class SiteWorkerRefused(Exception):
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, safety: Mapping[str, Any] | None = None) -> None:
         super().__init__(code)
         self.code = code
+        # The Worker's structured safety statement (``ppu_site_worker._safety``),
+        # carried verbatim; judged by its consumers, never trusted here.
+        self.safety = dict(safety) if isinstance(safety, Mapping) else None
 
 
 class SiteWorkerControlClient:
@@ -78,7 +81,7 @@ class SiteWorkerControlClient:
         if not isinstance(reply, dict):
             raise SiteWorkerRefused("SITE_WORKER_REPLY_INVALID")
         if not reply.get("ok"):
-            raise SiteWorkerRefused(str(reply.get("error")))
+            raise SiteWorkerRefused(str(reply.get("error")), reply.get("safety"))
         result = reply.get("result")
         if not isinstance(result, dict):
             raise SiteWorkerRefused("SITE_WORKER_REPLY_INVALID")
@@ -129,7 +132,9 @@ def _refusal(stage: str, exc: SiteWorkerRefused, **context: Any) -> PlasmaError:
         f"C-3 Site Worker {stage} refused: {code}",
         recoverable=safe_failure,
         context={"site_worker_stage": stage, "site_worker_code": code,
-                 "outcome_unknown": unknown, **context},
+                 "outcome_unknown": unknown, **context,
+                 **({"site_worker_safety": exc.safety}
+                    if exc.safety is not None and not unknown else {})},
     )
 
 
