@@ -1,39 +1,7 @@
 name: macOS Control Station installer acceptance
 
+# Explicit packaging acceptance: opt in through Actions > Run workflow.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "packaging/macos/**"
-      - "scripts/macos-control-station-pkg.py"
-      - "scripts/macos-control-station-installer-acceptance.py"
-      - "scripts/control-station-runtime.py"
-      - "scripts/control-station-release.py"
-      - "scripts/product-release.py"
-      - "software/web/app/**"
-      - "software/web/package.json"
-      - "software/web/scripts/build-product.mjs"
-      - "software/web/scripts/validate-product-runtime.mjs"
-      - "software/python/pyproject.toml"
-      - "software/python/tests/test_macos_control_station_installer.py"
-      - "release/product.json"
-      - ".github/workflows/macos-control-station-installer.yml"
-  pull_request:
-    paths:
-      - "packaging/macos/**"
-      - "scripts/macos-control-station-pkg.py"
-      - "scripts/macos-control-station-installer-acceptance.py"
-      - "scripts/control-station-runtime.py"
-      - "scripts/control-station-release.py"
-      - "scripts/product-release.py"
-      - "software/web/app/**"
-      - "software/web/package.json"
-      - "software/web/scripts/build-product.mjs"
-      - "software/web/scripts/validate-product-runtime.mjs"
-      - "software/python/pyproject.toml"
-      - "software/python/tests/test_macos_control_station_installer.py"
-      - "release/product.json"
-      - ".github/workflows/macos-control-station-installer.yml"
   workflow_dispatch:
 
 concurrency:
