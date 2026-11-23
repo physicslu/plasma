@@ -424,6 +424,9 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
                                        "sha256": hashlib.sha256(official_bytes).hexdigest(),
                                        "evidence_id": exact_evidence_id}
     group = provider._programming_groups_by_profile["stm32f1-medium-density-flash-v0"]
+    route_path = "release/openocd-qualification/catalog-stm32f103-medium-vfqfpn36-route-v1.json"
+    route_bytes = (provider._root / route_path).read_bytes()
+    route = json.loads(route_bytes)
     packet["applicability"] = {
         "base_device": record.base_device,
         "density_class": "medium",
@@ -433,14 +436,9 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
         "programming_group_id": provider._programming_groups_by_profile[
             "stm32f1-medium-density-flash-v0"]["group_id"],
         "geometry_id": geometry_id,
-        "package_route": {
-            "package": "VFQFPN36", "transport": "SWD",
-            "swdio": {"signal": "PA13", "pin": 25},
-            "swclk": {"signal": "PA14", "pin": 28},
-            "source_document": "DS5319 Rev 20",
-            "source_locator": "Table 5, VFQFPN36 pin definitions",
-            "source_sha256": group["manufacturer_evidence"]["source_lock"]["st_ds5319_rev20"],
-        },
+        "package_route_source": {"path": route_path,
+                                 "sha256": hashlib.sha256(route_bytes).hexdigest()},
+        "package_route": route["package_route"],
     }
     packet["fact_references"] = {
         "identity": f"{source_url}#{record.identifier}",
@@ -464,6 +462,10 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     ):
         with pytest.raises(DeviceCatalogIntegrityError, match=error):
             stage_packet({**packet, field: replacement})
+    bad_route = json.loads(json.dumps(packet))
+    bad_route["applicability"]["package_route_source"]["sha256"] = "0" * 64
+    with pytest.raises(DeviceCatalogIntegrityError, match="package route source lock drift"):
+        stage_packet(bad_route)
     source_response[0] = b"<html>STM32F103C8T6 only</html>"
     with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source"):
         repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="bad-page-v1")
@@ -715,6 +717,12 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
     with pytest.raises(DeviceCatalogIntegrityError, match="Provider/Profile/geometry/operations"):
         repo.stage_revision([independent], actor="owner")
     independent_path.write_bytes(original_packet)
+    for vendor in ("NXP Semiconductors", "Microchip Technology"):
+        copied_claim = json.loads(json.dumps(changes[0]))
+        copied_claim["record"]["vendor"] = vendor
+        copied_claim["qualification"]["publication_evidence"]["manufacturer"] = vendor
+        with pytest.raises(DeviceCatalogIntegrityError, match="reviewed facts"):
+            repo.stage_revision([copied_claim], actor="owner")
     forged_authority = json.loads(original_packet)
     forged_authority["applicability"]["qualification_sha256"] = "0" * 64
     independent_path.write_text(json.dumps(forged_authority))

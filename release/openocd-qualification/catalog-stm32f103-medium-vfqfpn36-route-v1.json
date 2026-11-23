@@ -1,0 +1,29 @@
+{
+  "schema_version": "catalog-package-route-authority-v1",
+  "status": "reviewed_source_only",
+  "manufacturer": "STMicroelectronics",
+  "series": "STM32F103",
+  "density_class": "medium",
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1",
+  "exact_icpns": [
+    "STM32F103T8U6"
+  ],
+  "package_route": {
+    "package": "VFQFPN36",
+    "transport": "SWD",
+    "swdio": {
+      "signal": "PA13",
+      "pin": 25
+    },
+    "swclk": {
+      "signal": "PA14",
+      "pin": 28
+    },
+    "source_document": "DS5319 Rev 20",
+    "source_locator": "Table 5, VFQFPN36 pin definitions",
+    "source_sha256": "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc"
+  },
+  "catalog_package": "UFQFPN",
+  "pin_count": "36",
+  "source_lock_key": "st_ds5319_rev20"
+}

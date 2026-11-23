@@ -592,6 +592,18 @@ class CatalogSqliteShadowRepository:
         from .runtime_evidence_root import default_runtime_evidence_root
 
         root = default_runtime_evidence_root()
+        def read_locked(lock: dict[str, str]) -> bytes:
+            if (not isinstance(lock, dict) or not isinstance(lock.get("path"), str)
+                    or not isinstance(lock.get("git_blob_sha1"), str)):
+                raise DeviceCatalogIntegrityError("L2 source lock malformed")
+            path = (root / lock["path"]).resolve()
+            if not path.is_relative_to(root.resolve()):
+                raise DeviceCatalogIntegrityError("L2 source lock outside authority root")
+            content = path.read_bytes()
+            if _git_blob_sha1(content) != lock["git_blob_sha1"]:
+                raise DeviceCatalogIntegrityError("L2 source lock drift")
+            return content
+
         try:
             candidates = []
             for path in (root / "release/openocd-qualification").glob("*.json"):
@@ -610,28 +622,23 @@ class CatalogSqliteShadowRepository:
             qualification = candidates[0]
             locks = (qualification["source_lock"], qualification["applicability"],
                      qualification["programming_profile"])
-            if any(_git_blob_sha1((root / lock["path"]).read_bytes()) != lock["git_blob_sha1"]
-                   for lock in locks):
-                raise DeviceCatalogIntegrityError("L2 low-density source lock drift")
-            source = json.loads((root / locks[0]["path"]).read_text())
-            applicability = json.loads((root / locks[1]["path"]).read_text())
-            profile = json.loads((root / locks[2]["path"]).read_text())
+            source, applicability, profile = [json.loads(read_locked(lock)) for lock in locks]
             identity_lock = applicability["production_catalog"]
-            identity_bytes = (root / identity_lock["path"]).read_bytes()
-            if _git_blob_sha1(identity_bytes) != identity_lock["git_blob_sha1"]:
-                raise DeviceCatalogIntegrityError("L2 low-density identity lock drift")
+            identity_bytes = read_locked(identity_lock)
             exact_rows = [row for row in applicability["records"] if row["icpn"] == record.identifier]
             if len(exact_rows) != 1 or record.identifier in applicability["excluded_exact_icpns"]:
                 raise DeviceCatalogIntegrityError("L2 Exact ICPN is outside reviewed applicability")
             exact = exact_rows[0]
+            qualified_rows = [row for row in qualification["records"]
+                              if row["icpn"] == record.identifier]
+            if len(qualified_rows) != 1:
+                raise DeviceCatalogIntegrityError("L2 Exact ICPN lacks Provider qualification")
+            qualified = qualified_rows[0]
             geometry_lock = {"path": exact["geometry_profile_path"],
                              "git_blob_sha1": exact["geometry_git_blob_sha1"]}
-            geometry_bytes = (root / geometry_lock["path"]).read_bytes()
-            if _git_blob_sha1(geometry_bytes) != geometry_lock["git_blob_sha1"]:
-                raise DeviceCatalogIntegrityError("L2 low-density Geometry lock drift")
-            geometry = json.loads(geometry_bytes)
+            geometry = json.loads(read_locked(geometry_lock))
         except (OSError, KeyError, TypeError, ValueError) as exc:
-            raise DeviceCatalogIntegrityError("L2 low-density source/Profile unavailable") from exc
+            raise DeviceCatalogIntegrityError("L2 source/Profile unavailable") from exc
         group = qualification["manufacturer_programming_group"]
         shared = group["shared_flash_geometry"]
         source_proof = source["evidence"]["official_datasheet"]
@@ -663,7 +670,7 @@ class CatalogSqliteShadowRepository:
                 or not profile_data["flash_size_read_fail_closed"]
                 or profile_data["user_flash_size_override_as_authority"]
                 or not profile_data["prohibit_full_bank_erase_until_separately_approved"]):
-            raise DeviceCatalogIntegrityError("L2 low-density Provider/Profile source contract drift")
+            raise DeviceCatalogIntegrityError("L2 Provider/Profile source contract drift")
         self._validate_exact_content(record, "locked_production_identity", identity_bytes,
                                      identity_lock["git_blob_sha1"])
         if (record.vendor != exact["manufacturer"] or record.base_device != exact["base_device"]
@@ -674,12 +681,24 @@ class CatalogSqliteShadowRepository:
                 or exact["software_state"] != "SUPPORTED"
                 or exact["programming_profile_id"] != profile["profile_id"]
                 or exact["blockers"] or exact["runtime_execution_authorized"]
+                or qualified["manufacturer"] != record.vendor
+                or qualified["base_device"] != record.base_device
+                or qualified["software_state"] != "SUPPORTED"
+                or qualified["programming_profile_id"] != profile["profile_id"]
+                or qualified["memory_geometry_profile_id"] != geometry["profile_id"]
+                or qualified["qualification_blockers"]
+                or any(item.get("state") != "SUPPORTED"
+                       or item.get("source_implementation_present") is not True
+                       or item.get("exact_icpn_qualified") is not True
+                       for item in qualified["operations"].values())
+                or qualified["main_flash_size_bytes"] != exact["flash_size_bytes"]
+                or qualified["page_count"] != geom["page_count"]
                 or geom["main_flash_size_bytes"] != exact["flash_size_bytes"]
                 or geom["page_count"] * geom["page_size_bytes"] != exact["flash_size_bytes"]
                 or geom["page_size_bytes"] != shared["erase_unit_bytes"]
                 or geom["program_granularity_bytes"] != shared["program_unit_bytes"]
                 or exact["flash_size_bytes"] not in profile_data["supported_flash_sizes_bytes"]):
-            raise DeviceCatalogIntegrityError("L2 low-density exact identity/Geometry conflict")
+            raise DeviceCatalogIntegrityError("L2 exact identity/Geometry conflict")
         official = reviewed.get("official_exact_source")
         if (not isinstance(official, dict) or official.get("kind") != "locked_production_identity"
                 or official.get("path") != identity_lock["path"]
@@ -770,58 +789,80 @@ class CatalogSqliteShadowRepository:
         group = provider._programming_groups_by_profile.get(profile_id)
         if not isinstance(group, dict):
             raise DeviceCatalogIntegrityError("L2 Provider/Profile/geometry/operations lack exact applicability")
-        if (group.get("manufacturer") != "STMicroelectronics"
-                or group.get("series") != "STM32F103"
-                or group.get("density_class") != "medium"):
+        if (group.get("manufacturer") != record.vendor
+                or group.get("series") != record.subfamily):
             raise DeviceCatalogIntegrityError("L2 Provider programming group drift")
         root = provider._root
+        route_lock = reviewed.get("applicability", {}).get("package_route_source")
+        if (not isinstance(route_lock, dict) or not isinstance(route_lock.get("path"), str)
+                or not isinstance(route_lock.get("sha256"), str)):
+            raise DeviceCatalogIntegrityError("L2 package route authority missing")
+        route_path = (root / route_lock["path"]).resolve()
+        if not route_path.is_relative_to(root.resolve()):
+            raise DeviceCatalogIntegrityError("L2 package route authority outside source root")
         try:
+            route_bytes = route_path.read_bytes()
+            route_authority = json.loads(route_bytes)
+            if hashlib.sha256(route_bytes).hexdigest() != route_lock["sha256"]:
+                raise DeviceCatalogIntegrityError("L2 package route source lock drift")
+            if not isinstance(route_authority, dict):
+                raise DeviceCatalogIntegrityError("L2 package route authority malformed")
             applicability = json.loads((root / APPLICABILITY_REL).read_text(encoding="utf-8"))
             ordering_lock = applicability["manufacturer_authority"]["ordering"]
             ordering_blob = ordering_lock["git_blob_sha1"]
             ordering_path = root / ordering_lock["path"]
             ordering_bytes = ordering_path.read_bytes()
             authority = json.loads(ordering_bytes)
-            bands = authority["records"]["STM32F103"]["bands"]
+            bands = authority["records"][record.subfamily]["bands"]
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise DeviceCatalogIntegrityError("L2 manufacturer applicability source unavailable") from exc
         if _git_blob_sha1(ordering_bytes) != ordering_blob:
             raise DeviceCatalogIntegrityError("L2 manufacturer ordering source lock drift")
-        band = next((item for item in bands if item["name"] == "medium"), None)
-        match = re.fullmatch(r"STM32F103([TCRV])([8B])([HTU])([67])(TR)?", record.identifier)
+        band = next((item for item in bands
+                     if item["name"] == group["density_class"]), None)
+        match = re.fullmatch(re.escape(record.subfamily) +
+                             r"([A-Z0-9])([A-Z0-9])([A-Z0-9])([A-Z0-9])(TR)?",
+                             record.identifier)
         if band is None or match is None:
             raise DeviceCatalogIntegrityError("L2 Exact ICPN is outside reviewed ordering applicability")
         pin_code, flash_code, package_code, temperature_code, tail = match.groups()
         flash_kib = band["flash_kib"].get(flash_code)
-        package = band["package_pin_overrides"].get(f"{package_code}/{pin_code}",
+        package = band.get("package_pin_overrides", {}).get(f"{package_code}/{pin_code}",
                                                    band["package"].get(package_code))
-        if (record.vendor != "STMicroelectronics" or record.family != "STM32F1"
-                or record.subfamily != "STM32F103"
-                or record.base_device != f"STM32F103{pin_code}{flash_code}"
+        if (record.vendor != applicability["manufacturer"]
+                or record.family != applicability["family"]
+                or record.base_device != f"{record.subfamily}{pin_code}{flash_code}"
                 or record.pin_count != str(band["pin_count"].get(pin_code))
                 or record.package != package or record.flash_size != f"{flash_kib} KiB"
                 or record.temperature_grade != band["temperature_c"].get(temperature_code)
                 or (record.option_suffix or "") != (tail or "")
-                or record.source_authority != "STMicroelectronics official"
+                or record.source_authority != applicability["manufacturer_authority"][
+                    "production_exact_identity"]["source_authority"]
                 or record.source_reference != band["source_url"]
                 or record.target_config != provider.provider["target_config"]):
             raise DeviceCatalogIntegrityError("L2 manufacturer identity/geometry conflicts with ordering authority")
-        # The previous non-LQFP review explicitly did not claim VFQFPN36. This
-        # independently reviewed package route is required before the shared
-        # medium-density Provider group can apply to that package.
-        if (pin_code, package_code, record.pin_count, record.package) != (
-            "T", "U", "36", "UFQFPN"
-        ):
+        # A separate, digest-locked package review must cover this exact part.
+        if (route_authority.get("schema_version") != "catalog-package-route-authority-v1"
+                or route_authority.get("status") != "reviewed_source_only"
+                or route_authority.get("manufacturer") != record.vendor
+                or route_authority.get("series") != record.subfamily
+                or route_authority.get("density_class") != group["density_class"]
+                or route_authority.get("provider_source_lock_id") != provider.source_lock_id
+                or route_authority.get("catalog_package") != record.package
+                or route_authority.get("pin_count") != record.pin_count
+                or not isinstance(route_authority.get("exact_icpns"), list)
+                or record.identifier not in route_authority["exact_icpns"]):
             raise DeviceCatalogIntegrityError("L2 package route lacks data-only applicability review")
-        package_route = {
-            "package": "VFQFPN36",
-            "transport": "SWD",
-            "swdio": {"signal": "PA13", "pin": 25},
-            "swclk": {"signal": "PA14", "pin": 28},
-            "source_document": "DS5319 Rev 20",
-            "source_locator": "Table 5, VFQFPN36 pin definitions",
-            "source_sha256": group["manufacturer_evidence"]["source_lock"]["st_ds5319_rev20"],
-        }
+        package_route = route_authority.get("package_route")
+        if (not isinstance(package_route, dict)
+                or not package_route.get("package")
+                or package_route.get("transport") != "SWD"
+                or not isinstance(package_route.get("swdio"), dict)
+                or not isinstance(package_route.get("swclk"), dict)
+                or package_route.get("source_sha256") != group[
+                    "manufacturer_evidence"]["source_lock"].get(
+                        route_authority.get("source_lock_key"))):
+            raise DeviceCatalogIntegrityError("L2 package route source mismatch")
         exact_source = reviewed.get("official_exact_source")
         expected_url = ("https://www.st.com/en/microcontrollers-microprocessors/"
                         f"{record.base_device.lower()}.html")
@@ -892,6 +933,7 @@ class CatalogSqliteShadowRepository:
             "provider_source_lock_id": provider.source_lock_id,
             "programming_group_id": group["group_id"],
             "geometry_id": geometry_id,
+            "package_route_source": route_lock,
             "package_route": package_route,
         }
         expected_references = {
@@ -902,7 +944,6 @@ class CatalogSqliteShadowRepository:
             "operations": f"{provider.qualification_id}#{group['group_id']}",
         }
         if (q.get("schema_version") != "2.0.0"
-                or q.get("registry_id") != "catalog-data-only-openocd-stm32f103-medium-v1"
                 or q.get("provider") != expected_provider
                 or q.get("programming") != expected_programming
                 or q.get("operations") != expected_operations

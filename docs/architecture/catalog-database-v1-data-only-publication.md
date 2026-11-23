@@ -162,19 +162,20 @@ datasheet/programming-manual geometry sources, and the qualified programming
 group. Arbitrary reviewer prose cannot stand in for those references.
 
 The data-only applicability validator accepts the source-validated OpenOCD
-0.12.0 STM32F103 medium-density route and the independently source-locked
-low-density documentary cohort. The low-density route verifies the Provider,
-manufacturer source, exact applicability, Programming Profile, per-base Flash
-Geometry and operation scope from locked data files and durable Evidence IDs.
-It does not consult the Python exact-ICPN qualification list or require that
-the Profile already occur in the previous Active Revision. Other Provider/group
-combinations fail closed until their source-backed contracts can be validated
-by the Publisher. A reviewed packet cannot authorize an installed Runtime or a
-Job.
+0.12.0 STM32F103 medium-density route and source-locked qualification documents
+using the existing Profile schema. The locked route selects a unique
+qualification document by its applicability blob and qualification SHA-256,
+then verifies Provider, manufacturer Exact identity, Profile, per-base Flash
+Geometry, exact qualification row and operation scope against its source locks
+and durable Evidence IDs. It does not consult the Python exact-ICPN
+qualification list or require that the Profile already occur in the previous
+Active Revision. Missing, ambiguous or altered qualification authority fails
+closed. A reviewed packet cannot authorize an installed Runtime or a Job.
 The first data-only package route is bounded to STM32F103 medium-density
-VFQFPN36. Its packet must match the source-locked DS5319 Rev 20 Table 5 SWD
-pins (PA13/25 and PA14/28). This is a fresh applicability review for a package
-that the earlier non-LQFP qualification explicitly left outside its scope;
+VFQFPN36. Its packet must match the SHA-256 locked package-route authority and
+source-locked DS5319 Rev 20 Table 5 SWD pins (PA13/25 and PA14/28). This is a
+fresh applicability review for a package that the earlier non-LQFP
+qualification explicitly left outside its scope;
 the earlier exclusion is not silently treated as support. Other package routes
 remain unqualified by this data-only validator.
 
