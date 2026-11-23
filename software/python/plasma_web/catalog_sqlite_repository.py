@@ -388,25 +388,43 @@ class CatalogSqliteShadowRepository:
     def acquire_exact_evidence(self, record: DeviceCatalogRecord, *, kind: str,
                                source_revision: str, actor: str = "publisher") -> str:
         """Acquire and authenticate one official source revision; repeat calls stay offline."""
-        from .openocd_software_qualification import APPLICABILITY_REL
+        from .openocd_software_qualification import _git_blob_sha1
         from .runtime_evidence_root import default_runtime_evidence_root
         if not isinstance(source_revision, str) or not source_revision.strip():
             raise DeviceCatalogIntegrityError("Evidence source revision required")
         root = default_runtime_evidence_root()
-        if record.vendor != "STMicroelectronics":
-            raise DeviceCatalogIntegrityError("official Exact source authority unsupported")
         url = ("https://www.st.com/en/microcontrollers-microprocessors/"
                f"{record.base_device.lower()}.html")
         if kind == "manufacturer_https":
+            if record.vendor != "STMicroelectronics":
+                raise DeviceCatalogIntegrityError("official HTTPS authority unsupported")
             reference = url
-            authority = "STMicroelectronics HTTPS"
+            authority = f"{record.vendor} HTTPS"
         elif kind == "locked_production_identity":
-            applicability = json.loads((root / APPLICABILITY_REL).read_text(encoding="utf-8"))
-            lock = applicability["manufacturer_authority"]["production_exact_identity"]
-            reference = lock["path"]
-            authority = "STMicroelectronics production identity lock"
-            if source_revision != lock["git_blob_sha1"]:
+            matches = []
+            for path in (root / "release/openocd-qualification").glob("*.json"):
+                try:
+                    document = json.loads(path.read_text(encoding="utf-8"))
+                    locks = [document.get("production_catalog")]
+                    locks.append(document.get("manufacturer_authority", {}).get(
+                        "production_exact_identity"))
+                    for lock in locks:
+                        if (isinstance(lock, dict) and lock.get("git_blob_sha1") == source_revision
+                                and isinstance(lock.get("path"), str)):
+                            source = (root / lock["path"]).resolve()
+                            if not source.is_relative_to(root.resolve()) or not source.is_file():
+                                continue
+                            content = source.read_bytes()
+                            if _git_blob_sha1(content) != source_revision:
+                                continue
+                            self._validate_exact_content(record, kind, content, source_revision)
+                            matches.append((lock["path"], content))
+                except (OSError, ValueError, TypeError, KeyError, DeviceCatalogIntegrityError):
+                    continue
+            if not matches or len(set(path for path, _ in matches)) != 1:
                 raise DeviceCatalogIntegrityError("official Exact identity lock mismatch")
+            reference, locked_content = matches[0]
+            authority = f"{record.vendor} production identity lock"
         else:
             raise DeviceCatalogIntegrityError("official Exact source kind unsupported")
         with sqlite3.connect(self.path, timeout=10) as conn:
@@ -419,7 +437,7 @@ class CatalogSqliteShadowRepository:
             self._validate_exact_content(record, kind, content, source_revision)
             return row[0]
         content = (self._fetch_official_exact_source(url) if kind == "manufacturer_https"
-                   else (root / reference).read_bytes())
+                   else locked_content)
         self._validate_exact_content(record, kind, content, source_revision)
         return self._store_evidence(authority, reference, source_revision, content, actor=actor)
 
@@ -533,8 +551,13 @@ class CatalogSqliteShadowRepository:
     def _validate_l2_applicability(self, record: DeviceCatalogRecord, q: dict[str, Any],
                                    reviewed: dict[str, Any]) -> None:
         """Bind an exact part to source-validated provider semantics and manufacturer facts."""
-        if q.get("programming", {}).get("programming_profile_id") == "stm32f1-low-density-flash-v0":
-            self._validate_low_density_l2(record, q, reviewed)
+        applicability = reviewed.get("applicability")
+        if (isinstance(applicability, dict)
+                and applicability.get("exact_applicability_git_blob_sha1")):
+            self._validate_locked_l2(record, q, reviewed)
+            return
+        if isinstance(applicability, dict) and applicability.get("ordering_authority_id"):
+            self._validate_data_only_l2(record, q, reviewed)
             return
         from .programming_qualification import get_default_programming_qualification_registry
 
@@ -560,18 +583,31 @@ class CatalogSqliteShadowRepository:
                                  "ppu_readiness_source", "family_ready")))):
                 raise DeviceCatalogIntegrityError("L2 Provider/Profile/geometry/operations lack exact applicability")
             return
-        self._validate_data_only_l2(record, q, reviewed)
+        raise DeviceCatalogIntegrityError("L2 exact applicability authority missing")
 
-    def _validate_low_density_l2(self, record: DeviceCatalogRecord, q: dict[str, Any],
-                                 reviewed: dict[str, Any]) -> None:
-        """Validate the locked documentary cohort without a Python exact-part registry."""
+    def _validate_locked_l2(self, record: DeviceCatalogRecord, q: dict[str, Any],
+                            reviewed: dict[str, Any]) -> None:
+        """Resolve a reviewed exact part through versioned source and Profile locks."""
         from .openocd_software_qualification import _git_blob_sha1
         from .runtime_evidence_root import default_runtime_evidence_root
 
         root = default_runtime_evidence_root()
         try:
-            qualification = json.loads((root / "release/openocd-qualification/"
-                                        "openocd-0.12.0-stm32f103-low-density-12-v1.json").read_text())
+            candidates = []
+            for path in (root / "release/openocd-qualification").glob("*.json"):
+                source_bytes = path.read_bytes()
+                source_document = json.loads(source_bytes)
+                if not isinstance(source_document, dict):
+                    continue
+                lock = source_document.get("applicability")
+                if (isinstance(lock, dict) and lock.get("git_blob_sha1") ==
+                        reviewed["applicability"]["exact_applicability_git_blob_sha1"]
+                        and hashlib.sha256(source_bytes).hexdigest() ==
+                        reviewed["applicability"].get("qualification_sha256")):
+                    candidates.append(source_document)
+            if len(candidates) != 1:
+                raise DeviceCatalogIntegrityError("L2 qualification authority missing or ambiguous")
+            qualification = candidates[0]
             locks = (qualification["source_lock"], qualification["applicability"],
                      qualification["programming_profile"])
             if any(_git_blob_sha1((root / lock["path"]).read_bytes()) != lock["git_blob_sha1"]
@@ -617,7 +653,7 @@ class CatalogSqliteShadowRepository:
                 or geometry.get("provider_source_lock_id") != qualification["provider_source_lock_id"]
                 or group.get("manufacturer") != record.vendor
                 or group.get("series") != record.subfamily
-                or group.get("density_class") != "low"
+                or group.get("density_class") != reviewed["applicability"].get("density_class")
                 or group["manufacturer_evidence"]["direct_applicability_id"] != applicability["applicability_id"]
                 or group["manufacturer_evidence"]["source_lock_path"] != locks[0]["path"]
                 or group["manufacturer_evidence"]["programming_profile_id"] != profile["profile_id"]
@@ -673,9 +709,10 @@ class CatalogSqliteShadowRepository:
             "backend_constraints": group["backend_constraints"],
         }
         expected_applicability = {
-            "base_device": record.base_device, "density_class": "low",
+            "base_device": record.base_device, "density_class": group["density_class"],
             "provider_source_lock_id": qualification["provider_source_lock_id"],
             "programming_group_id": group["group_id"],
+            "qualification_sha256": reviewed["applicability"]["qualification_sha256"],
             "profile_git_blob_sha1": locks[2]["git_blob_sha1"],
             "geometry_git_blob_sha1": geometry_lock["git_blob_sha1"],
             "exact_applicability_git_blob_sha1": locks[1]["git_blob_sha1"],
@@ -728,8 +765,10 @@ class CatalogSqliteShadowRepository:
         provider = get_default_openocd_software_qualification_registry()
         if provider is None or q.get("catalog_level") != 2:
             raise DeviceCatalogIntegrityError("L2 requires a source-validated Provider applicability")
-        profile_id = "stm32f1-medium-density-flash-v0"
-        group = provider._programming_groups_by_profile[profile_id]
+        profile_id = q.get("programming", {}).get("programming_profile_id")
+        group = provider._programming_groups_by_profile.get(profile_id)
+        if not isinstance(group, dict):
+            raise DeviceCatalogIntegrityError("L2 Provider/Profile/geometry/operations lack exact applicability")
         if (group.get("manufacturer") != "STMicroelectronics"
                 or group.get("series") != "STM32F103"
                 or group.get("density_class") != "medium"):
@@ -820,13 +859,30 @@ class CatalogSqliteShadowRepository:
             rf"{record.base_device.lower()}-{flash_kib}k-catalog-v[1-9][0-9]*", geometry_id
         ):
             raise DeviceCatalogIntegrityError("L2 Geometry revision is not scoped to this base device")
-        reference = provider.describe("STMicroelectronics", "STM32F103C8T6")
-        expected_programming = dict(reference["programming"])
-        expected_programming["memory_geometry_profile_id"] = geometry_id
-        expected_geometry = dict(expected_programming["flash_geometry"])
-        expected_geometry["main_flash_size_bytes"] = flash_kib * 1024
-        expected_geometry["page_count"] = flash_kib * 1024 // group["shared_flash_geometry"]["erase_unit_bytes"]
-        expected_programming["flash_geometry"] = expected_geometry
+        shared = group["shared_flash_geometry"]
+        expected_programming = {
+            "programming_profile_id": profile_id,
+            "memory_geometry_profile_id": geometry_id,
+            "debug_transport": group["debug_transport"],
+            "electrical": {
+                "vdd_programming_v": group["programming_electrical"]["vdd_programming_v"],
+                "external_vpp_required": group["programming_electrical"]["external_vpp_required"],
+            },
+            "flash_geometry": {
+                "main_flash_start": shared["main_flash_start"],
+                "main_flash_size_bytes": flash_kib * 1024,
+                "page_count": flash_kib * 1024 // shared["erase_unit_bytes"],
+                **{key: shared[key] for key in ("erase_unit", "erase_unit_bytes",
+                                                  "program_unit", "program_unit_bytes")},
+            },
+            "blocked_operations": group["blocked_operations"],
+            "backend_constraints": group["backend_constraints"],
+        }
+        expected_provider = {key: provider.provider[key] for key in (
+            "provider_id", "version", "source_commit", "runtime_id",
+            "target_config", "flash_driver")}
+        expected_operations = {op: {"state": item["state"], "scope": item.get("scope")}
+                               for op, item in group["operation_qualification"].items()}
         expected_applicability = {
             "base_device": record.base_device,
             "density_class": band["name"],
@@ -846,9 +902,9 @@ class CatalogSqliteShadowRepository:
         }
         if (q.get("schema_version") != "2.0.0"
                 or q.get("registry_id") != "catalog-data-only-openocd-stm32f103-medium-v1"
-                or q.get("provider") != reference["provider"]
+                or q.get("provider") != expected_provider
                 or q.get("programming") != expected_programming
-                or q.get("operations") != reference["operations"]
+                or q.get("operations") != expected_operations
                 or q.get("qualification_gaps") != []
                 or reviewed.get("applicability") != expected_applicability
                 or reviewed.get("fact_references") != expected_references):

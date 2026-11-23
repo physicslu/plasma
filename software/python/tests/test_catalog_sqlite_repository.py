@@ -269,7 +269,7 @@ def test_l1_to_l2_requires_evidence_and_known_provider_profile(tmp_path: Path, m
     bad["programming"]["programming_profile_id"] = "wrong-profile"
     with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
         repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
-    with pytest.raises(DeviceCatalogIntegrityError, match="Exact ICPN is outside reviewed ordering applicability"):
+    with pytest.raises(DeviceCatalogIntegrityError, match="exact applicability authority missing"):
         repo.stage_revision([{"record": asdict(record), "qualification": l2}], actor="owner")
     assert repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 1
     assert {key for key, q in repo.read_active().qualifications.items() if q["catalog_level"] == 3} == baseline_l3
@@ -501,7 +501,9 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
             repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
     assert repo.read_active().revision_sha256 == l1_revision
 
-    stage = stage_packet(packet)
+    with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
+               side_effect=AssertionError("static Exact registry used by data-only Publisher")):
+        stage = stage_packet(packet)
     with sqlite3.connect(repo.path) as conn:
         audit_before = conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0]
     source_response[0] = b"<html>changed official page</html>"
@@ -516,7 +518,9 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     packet_path.unlink()
     repo = CatalogSqliteShadowRepository(repo.path)
     assert repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="st-page-v1") == exact_evidence_id
-    l2_revision = repo.publish_staged(stage, actor="owner")
+    with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
+               side_effect=AssertionError("static Exact registry used by data-only Publisher")):
+        l2_revision = repo.publish_staged(stage, actor="owner")
     snapshot = repo.read_active()
     assert l2_revision != l1_revision
     assert snapshot.qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 2
@@ -610,6 +614,8 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
     root = default_runtime_evidence_root()
     qualification = json.loads((root / "release/openocd-qualification/"
                                 "openocd-0.12.0-stm32f103-low-density-12-v1.json").read_text())
+    qualification_sha = hashlib.sha256((root / "release/openocd-qualification/"
+        "openocd-0.12.0-stm32f103-low-density-12-v1.json").read_bytes()).hexdigest()
     app_lock = qualification["applicability"]
     app = json.loads((root / app_lock["path"]).read_text())
     exacts = {item["icpn"] for item in app["records"]}
@@ -666,6 +672,7 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
             "base_device": record.base_device, "density_class": "low",
             "provider_source_lock_id": qualification["provider_source_lock_id"],
             "programming_group_id": group["group_id"],
+            "qualification_sha256": qualification_sha,
             "profile_git_blob_sha1": qualification["programming_profile"]["git_blob_sha1"],
             "geometry_git_blob_sha1": app_row["geometry_git_blob_sha1"],
             "exact_applicability_git_blob_sha1": app_lock["git_blob_sha1"],
@@ -694,6 +701,29 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
     bad["qualification"]["provider"]["version"] = "unreviewed"
     with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
         repo.stage_revision([bad], actor="owner")
+    # A reviewed packet alone cannot promote a different, unqualified Provider.
+    independent = json.loads(json.dumps(changes[0]))
+    independent_path = tmp_path / (independent["record"]["identifier"] + ".json")
+    original_packet = independent_path.read_bytes()
+    independent_packet = json.loads(original_packet)
+    independent["qualification"]["provider"]["provider_id"] = "unqualified-independent-provider"
+    independent["qualification"]["publication_evidence"]["provider_id"] = "unqualified-independent-provider"
+    independent_packet["provider"]["provider_id"] = "unqualified-independent-provider"
+    independent_path.write_text(json.dumps(independent_packet))
+    independent["qualification"]["publication_evidence"]["source_sha256"] = hashlib.sha256(
+        independent_path.read_bytes()).hexdigest()
+    with pytest.raises(DeviceCatalogIntegrityError, match="Provider/Profile/geometry/operations"):
+        repo.stage_revision([independent], actor="owner")
+    independent_path.write_bytes(original_packet)
+    forged_authority = json.loads(original_packet)
+    forged_authority["applicability"]["qualification_sha256"] = "0" * 64
+    independent_path.write_text(json.dumps(forged_authority))
+    forged = json.loads(json.dumps(changes[0]))
+    forged["qualification"]["publication_evidence"]["source_sha256"] = hashlib.sha256(
+        independent_path.read_bytes()).hexdigest()
+    with pytest.raises(DeviceCatalogIntegrityError, match="qualification authority"):
+        repo.stage_revision([forged], actor="owner")
+    independent_path.write_bytes(original_packet)
     with pytest.raises(DeviceCatalogIntegrityError, match="duplicate exact ICPN"):
         repo.stage_revision([changes[0], changes[0]], actor="owner")
     with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
