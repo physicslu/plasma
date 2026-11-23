@@ -110,11 +110,10 @@ _MANAGED_POST_PATTERNS = tuple(
         r"^/api/engineering/diagnostics/loopback$",
         r"^/api/engineering/diagnostics/openocd-control-plane$",
         r"^/api/engineering/session$",
+        # Legacy PPU Batch writes are not Manager-owned Batch submissions.
+        # Only /api/programming/batches may start Manager-coordinated Batches.
         r"^/api/jobs$",
         rf"^/api/jobs/{_SEGMENT}/cancel$",
-        r"^/api/batches$",
-        rf"^/api/batches/{_SEGMENT}/cancel$",
-        rf"^/api/batches/{_SEGMENT}/targets/{_SEGMENT}/{_SEGMENT}/cancel$",
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/programming-assets/check$",
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/programming-assets$",
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/jobs$",
