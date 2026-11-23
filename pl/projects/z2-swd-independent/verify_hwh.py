@@ -212,7 +212,7 @@ def check_xdc(xdc: Path) -> str:
     return sha256(xdc)
 
 
-def pair_manifest(build: Path, source_sha: str, hw: dict) -> dict:
+def pair_manifest(build: Path, source_sha: str, verified_hwh: Path) -> dict:
     """Write a Host-only candidate paired to the exact generated BIN and HWH."""
     artifacts = build / "artifacts"
     firmware = artifacts / "system_wrapper.bin"
@@ -222,7 +222,8 @@ def pair_manifest(build: Path, source_sha: str, hw: dict) -> dict:
             "OPP_PAIRED_ARTIFACT_MISSING")
     project = build / "project/z2_swd_independent.runs/impl_1"
     require(sha256(firmware) == sha256(project / "system_wrapper.bin") and
-            sha256(bit) == sha256(project / "system_wrapper.bit"),
+            sha256(bit) == sha256(project / "system_wrapper.bit") and
+            sha256(hwh) == sha256(verified_hwh),
             "OPP_PAIRED_ARTIFACT_MISMATCH")
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from pl.hil import fpga_image_guard as guard
@@ -398,7 +399,7 @@ def verify_artifacts(*, hwh: Path, bit: Path, reports: Path,
     # evidence for reviewer. A positive exit alone does NOT qualify timing.
     require("SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS" in build_stdout,
             "SWD_BUILD_TCL_SIGNOFF_MARKER_MISSING")
-    paired = pair_manifest(build, source_sha, hw) if build is not None else {}
+    paired = pair_manifest(build, source_sha, hwh) if build is not None else {}
     return {
         "schema": "plasma.opp.swd5.host-build.evidence.v1",
         "source_sha": source_sha,

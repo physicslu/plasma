@@ -233,6 +233,10 @@ def test_artifact_requires_real_tcl_marker_and_records_no_hardware(tmp_path):
     assert generic["manifest_sha256"] == swd.sha256(
         artifacts / "plasma-image-manifest.json")
     assert generic["bin_sha256"] == swd.sha256(artifacts / "system_wrapper.bin")
+    (artifacts / "system.hwh").write_bytes(hwh.read_bytes() + b"\n")
+    with pytest.raises(swd.SWDBuildDenied,
+                       match="OPP_PAIRED_ARTIFACT_MISMATCH"):
+        swd.pair_manifest(tmp_path, sha, hwh)
 
     (tmp_path / "vivado-stdout.log").write_text(
         "OPP_COMMON_SWD5_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED\n")
