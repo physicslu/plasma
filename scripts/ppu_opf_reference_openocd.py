@@ -590,8 +590,13 @@ async def execute_runtime_flash(
     image_root: Path, job_binding: Mapping[str, Any] | None,
     attempt: int = 1,
     stage_event=None,
+    pinned_profile: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Production REST Flash cutover; no direct-C3 fallback.
+
+    ``pinned_profile``: this Job's own ``preflight_runtime_flash`` result from
+    Job preparation (U4). The Set cannot change under the Job's execution
+    lease, so it is not verified twice; it must name the pinned Set.
 
     The Runtime supplies the Set pinned under its execution lease and the one
     Job deadline (including retries). Select the requested Bundle Profile
@@ -603,13 +608,18 @@ async def execute_runtime_flash(
     try:
         # Blocking file reads and SHA256 checks run off the Runtime event loop
         # (asyncio.to_thread) so concurrent Sites do not queue behind them.
-        pinned_profile = await job_timing.in_thread(
-            "preflight", preflight_runtime_flash,
-            product_root=product_root, active_asset_set=active_asset_set,
-            target=request.target, site_id=request.site_id, image_size=len(request.image),
-            job_binding=job_binding,
-            provider=request.metadata.get("provider"), profile=request.metadata.get("profile"),
-            operation=operation)
+        if pinned_profile is None:
+            pinned_profile = await job_timing.in_thread(
+                "preflight", preflight_runtime_flash,
+                product_root=product_root, active_asset_set=active_asset_set,
+                target=request.target, site_id=request.site_id, image_size=len(request.image),
+                job_binding=job_binding,
+                provider=request.metadata.get("provider"), profile=request.metadata.get("profile"),
+                operation=operation)
+        else:
+            _need(isinstance(active_asset_set, Mapping)
+                  and pinned_profile.get("asset_set_sha256") == active_asset_set.get("asset_set_sha256"),
+                  "PINNED_PROFILE_SET_MISMATCH")
         digest = pinned_profile["asset_set_sha256"]
         profile, handoff = await job_timing.in_thread(
             "staged_manifest", _staged_profile_and_handoff,

@@ -1602,16 +1602,6 @@ class BundleProgrammingWorkflow:
             if signer is not None and hasattr(client, "write_signer"):
                 client.write_signer = signer(run.alias)
             self._update(run, state="preflight")
-            started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
-            try:
-                self._readiness(client, run.site, plan.route.site_interface,
-                                plan.payload.get("execution_owner_id"), run.alias)
-            finally:
-                if started is not None:
-                    _m0_timing("manager_preflight", run_id=run.run_id, plan_id=plan.plan_id,
-                               ppu_alias=run.alias, site_id=run.site,
-                               duration_ms=round((self.monotonic() - started) * 1000, 3))
-            self._step(run, "PREFLIGHT", "PASS")
             session = self._batch_session(run.alias, plan.payload.get("execution_owner_id"))
             active = (session["assets"] if session is not None else
                       self._timed_bootstrap_read(run.alias, self.coordinator.assets, "assets"))
@@ -1629,6 +1619,11 @@ class BundleProgrammingWorkflow:
                     _m0_timing("manager_presubmit_readiness", run_id=run.run_id,
                                plan_id=plan.plan_id, ppu_alias=run.alias, site_id=run.site,
                                duration_ms=round((self.monotonic() - started) * 1000, 3))
+            # U4: this one readiness read, immediately before the single
+            # submission, is the run's preflight. An earlier identical read
+            # (two PPU HTTP calls and one full Active Set verification per
+            # attempt) proved nothing this one does not prove later.
+            self._step(run, "PREFLIGHT", "PASS")
             # The PPU itself must prove the Resources the Job is bound to.
             report = ready.get("active_resources")
             if not (isinstance(report, dict) and report.get("state") == "VERIFIED"
