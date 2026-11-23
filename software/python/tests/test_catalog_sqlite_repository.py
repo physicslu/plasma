@@ -598,6 +598,133 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     assert repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 2
 
 
+def test_low_density_twelve_publish_from_l1_without_active_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from collections import Counter
+    from plasma_web.openocd_software_qualification import _git_blob_sha1
+    from plasma_web.runtime_evidence_root import default_runtime_evidence_root
+
+    registry = get_default_programming_qualification_registry()
+    catalog = get_default_device_catalog()
+    root = default_runtime_evidence_root()
+    qualification = json.loads((root / "release/openocd-qualification/"
+                                "openocd-0.12.0-stm32f103-low-density-12-v1.json").read_text())
+    app_lock = qualification["applicability"]
+    app = json.loads((root / app_lock["path"]).read_text())
+    exacts = {item["icpn"] for item in app["records"]}
+    excluded = set(app["excluded_exact_icpns"])
+    assert len(exacts) == 12 and len(excluded) == 3 and not (exacts & excluded)
+    records = [catalog.resolve("STMicroelectronics", name) for name in sorted(exacts)]
+    assert all(records)
+
+    def l1(record):
+        value = json.loads(json.dumps(registry.describe(record.vendor, record.identifier)))
+        value.update(state="CANDIDATE", reviewed=False, catalog_level=1,
+                     catalog_level_state="PROGRAMMING_CANDIDATE", job_selectable=False,
+                     provider=None, programming=None, operations={})
+        return value
+
+    class BeforePublication:
+        _catalog = catalog
+
+        def describe(self, vendor, icpn):
+            record = catalog.resolve(vendor, icpn)
+            return l1(record) if icpn in exacts else registry.describe(vendor, icpn)
+
+    repo = CatalogSqliteShadowRepository(tmp_path / "low-density.sqlite3")
+    before = repo.import_verified_manifest(default_catalog_manifest_path(),
+                                           qualification_registry=BeforePublication())
+    old = repo.read_active()
+    assert Counter(q["catalog_level"] for q in old.qualifications.values()) == {
+        0: 204, 1: 5604, 3: 77,
+    }
+    assert not any(q.get("programming", {}) and q["programming"].get("programming_profile_id") ==
+                   "stm32f1-low-density-flash-v0" for q in old.qualifications.values())
+    old_l3 = {key: (old.catalog.resolve(*key), q) for key, q in old.qualifications.items()
+              if q["catalog_level"] == 3}
+    identity_lock = app["production_catalog"]
+    group = qualification["manufacturer_programming_group"]
+    changes = []
+    for record in records:
+        candidate = json.loads(json.dumps(registry.describe(record.vendor, record.identifier)))
+        candidate["catalog_level"] = 2
+        candidate["catalog_level_state"] = "PROGRAMMABLE"
+        packet_path = tmp_path / (record.identifier + ".json")
+        _reviewed_l2_packet(record, candidate, packet_path)
+        packet = json.loads(packet_path.read_text())
+        evidence_id = repo.acquire_exact_evidence(
+            record, kind="locked_production_identity",
+            source_revision=identity_lock["git_blob_sha1"])
+        packet["official_exact_source"] = {
+            "kind": "locked_production_identity", "path": identity_lock["path"],
+            "git_blob_sha1": identity_lock["git_blob_sha1"],
+            "exact_icpn": record.identifier, "evidence_id": evidence_id,
+        }
+        app_row = next(row for row in app["records"] if row["icpn"] == record.identifier)
+        packet["applicability"] = {
+            "base_device": record.base_device, "density_class": "low",
+            "provider_source_lock_id": qualification["provider_source_lock_id"],
+            "programming_group_id": group["group_id"],
+            "profile_git_blob_sha1": qualification["programming_profile"]["git_blob_sha1"],
+            "geometry_git_blob_sha1": app_row["geometry_git_blob_sha1"],
+            "exact_applicability_git_blob_sha1": app_lock["git_blob_sha1"],
+        }
+        packet["fact_references"] = {
+            "identity": f"{identity_lock['path']}#{record.identifier}",
+            "route": f"{qualification['provider_source_lock_id']}#{record.target_config}",
+            "geometry": f"{app_row['geometry_profile_path']}#{app_row['geometry_git_blob_sha1']}",
+            "operations": f"{qualification['qualification_id']}#{group['group_id']}",
+        }
+        packet_path.write_text(json.dumps(packet))
+        candidate["publication_evidence"]["source_sha256"] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+        changes.append({"record": asdict(record), "qualification": candidate})
+    with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
+               side_effect=AssertionError("static exact registry used by Publisher")):
+        assert len(repo.validate_changes(changes)) == 12
+    bad = json.loads(json.dumps(changes[0]))
+    bad["qualification"]["programming"]["flash_geometry"]["page_count"] += 1
+    with pytest.raises(DeviceCatalogIntegrityError, match="geometry|reviewed facts"):
+        repo.stage_revision([bad], actor="owner")
+    bad = json.loads(json.dumps(changes[0]))
+    bad["qualification"]["operations"]["erase"]["scope"] = "full-bank erase"
+    with pytest.raises(DeviceCatalogIntegrityError, match="reviewed facts"):
+        repo.stage_revision([bad], actor="owner")
+    bad = json.loads(json.dumps(changes[0]))
+    bad["qualification"]["provider"]["version"] = "unreviewed"
+    with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
+        repo.stage_revision([bad], actor="owner")
+    with pytest.raises(DeviceCatalogIntegrityError, match="duplicate exact ICPN"):
+        repo.stage_revision([changes[0], changes[0]], actor="owner")
+    with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
+               side_effect=AssertionError("static exact registry used by Publisher")):
+        stage = repo.stage_revision(changes, actor="owner")
+        assert repo.read_active().revision_sha256 == before
+        published = repo.publish_staged(stage, actor="owner")
+    assert published != before
+    after = repo.read_active()
+    assert Counter(q["catalog_level"] for q in after.qualifications.values()) == {
+        0: 204, 1: 5592, 2: 12, 3: 77,
+    }
+    assert len(after.qualifications) == 5885
+    assert {key: (after.catalog.resolve(*key), q) for key, q in after.qualifications.items()
+            if q["catalog_level"] == 3} == old_l3
+    assert all(after.qualifications[("stmicroelectronics", name.casefold())]["catalog_level"] == 1
+               for name in excluded)
+    assert len({key for key in after.qualifications}) == 5885
+    for name in exacts:
+        evidence = after.qualifications[("stmicroelectronics", name.casefold())]["publication_evidence"]
+        assert evidence["reviewed_evidence_id"] and "source_path" not in evidence
+        assert evidence["official_exact_source"]["evidence_id"]
+    monkeypatch.setenv(selector.SQLITE_SELECTOR_DB_ENV, str(repo.path))
+    status, body = selector.search_response("q=STM32F103C4T6A&levels=2,3")
+    assert status == 200 and body["results"][0]["catalog_level"] == 2
+    repo.rollback(before, actor="owner")
+    assert repo.read_active().revision_sha256 == before
+    repo.rollback(published, actor="owner")
+    assert repo.read_active().revision_sha256 == published
+
+
 def test_v2_schema_upgrade_keeps_revisions_and_audit(tmp_path: Path) -> None:
     repo = CatalogSqliteShadowRepository(tmp_path / "upgrade.sqlite3")
     revision = repo.import_verified_manifest(default_catalog_manifest_path())

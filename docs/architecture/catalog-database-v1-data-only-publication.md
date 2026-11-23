@@ -161,15 +161,16 @@ Provider source lock and target, the locked
 datasheet/programming-manual geometry sources, and the qualified programming
 group. Arbitrary reviewer prose cannot stand in for those references.
 
-The current data-only applicability validator is deliberately bounded to the
-source-validated OpenOCD 0.12.0 STM32F103 medium-density programming group.
-It checks the existing Provider release, driver/target, Programming Profile
-schema, geometry units and supported operation scopes, then derives the exact
-flash size and page count from the ordering code and group. New Geometry IDs
-are scoped to the base device and versioned in the immutable publication
-packet. Other Provider/group combinations fail closed until their existing
-source-backed contracts can be validated by a Publisher implementation. A
-reviewed packet cannot authorize an installed Runtime or a Job.
+The data-only applicability validator accepts the source-validated OpenOCD
+0.12.0 STM32F103 medium-density route and the independently source-locked
+low-density documentary cohort. The low-density route verifies the Provider,
+manufacturer source, exact applicability, Programming Profile, per-base Flash
+Geometry and operation scope from locked data files and durable Evidence IDs.
+It does not consult the Python exact-ICPN qualification list or require that
+the Profile already occur in the previous Active Revision. Other Provider/group
+combinations fail closed until their source-backed contracts can be validated
+by the Publisher. A reviewed packet cannot authorize an installed Runtime or a
+Job.
 The first data-only package route is bounded to STM32F103 medium-density
 VFQFPN36. Its packet must match the source-locked DS5319 Rev 20 Table 5 SWD
 pins (PA13/25 and PA14/28). This is a fresh applicability review for a package
@@ -197,9 +198,12 @@ data-only L2 rows must first replace those rows with durable Evidence IDs.
 The packet hash attests the reviewed packet bytes, **not** the original PDF bytes;
 unavailable original-document custody must not be represented as a PDF digest.
 The trusted Publisher OS identity is the admission authority; the reviewer's
-name in the packet is an audit claim, not authentication by itself. The Publisher uses only
-Provider release/Profile locks already admitted in the active Catalog. A new
-Provider implementation, Profile schema or release requires a code/schema change.
+name in the packet is an audit claim, not authentication by itself. The Publisher
+checks the Provider release/Profile source locks directly, including a valid
+Profile absent from the previous Active Revision. A new Provider implementation,
+Profile schema or release requires a code/schema change. Ordinary data-only
+Stage/Publish writes the Manager SQLite revision outside a GitHub software
+release; the Publisher code/schema PR uses focused Catalog CI.
 
 ```bash
 python3 -m plasma_web.catalog_sqlite_repository --db /manager-data/catalog.sqlite3 --acquire-evidence source-request.json --actor catalog-owner
