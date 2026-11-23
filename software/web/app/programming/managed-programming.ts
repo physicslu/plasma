@@ -743,12 +743,27 @@ export function batchSiteVerdict(
   if (unit.outcome == null) return { verdict: "RUNNING", reason: null };
   if (unit.outcome !== "PASS") return { verdict: unit.outcome, reason: unit.reason };
   const attempt = unit.attempts[unit.attempts.length - 1];
+  if (attempt && attempt.outcome !== "PASS") return { verdict: "FAIL", reason: "LAST_ATTEMPT_NOT_PASS" };
+  return attemptVerdict(batch, unit, run);
+}
+
+/**
+ * The verdict of one Site's LAST attempt (Run Outcome), whatever the Site
+ * lane is doing: a Repeat lane stays open (RUNNING / AWAITING_CONTINUE) after
+ * a Cycle's run has passed. A PASS attempt passes only with the evidence
+ * `batchSiteVerdict` requires of a PASS Site - the same checks, not a copy.
+ */
+export function attemptVerdict(
+  batch: ProgrammingBatch, unit: ProgrammingBatchUnit, run: ProgrammingRun | null,
+): { verdict: RunVerdict; reason: string | null } {
+  const attempt = unit.attempts[unit.attempts.length - 1];
   if (!attempt) return { verdict: "FAIL", reason: "ATTEMPT_RECORD_MISSING" };
+  if (attempt.outcome == null) return { verdict: "RUNNING", reason: null };
+  if (attempt.outcome !== "PASS") return { verdict: attempt.outcome, reason: attempt.reason };
   const key = attempt.job_key;
-  const failed = attempt.outcome !== "PASS" ? "LAST_ATTEMPT_NOT_PASS"
-    // Site identity: the attempt must be the Manager's record of THIS Site of
-    // THIS PPU in THIS Batch, never another Site's evidence read across.
-    : key == null || key.ppu_alias !== unit.ppu_alias || key.site_id !== unit.site_id
+  // Site identity: the attempt must be the Manager's record of THIS Site of
+  // THIS PPU in THIS Batch, never another Site's evidence read across.
+  const failed = key == null || key.ppu_alias !== unit.ppu_alias || key.site_id !== unit.site_id
       || key.batch_id !== batch.batch_id ? "ATTEMPT_IDENTITY_MISMATCH"
     : attempt.safe_off !== true ? "SAFE_OFF_NOT_VERIFIED"
     : !attempt.job_binding_sha256 ? "JOB_BINDING_MISSING"

@@ -796,10 +796,11 @@ export default function ManagedProgrammingWorkspace() {
               // identities and its Receipt summary, never the whole JSON Receipt.
               // Concurrent lanes: this attempt's run may not be the Batch's
               // current_run, so it is read from the Manager by its run_id.
-              const failed = attempt.outcome !== "PASS";
               pendingRunLogs.push(loadAttemptRun(next, request.alias, attemptSite, attempt.run_id).then(finishedRun => {
                 if (!finishedRun) return;
                 logPlan(finishedRun, attempt.plan_id);
+                // A Manager PASS whose Receipt fails `runVerdict` is an error line, as in PMode.
+                const failed = attempt.outcome !== "PASS" || runVerdict(finishedRun).verdict !== "PASS";
                 for (const line of programmingRunLogLines(finishedRun, {
                   executionInterface: interfaceOf(finishedRun.site_id),
                 })) {

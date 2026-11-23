@@ -31,8 +31,8 @@ import {
   continueMarkKey, sitesToContinue,
   loadManagedTopology, loadProgrammingRoutes,
   ManagedProgrammingBlocked, ManagedStartOutcomeUnknown,
-  PROGRAMMING_OPERATION_LABELS, batchSiteVerdict, routeDeclaring, routeSequenceOperations,
-  loadUnitRun, managedCycleHistory, runManagedBatch, runOfUnit,
+  PROGRAMMING_OPERATION_LABELS, attemptVerdict, batchSiteVerdict, routeDeclaring, routeSequenceOperations,
+  loadUnitRun, managedCycleHistory, runManagedBatch, runOfUnit, unitCycleLabel,
   type ManagedTopology, type ProgrammingSource, type RoutesState,
 } from "../programming/managed-programming";
 import { getProgrammingBatch, getStartReconciliation, normalizeOperations,
@@ -539,30 +539,51 @@ export default function FactoryConsoleV2() {
     }
     for (const unit of batch.units) {
       const last = unit.attempts[unit.attempts.length - 1] ?? null;
-      if (unit.outcome == null && last?.outcome == null) continue;
       const key = `${batch.batch_id}:${unit.ppu_alias}:${unit.site_id}`;
-      const signature = `${unit.outcome ?? "—"}:${last?.attempt ?? 0}:${last?.outcome ?? "—"}`;
-      if (loggedRecords.current.get(key) === signature) continue;
-      loggedRecords.current.set(key, signature);
       const ppu = topology?.ppus.find(item => item.alias === unit.ppu_alias);
       const interfaceName = ppu?.sites.find(site => site.site_id === unit.site_id)?.interface ?? "unknown";
       const label = `PPU ${unit.ppu_alias} · PPU ID ${ppu?.ppuId ?? "unknown"} · ${siteLabel(unit.site_id)}`;
+      // Site Lane waiting for the operator (Replace IC / FAIL review): once per pause.
+      const cycle = unit.cycle;
+      if (unit.outcome == null && cycle?.state === "AWAITING_CONTINUE") {
+        const waitKey = `${key}:wait:${cycle.continue_seq}`;
+        if (!loggedRecords.current.has(waitKey)) {
+          loggedRecords.current.set(waitKey, "");
+          appendLog(`[SITE] ${label} · ${unitCycleLabel(unit) ?? "AWAITING_CONTINUE"}`,
+            cycle.wait_reason === "REPLACE_IC" ? "INFO" : "WARN");
+        }
+      }
+      // Each finished attempt's run once (Run Outcome), keyed by its run: a
+      // Repeat Cycle restarts at attempt 1. The Site line once, when settled.
+      const runKey = last?.outcome != null ? `${key}:run:${last.run_id ?? `${last.cycle_index ?? 1}:${last.attempt}`}` : null;
+      const siteKey = unit.outcome != null ? `${key}:site` : null;
+      const logRun = runKey != null && !loggedRecords.current.has(runKey);
+      const logSite = siteKey != null && !loggedRecords.current.has(siteKey);
+      if (!logRun && !logSite) continue;
+      const runSeen = runKey != null && !logRun;
+      if (runKey) loggedRecords.current.set(runKey, "");
+      if (siteKey) loggedRecords.current.set(siteKey, "");
       const logUnit = (latestRun: ProgrammingRun | null, loadFailed: boolean) => {
         const verdict = batchSiteVerdict(batch, unit, latestRun);
-        let evidenceLogged = false;
-        if (latestRun?.outcome != null) {
-          if (latestRun.outcome === "PASS" && verdict.verdict !== "PASS") {
-            appendLog(`[EVIDENCE] MANAGER RUN PASS REJECTED · ${verdict.reason ?? "unverified receipt"} · ${label}`, "ERROR");
-          } else {
+        // An open Site Lane (Repeat, Retry) is judged on its last run alone;
+        // a settled one on the Site verdict. Neither relaxes the evidence.
+        const evidence = unit.outcome == null ? attemptVerdict(batch, unit, latestRun) : verdict;
+        let evidenceLogged = runSeen;
+        if (logRun && latestRun?.outcome != null) {
+          if (latestRun.outcome === "PASS" && evidence.verdict !== "PASS") {
+            appendLog(`[EVIDENCE] MANAGER RUN PASS REJECTED · ${evidence.reason ?? "unverified receipt"} · ${label}`, "ERROR");
+          } else if (unit.outcome != null || evidence.verdict !== "PASS" || batch.policy.repeat <= 1) {
             // These lines carry the Site interface [EVIDENCE] line already.
+            // A verified PASS Cycle of a Repeat lane is logged by Cycle History.
             for (const line of programmingRunLogLines(latestRun, { executionInterface: interfaceName })) {
-              appendLog(`${line} · ${label}`, verdict.verdict === "PASS" ? "INFO" : "ERROR");
+              appendLog(`${line} · ${label}`, evidence.verdict === "PASS" ? "INFO" : "ERROR");
             }
             evidenceLogged = true;
           }
-        } else if (loadFailed) {
+        } else if (logRun && loadFailed) {
           appendLog(`[RUN] Run ${last?.run_id ?? "—"} · receipt not loaded from the Manager · ${label}`, "WARN");
         }
+        if (!logSite) return;
         appendLog(`[SITE] ${label} · ${verdict.verdict} · Run ${last?.run_id ?? "—"} · Job ${last?.job_id ?? "—"} · SAFE_OFF ${safeOffLabel(last?.safe_off_state, last?.safe_off)}${verdict.reason ?? unit.reason ? " · " + (verdict.reason ?? unit.reason) : ""}`,
           verdict.verdict === "PASS" ? "INFO" : "WARN");
         if ((unit.outcome === "PASS" || unit.outcome === "FAIL") && !evidenceLogged) {
