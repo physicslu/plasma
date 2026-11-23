@@ -52,6 +52,12 @@ jobs:
           software/python/tests/test_control_station_release.py
           software/python/tests/test_product_release.py
           software/python/tests/test_render_deployment.py
+      - name: Verify packaged Manager Selector and committed Catalog (Linux)
+        if: runner.os == 'Linux'
+        run: >-
+          python -m pytest -q
+          software/python/tests/test_manager_device_selector.py::test_packaged_manager_serves_selector_from_its_own_catalog
+          software/python/tests/test_manager_device_selector.py::test_catalog_export_is_raw_git_blob_bytes_even_with_autocrlf
       - name: Build release, clean-extract, and run Console/BFF + Manager smoke
         run: >-
           python scripts/control-station-runtime-acceptance.py
