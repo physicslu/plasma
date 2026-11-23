@@ -178,7 +178,7 @@ export function managedProductionSnapshot(
     // Forward Manager truth unchanged, including unknown historical timing.
     created_at: batch.created_at ?? "",
     started_at: batch.started_at ?? null, finished_at: batch.finished_at ?? null,
-    operations: [...batch.operations],
+    operations: [...(batch.operations ?? [])],
     awaiting_continue: awaitingUnits(batch).map(unit => ({
       ppu_id: unit.ppu_alias, site_id: unit.site_id, continue_seq: unit.cycle!.continue_seq,
       detail: unitFailDetail(unit) ?? unitCycleLabel(unit) ?? "waiting for Continue",

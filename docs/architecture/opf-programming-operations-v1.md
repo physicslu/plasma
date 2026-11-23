@@ -67,9 +67,12 @@ Target Finalization is unchanged by retirement: the existing preamble and ending
 
 ## Layers
 
-1. **Manager plan** (`POST …/programming/plans`): exactly one of `operations` or `operation`
-   (`read` only). Unchanged: Registry, pairing, Recovery, Resource Reuse / B1–B3,
-   plan TTL, one plan → one run, OUTCOME_UNKNOWN latch, `auto_retry = DISABLED`.
+1. **Manager Batch** (`POST /api/programming/batches`): exactly one of `operations` or
+   `operation` (`read` only). Every Job, Read Memory included, is an attempt of a
+   Manager-owned Batch; the Batch plans each attempt internally (the alias-scoped
+   `programming/plans` + `runs` retired in U2). Unchanged: Registry, pairing, Recovery,
+   Resource Reuse / B1–B3 (before the Reservation, U1), one plan → one run,
+   OUTCOME_UNKNOWN latch, `auto_retry = DISABLED`.
 2. **PPU Gateway** `/api/jobs`: `operations` (+ `job_binding`) → `Operation.PROGRAMMING`.
 3. **SiteManager**: re-derives the Resource Set, re-validates the list and verifies the exact
    Binding under the Job lease; `max_retries` must be 0.

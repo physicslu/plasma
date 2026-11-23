@@ -93,7 +93,7 @@ from typing import Any, Callable, Generator, Mapping
 from .programming import (
     SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
     TARGET_TRANSACTION_UNKNOWN, BatchPreparation, BundleProgrammingWorkflow, JOB_TERMINAL,
-    SITE_DENIED_BEFORE_HARDWARE, ProgrammingError, _m0_timing,
+    PROGRAMMING, SITE_DENIED_BEFORE_HARDWARE, ProgrammingError, _m0_timing,
 )
 from .bootstrap import BootstrapManagerError
 from .client import PPUHTTPError
@@ -123,7 +123,7 @@ BATCH_TERMINAL = frozenset({"PASS", "FAIL", "PARTIAL", "OUTCOME_UNKNOWN", "BLOCK
 # A Target counts as executed only when a Job was submitted for it.
 EXECUTED_OUTCOMES = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN"})
 SETTLED_UNIT_OUTCOMES = EXECUTED_OUTCOMES | {"PARTIAL"}
-PLAN_KEYS = frozenset({"icpn", "operations", "image_base64", "image_filename",
+PLAN_KEYS = frozenset({"icpn", "operations", "operation", "image_base64", "image_filename",
                        "bundle_base64", "address", "length"})
 TARGET_KEY = "targets"
 POLICY_KEYS = frozenset({"retry_limit", "stop_policy", "repeat", "replace_ic_before_next_cycle"})
@@ -1114,11 +1114,13 @@ class ProgrammingBatchCoordinator:
     def _start(self, body: Mapping[str, Any]) -> dict[str, Any]:
         if (not isinstance(body, Mapping)
                 or set(body) - PLAN_KEYS - {TARGET_KEY} - POLICY_KEYS - START_KEYS
-                or "operations" not in body or TARGET_KEY not in body):
+                or len({"operations", "operation"} & set(body)) != 1
+                or TARGET_KEY not in body):
             raise ProgrammingError(
                 400, "invalid_request",
                 "a batch requires icpn, targets, an operations list with its Programming "
-                "Image, Bundle or erase range, and optional retry_limit / stop_policy")
+                "Image, Bundle or erase range (or operation \"read\" with its range), and "
+                "optional retry_limit / stop_policy")
         if "start_id" not in body:
             raise ProgrammingError(
                 400, "invalid_request",
@@ -1171,7 +1173,9 @@ class ProgrammingBatchCoordinator:
                 "start_id": start_id,
                 "targets": [dict(target, site_ids=list(target["site_ids"]))
                             for target in targets],
-                "operations": plan_body["operations"],
+                # The ordered E/P/V list, or None for the independent read Job.
+                "operations": plan_body.get("operations"),
+                "operation": plan_body.get("operation"),
                 "source": _source_of(plan_body), "icpn": plan_body.get("icpn"),
                 "policy": policy, "state": "running",
                 "execution_status": "RUNNING", "outcome": None, "reason": None,
@@ -1184,7 +1188,8 @@ class ProgrammingBatchCoordinator:
             # never reconcile as "not accepted". Partial admission has still
             # consumed it, so a BLOCKED Target needs a NEW start.
             self.workflow.consume_batch_start(
-                start_id, batch["batch_id"], batch["targets"])
+                start_id, batch["batch_id"], batch["targets"],
+                batch["operation"] or PROGRAMMING)
             self._batches[batch["batch_id"]] = batch
             try:
                 self._persist_locked()

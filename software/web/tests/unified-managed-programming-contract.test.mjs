@@ -52,18 +52,16 @@ test("ONLINE and Programming capability are judged separately with exact reasons
 });
 
 test("one Start: lock -> plan -> exactly one start -> observe; no retry of any write", () => {
-  // Only independent Read plans/starts a run in the Browser; programming
-  // submits one Manager Batch and the Manager owns every Site plan/Job.
-  assert.equal((core.match(/planProgramming\(/g) ?? []).length, 1);
-  assert.equal((core.match(/startProgramming\(/g) ?? []).length, 1);
+  // U2: programming and Read Memory each submit one Manager Batch; the
+  // Manager owns every Site plan/Job. The Browser never plans or starts a run.
+  assert.doesNotMatch(core, /planProgramming\(|startProgramming\(/);
   assert.match(core, /export async function runManagedRead\(/);
   // Both modes use the canonical Manager Batch entry point.
   assert.equal((emode.match(/runManagedBatch\(/g) ?? []).length, 1);
   assert.doesNotMatch(emode, /planProgramming\(|startProgramming\(/);
-  // The only loops are the read-only status polls (run, Batch).
+  // The only loops are the read-only Batch status polls (programming, Read).
   assert.equal((core.match(/\bwhile \(/g) ?? []).length, 2);
-  assert.match(core, /while \(run\.outcome == null\)/);
-  assert.match(core, /while \(batch\.outcome == null\)/);
+  assert.equal((core.match(/while \(batch\.outcome == null\)/g) ?? []).length, 2);
   assert.doesNotMatch(core, /for \(let (retry|attempt)/);
   assert.match(core, /MANAGED_JOB_POLICY = Object\.freeze\(\{ attempts: 1, auto_retry: "DISABLED" as const \}\)/);
   assert.match(core, /status != null && status >= 400 && status < 500/);
@@ -178,7 +176,7 @@ test("EMode sections are numbered 1 / 2 (2-1 … 2-4) / 3 / 4 and no current fea
 
 test("the standing PROGRAMMING PLAN panel is gone; the Backend plan still runs and is logged", () => {
   assert.doesNotMatch(emode, /PROGRAMMING PLAN|managed-plan|aria-label="Programming plan"/);
-  assert.match(core, /plan = await planProgramming\(request\.alias, \{/);
+  assert.match(core, /batch = await startProgrammingBatch\(\{[\s\S]{0,200}operation: "read",/);
   assert.match(core, /batch = await startProgrammingBatch\(input, startId\)/);
   assert.match(emode, /\[PLAN\] \$\{planned\.plan_id\} · Route/);
   assert.match(emode, /Resource SHA256 \$\{planned\.resource\.resource_set_sha256\} · Job Binding SHA256/);
@@ -196,7 +194,8 @@ test("EMode Batch Policy: Repeat / Retry / Stop Policy are decided by the Manage
   assert.doesNotMatch(api, /actor/);
   // One Batch request; the Browser has no retry loop and no plan / start of its own.
   assert.equal((emode.match(/runManagedBatch\(/g) ?? []).length, 1);
-  assert.equal((core.match(/startProgrammingBatch\(/g) ?? []).length, 1);
+  // One Batch request each for programming and Read Memory (U2).
+  assert.equal((core.match(/startProgrammingBatch\(/g) ?? []).length, 2);
   assert.doesNotMatch(emode, /runManagedProgramming\(|planProgramming\(|startProgramming\(/);
   assert.doesNotMatch(emode, /for \(let (retry|attempt)|while \(/);
   assert.match(emode, /retryMax: MAX_RETRY_LIMIT/);
@@ -367,7 +366,7 @@ test("EMode and PMode number the same four chapters and the same Programming Job
 
 test("removing the duplicated UI keeps the Manager evidence and the safety gates", () => {
   // Admission, Job Binding, Resource identity and Start reconciliation are untouched.
-  assert.match(core, /plan = await planProgramming\(request\.alias, \{/);
+  assert.match(core, /batch = await startProgrammingBatch\(\{[\s\S]{0,200}operation: "read",/);
   assert.match(core, /batch = await startProgrammingBatch\(input, startId\)/);
   assert.match(emode, /async function reconcileStartHold/);
   assert.match(emode, /managed-start-hold/);
