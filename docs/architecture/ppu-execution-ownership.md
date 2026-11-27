@@ -117,6 +117,19 @@ The Plasma Manager's canonical Batch asks three separate questions before it ope
 
 A busy **peer** Site of the same Batch is not a reason to hold a released Site: the Manager's fleet snapshot (polled every few seconds) is not used to judge Site activity for programming. Platform maintenance (Bootstrap deployment, Runtime activation, Asset Set changes, FPGA reload) is a different gate: it still requires the whole PPU idle (`ppu_busy` / `ppu_idle_state_unproven` in the Manager; quiesce refused while any lease is held on the PPU; Reload Fence and Root Guard unchanged).
 
+## Loaded FPGA image under a Batch Reservation (U8 / U11, 2026-11-27)
+
+A Batch Resource Reservation (#1521) also pins the **loaded FPGA image** of the PPU:
+
+* **Pin.** The Reservation's first Job records the identity the root Site Worker reports from the Root journal: `image_id`, `session_id`, `boot_id` and `firmware_sha256`. The Runtime account cannot read that journal itself. `GET /api/status` shows the pin as `resource_reservation.fpga_image_id`.
+* **Check.** Every later Job of the Reservation must report the same identity. The executor checks it after the Worker `status` read and before any Site session (`RESERVED_FPGA_IDENTITY_REFUSED`). A different identity isolates the PPU as `RECOVERY_REQUIRED` with reason `RESERVED_FPGA_IDENTITY_CHANGED`, the same treatment as a changed Resource identity. A Job outside a Reservation is not affected.
+* **Root Entry.** `download`, `test` and `restore` refuse while the Runtime's durable Reservation (`/var/lib/plasma/output/ppu-resource-reservation.json`) is `ACTIVE`, with the code `RUNTIME_RESOURCE_RESERVATION_ACTIVE`.
+  * The file is opened without following links. Only a small regular file is read. An unreadable or malformed file fails closed (`RUNTIME_RESERVATION_UNREADABLE`).
+  * The file is used only to refuse; it never authorizes anything.
+  * `RECOVERY_REQUIRED` and released Reservations do not block operator recovery.
+* **B3.** The B3 FPGA load was already excluded: it needs the Runtime's asset quiesce lease, which a held Reservation refuses.
+* **Residual window.** A Root load between a Job's Worker `status` read and its own `open_job_session` is still caught by the Worker's per-session identity comparison and the Reload Fence. That comparison is not against the Reservation pin.
+
 ## Scope and limitations
 
 This change establishes the active-work non-overlap invariant at the PPU execution boundary. It does not persist leases across a Plasma Server process restart; restart reconciliation belongs to the separate Persistent Batch State / Gateway Restart Recovery work.

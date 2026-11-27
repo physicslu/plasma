@@ -392,6 +392,7 @@ class SiteWorker:
                     active_asset_set=runtime.active_asset_set,
                     admitted_job_binding=runtime.job_binding,
                     trusted_provider=runtime.trusted_provider,
+                    fpga_identity_guard=runtime.fpga_identity_guard,
                 ))
                 runtime.active_task = asyncio.create_task(
                     self.handler.execute(request, stage_callback),

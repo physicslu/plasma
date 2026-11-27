@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
+from functools import partial
 from typing import Any
 
 from plasma_core.config import PlasmaConfig, SiteConfig
@@ -20,6 +21,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.job_logging import OutputManager, ServerEventLogger, atomic_write_json
 from plasma_core.models import JobRequest, JobResult, iso_now
 from plasma_core.protocol import PROTOCOL_VERSION
+from plasma_opf.site_safety import site_safety_class
 from plasma_interfaces.base import BaseInterface
 from plasma_interfaces.fpga import FPGAInterface
 from plasma_interfaces.mock import MockActivityTracker, MockInterface
@@ -31,6 +33,7 @@ from .execution_router import RoutedProgrammingHandler, SiteExecutionRouter
 from .job_manager import JobRegistry, JobRuntime
 from .runtime_control import RuntimeQuiesceGate
 from .site_worker import SiteWorker
+from .time_sync import ChronyTimeSync
 
 InterfaceFactory = Callable[[SiteConfig], BaseInterface]
 # OFE-1B Job Image source (Gateway-validated, PPU re-verified at admission).
@@ -78,52 +81,11 @@ class PPUExecutionLease:
 
 RESERVATION_FILE = "ppu-resource-reservation.json"
 RESERVATION_TTL_S = 90
-# Structured C-3 Site Worker safety evidence (ppu_site_worker._safety,
-# docs/architecture/site-safety-evidence-v1.md). The Manager judges the same
-# statement with the same rules (plasma_manager.programming.site_safety_class).
-SITE_SAFETY_SCHEMA = "plasma.ppu.site-safety.v1"
-PRE_HARDWARE_DENIED = "PRE_HARDWARE_DENIED"
-FAILED_SAFE_OFF_VERIFIED = "FAILED_SAFE_OFF_VERIFIED"
-_SITE_SAFETY_PREFIX = {PRE_HARDWARE_DENIED: "TRANSPORT_DENIED:",
-                       FAILED_SAFE_OFF_VERIFIED: "OPERATION_FAILED_SAFE:"}
-
-
-def site_safety_class(context: Any, *, job_id: Any, site_id: Any,
-                      operation: Any) -> str | None:
-    """PRE_HARDWARE_DENIED / FAILED_SAFE_OFF_VERIFIED, or None (unproven).
-
-    Trusted only when the Worker's structured statement names exactly this
-    Job, Site, operation and the ``run`` stage, the outcome is explicitly
-    known, and the refusal code matches the statement's class. A code text
-    alone (e.g. ``TRANSPORT_DENIED:``) proves nothing.
-    """
-    if not isinstance(context, dict) or context.get("outcome_unknown") is not False:
-        return None
-    safety = context.get("site_worker_safety")
-    if not isinstance(safety, dict) or safety.get("schema") != SITE_SAFETY_SCHEMA:
-        return None
-    kind, code = safety.get("class"), safety.get("code")
-    prefix = _SITE_SAFETY_PREFIX.get(kind) if type(kind) is str else None
-    if (prefix is None or type(code) is not str or not code
-            or context.get("site_worker_code") != prefix + code):
-        return None
-    if context.get("site_worker_stage") != "run" or safety.get("stage") != "run":
-        return None
-    if (type(job_id) is not str or safety.get("job_id") != job_id
-            or context.get("job_id") != job_id):
-        return None
-    if (type(site_id) is not int or type(safety.get("site")) is not int
-            or safety.get("site") != site_id or context.get("site_id") != site_id):
-        return None
-    if (type(operation) is not str or safety.get("operation") != operation
-            or context.get("operation") != operation):
-        return None
-    touched, safe_off = safety.get("hardware_touched"), safety.get("safe_off")
-    if kind == PRE_HARDWARE_DENIED:
-        return kind if touched is False and safe_off is None else None
-    return kind if touched is True and safe_off is True else None
-
-
+#: U8: a Batch Reservation pins the loaded-image identity the root Site Worker
+#: reports from the Root journal (status, image, session, boot and image digest
+#: fields); the Runtime user cannot read the journal. Only the journal file's
+#: own digest is left out: it is not part of the loaded image's identity.
+FPGA_IDENTITY_VOLATILE = frozenset({"journal_sha256"})
 class SiteManager:
     """Own the Programming Sites local to exactly one physical PPU."""
 
@@ -158,6 +120,9 @@ class SiteManager:
         self._reservation: dict[str, Any] | None = self._load_reservation()
         self._delegated_package_jobs: set[str] = set()
         self._runtime_quiesce = RuntimeQuiesceGate()
+        self._time_sync = ChronyTimeSync()
+        # Production Stage C wiring supplies the root Site Worker status.
+        self._site_worker_status_reader: Callable[[], dict[str, Any]] | None = None
         self._started = False
 
         for site in config.sites:
@@ -477,6 +442,44 @@ class SiteManager:
                 raise PlasmaError(ErrorCode.PPU_BUSY,
                                   "PPU Resource Reservation could not be made durable") from None
 
+    def _guard_reserved_fpga_identity(self, job_id: str, identity: Any) -> None:
+        """U8: one loaded FPGA image for the whole Batch Reservation.
+
+        The Reservation's first Job pins the identity the root Site Worker
+        reports; every later Job of that Reservation must report the same one
+        before any Site session. A change (e.g. a Root image load between two
+        Jobs) isolates the PPU exactly like a changed Resource identity.
+        A Job outside a Reservation is not affected.
+        """
+        observed = ({key: value for key, value in identity.items()
+                     if key not in FPGA_IDENTITY_VOLATILE}
+                    if isinstance(identity, dict) else None)
+        with self._execution_lock:
+            record = self._reservation_now()
+            if record is None or record["state"] != "ACTIVE" or job_id not in record["job_ids"]:
+                return
+            pinned = record.get("fpga_identity")
+            if pinned is None:
+                if (not observed or type(observed.get("image_id")) is not str
+                        or not all(type(v) is str and v for v in observed.values())):
+                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                      "RESERVED_FPGA_IDENTITY_UNVERIFIABLE")
+                record["fpga_identity"] = observed
+                self._persist_reservation(record)
+                return
+            if observed == pinned:
+                return
+            self._reservation = self._recovery_record(
+                record, "RESERVED_FPGA_IDENTITY_CHANGED",
+                sorted(job for job in record["job_ids"] if not self._job_safe_off_proven(job)))
+            self._persist_reservation(self._reservation)
+            reservation = self._reservation
+        self.server_log.event("ERROR", "ppu_reserved_fpga_identity_changed",
+                              ppu_id=self.config.ppu.id, job_id=job_id,
+                              pinned_image_id=pinned.get("image_id"),
+                              observed_image_id=(observed or {}).get("image_id"))
+        raise self._reservation_busy("reserved FPGA identity changed", reservation)
+
     def _job_safe_off_proven(self, job_id: str) -> bool:
         """This PPU's own terminal Job result proves the Site is safe."""
         try:
@@ -551,6 +554,8 @@ class SiteManager:
             "state", "ppu_id", "owner_id", "epoch", "asset_set_sha256", "generation",
             "resource_set_sha256", "reason", "recovery_id", "reserved_epoch") if key in record}
         view["epoch"] = self._runtime_epoch
+        if isinstance(record.get("fpga_identity"), dict):
+            view["fpga_image_id"] = record["fpga_identity"].get("image_id")
         if record["state"] == "RECOVERY_REQUIRED":
             view["unproven_job_ids"] = list(record["unproven_job_ids"])
         elif record["state"] == "ACTIVE":
@@ -666,6 +671,69 @@ class SiteManager:
     def resource_reservation_snapshot(self) -> dict[str, Any]:
         with self._execution_lock:
             return self._reservation_view(self._reservation_now())
+
+    def pre_start_time_sync(self, *, owner_id: str, token: str | None,
+                            threshold_ms: int, budget_ms: int) -> dict[str, Any]:
+        """Serialize a bounded clock correction against all PPU admissions.
+
+        A Batch may use only its own Resource Reservation before its first
+        Job. The same lock protects reservation, Job lease and B3 quiesce;
+        holding it through chronyc closes the check-to-adjust race.
+        """
+        started = time.monotonic()
+        self._validate_execution_owner(owner_id, "owner_id")
+        if type(threshold_ms) is not int or not 1 <= threshold_ms <= 1000:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid time sync threshold")
+        if type(budget_ms) is not int or not 100 <= budget_ms <= 5000:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid time sync budget")
+        with self._execution_lock:
+            reservation = self._reservation_now()
+            busy = (self._runtime_quiesce.active() or self._execution_lease is not None
+                    or any(not job.state.terminal for job in self.registry.all()))
+            if reservation is not None:
+                busy = busy or (reservation["state"] != "ACTIVE"
+                                or reservation["owner_id"] != owner_id
+                                or token != reservation["token"]
+                                or bool(reservation["job_ids"]))
+            elif token is not None:
+                busy = True
+            if not busy and (self._site_worker_status_reader is not None
+                             or any(site.interface != "mock" for site in self._site_configs.values()
+                                    if site.enabled)):
+                # Root admission records and Site sessions are owned by the
+                # separate privileged Worker, not inferred from an idle REST
+                # queue. An unreadable Worker is an unverified owner.
+                try:
+                    worker = (self._site_worker_status_reader()
+                              if self._site_worker_status_reader is not None else None)
+                    busy = (not isinstance(worker, dict)
+                            or not isinstance(worker.get("sessions"), list)
+                            or bool(worker["sessions"])
+                            or not isinstance(worker.get("sealed_sites"), list)
+                            or bool(worker["sealed_sites"])
+                            or not isinstance(worker.get("admission_record_sites"), list)
+                            or bool(worker["admission_record_sites"])
+                            or worker.get("not_ready") is not None)
+                except Exception:  # noqa: BLE001 - unknown Root ownership is busy
+                    busy = True
+            if busy:
+                return {"ppu_id": self.config.ppu.id, "status": "SKIPPED_BUSY",
+                        "source": "chronyd", "service": "chrony",
+                        "before_offset_ms": None, "after_offset_ms": None,
+                        "uncertainty_ms": None, "adjustment_performed": False,
+                        "warning_code": "PPU_BUSY_OR_ROOT_OWNERSHIP_UNVERIFIED",
+                        "elapsed_ms": round((time.monotonic() - started) * 1000, 3),
+                        "observed_at_utc": iso_now()}
+            result = self._time_sync.execute(ppu_id=self.config.ppu.id,
+                                             threshold_ms=threshold_ms,
+                                             budget_ms=budget_ms)
+            self.server_log.event(
+                "INFO" if result["status"] in {"SYNCED", "CORRECTED"} else "WARNING",
+                "pre_start_time_sync", ppu_id=self.config.ppu.id,
+                owner_id=owner_id, status=result["status"],
+                warning_code=result["warning_code"],
+                adjustment_performed=result["adjustment_performed"])
+            return result
 
     def _release_execution_job(self, job_id: str) -> None:
         released: tuple[str, str] | None = None
@@ -973,6 +1041,8 @@ class SiteManager:
                                   "JOB_IMAGE_SOURCE_NOT_EXCLUSIVE")
             if binding_selected:
                 runtime.job_binding = self._admit_job_binding(request, pinned)
+                runtime.fpga_identity_guard = partial(
+                    self._guard_reserved_fpga_identity, request.job_id)
                 lap("job_binding")
             request = self.execution_routers[request.site_id].admit(
                 request, trusted_provider=trusted_provider)

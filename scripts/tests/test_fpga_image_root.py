@@ -73,6 +73,8 @@ class GenericImageRootTests(unittest.TestCase):
         self.port = FakePort(self.release)
         self.stack.enter_context(patch.object(stage, "STATE", self.folder / "state.json"))
         self.stack.enter_context(patch.object(stage, "CHILD", self.folder / "child.json"))
+        self.reservation = self.folder / "ppu-resource-reservation.json"
+        self.stack.enter_context(patch.object(stage, "RUNTIME_RESERVATION", self.reservation))
         self.stack.enter_context(patch.object(stage, "trusted_local"))
         self.stack.enter_context(patch.object(stage, "_state_file_trusted"))
         self.stack.enter_context(patch.object(stage.guard, "RootZ2TargetPort",
@@ -291,6 +293,35 @@ class GenericImageRootTests(unittest.TestCase):
             self.release.firmware_name, self.release.recovery_name])
         self.assertEqual(stage.read_state(self.release)["status"], "RECOVERY")
         self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+
+    def test_no_operator_pl_change_while_a_batch_holds_the_ppu(self):
+        """U11: download / test / restore refuse an ACTIVE Runtime Reservation."""
+        self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+        writes = list(self.port.writes)
+        self.reservation.write_text(json.dumps({"state": "ACTIVE", "owner_id": "batch-1"}))
+        for verb in ("download", "test", "restore"):
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "RUNTIME_RESOURCE_RESERVATION_ACTIVE"):
+                stage.run(verb)
+        self.assertEqual(self.port.writes, writes)
+        # A settled or isolated Reservation does not block operator recovery.
+        for state in ("RECOVERY_REQUIRED", "RELEASED"):
+            self.reservation.write_text(json.dumps({"state": state}))
+            self.assertEqual(stage.run("test")["result"], "IDENTITY_PASS")
+
+    def test_an_unreadable_runtime_reservation_fails_closed(self):
+        self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+        for content in (b"not json", b"[]", b'{"state": 1}'):
+            self.reservation.write_bytes(content)
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "RUNTIME_RESERVATION_UNREADABLE"):
+                stage.run("test")
+        # A link (e.g. to a device) is never followed.
+        self.reservation.unlink()
+        self.reservation.symlink_to("/dev/zero")
+        with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                    "RUNTIME_RESERVATION_UNREADABLE"):
+            stage.run("test")
 
     def test_identity_requires_manual_download_first(self):
         for verb in ("test", "restore"):
@@ -936,6 +967,142 @@ class SiteAdmissionPolicyWiringTests(unittest.TestCase):
         self.assertNotIn("vanished_pids", facts.call_args.kwargs)
 
 
+class SiteAdmissionImageHashCacheTests(unittest.TestCase):
+    """U12: Site admission reuses a proven digest; nothing else does."""
+
+    def setUp(self):
+        self.td = tempfile.TemporaryDirectory()
+        self.addCleanup(self.td.cleanup)
+        base = Path(self.td.name)
+        self.firmware = base / "firmware"
+        self.firmware.mkdir()
+        self.owner = base / "owner"
+        self.owner.mkdir(mode=0o700)
+        self.image = self.firmware / "candidate.bin"
+        self.image.write_bytes(b"candidate image bytes")
+        self.sha = hashlib.sha256(b"candidate image bytes").hexdigest()
+        self.settle(self.image)
+        for target, value in (("FIRMWARE", self.firmware),
+                              ("IMAGE_SHA_CACHE", self.owner / "image-sha-cache.json")):
+            patcher = patch.object(guard, target, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        patcher = patch.object(guard, "protected")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.hashes = 0
+        real = guard.hashlib.sha256
+
+        def counting(*args):
+            self.hashes += 1
+            return real(*args)
+        patcher = patch.object(guard.hashlib, "sha256", side_effect=counting)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @staticmethod
+    def settle(path):
+        # Age mtime; ctime stays "now", so pretend the clock moved on.
+        os.utime(path, ns=(1, 1))
+
+    def later(self):
+        return patch.object(guard.time, "time_ns",
+                            return_value=self.image.stat().st_ctime_ns + 3_000_000_000)
+
+    def run_cached(self, expected=None, boot="boot-a"):
+        return guard.sha_file_cached(self.image, expected or self.sha, boot_id=boot)
+
+    def test_second_admission_reuses_proven_digest(self):
+        with self.later():
+            self.assertEqual(self.run_cached(), (self.sha, "FULL"))
+            self.assertEqual(self.run_cached(), (self.sha, "CACHE"))
+        self.assertEqual(self.hashes, 1)
+        cache = self.owner / "image-sha-cache.json"
+        self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
+
+    def test_rewritten_image_is_hashed_again_and_refused(self):
+        with self.later():
+            self.run_cached()
+        self.image.write_bytes(b"candidate image BYTES")  # same size, new ctime
+        with self.later(), self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                                  "FIRMWARE_BYTES_CHANGED"):
+            self.run_cached()
+
+    def test_replaced_image_with_restored_mtime_misses(self):
+        with self.later():
+            self.run_cached()
+        replacement = self.firmware / "new.bin"
+        replacement.write_bytes(b"candidate image BYTES")
+        os.utime(replacement, ns=(1, 1))
+        os.replace(replacement, self.image)
+        with self.later(), self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                                  "FIRMWARE_BYTES_CHANGED"):
+            self.run_cached()
+
+    def test_other_boot_or_other_expected_digest_never_hits(self):
+        with self.later():
+            self.run_cached()
+            self.assertEqual(self.run_cached(boot="boot-b"), (self.sha, "FULL"))
+            with self.assertRaisesRegex(guard.TargetSafetyDenied,
+                                        "FIRMWARE_BYTES_CHANGED"):
+                self.run_cached(expected="b" * 64)
+
+    def test_recently_changed_image_is_not_cached(self):
+        with patch.object(guard.time, "time_ns",
+                          return_value=self.image.stat().st_ctime_ns + 1):
+            self.run_cached()
+            self.assertEqual(self.run_cached(), (self.sha, "FULL"))
+        self.assertFalse((self.owner / "image-sha-cache.json").exists())
+
+    def test_mismatch_is_never_cached(self):
+        with self.later(), self.assertRaises(guard.TargetSafetyDenied):
+            self.run_cached(expected="c" * 64)
+        self.assertFalse((self.owner / "image-sha-cache.json").exists())
+
+    def test_untrusted_or_corrupt_cache_is_ignored(self):
+        cache = self.owner / "image-sha-cache.json"
+        forged = {"entries": {"candidate.bin": {
+            "boot_id": "boot-a", "sha256": self.sha,
+            "stat": guard._stat_identity(self.image.stat())}}}
+        for mode, body in ((0o644, json.dumps(forged)), (0o600, "{not json")):
+            with self.subTest(mode=mode):
+                cache.unlink(missing_ok=True)
+                cache.write_text(body)
+                cache.chmod(mode)
+                with patch.object(guard.time, "time_ns", return_value=0):
+                    self.assertEqual(self.run_cached(), (self.sha, "FULL"))
+        link = self.owner / "elsewhere.json"
+        cache.unlink()
+        link.write_text(json.dumps(forged))
+        link.chmod(0o600)
+        cache.symlink_to(link)
+        with patch.object(guard.time, "time_ns", return_value=0):
+            self.assertEqual(self.run_cached(), (self.sha, "FULL"))
+
+    def test_only_site_admission_enables_cache(self):
+        import threading
+        for site, enabled in ((1, True), (2, True), (None, False)):
+            port = guard.RootZ2TargetPort(release=object())
+            port._locked, port._lock_owner_pid = True, os.getpid()
+            port._lock_owner_thread = threading.get_ident()
+            port._site = site
+            with self.subTest(site=site), patch.object(
+                    guard, "read_live_z2_facts", side_effect=lambda **kw: kw) as facts:
+                port.current_facts()
+                self.assertIs(facts.call_args.kwargs["image_hash_cache"], enabled)
+        with patch.object(guard, "read_live_z2_facts",
+                          side_effect=lambda **kw: kw) as facts:
+            port.runtime_program_facts()
+        self.assertNotIn("image_hash_cache", facts.call_args.kwargs)
+
+    def test_image_sha256_for_reload_stays_full(self):
+        with self.later():
+            self.run_cached()
+        with patch.object(guard, "sha_file_cached",
+                          side_effect=AssertionError("reload must not use cache")):
+            self.assertEqual(guard.sha_file(self.image, self.sha), self.sha)
+
+
 class RootLazyHwhParserImportTests(unittest.TestCase):
     """WO-2 F1: Site admission imports the Root modules on every Job; only
     HWH validation needs ElementTree. Each case runs in a FRESH interpreter
@@ -1265,6 +1432,8 @@ class ProgramSessionProcScanSplitTests(unittest.TestCase):
         self.assertEqual(facts["proc_conflicts"], ["untrusted-owner"])
         self.assertEqual(set(timings),
                          {"image_hash", "kernel_owners", "process_census"})
+        self.assertEqual(facts["image_hash_source"],
+                         {"candidate": "FULL", "recovery": "FULL"})
         self.assertTrue(all(type(ms) is float and ms >= 0
                             for ms in timings.values()))
 

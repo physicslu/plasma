@@ -644,6 +644,16 @@ class CatalogSqliteShadowRepository:
         source_proof = source["evidence"]["official_datasheet"]
         profile_data = profile["data"]
         geom = geometry["data"]
+        from .openocd_software_qualification import get_default_openocd_software_qualification_registry
+        admitted_provider = get_default_openocd_software_qualification_registry()
+        provider_keys = ("provider_id", "version", "source_commit", "runtime_id",
+                         "target_config", "flash_driver")
+        if (admitted_provider is None
+                or qualification.get("provider_source_lock_id") != admitted_provider.source_lock_id
+                or not isinstance(qualification.get("provider"), dict)
+                or any(qualification["provider"].get(key) != admitted_provider.provider.get(key)
+                       for key in provider_keys)):
+            raise DeviceCatalogIntegrityError("L2 Provider release is not qualified")
         if (qualification.get("status") != "reviewed_source_only"
                 or source.get("status") != "REVIEWED_DOCUMENTARY_EVIDENCE"
                 or source_proof.get("documentary_review", {}).get("status") != "VERIFIED"
@@ -706,7 +716,7 @@ class CatalogSqliteShadowRepository:
                 or official.get("exact_icpn") != record.identifier):
             raise DeviceCatalogIntegrityError("L2 official Exact identity lock mismatch")
         metadata, saved = self._read_evidence(official.get("evidence_id"))
-        if (metadata[:3] != ("STMicroelectronics production identity lock", identity_lock["path"],
+        if (metadata[:3] != (f"{record.vendor} production identity lock", identity_lock["path"],
                             identity_lock["git_blob_sha1"]) or saved != identity_bytes):
             raise DeviceCatalogIntegrityError("L2 official Exact identity lock mismatch")
         expected_provider = {k: qualification["provider"][k] for k in
@@ -880,7 +890,7 @@ class CatalogSqliteShadowRepository:
             }:
                 raise DeviceCatalogIntegrityError("L2 official Exact identity lock mismatch")
             metadata, identity_bytes = self._read_evidence(exact_source.get("evidence_id"))
-            if metadata[:3] != ("STMicroelectronics production identity lock", identity_lock["path"],
+            if metadata[:3] != (f"{record.vendor} production identity lock", identity_lock["path"],
                                 identity_lock["git_blob_sha1"]):
                 raise DeviceCatalogIntegrityError("L2 official Exact identity lock mismatch")
             self._validate_exact_content(record, "locked_production_identity", identity_bytes, metadata[2])
@@ -890,7 +900,7 @@ class CatalogSqliteShadowRepository:
                     or not isinstance(exact_source.get("sha256"), str)):
                 raise DeviceCatalogIntegrityError("L2 official Exact source missing")
             metadata, source_bytes = self._read_evidence(exact_source.get("evidence_id"))
-            if (metadata[0] != "STMicroelectronics HTTPS" or metadata[1] != expected_url
+            if (metadata[0] != f"{record.vendor} HTTPS" or metadata[1] != expected_url
                     or metadata[3] != exact_source["sha256"]):
                 raise DeviceCatalogIntegrityError("L2 official Exact source bytes or identity mismatch")
             self._validate_exact_content(record, "manufacturer_https", source_bytes, metadata[2])

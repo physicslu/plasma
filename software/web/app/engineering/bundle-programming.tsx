@@ -1,31 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
-import { loadManagedTopology, type ManagedTopology } from "../programming/managed-programming";
+import {
+  loadManagedTopology, runManagedBatch, runManagedRead, type ManagedTopology,
+} from "../programming/managed-programming";
 import { ProgrammingRunView } from "../operator-ui/programming-run-view";
 import {
   acknowledgeProgrammingRun,
   getProgrammingRoutes,
-  getProgrammingRun,
   IMAGE_OPERATIONS,
-  planProgramming,
   PROGRAMMING_OPERATIONS,
-  startProgramming,
-  type PlanInput,
-  type ProgrammingPlan,
   type ProgrammingRoute,
   type ProgrammingRun,
 } from "./bundle-programming-api";
 
-const POLL_MS = 1000;
 // The IC Profile determines programming support; the PPU determines which Sites exist.
 const PICKER_LEVELS: Array<1 | 2 | 3> = [1, 2, 3];
-
-function short(value: string | null | undefined): string {
-  return value ? `${value.slice(0, 12)}…` : "—";
-}
 
 export default function BundleProgramming({ alias }: { alias: string }) {
   const [routes, setRoutes] = useState<ProgrammingRoute[] | null>(null);
@@ -37,13 +29,11 @@ export default function BundleProgramming({ alias }: { alias: string }) {
   const [chosenOperation, setChosenOperation] = useState<string | null>(null);
   const [rangeAddress, setRangeAddress] = useState("");
   const [rangeLength, setRangeLength] = useState("");
-  const [planState, setPlanState] = useState<{ key: string; plan: ProgrammingPlan } | null>(null);
-  const [confirmedPlanId, setConfirmedPlanId] = useState<string | null>(null);
-  const [pollTick, setPollTick] = useState(0);
+  const [confirmedKey, setConfirmedKey] = useState<string | null>(null);
   const [run, setRun] = useState<ProgrammingRun | null>(null);
-  const [busy, setBusy] = useState<"plan" | "start" | "ack" | null>(null);
+  const [busy, setBusy] = useState<"start" | "ack" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const startedRef = useRef<string | null>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,78 +73,52 @@ export default function BundleProgramming({ alias }: { alias: string }) {
   const needsImage = operation != null && IMAGE_OPERATIONS.has(operation);
   const address = /^(0x[0-9a-f]+|[0-9]+)$/i.test(rangeAddress.trim()) ? Number(rangeAddress.trim()) : null;
   const length = /^(0x[0-9a-f]+|[0-9]+)$/i.test(rangeLength.trim()) ? Number(rangeLength.trim()) : null;
-  // A prepared plan (and its confirmation) is valid only for the exact selection it was built from.
+  // The confirmation is valid only for the exact selection it was given for.
   const selectionKey = `${alias}|${icpn ?? ""}|${siteId ?? ""}|${operation ?? ""}|${needsImage
     ? (file ? `${file.name}:${file.size}:${file.lastModified}` : "")
     : `${address ?? ""}:${length ?? ""}`}`;
-  const plan = planState?.key === selectionKey ? planState.plan : null;
-  const confirmed = plan != null && confirmedPlanId === plan.plan_id;
+  const confirmed = confirmedKey === selectionKey;
 
-  const runActive = run != null && run.outcome == null;
   const inputReady = needsImage ? file != null : address != null && length != null;
-  const canPrepare = Boolean(icpn && siteId != null && operation && inputReady && !busy && !runActive);
-  const canStart = Boolean(plan && confirmed && !busy && !runActive);
+  const ready = Boolean(icpn && siteId != null && operation && inputReady && !busy);
+  const canStart = ready && confirmed;
 
-  async function prepare() {
-    if (!icpn || siteId == null || !operation || !inputReady) return;
-    setBusy("plan");
+  /**
+   * One Manager Batch of one Site and one Cycle (U2): the same canonical
+   * Batch EMode and PMode use. The Manager reuses or activates Resources
+   * before its Reservation and submits the Job once; nothing is retried.
+   */
+  async function start() {
+    if (!canStart || !icpn || siteId == null || !operation) return;
+    // One confirmation starts at most one Batch, even on a double click.
+    if (startedRef.current) return;
+    startedRef.current = true;
+    setBusy("start");
     setError(null);
     setRun(null);
     try {
-      let input: PlanInput;
       if (needsImage && file) {
-        input = {
-          icpn, siteId, operations: ["erase", "program", "verify"],
-          image: new Uint8Array(await file.arrayBuffer()), filename: file.name,
-        };
+        await runManagedBatch({
+          alias, icpn, source: "image", operations: ["erase", "program", "verify"], file,
+          siteIds: [siteId], retryLimit: 0, stopPolicy: { kind: "never" },
+        }, {
+          onBatch: next => { if (next.current_run) setRun(next.current_run); },
+          onPollError: setError,
+        });
       } else {
-        input = { icpn, siteId, operation: "read", address: address ?? 0, length: length ?? 0 };
+        const result = await runManagedRead(
+          { alias, siteId, icpn, address: address ?? 0, length: length ?? 0 },
+          { onRun: setRun, onPollError: setError });
+        setRun(result.run);
       }
-      const next = await planProgramming(alias, input);
-      setPlanState({ key: selectionKey, plan: next });
-      setConfirmedPlanId(null);
-    } catch (reason) {
-      setPlanState(null);
-      setError(reason instanceof Error ? reason.message : "Programming plan failed");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function start() {
-    if (!plan || !confirmed) return;
-    // One plan can start at most one run, even on a double click.
-    if (startedRef.current === plan.plan_id) return;
-    startedRef.current = plan.plan_id;
-    setBusy("start");
-    setError(null);
-    try {
-      setRun(await startProgramming(alias, plan.plan_id));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Programming start failed");
     } finally {
-      setPlanState(null);
-      setConfirmedPlanId(null);
+      startedRef.current = false;
+      setConfirmedKey(null);
       setBusy(null);
     }
   }
-
-  const poll = useCallback(async (runId: string) => {
-    try {
-      setRun(await getProgrammingRun(alias, runId));
-      setError(null);
-    } catch (reason) {
-      // Reads are safe to repeat; the run itself is never resubmitted.
-      setError(reason instanceof Error ? reason.message : "Programming status unavailable; the run was NOT resubmitted");
-      setPollTick(tick => tick + 1);
-    }
-  }, [alias]);
-
-  useEffect(() => {
-    if (!run || run.outcome != null) return;
-    const timer = window.setTimeout(() => { void poll(run.run_id); }, POLL_MS);
-    return () => window.clearTimeout(timer);
-  }, [run, poll, pollTick]);
 
   async function acknowledge() {
     if (!run) return;
@@ -176,12 +140,12 @@ export default function BundleProgramming({ alias }: { alias: string }) {
           <h3>Bundle Programming</h3>
           <p data-testid="platform-programming-scope">
             Maintenance and diagnostic entry. Normal programming is EMode → Programming (Single PPU) and
-            PMode → Factory Console; all three use the same Manager programming plan and run.
+            PMode → Factory Console; all three submit the same Manager Batch (here: one Site, one Cycle).
           </p>
           <p>
             Select IC, Site, Operation and its image or range. The Manager reuses the PPU&apos;s verified Programming
-            Resources when they are identical (no B1/B2/B3, no FPGA load), otherwise activates the canonical Bundle,
-            then submits one Job with your Operation. No automatic retry.
+            Resources when they are identical (no B1/B2/B3, no FPGA load), otherwise activates the canonical Bundle
+            before the Batch reserves them, then submits one Job with your Operation. No automatic retry.
           </p>
         </div>
       </header>
@@ -195,7 +159,7 @@ export default function BundleProgramming({ alias }: { alias: string }) {
             value={device}
             onChange={setDevice}
             levels={PICKER_LEVELS}
-            disabled={Boolean(busy) || runActive}
+            disabled={Boolean(busy)}
           />
         </label>
         <label>
@@ -203,7 +167,7 @@ export default function BundleProgramming({ alias }: { alias: string }) {
           <select
             aria-label="Programming Operation"
             value={operation ?? ""}
-            disabled={!operationOptions.length || Boolean(busy) || runActive}
+            disabled={!operationOptions.length || Boolean(busy)}
             onChange={event => setChosenOperation(event.target.value)}
           >
             {operationOptions.map(item => <option key={item} value={item}>{item}</option>)}
@@ -216,7 +180,7 @@ export default function BundleProgramming({ alias }: { alias: string }) {
               type="file"
               accept=".bin,application/octet-stream"
               aria-label="Image file"
-              disabled={Boolean(busy) || runActive}
+              disabled={Boolean(busy)}
               onChange={event => setFile(event.target.files?.[0] ?? null)}
             />
           </label>
@@ -225,12 +189,12 @@ export default function BundleProgramming({ alias }: { alias: string }) {
             <label>
               <span>Address</span>
               <input aria-label="Range address" value={rangeAddress} placeholder="0x08000000"
-                disabled={Boolean(busy) || runActive} onChange={event => setRangeAddress(event.target.value)} />
+                disabled={Boolean(busy)} onChange={event => setRangeAddress(event.target.value)} />
             </label>
             <label>
               <span>Length (bytes)</span>
               <input aria-label="Range length" value={rangeLength} placeholder="1024"
-                disabled={Boolean(busy) || runActive} onChange={event => setRangeLength(event.target.value)} />
+                disabled={Boolean(busy)} onChange={event => setRangeLength(event.target.value)} />
             </label>
           </>
         )}
@@ -239,7 +203,7 @@ export default function BundleProgramming({ alias }: { alias: string }) {
           <select
             aria-label="Programming Site"
             value={siteId ?? ""}
-            disabled={!siteOptions.length || Boolean(busy) || runActive}
+            disabled={!siteOptions.length || Boolean(busy)}
             onChange={event => setChosenSite(Number(event.target.value))}
           >
             {siteOptions.map(site => <option key={site} value={site}>Site {site}</option>)}
@@ -250,51 +214,26 @@ export default function BundleProgramming({ alias }: { alias: string }) {
             No Programming Route declares {icpn} on PPU {alias}.
           </p>
         )}
-        <button className="ppuSiteButton" type="button" disabled={!canPrepare} onClick={() => void prepare()}>
-          {busy === "plan" ? "Preparing…" : "Prepare Programming"}
-        </button>
       </div>
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
 
-      {plan && (
-        <section aria-label="Programming plan" className="ppuSiteCard">
-          <dl>
-            <dt>PPU / Site</dt><dd>{plan.ppu_alias} / Site {plan.site_id}</dd>
-            <dt>IC</dt><dd>{plan.route.icpn}</dd>
-            <dt>Operation</dt><dd data-testid="plan-operation">{plan.operation}</dd>
-            <dt>Route</dt><dd>{plan.route.route_id} ({plan.route.provider} → {plan.route.profile})</dd>
-            {plan.bundle && (
-              <>
-                <dt>Programming Image</dt><dd>{plan.bundle.image_filename} · {plan.bundle.image_size} B · <code>{short(plan.bundle.image_sha256)}</code></dd>
-              </>
-            )}
-            <dt>Range</dt>
-            <dd>0x{plan.job_binding.range.address.toString(16)} · {plan.job_binding.range.length} B</dd>
-            <dt>Resources</dt><dd data-testid="plan-resource-sha"><code>{plan.resource.resource_set_sha256}</code></dd>
-            <dt>Active Set</dt><dd>{plan.active_asset_set.state} <code>{short(plan.active_asset_set.asset_set_sha256)}</code></dd>
-            <dt>Activation</dt>
-            <dd data-testid="plan-activation">
-              {plan.activation_required
-                ? `Required: B1 upload → B2 admit → B3 activate Bundle ${short(plan.bundle?.archive_sha256)} (no FPGA load)`
-                : "Not required: the PPU verified identical Programming Resources (no B1/B2/B3, no FPGA load)"}
-            </dd>
-          </dl>
-          <label>
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={event => setConfirmedPlanId(event.target.checked ? plan.plan_id : null)}
-              aria-label="Confirm programming"
-            />
-            I confirm {plan.operation} on {plan.route.icpn} at {plan.ppu_alias} Site {plan.site_id} with this exact
-            {plan.image_asset ? " image" : " range"}.
-          </label>
-          <button className="ppuSiteButton primary" type="button" disabled={!canStart} onClick={() => void start()}>
-            {busy === "start" ? "Starting…" : "Start Programming"}
-          </button>
-        </section>
-      )}
+      <section aria-label="Programming start" className="ppuSiteCard">
+        <label>
+          <input
+            type="checkbox"
+            checked={confirmed}
+            disabled={!ready}
+            onChange={event => setConfirmedKey(event.target.checked ? selectionKey : null)}
+            aria-label="Confirm programming"
+          />
+          I confirm {operation ?? "—"} on {icpn ?? "—"} at {alias} Site {siteId ?? "—"} with this exact
+          {needsImage ? " image" : " range"}.
+        </label>
+        <button className="ppuSiteButton primary" type="button" disabled={!canStart} onClick={() => void start()}>
+          {busy === "start" ? "Running…" : "Start Programming"}
+        </button>
+      </section>
 
       {run && (
         <ProgrammingRunView run={run} onAcknowledge={() => void acknowledge()} acknowledging={busy === "ack"} />

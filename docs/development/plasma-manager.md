@@ -192,7 +192,7 @@ cd software/python
 
 ## Programming operations (one Job, `operations` list)
 
-Erase / Program / Verify run as ONE `programming` Job with an ordered `operations` list (one Job ID, lease, Job Binding and receipt); `read` is an independent Job; `flash_cycle` is retired and rejected by current admission. Normative detail: [OPF Programming Operations v1](../architecture/opf-programming-operations-v1.md). Host-only tests are not a hardware qualification of any operation.
+Erase / Program / Verify run as ONE `programming` Job with an ordered `operations` list (one Job ID, lease, Job Binding and receipt); `read` is an independent Job submitted as its own one-Site, one-Cycle Manager Batch (`operation: "read"`; the alias-scoped single `programming/plans` + `runs` retired in U2 with `410 programming_route_retired`); `flash_cycle` is retired and rejected by current admission. Normative detail: [OPF Programming Operations v1](../architecture/opf-programming-operations-v1.md). Host-only tests are not a hardware qualification of any operation.
 
 EMode Batch Retry / Stop Policy is Manager-owned (`programming_batch.py`): [EMode Batch Retry / Stop Policy v1](../architecture/emode-batch-retry-stop-policy-v1.md). Manual Repeat and its statistics (cumulative attempt counters, cursor-paged Cycle History `GET programming/batches/{id}/cycles`): [Batch Statistics v1](../architecture/unified-8site-scheduler-repeat-work-order-v1.md) §4.2. A Job the Site Worker refused before any hardware access is a BLOCKED Run (`SITE_DENIED_BEFORE_HARDWARE`, SAFE_OFF `NOT_TOUCHED`), never a Cycle FAIL; the Site waits for Continue. Only the structured Worker statement counts, judged identically by Manager and PPU: [Site Safety Evidence v1](../architecture/site-safety-evidence-v1.md).
 

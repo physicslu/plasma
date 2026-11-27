@@ -420,9 +420,11 @@ can happen inside a Batch run; a Batch plan that would need one is refused
 (`batch_resource_not_active`). A definite B1/B2/B3 failure blocks that PPU's
 Sites; a B3 whose outcome is unknown blocks them with failure domain
 `TARGET_TRANSACTION_UNKNOWN` and is never resubmitted. No DUT is touched in
-either case. The evidence is kept in the Batch's `resource_activation`. The
-alias-scoped single run (`programming/plans` + `runs`) still activates inside
-its run through the same `_activate_bundle` until that route retires (U2).
+either case. The evidence is kept in the Batch's `resource_activation`.
+**U2:** the alias-scoped single run (`programming/plans` + `runs`) is retired
+(`410 programming_route_retired`); every programming and Read Memory Job is a
+Batch attempt, a plan never activates (`batch_resource_not_active`), and
+`_activate_bundle` has exactly one caller, the Batch.
 
 Activation needed but no Image (`erase`/`read`) → 409
 `resource_activation_requires_image`. Before submission the Manager requires

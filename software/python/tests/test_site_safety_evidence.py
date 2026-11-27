@@ -101,10 +101,13 @@ def test_manager_and_ppu_judge_every_statement_identically(case, context, expect
     assert ppu_side.site_safety_class(copy.deepcopy(context), **kwargs) == expected
 
 
-def test_both_sides_share_the_schema_and_class_names():
-    for name in ("SITE_SAFETY_SCHEMA", "PRE_HARDWARE_DENIED", "FAILED_SAFE_OFF_VERIFIED",
-                 "_SITE_SAFETY_PREFIX"):
-        assert getattr(manager_side, name) == getattr(ppu_side, name), name
+def test_both_sides_use_the_one_shared_judgment():
+    # U9: one definition in plasma_opf, never two copies kept in step.
+    from plasma_opf import site_safety
+    assert manager_side.site_safety_class is site_safety.site_safety_class
+    assert ppu_side.site_safety_class is site_safety.site_safety_class
+    for name in ("SITE_SAFETY_SCHEMA", "PRE_HARDWARE_DENIED", "FAILED_SAFE_OFF_VERIFIED"):
+        assert getattr(manager_side, name) == getattr(site_safety, name), name
 
 
 # ------------------------------------------------- Manager Run classification

@@ -33,7 +33,7 @@ M1 extends existing best-effort `PLASMA_M0` stderr JSON: no new flags, files, RE
 | `manager_initial_admission` | batch_id, cycle_id, ppu_alias, site_id, attempt=1, platform_leader | Full first-stage PPU leader wait plus per-Site admission, emitted also on blocked/failed path. **Not additive** to other gate spans. |
 | `manager_readiness` | site_id and execution_owner_id when present | Whole `_readiness` including health/status GET and predicate evaluation; emitted on failure. |
 | `manager_readiness_http` | site_id, endpoint=health_ready/site_status | One Gateway GET and response parsing, emitted on failure; child of `manager_readiness`. |
-| `manager_preflight` | run_id, plan_id, ppu_alias, site_id | Readiness invocation for PREFLIGHT only; its subsequent journal step is **not** included. |
+| `manager_preflight` | run_id, plan_id, ppu_alias, site_id | **Retired in U4 (2026-11-23):** the separate PREFLIGHT readiness read was removed; the pre-submit readiness read is the run's preflight. |
 | `manager_presubmit_readiness` | run_id, plan_id, ppu_alias, site_id | Fresh readiness invocation before Resource confirmation and POST; the Resource comparison itself is outside this span. |
 | `manager_bootstrap_read` | ppu_alias, operation=status/assets | Bootstrap Coordinator read (including authenticated status and assets network calls). Span is inclusive; no credentials or response body logged. During B3 polls multiple events may occur. |
 | M0: `manager_plan`, `manager_cycle_admission`, `manager_submit_http`, `ppu_site_status`, `ppu_site_resources`, `ppu_asset_sha256`, `ppu_enqueue` | Existing fields and scopes | Reuse existing evidence. `manager_admission` and child spans overlap their enclosing timing; do not blindly sum. |

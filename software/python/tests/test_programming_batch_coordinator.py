@@ -93,10 +93,11 @@ def test_default_policy_is_one_attempt_repeat_one_never_stop():
     assert parse_policy({"repeat": 10000, "replace_ic_before_next_cycle": False})["repeat"] == 10000
 
 
-def test_a_batch_takes_an_operations_list_never_a_read_or_flash_cycle(tmp_path):
+def test_a_batch_takes_an_operations_list_or_a_read_never_a_flash_cycle(tmp_path):
+    # U2: Read Memory is a Batch (``operation: "read"``); both selectors, an
+    # unknown operation or neither is refused before anything is admitted.
     batches, _w, gateway = rig(tmp_path)
-    for request in ({"icpn": "STM32F103C8T6", "site_id": 2, "operation": "read",
-                     "address": 0x08000000, "length": 16},
+    for request in ({**ops_body(FULL), "operation": "read"},
                     {**ops_body(FULL), "operation": "flash_cycle"},
                     {k: v for k, v in ops_body(FULL).items() if k != "operations"}):
         with pytest.raises(ProgrammingError) as caught:

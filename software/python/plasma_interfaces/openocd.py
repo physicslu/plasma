@@ -44,6 +44,7 @@ class OpenOCDInterface(BaseInterface):
             str(options.get("normalized_image_root", DEFAULT_IMAGE_ROOT))
         )
         self._request: JobRequest | None = None
+        self._prepared_profile: dict[str, Any] | None = None
         # Installed by the trusted Runtime composition, never by Job metadata.
         self.opf_flash_executor: Callable[..., Awaitable[dict[str, Any]]] | None = None
         self.opf_flash_preflight: Callable[..., dict[str, Any]] | None = None
@@ -115,9 +116,12 @@ class OpenOCDInterface(BaseInterface):
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                               "RUNTIME_CONTEXT_JOB_MISMATCH")
         self._binding(request.operation)
+        self._prepared_profile = None
         try:
             with job_timing.span("prepare_preflight"):
-                self.opf_flash_preflight(
+                # U4: the one Active-Set verification of this Job; execution
+                # reuses it rather than verifying the same Set a second time.
+                self._prepared_profile = self.opf_flash_preflight(
                     active_asset_set=thaw(self._context.active_asset_set), target=request.target,
                     site_id=request.site_id, image_size=request.image_size,
                     job_binding=thaw(self._context.admitted_job_binding),
@@ -151,6 +155,8 @@ class OpenOCDInterface(BaseInterface):
             job_binding=thaw(self._context.admitted_job_binding),
             stage_event=self.stage_event,
             attempt=self._context.attempt,
+            pinned_profile=self._prepared_profile,
+            fpga_identity_guard=self._context.fpga_identity_guard,
         ))
 
     async def run_operations(
@@ -219,5 +225,6 @@ class OpenOCDInterface(BaseInterface):
     async def safe_shutdown(self) -> None:
         # The context never outlives the Job it was bound for.
         self._request = None
+        self._prepared_profile = None
         self._context = None
         self.operation_evidence = None

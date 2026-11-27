@@ -118,8 +118,10 @@ def test_per_cycle_call_counts_before_and_after(tmp_path, repeat):
     assert b.run()["outcome"] == "PASS"
     calls = b.bootstrap_calls()
     assert calls["assets"] == 1 and calls["status"] == repeat
-    assert b.http["GET /api/status?site"] == 3 * repeat + 1
-    assert b.http["GET /api/health/ready"] == 3 * repeat
+    # U4: per Cycle one admission read and one pre-submit read (the separate
+    # PREFLIGHT read is gone); plus the Batch's one Reservation identity read.
+    assert b.http["GET /api/status?site"] == 2 * repeat + 1
+    assert b.http["GET /api/health/ready"] == 2 * repeat
     assert b.http["POST /api/resource-reservations"] == 2
     assert b.local["routes"] == 1 and b.local["_parse_request"] == 2
 

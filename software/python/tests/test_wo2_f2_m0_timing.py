@@ -216,8 +216,9 @@ def test_m1_first_cycle_and_run_phases_carry_correlation(monkeypatch, capsys, tm
     assert initial[0]["batch_id"] == session.batch_id
     assert initial[0]["cycle_id"] and initial[0]["site_id"] == 1
     assert initial[0]["platform_leader"] is True and initial[0]["duration_ms"] >= 0
-    for name in ("manager_preflight", "manager_presubmit_readiness"):
-        samples = [r for r in events if r["event"] == name]
-        assert len(samples) == 1 and samples[0]["run_id"] and samples[0]["plan_id"]
-        assert samples[0]["duration_ms"] >= 0
+    # U4: one readiness read per attempt, immediately before the submission.
+    samples = [r for r in events if r["event"] == "manager_presubmit_readiness"]
+    assert len(samples) == 1 and samples[0]["run_id"] and samples[0]["plan_id"]
+    assert samples[0]["duration_ms"] >= 0
+    assert not [r for r in events if r["event"] == "manager_preflight"]
     assert any(r["event"] == "manager_bootstrap_read" for r in events)

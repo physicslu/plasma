@@ -37,17 +37,19 @@ export type BatchStatistics = {
 export type CycleTally = { settled: number; pass: number; fail: number };
 
 /**
- * One Site's settled Cycles. A Repeat session reads the Manager's Cycle
- * counters; a one-Cycle Site is its verified final verdict (the Browser's
- * receipt check may reject a Manager PASS, never promote anything).
+ * One Site's settled Cycles: the Manager's Cycle counters (U9). Only a record
+ * from a Manager older than Batch Statistics v1 (no counters) falls back to
+ * its one final outcome.
  */
 export function unitCycleTally(
   cycle: { planned: number; settled: number; pass: number; fail: number } | null | undefined,
-  siteVerdict: string,
+  siteOutcome: string,
 ): CycleTally {
-  if (cycle && cycle.planned > 1) return { settled: cycle.settled, pass: cycle.pass, fail: cycle.fail };
-  const pass = siteVerdict === "PASS" ? 1 : 0;
-  const fail = siteVerdict === "FAIL" ? 1 : 0;
+  if (cycle && typeof cycle.settled === "number") {
+    return { settled: cycle.settled, pass: cycle.pass, fail: cycle.fail };
+  }
+  const pass = siteOutcome === "PASS" ? 1 : 0;
+  const fail = siteOutcome === "FAIL" ? 1 : 0;
   return { settled: pass + fail, pass, fail };
 }
 

@@ -21,6 +21,7 @@ from types import SimpleNamespace
 import pytest
 
 from plasma_manager.programming import BundleProgrammingWorkflow, ProgrammingError
+from plasma_manager.client import PPUTransportError
 from plasma_manager.programming_batch import (
     ProgrammingBatchCoordinator, aggregate_outcome, migrate_batch_record,
     parse_policy, parse_targets,
@@ -88,9 +89,19 @@ class MultiplexGateway(FakeGateway):
         self.jobs = {}
         self.resource_reservation = None
         self.reservation_calls = []
+        self.time_sync_calls = []
 
     def relay(self, method, path, **kwargs):
         with self.job_lock:
+            if method == 'POST' and path == '/api/pre-start-time-sync':
+                request = json.loads(kwargs['body'])
+                self.time_sync_calls.append(request)
+                return self._resp(200, {'time_sync': {
+                    'ppu_id': self.ppu_id, 'status': 'SYNCED', 'source': 'chronyd',
+                    'service': 'chrony', 'before_offset_ms': 1.0,
+                    'after_offset_ms': 1.0, 'uncertainty_ms': 1.0,
+                    'elapsed_ms': 1.0, 'adjustment_performed': False,
+                    'warning_code': None, 'observed_at_utc': '2026-11-20T00:00:00+00:00'}})
             if method == 'POST' and path == '/api/resource-reservations':
                 request = json.loads(kwargs['body'])
                 self.reservation_calls.append(request['action'])
@@ -282,6 +293,9 @@ def test_two_ppus_each_run_their_own_sites(tmp_path):
     assert batch["counts"]["pass"] == 3 and batch["counts"]["sites"] == 3
     # Each Site is its own Job on its own PPU; nothing is shared but the Image.
     assert len(gateways["z2"].posts) == 2 and len(gateways["z2b"].posts) == 1
+    assert {alias: len(gateway.time_sync_calls) for alias, gateway in gateways.items()} == {
+        "z2": 1, "z2b": 1}
+    assert set(batch["time_sync"]) == {"z2", "z2b"}
     keys = [a["job_key"] for u in batch["units"] for a in u["attempts"]]
     assert keys == [{"batch_id": batch["batch_id"], "ppu_alias": "z2", "site_id": 2, "cycle": 1,
                      "attempt": 1},
@@ -289,6 +303,58 @@ def test_two_ppus_each_run_their_own_sites(tmp_path):
                      "attempt": 1},
                     {"batch_id": batch["batch_id"], "ppu_alias": "z2b", "site_id": 2, "cycle": 1,
                      "attempt": 1}]
+
+
+def test_repeat_100_keeps_one_pre_start_sync(tmp_path):
+    batches, workflow, gateways, _c = rig(tmp_path, sites=(2,))
+    started = batches.start_batch(with_start(
+        workflow, [one("z2", 2)], repeat=100, replace_ic_before_next_cycle=False))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS"
+    assert batch["cycles"]["settled"] == 100
+    assert len(gateways["z2"].posts) == 100
+    assert len(gateways["z2"].time_sync_calls) == 1
+    assert batch["time_sync"]["z2"]["status"] == "SYNCED"
+
+
+def test_retry_keeps_one_pre_start_sync(tmp_path):
+    batches, workflow, gateways, _c = rig(tmp_path, sites=(2,),
+                                          job_final=["failed", "success"])
+    started = batches.start_batch(with_start(
+        workflow, [one("z2", 2)], retry_limit=1))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS"
+    assert len(gateways["z2"].posts) == 2
+    assert len(gateways["z2"].time_sync_calls) == 1
+
+
+def test_pre_start_sync_warning_does_not_change_programming_outcome(tmp_path):
+    batches, workflow, gateways, _c = rig(tmp_path, sites=(2,))
+    def unavailable(alias, owner_id, ppu_id):
+        return {"ppu_id": ppu_id, "status": "UNAVAILABLE", "warning_code": "NO_SERVICE",
+                "adjustment_performed": False, "elapsed_ms": 1.0}
+    workflow.pre_start_time_sync = unavailable
+    started = batches.start_batch(with_start(workflow, [one("z2", 2)]))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS"
+    assert batch["time_sync"]["z2"]["status"] == "UNAVAILABLE"
+    assert len(gateways["z2"].posts) == 1
+
+
+def test_time_sync_transport_timeout_is_warning_and_job_still_runs(tmp_path):
+    batches, workflow, gateways, _c = rig(tmp_path, sites=(2,))
+    gateway = gateways["z2"]
+    original = gateway.relay
+    def relay(method, path, **kwargs):
+        if path == "/api/pre-start-time-sync":
+            raise PPUTransportError("timed out") from TimeoutError("timed out")
+        return original(method, path, **kwargs)
+    gateway.relay = relay
+    started = batches.start_batch(with_start(workflow, [one("z2", 2)]))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["time_sync"]["z2"]["status"] == "TIMEOUT"
+    assert batch["outcome"] == "PASS"
+    assert len(gateway.posts) == 1
 
 
 def test_a_failing_ppu_does_not_stop_an_unrelated_one(tmp_path):
@@ -1076,12 +1142,23 @@ def test_a_batch_activates_missing_resources_once_before_its_reservation(tmp_pat
     coord = coordinators["z2"]
     coord.active_sha = None   # EMPTY Active Set: the Route's Resources are not Active
     acquired_after_b3 = []
+    events = []
+    sync_tokens = []
     relay = gateways["z2"].relay
 
     def observe(method, path, **kwargs):
-        if method == "POST" and path == "/api/resource-reservations" \
-                and json.loads(kwargs["body"])["action"] == "acquire":
-            acquired_after_b3.append("B3" in coord.calls)
+        if method == "POST":
+            if path == "/api/resource-reservations":
+                action = json.loads(kwargs["body"])["action"]
+                if action == "acquire":
+                    acquired_after_b3.append("B3" in coord.calls)
+                    events.append("reserve")
+            elif path == "/api/pre-start-time-sync":
+                events.append("sync")
+                sync_tokens.append((json.loads(kwargs["body"])["token"],
+                                    gateways["z2"].resource_reservation["token"]))
+            elif path == "/api/jobs":
+                events.append("job")
         return relay(method, path, **kwargs)
 
     gateways["z2"].relay = observe
@@ -1099,6 +1176,8 @@ def test_a_batch_activates_missing_resources_once_before_its_reservation(tmp_pat
     assert [s["step"] for s in activation["z2"]["steps"]] == ACTIVATION_STEPS
     # The Reservation is acquired only after B3 and every Job reuses the Resources.
     assert acquired_after_b3 == [True]
+    assert events[:3] == ["reserve", "sync", "job"]
+    assert len(sync_tokens) == 1 and sync_tokens[0][0] == sync_tokens[0][1]
     assert len(gateways["z2"].posts) == 4 and len(gateways["z2b"].posts) == 2
     assert all(run.plan["activation_required"] is False for run in workflow._runs.values())
     assert gateways["z2"].reservation_calls[0] == "acquire"
@@ -1116,6 +1195,8 @@ def test_already_active_resources_are_reused_without_activation(tmp_path):
 
 @pytest.mark.parametrize("b3, reason, domain", [
     ({"b3_raises": True}, "B3_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT",
+     "TARGET_TRANSACTION_UNKNOWN"),
+    ({"status_raises_after_b3": True}, "B3_STATE_UNKNOWN_DO_NOT_RESUBMIT",
      "TARGET_TRANSACTION_UNKNOWN"),
     ({"b3_final": "failed"}, "B3_FAILED", "TARGET_NOT_READY"),
 ])
@@ -1160,3 +1241,72 @@ def test_a_plan_inside_a_batch_never_activates(tmp_path):
         workflow.plan("z2", {**request, "site_id": 2}, preparation=BatchPreparation())
     assert caught.value.code == "batch_resource_not_active"
     assert "B1_create" not in coordinators["z2"].calls
+
+
+def test_resources_still_not_active_after_activation_submit_nothing(tmp_path):
+    batches, workflow, gateways, coordinators = rig(tmp_path)
+    coordinators["z2"].active_sha = None
+    gateways["z2"].resource_for = lambda _active: "d" * 64   # B3 did not yield the Route's Resources
+    started = batches.start_batch(with_start(workflow, [one("z2", 2)]))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert units_of(batch) == [("z2", 2, "BLOCKED", "BLOCKED")]
+    assert batch["units"][0]["reason"] == "ADMISSION_RESOURCE_RESERVATION_REQUIRES_ACTIVE_SET"
+    assert coordinators["z2"].calls.count("B3") == 1
+    assert gateways["z2"].posts == [] and gateways["z2"].reservation_calls == []
+
+
+def test_a_bundle_source_batch_activates_the_users_exact_archive(tmp_path):
+    from .test_bundle_programming_workflow import user_bundle
+    batches, workflow, gateways, coordinators = rig(tmp_path)
+    coord = coordinators["z2"]
+    coord.active_sha = None
+    built = user_bundle()
+    request = {k: v for k, v in body([one("z2", 2)]).items()
+               if k not in ("image_base64", "image_filename")}
+    request["bundle_base64"] = base64.b64encode(built.archive).decode()
+    request["start_id"] = workflow.issue_batch_start({"kind": "batch"})["start"]["start_id"]
+    started = batches.start_batch(request)
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS" and batch["source"] == "bundle", batch
+    # B1 carried the user's own bytes and B3 activated exactly that identity.
+    assert bytes(coord.uploaded) == built.archive and coord.active_sha == built.archive_sha256
+    assert coord.b3_body["fpga_load"] is False
+    [post] = gateways["z2"].posts
+    assert base64.b64decode(post["asset_base64"]) == image()
+    assert not {"bundle_base64", "asset_set_sha256"} & set(post)
+
+
+def test_read_memory_is_a_one_site_batch_attempt(tmp_path):
+    batches, workflow, gateways, coordinators = rig(tmp_path)
+    request = {"icpn": ICPN, "targets": [one("z2", 2)], "operation": "read",
+               "address": 0x08000010, "length": 777,
+               "start_id": workflow.issue_batch_start({"kind": "batch"})["start"]["start_id"]}
+    started = batches.start_batch(request)
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS", batch
+    assert batch["operation"] == "read" and batch["operations"] is None
+    assert batch["source"] == "range" and batch["counts"]["attempts"] == 1
+    [post] = gateways["z2"].posts
+    assert post["operation"] == "read" and "operations" not in post
+    assert "asset_base64" not in post and "image_asset" not in post
+    run = batch["current_run"]
+    assert run["plan"]["operation"] == "read" and run["receipt"]["read_output"]["bytes"] == 777
+    data, meta = workflow.read_output("z2", run["run_id"])
+    assert len(data) == 777 and meta["sha256"] == run["receipt"]["read_output"]["sha256"]
+    assert not {"B1_create", "B2", "B3"} & set(coordinators["z2"].calls)
+    # A lost answer reconciles as a READ Batch, never as a programming one.
+    view = batches.reconcile_start(request["start_id"])["reconciliation"]
+    assert view["kind"] == "batch" and view["state"] == "TERMINAL_CONFIRMED"
+    assert view["identity"]["operation"] == "read" and view["identity"]["operations"] is None
+
+
+def test_a_read_batch_never_activates(tmp_path):
+    batches, workflow, gateways, coordinators = rig(tmp_path)
+    coordinators["z2"].active_sha = None
+    request = {"icpn": ICPN, "targets": [one("z2", 2)], "operation": "read",
+               "address": 0x08000010, "length": 64,
+               "start_id": workflow.issue_batch_start({"kind": "batch"})["start"]["start_id"]}
+    batch = batches.status_batch(batches.start_batch(request)["batch"]["batch_id"])["batch"]
+    assert units_of(batch) == [("z2", 2, "BLOCKED", "BLOCKED")]
+    assert batch["units"][0]["reason"] == "ADMISSION_RESOURCE_ACTIVATION_REQUIRES_IMAGE"
+    assert "B1_create" not in coordinators["z2"].calls and gateways["z2"].posts == []

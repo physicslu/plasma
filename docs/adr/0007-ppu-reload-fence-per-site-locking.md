@@ -88,6 +88,20 @@ currently installed Z2 Root Guard.
 Root reload/test/restore keep the strict rescan. See
 [Root Guard program/configuration split](../development/root-guard-runtime-program-split-2026-10-29.md#2026-11-19--abi-v5-site-admission-confirmed-exited-pids-wo-1).
 
+**Implementation note (2026-11-27, U12).** Site admission no longer hashes
+both FPGA images in full on every Job (about 130 ms per 4 MB image on Z2). A
+digest that was fully hashed and matched the pinned value is recorded in
+`/run/plasma-z2-swd05/image-sha-cache.json` (root-only, tmpfs) with the boot
+ID and the file's device, inode, size, mtime and ctime. A later Site
+admission reuses it only when all of these are equal and the pinned value is
+the same; any rewrite or replacement changes ctime, which userspace cannot
+set. A file changed within 2 s of being hashed, changed while being hashed,
+or a missing, foreign-owned, group/other-accessible, symlinked or corrupt
+cache file means a full hash, never a denial and never a match. FPGA Manager
+load, test, restore and the runtime program session keep the full hash. The
+facts report `image_hash_source` (`CACHE` or `FULL`) per image. The `/proc`
+census and kernel owner scan are unchanged.
+
 **Not yet qualified:** actual ARMv7/RAM/device-width barrier, FPGA
 HWH/BIT/Timing, two simultaneous real DUTs, Root lock file DAC on Z2,
 full PS Owner/Provider connection, or eight-Site physical throughput.

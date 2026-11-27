@@ -850,6 +850,21 @@ def test_locked_source_admits_new_profile_without_python_exact_registry(
     packet_path.write_text(json.dumps(packet))
     candidate["publication_evidence"]["source_sha256"] = hashlib.sha256(
         packet_path.read_bytes()).hexdigest()
+    # A self-consistent reviewed packet cannot introduce an unqualified release.
+    forged = json.loads(json.dumps(qualification))
+    forged["provider"]["source_commit"] = "0" * 40
+    forged_bytes = json.dumps(forged, sort_keys=True).encode()
+    authority_path = fixture_root / "release/openocd-qualification/independent-profile-qualification-v1.json"
+    authority_path.write_bytes(forged_bytes)
+    packet["applicability"]["qualification_sha256"] = hashlib.sha256(forged_bytes).hexdigest()
+    packet_path.write_text(json.dumps(packet))
+    candidate["publication_evidence"]["source_sha256"] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    with pytest.raises(DeviceCatalogIntegrityError, match="Provider release is not qualified"):
+        repo.stage_revision([{"record": asdict(record), "qualification": candidate}], actor="owner")
+    authority_path.write_bytes(qualification_bytes)
+    packet["applicability"]["qualification_sha256"] = hashlib.sha256(qualification_bytes).hexdigest()
+    packet_path.write_text(json.dumps(packet))
+    candidate["publication_evidence"]["source_sha256"] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
     with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
                side_effect=AssertionError("static Exact registry used by Publisher")):
         stage = repo.stage_revision([{"record": asdict(record), "qualification": candidate}],

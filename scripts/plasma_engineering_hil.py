@@ -2,8 +2,12 @@
 """SWPC engineering-only Manager Batch -> Z2 -> Blue Pill CDC E2E runner.
 
 Hardware writes require explicit --execute and the existing Manager/PPU
-authorization. This tool never deploys the Control Station, Runtime, Bundle or
-FPGA; it refuses a Manager plan that requires resource activation.
+authorization. This tool never deploys the Control Station, Runtime or FPGA.
+Since U1/U2 a Manager Batch activates missing Programming Resources itself
+before its Reservation (B1/B2/B3, never an FPGA load) and the single plan
+preview is retired, so this tool cannot refuse activation in advance: it
+reports BLOCKED (never PASS, never a resend) for any Batch that activated
+(``resource_activation``) instead of reusing PPU-verified Resources.
 """
 from __future__ import annotations
 
@@ -73,7 +77,6 @@ class Manager:
         self.url = require_loopback(url)
         self.last_start_id: str | None = None
         self.last_batch_id: str | None = None
-        self.last_preview_plan_id: str | None = None
 
     def call(self, method: str, route: str, body: dict | None = None) -> dict:
         data = None if body is None else json.dumps(body).encode("utf-8")
@@ -96,40 +99,11 @@ class Manager:
         return result
 
 
-def issue_and_check_reuse(client: Manager, alias: str, site: int, image: dict) -> str:
-    body = {"icpn": ICPN, "site_id": site,
-            "operations": OPERATIONS, "image_base64": image["image_base64"]}
-    route = f"/api/registry/{alias}/bootstrap/programming/plans"
-    response = client.call("POST", route, body)
-    plan = response.get("plan")
-    if not isinstance(plan, dict) or not HEX32.fullmatch(str(plan.get("plan_id"))):
-        raise HILFailure("Manager plan identity not confirmed; do not proceed")
-    plan_id = plan["plan_id"]
-    # Keep the exact issued identity even if the subsequent VOID request fails.
-    # A preview Start must be reconciled rather than silently abandoned.
-    client.last_preview_plan_id = plan_id
-    # The preview wrote a run Start to the Manager journal. Void it before
-    # returning; this tool submits programming only through canonical Batch.
-    void = client.call("POST", f"/api/programming/starts/{plan_id}/void",
-                       {"void": "VOID_UNSTARTED_START"})
-    reconciliation = void.get("reconciliation")
-    if not isinstance(reconciliation, dict) or reconciliation.get("state") != "NOT_ACCEPTED":
-        raise HILFailure("unused preview Start was not definitely voided")
-    if (plan.get("activation_required") is not False
-            or (plan.get("resource") or {}).get("reuse") is not True
-            or plan.get("fpga_load") is not False):
-        raise HILFailure("RESOURCE_REUSE_NOT_PROVEN: HIL must not activate Bundle/FPGA")
-    asset = plan.get("image_asset") or {}
-    if asset.get("sha256") != image["sha256"] or asset.get("size") != image["size"]:
-        raise HILFailure("Manager planned a different image")
-    sha = (plan.get("resource") or {}).get("resource_set_sha256")
-    if not isinstance(sha, str) or len(sha) != 64:
-        raise HILFailure("Manager Resource Set identity is missing")
-    return sha
 
-
-def validate_receipt(batch: dict, alias: str, site: int, image: dict,
-                     expected_resource: str) -> dict:
+def validate_receipt(batch: dict, alias: str, site: int, image: dict) -> dict:
+    if batch.get("resource_activation"):
+        raise HILFailure("RESOURCE_REUSE_NOT_PROVEN: the Batch activated Programming "
+                         "Resources (B1/B2/B3); do not resubmit")
     if (batch.get("outcome") != "PASS" or batch.get("execution_status") != "COMPLETED"
             or batch.get("counts", {}).get("pass") != 1
             or batch.get("counts", {}).get("sites") != 1):
@@ -153,6 +127,9 @@ def validate_receipt(batch: dict, alias: str, site: int, image: dict,
     receipt = run.get("receipt")
     if not isinstance(receipt, dict):
         raise HILFailure("PPU Job receipt missing")
+    expected_resource = receipt.get("expected_resource_set_sha256")
+    if not isinstance(expected_resource, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_resource):
+        raise HILFailure("Manager Resource Set identity is missing")
     required = {
         "safe_off": True,
         "readback_sha256": image["sha256"],
@@ -188,8 +165,6 @@ def one_attempt(client: Manager, alias: str, site: int, image: dict,
                 timeout_s: float, poll_s: float) -> tuple[dict, dict]:
     client.last_start_id = None
     client.last_batch_id = None
-    client.last_preview_plan_id = None
-    resource = issue_and_check_reuse(client, alias, site, image)
     start = client.call("POST", "/api/programming/starts", {"kind": "batch"})
     token = (start.get("start") or {}).get("start_id")
     if not isinstance(token, str) or not HEX32.fullmatch(token):
@@ -224,7 +199,7 @@ def one_attempt(client: Manager, alias: str, site: int, image: dict,
                 f"start_id={token}, batch_id={batch_id}: Batch poll identity "
                 "missing/mismatched; do not resubmit")
         batch = next_batch
-    evidence = validate_receipt(batch, alias, site, image, resource)
+    evidence = validate_receipt(batch, alias, site, image)
     return evidence, {"start_id": token, "batch_id": batch_id, "batch": batch}
 
 
@@ -285,7 +260,6 @@ def run(args: argparse.Namespace) -> int:
     except (HILFailure, AssertionError, OSError, ImportError, RuntimeError, UnicodeError) as exc:
         report["result"] = "BLOCKED"
         report["reason"] = f"{type(exc).__name__}: {str(exc)[:500]}"
-        report["last_preview_plan_id"] = client.last_preview_plan_id
         report["last_start_id"] = client.last_start_id
         report["last_batch_id"] = client.last_batch_id
         print(f"HIL BLOCKED: {report['reason']}", file=sys.stderr)
@@ -295,7 +269,6 @@ def run(args: argparse.Namespace) -> int:
         # exits; leave the exact Start/Batch IDs for read-only reconciliation.
         report["result"] = "OUTCOME_UNKNOWN"
         report["reason"] = "OPERATOR_INTERRUPTED_OBSERVER_DO_NOT_RESUBMIT"
-        report["last_preview_plan_id"] = client.last_preview_plan_id
         report["last_start_id"] = client.last_start_id
         report["last_batch_id"] = client.last_batch_id
         return 130
