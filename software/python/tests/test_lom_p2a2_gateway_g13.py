@@ -168,6 +168,12 @@ def test_engineering_ticket_enrollment_then_signed_gateway_write(lab):
     assert status == 202 and manager_auth.RESPONSE_HEADER in headers
     assert _Routes.recorded[-1] == ("/api/resource-reservations",
                                      json.dumps(reservation).encode())
+    time_sync = {"owner_id": "batch-test", "token": "token",
+                 "threshold_ms": 100, "budget_ms": 1000}
+    status, headers, _body = _post(_gateway_client(coordinator, gateway),
+                                   "/api/pre-start-time-sync", time_sync)
+    assert status == 202 and manager_auth.RESPONSE_HEADER in headers
+    assert _Routes.recorded[-1] == ("/api/pre-start-time-sync", json.dumps(time_sync).encode())
 
 
 def test_button_enrollment_binds_the_requesting_manager(lab):
@@ -203,6 +209,9 @@ def test_unsigned_wrong_or_unclassified_writes_fail_closed_before_dispatch(lab):
                            {"Content-Type": "application/json"})
     assert status == 401 and payload["error"]["code"] == "CONTROLLER_UNAUTHENTICATED"
     status, payload = _raw(gateway, "POST", "/api/resource-reservations", b"{}",
+                           {"Content-Type": "application/json"})
+    assert status == 401 and payload["error"]["code"] == "CONTROLLER_UNAUTHENTICATED"
+    status, payload = _raw(gateway, "POST", "/api/pre-start-time-sync", b"{}",
                            {"Content-Type": "application/json"})
     assert status == 401 and payload["error"]["code"] == "CONTROLLER_UNAUTHENTICATED"
     assert payload["error"]["controller_generation"] == 1
@@ -326,6 +335,7 @@ def test_every_manager_forwarded_post_route_is_classified():
         "/api/settings/sites/activation": "site.activation", "/api/settings/sites/2": "site.settings.write",
         "/api/mock/runtime": "ppu.settings.write", "/api/jobs": "site.job.submit",
         "/api/resource-reservations": "site.job.submit",
+        "/api/pre-start-time-sync": "site.job.submit",
         "/api/jobs/job-1/cancel": "site.job.cancel",
         "/api/settings/ppu-network/activation": "ppu.settings.write",
         "/api/settings/ppu-network/activation/act-1/commit": "ppu.settings.write",

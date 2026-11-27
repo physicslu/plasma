@@ -65,7 +65,7 @@ from plasma_opf.site_safety import (  # noqa: F401 - re-exported for Receipt rea
 from plasma_opf import bundle_v3
 from .shared_control import SharedControlError, shared_boundary, shared_control_reason
 from .bootstrap import BootstrapManagerError
-from .client import PPUHTTPError
+from .client import PPUHTTPError, PPUTransportError
 
 ROUTES_ENV = "PLASMA_PROGRAMMING_ROUTES_ROOT"
 ROUTES_RELATIVE = Path("data/opf/programming-routes")
@@ -841,6 +841,67 @@ class BundleProgrammingWorkflow:
         if session is not None:
             self._reservation_write(alias, {"action": "release", "owner_id": owner_id,
                                             "token": session["reservation"]["token"]})
+
+    def pre_start_time_sync(self, alias: str, owner_id: str, ppu_id: str) -> dict[str, Any]:
+        """One optional PPU observation; it never changes Programming Admission."""
+        started = self.monotonic()
+        result: dict[str, Any] = {
+            "ppu_id": ppu_id, "status": "UNAVAILABLE", "source": None,
+            "service": None, "before_offset_ms": None, "after_offset_ms": None,
+            "uncertainty_ms": None, "adjustment_performed": False,
+            "warning_code": "PPU_TIME_SYNC_UNAVAILABLE", "observed_at_utc": _now(),
+        }
+        try:
+            threshold_ms = int(os.environ.get("PLASMA_PRESTART_TIME_SYNC_THRESHOLD_MS", "100"))
+            budget_ms = int(os.environ.get("PLASMA_PRESTART_TIME_SYNC_BUDGET_MS", "1000"))
+            if not 1 <= threshold_ms <= 1000 or not 100 <= budget_ms <= 5000:
+                raise ValueError("time sync configuration out of range")
+            session = self._batch_session(alias, owner_id)
+            token = session["reservation"]["token"] if session is not None else None
+            record = self._record(alias)
+            client = self.gateway_client_factory(record.endpoint, self.request_timeout_s)
+            signer = getattr(self.coordinator, "gateway_signer", None)
+            if signer is not None and hasattr(client, "write_signer"):
+                client.write_signer = signer(alias)
+            status, _headers, payload = client.relay(
+                "POST", "/api/pre-start-time-sync",
+                headers={"Accept": "application/json", "Content-Type": "application/json"},
+                body=json.dumps({"owner_id": owner_id, "token": token,
+                                 "threshold_ms": threshold_ms, "budget_ms": budget_ms},
+                                sort_keys=True).encode(),
+                timeout_s=budget_ms / 1000 + 0.2,
+                max_response_bytes=65536)
+            answer = json.loads(payload)
+            observed = answer.get("time_sync") if status == 200 and isinstance(answer, dict) else None
+            if (not isinstance(observed, dict) or observed.get("ppu_id") != ppu_id
+                    or observed.get("status") not in {"SYNCED", "CORRECTED", "SKIPPED_BUSY",
+                                                       "UNAVAILABLE", "UNTRUSTED_SOURCE", "TIMEOUT",
+                                                       "FAILED", "UNSUPPORTED"}
+                    or type(observed.get("adjustment_performed")) is not bool):
+                raise ValueError("untrusted PPU time sync response")
+            if observed["status"] in {"SYNCED", "CORRECTED"}:
+                after = observed.get("after_offset_ms")
+                before = observed.get("before_offset_ms")
+                adjusted = observed["adjustment_performed"]
+                if (type(before) not in (float, int) or type(after) not in (float, int)
+                        or abs(after) > threshold_ms
+                        or adjusted != (observed["status"] == "CORRECTED")
+                        or observed.get("source") != "chronyd"):
+                    raise ValueError("unverified PPU time sync success")
+            result = observed
+        except TimeoutError as exc:
+            result.update(status="TIMEOUT", warning_code=type(exc).__name__.upper())
+        except PPUTransportError as exc:
+            cause = exc.__cause__
+            timed_out = isinstance(cause, TimeoutError) or isinstance(
+                getattr(cause, "reason", None), TimeoutError)
+            result.update(status="TIMEOUT" if timed_out else "UNAVAILABLE",
+                          warning_code="PPU_TIME_SYNC_TIMEOUT" if timed_out
+                          else "PPU_TIME_SYNC_TRANSPORT_ERROR")
+        except Exception as exc:  # noqa: BLE001 - optional observation only
+            result.update(warning_code=type(exc).__name__.upper())
+        result["elapsed_ms"] = round((self.monotonic() - started) * 1000, 3)
+        return result
 
     def target_block(self, alias: str, site: int, *,
                      execution_owner_id: str | None = None,

@@ -443,6 +443,15 @@ export default function FactoryConsoleV2() {
    * Site's lines are logged together once it is loaded.
    */
   const logManagedBatch = useCallback((batch: ProgrammingBatch, topology: ManagedTopology | null) => {
+    for (const [alias, observation] of Object.entries(batch.time_sync ?? {})) {
+      const key = `${batch.batch_id}:time-sync:${alias}`;
+      if (loggedRecords.current.has(key)) continue;
+      loggedRecords.current.set(key, observation.status);
+      appendLog(`[TIME SYNC] PPU ${alias} · ${observation.status} · ${observation.service ?? "service unknown"}${
+        observation.after_offset_ms == null ? "" : ` · offset ${observation.after_offset_ms} ms`}${
+        observation.warning_code ? ` · ${observation.warning_code}` : ""} · ${observation.elapsed_ms} ms`,
+        observation.status === "SYNCED" || observation.status === "CORRECTED" ? "INFO" : "WARN");
+    }
     // Every settled Cycle of a Repeat Batch reaches the Factory Log from the
     // Manager's Cycle History by cursor - also Cycles that started and ended
     // between two polls, after a reconnect or after a reload (a new reader

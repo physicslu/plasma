@@ -289,6 +289,16 @@ class PlasmaServer:
                 metadata["action"], owner_id=metadata["owner_id"],
                 token=metadata["token"], expected=metadata["expected"]))
 
+        if metadata.get("message_type") == "pre_start_time_sync":
+            if (frame.binary or frame.map_data
+                    or set(metadata) != {"protocol_version", "message_type", "owner_id",
+                                        "token", "threshold_ms", "budget_ms"}):
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "time sync request is invalid")
+            return self._success(self.manager.pre_start_time_sync(
+                owner_id=metadata["owner_id"],
+                token=metadata["token"], threshold_ms=metadata["threshold_ms"],
+                budget_ms=metadata["budget_ms"]))
+
         try:
             operation = Operation(str(metadata["operation"]))
         except (KeyError, ValueError) as exc:

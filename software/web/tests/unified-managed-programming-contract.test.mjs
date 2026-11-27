@@ -12,11 +12,21 @@ const read = path => readFile(new URL(path, root), "utf8");
 const core = await read("app/programming/managed-programming.ts");
 const emode = await read("app/engineering/managed-programming-workspace.tsx");
 const page = await read("app/engineering/page.tsx");
+const pmode = await read("app/fleet/factory-console-v2.tsx");
 const api = await read("app/engineering/bundle-programming-api.ts");
 const bff = await read("app/api/manager/bootstrap-bff.ts");
 const panel = await read("app/operator-ui/programming-job-panel.tsx");
 const selector = await read("app/operator-ui/programming-source-selector.tsx");
 const view = await read("app/operator-ui/programming-run-view.tsx");
+
+test("both managed modes show one warning per PPU for a failed Batch time sync", () => {
+  assert.match(emode, /Object\.entries\(next\.time_sync \?\? \{\}\)/);
+  assert.match(emode, /loggedTimeSync\.current\.has\(key\)/);
+  assert.match(emode, /!\["SYNCED", "CORRECTED"\]\.includes\(observation\.status\)/);
+  assert.match(pmode, /Object\.entries\(batch\.time_sync \?\? \{\}\)/);
+  assert.match(pmode, /loggedRecords\.current\.has\(key\)/);
+  assert.match(pmode, /observation\.status === "SYNCED" \|\| observation\.status === "CORRECTED" \? "INFO" : "WARN"/);
+});
 
 test("formal Console routes EMode Programming to the Manager backend, never the Mock runtime", () => {
   // U10: the Console is Manager-managed only; there is no standalone router.
