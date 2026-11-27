@@ -22,6 +22,7 @@ on:
       - "software/web/e2e/tests/mock-runtime-settings-runtime.spec.ts"
       - "software/web/e2e/tests/programming-job-real-stack-parity.spec.ts"
       - "software/web/e2e/tests/programming-job-test-helpers.ts"
+      - "software/web/e2e/tests/mock-cd-managed-helpers.ts"
   push:
     branches: [main]
     paths:
@@ -44,6 +45,7 @@ on:
       - "software/web/e2e/tests/mock-runtime-settings-runtime.spec.ts"
       - "software/web/e2e/tests/programming-job-real-stack-parity.spec.ts"
       - "software/web/e2e/tests/programming-job-test-helpers.ts"
+      - "software/web/e2e/tests/mock-cd-managed-helpers.ts"
   workflow_dispatch:
 
 concurrency:
@@ -109,17 +111,25 @@ jobs:
               if runtime.is_file():
                   payload = json.loads(runtime.read_text(encoding="utf-8"))
                   if payload.get("state") == "ready":
-                      engineering = payload.get("engineering") or {}
                       print(json.dumps(payload, indent=2, sort_keys=True))
                       with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as stream:
                           stream.write(f"MOCK_CD_WEB_URL={payload['web_url']}\n")
                           stream.write(f"MOCK_CD_GATEWAY_URL={payload['gateway_url']}\n")
-                          stream.write(f"MOCK_CD_UNREACHABLE_GATEWAY_URL={payload['unreachable_gateway_url']}\n")
-                          stream.write(f"MOCK_CD_EXPECTED_SITES={payload['enabled_sites']}\n")
-                          stream.write(f"MOCK_CD_EXPECTED_PPU_ID={payload['ppu_id']}\n")
-                          stream.write(f"MOCK_CD_ENGINEERING_FACILITY_ID={engineering['test_facility_id']}\n")
-                          stream.write(f"MOCK_CD_ENGINEERING_PPU_ID={engineering['test_ppu_id']}\n")
-                          stream.write(f"MOCK_CD_ENGINEERING_PPU_SITES={engineering['test_ppu_sites']}\n")
+                          # U10 Managed Lifecycle: the managed PPUs, their Route and the
+                          # test-harness-only PPU offline/online control.
+                          managed = payload["managed"]
+                          ppus = {item["alias"]: item for item in managed["ppus"]}
+                          ppu_a, ppu_b = managed["aliases"][0], managed["aliases"][1]
+                          route = managed["route"]
+                          stream.write(f"MOCK_CD_CONSOLE_PPU_ALIAS={managed['console_ppu_alias']}\n")
+                          stream.write(f"MOCK_CD_PPU_A_ALIAS={ppu_a}\n")
+                          stream.write(f"MOCK_CD_PPU_A_SITES={ppus[ppu_a]['sites']}\n")
+                          stream.write(f"MOCK_CD_PPU_B_ALIAS={ppu_b}\n")
+                          stream.write(f"MOCK_CD_PPU_B_SITES={ppus[ppu_b]['sites']}\n")
+                          stream.write(f"MOCK_CD_ROUTE_ICPN={route['icpn']}\n")
+                          stream.write(f"MOCK_CD_FLASH_BASE={route['flash_base']}\n")
+                          stream.write(f"MOCK_CD_FLASH_SIZE={route['flash_size']}\n")
+                          stream.write(f"MOCK_CD_HARNESS_CONTROL_URL={managed['harness_control_url']}\n")
                       break
               time.sleep(0.25)
           else:
@@ -148,7 +158,7 @@ jobs:
           runtime_path = Path("artifacts/mock-cd-browser/stack/runtime.json")
           runtime = json.loads(runtime_path.read_text(encoding="utf-8")) if runtime_path.is_file() else {}
           payload = {
-              "schema_version": 3,
+              "schema_version": 4,
               "commit": os.environ.get("MOCK_CD_COMMIT", "unknown"),
               "result": "PASS" if passed else "FAIL",
               "stack": {
@@ -156,14 +166,22 @@ jobs:
                   "enabled_sites": runtime.get("enabled_sites"),
                   "gateway": "real",
                   "api_mocking": False,
-                  "engineering": runtime.get("engineering"),
+                  "lifecycle": "managed",
+                  "manager": (runtime.get("managed") or {}).get("manager_url"),
+                  "managed_ppus": (runtime.get("managed") or {}).get("aliases"),
+                  "route": (runtime.get("managed") or {}).get("route"),
               },
               "scenarios": {
-                  "gateway_offline_recovery": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
-                  "per_site_erase_program_verify_read_download": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
-                  "batch_membership_selected_sites_x_operations": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
-                  "engineering_server_catalog_and_selected_ppu_execution": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
-                  "engineering_1mib_programming_asset_cache_reuse_and_reconnect": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "control_station_routing_ownership": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "managed_ppu_offline_recovery": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "emode_managed_per_site_erase_program_verify_read_download": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "emode_managed_batch_noncontiguous_sites_x_operations": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "emode_1mib_image_once_per_batch_resource_set_activated_once_reused": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "pmode_multi_ppu_batch_shared_image_epv": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "pmode_multi_ppu_batch_erase": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "pmode_abort_is_stop_queuing_started_jobs_complete": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "mock_runtime_settings_via_manager_relay": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "pmode_emode_programming_job_parity_1200_1680": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
               },
           }
           path = Path("artifacts/mock-cd-browser/browser-acceptance.json")

@@ -95,57 +95,54 @@ The GitHub workflow uploads the whole `artifacts/mock-cd/` directory as `mock-cd
 
 `.github/workflows/mock-cd-browser.yml` drives the actual Control Station through Playwright while the persistent harness `scripts/mock-cd-browser-stack.py` keeps the same Mock CD stack alive.
 
-The browser test does **not** use `page.route()` to replace Plasma APIs. The canonical engineering execution path is:
+The browser test does **not** use `page.route()` to replace Plasma APIs. Since U10 the Console is managed-only and the canonical execution path is the Managed Lifecycle:
 
 ```text
-Playwright browser action
-  -> Engineering Mode -> Programming
-  -> real Plasma Gateway
-  -> EngineeringPPUProvider
-  -> selected virtual PlasmaServer
-  -> SiteManager / SiteWorker
-  -> MockInterface
-  -> runtime result / Read download
-  -> browser assertion
+Playwright browser action (EMode Programming / PMode Factory Console)
+  -> same-origin Console BFF (/api/manager/...)
+  -> Plasma Manager ProgrammingBatchCoordinator
+  -> real PPU Bootstrap: Resource Set activation (B1/B2/B3, first use only),
+     Reservation, Job Binding
+  -> Mock PPU Runtime (Plasma Server + MockInterface) via its G13 Gateway
+  -> Manager Batch / run receipt (incl. Read output)
+  -> browser assertion + Manager evidence read through the same BFF
 ```
 
-The former Single PPU Programming Console is not part of Browser Runtime Acceptance. EMode Programming owns the single-PPU engineering workflow. `/ppu` is tested only as a compatibility redirect to `/engineering`.
+Specs only observe Browser requests (`page.on`) and read Manager evidence (`GET /api/manager/programming/batches/<id>`, `GET /api/manager/registry/<alias>/bootstrap/programming/runs/<run_id>`). The retired Browser-owned paths (`/api/batches`, `/api/engineering/...`, `/api/programming-assets`, direct `/api/jobs`) are recorded only to prove they stay unused. `/ppu` is tested only as a compatibility redirect to `/engineering`.
 
-The persistent stack publishes `runtime.json`. The workflow derives the Web URL, Plasma Gateway URL, deliberately unreachable Plasma Gateway test endpoint, and representative Engineering Facility/PPU identity from that runtime contract instead of duplicating runtime values in the Playwright step. The runtime field names remain compatibility-sensitive implementation details where applicable.
+The persistent stack publishes `runtime.json` (schema 3). Besides the Web URL it carries `managed`: the Manager URL, the two managed Mock PPUs (`ppu-a` 8 Sites, `ppu-b` 4 Sites), the Mock Route (ICPN, Flash Base / Size) and `harness_control_url`, a test-harness-only switch (`POST /ppus/<alias>/offline|online`) that stops and restarts one PPU's Gateway. The workflow exports these as `MOCK_CD_*` environment variables. Every PPU starts with no Active Set: its first Batch that carries an Image runs B1/B2/B3, later Batches reuse it. An Image-less Batch (Erase-only, Read) never activates.
 
 The acceptance scenarios are:
 
 1. **Control Station routing ownership**
-   - `/` resolves to `/demo` and renders the product-mode entry;
-   - `/ppu` resolves to `/engineering`;
+   - `/` resolves to `/demo`; `/ppu` resolves to `/engineering`;
    - neither route exposes the retired `SITE MATRIX / PPU CONTROL` UI.
 
-2. **Engineering Plasma Gateway connection state**
-   - start from the valid same-origin Engineering path and confirm the provider is online;
-   - use the test harness's syntactically valid but unreachable Plasma Gateway path and confirm EMode reports offline;
-   - restore the valid path and confirm clean recovery;
-   - verify malformed non-HTTP endpoint input is rejected without reviving retired Browser-owned topology authority.
+2. **Manager-managed PPU offline / recovery**
+   - the Console has no Gateway URL / Connect control;
+   - the harness takes a managed PPU's Gateway offline: EMode shows `PPU OFFLINE` and Start is disabled while the Manager Registry stays ONLINE;
+   - back online: `PPU ONLINE`, Start enabled again, nothing submitted.
 
 3. **EMode per-Site E/P/V/R and Read download**
-   - enter `Engineering -> Programming` through the actual Web UI;
-   - select the runtime-provided representative Facility and PPU;
-   - require Site topology to come from that selected PPU STATUS and contain no `SITE 0`;
-   - load a deterministic Programming Image and execute `Erase -> Program -> Verify -> Read` on a Site;
-   - observe real outbound requests scoped to `/api/engineering/targets/{facility_id}/{ppu_id}/api/jobs`;
-   - require every operation to reach `SUCCESS` through the Python Provider and selected virtual `PlasmaServer`;
-   - download the Read result and verify its content.
+   - Erase, Program and Verify each run as their own one-Site Manager Batch with exactly that operation and reach PASS in the Manager receipt;
+   - READ on the Site row is its own Read Batch over address / length (the Route's whole Flash);
+   - the Browser download is named by the Manager's Read output and its bytes re-hash to the receipt SHA256 (Image at Flash Base, the rest erased).
 
-4. **EMode server-owned Batch**
-   - select an arbitrary non-contiguous Site subset in EMode;
-   - select multiple operations;
-   - require one real `POST /api/batches` whose target identity, Site membership and operation list exactly match operator intent;
-   - require the authoritative server-owned Batch to reach `SUCCESS` and selected Site results to reach `PASS`;
-   - do not use the retired browser-owned `BatchLifecycle` path.
+4. **EMode Batch membership**
+   - a non-contiguous Site subset × multiple operations is ONE `POST /api/manager/programming/batches` whose Target Set and operations match operator intent;
+   - the Manager Batch and every Site run reach PASS.
 
-5. **Programming Image asset reuse/reconnect**
-   - exercise the dedicated Engineering asset-cache/reconnect scenario;
-   - require server-owned Batch asset semantics and Engineering session continuity;
-   - prove the active path does not fall back to legacy direct asset endpoints or direct per-Site Batch orchestration.
+5. **1 MiB Programming Image reuse**
+   - three Batches (the third after a Console reload) each carry the Image once, for both Sites;
+   - Manager evidence: every Job binds the same Image; the Resource Set is activated at most once (Batch `resource_activation`, B1/B2/B3) and later Batches reuse it (`resource_reuse`, Active Set generation 1).
+
+6. **PMode multi-PPU Batch**
+   - one Manager Batch over `ppu-a` + `ppu-b` with a shared Image (E/P/V) and one Erase-only Batch complete on both PPUs, each with its own Job / Binding;
+   - ABORT is whole-Batch STOP QUEUING: started Jobs complete PASS, queued Cycles are never submitted. Known intermittent pre-existing BFF bug: the stop relay (GET Batch, then POST stop to the HTTP/1.0 Manager) can lose the POST (503 `manager_unavailable`); the test stays strict.
+
+7. **Mock runtime settings** are written through the Manager relay (the G13 Gateway refuses an unsigned direct write) and EMode System Configuration shows the applied revision.
+
+8. **Programming Job parity**: PMode and EMode present one Programming Job contract at 1200 px and 1680 px.
 
 The Playwright configuration preserves trace, screenshot, video, HTML report, and JSON report on failure. The workflow emits:
 
