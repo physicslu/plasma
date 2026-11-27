@@ -269,7 +269,7 @@ def test_l1_to_l2_requires_evidence_and_known_provider_profile(tmp_path: Path, m
     bad["programming"]["programming_profile_id"] = "wrong-profile"
     with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
         repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
-    with pytest.raises(DeviceCatalogIntegrityError, match="Exact ICPN is outside reviewed ordering applicability"):
+    with pytest.raises(DeviceCatalogIntegrityError, match="exact applicability authority missing"):
         repo.stage_revision([{"record": asdict(record), "qualification": l2}], actor="owner")
     assert repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 1
     assert {key for key, q in repo.read_active().qualifications.items() if q["catalog_level"] == 3} == baseline_l3
@@ -424,6 +424,9 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
                                        "sha256": hashlib.sha256(official_bytes).hexdigest(),
                                        "evidence_id": exact_evidence_id}
     group = provider._programming_groups_by_profile["stm32f1-medium-density-flash-v0"]
+    route_path = "release/openocd-qualification/catalog-stm32f103-medium-vfqfpn36-route-v1.json"
+    route_bytes = (provider._root / route_path).read_bytes()
+    route = json.loads(route_bytes)
     packet["applicability"] = {
         "base_device": record.base_device,
         "density_class": "medium",
@@ -433,14 +436,9 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
         "programming_group_id": provider._programming_groups_by_profile[
             "stm32f1-medium-density-flash-v0"]["group_id"],
         "geometry_id": geometry_id,
-        "package_route": {
-            "package": "VFQFPN36", "transport": "SWD",
-            "swdio": {"signal": "PA13", "pin": 25},
-            "swclk": {"signal": "PA14", "pin": 28},
-            "source_document": "DS5319 Rev 20",
-            "source_locator": "Table 5, VFQFPN36 pin definitions",
-            "source_sha256": group["manufacturer_evidence"]["source_lock"]["st_ds5319_rev20"],
-        },
+        "package_route_source": {"path": route_path,
+                                 "sha256": hashlib.sha256(route_bytes).hexdigest()},
+        "package_route": route["package_route"],
     }
     packet["fact_references"] = {
         "identity": f"{source_url}#{record.identifier}",
@@ -464,6 +462,15 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     ):
         with pytest.raises(DeviceCatalogIntegrityError, match=error):
             stage_packet({**packet, field: replacement})
+    bad_route = json.loads(json.dumps(packet))
+    bad_route["applicability"]["package_route_source"]["sha256"] = "0" * 64
+    with pytest.raises(DeviceCatalogIntegrityError, match="package route source lock drift"):
+        stage_packet(bad_route)
+    bad_identity = json.loads(json.dumps(packet))
+    bad_identity["official_exact_source"]["url"] = (
+        "https://example.test/stm32f103t8.html")
+    with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source missing"):
+        stage_packet(bad_identity)
     source_response[0] = b"<html>STM32F103C8T6 only</html>"
     with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source"):
         repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="bad-page-v1")
@@ -501,7 +508,9 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
             repo.stage_revision([{"record": asdict(record), "qualification": bad}], actor="owner")
     assert repo.read_active().revision_sha256 == l1_revision
 
-    stage = stage_packet(packet)
+    with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
+               side_effect=AssertionError("static Exact registry used by data-only Publisher")):
+        stage = stage_packet(packet)
     with sqlite3.connect(repo.path) as conn:
         audit_before = conn.execute("SELECT count(*) FROM catalog_audit_events").fetchone()[0]
     source_response[0] = b"<html>changed official page</html>"
@@ -516,7 +525,9 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     packet_path.unlink()
     repo = CatalogSqliteShadowRepository(repo.path)
     assert repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="st-page-v1") == exact_evidence_id
-    l2_revision = repo.publish_staged(stage, actor="owner")
+    with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
+               side_effect=AssertionError("static Exact registry used by data-only Publisher")):
+        l2_revision = repo.publish_staged(stage, actor="owner")
     snapshot = repo.read_active()
     assert l2_revision != l1_revision
     assert snapshot.qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 2
@@ -610,6 +621,8 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
     root = default_runtime_evidence_root()
     qualification = json.loads((root / "release/openocd-qualification/"
                                 "openocd-0.12.0-stm32f103-low-density-12-v1.json").read_text())
+    qualification_sha = hashlib.sha256((root / "release/openocd-qualification/"
+        "openocd-0.12.0-stm32f103-low-density-12-v1.json").read_bytes()).hexdigest()
     app_lock = qualification["applicability"]
     app = json.loads((root / app_lock["path"]).read_text())
     exacts = {item["icpn"] for item in app["records"]}
@@ -666,6 +679,7 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
             "base_device": record.base_device, "density_class": "low",
             "provider_source_lock_id": qualification["provider_source_lock_id"],
             "programming_group_id": group["group_id"],
+            "qualification_sha256": qualification_sha,
             "profile_git_blob_sha1": qualification["programming_profile"]["git_blob_sha1"],
             "geometry_git_blob_sha1": app_row["geometry_git_blob_sha1"],
             "exact_applicability_git_blob_sha1": app_lock["git_blob_sha1"],
@@ -694,6 +708,35 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
     bad["qualification"]["provider"]["version"] = "unreviewed"
     with pytest.raises(DeviceCatalogIntegrityError, match="evidence"):
         repo.stage_revision([bad], actor="owner")
+    # A reviewed packet alone cannot promote a different, unqualified Provider.
+    independent = json.loads(json.dumps(changes[0]))
+    independent_path = tmp_path / (independent["record"]["identifier"] + ".json")
+    original_packet = independent_path.read_bytes()
+    independent_packet = json.loads(original_packet)
+    independent["qualification"]["provider"]["provider_id"] = "unqualified-independent-provider"
+    independent["qualification"]["publication_evidence"]["provider_id"] = "unqualified-independent-provider"
+    independent_packet["provider"]["provider_id"] = "unqualified-independent-provider"
+    independent_path.write_text(json.dumps(independent_packet))
+    independent["qualification"]["publication_evidence"]["source_sha256"] = hashlib.sha256(
+        independent_path.read_bytes()).hexdigest()
+    with pytest.raises(DeviceCatalogIntegrityError, match="Provider/Profile/geometry/operations"):
+        repo.stage_revision([independent], actor="owner")
+    independent_path.write_bytes(original_packet)
+    for vendor in ("NXP Semiconductors", "Microchip Technology"):
+        copied_claim = json.loads(json.dumps(changes[0]))
+        copied_claim["record"]["vendor"] = vendor
+        copied_claim["qualification"]["publication_evidence"]["manufacturer"] = vendor
+        with pytest.raises(DeviceCatalogIntegrityError, match="reviewed facts"):
+            repo.stage_revision([copied_claim], actor="owner")
+    forged_authority = json.loads(original_packet)
+    forged_authority["applicability"]["qualification_sha256"] = "0" * 64
+    independent_path.write_text(json.dumps(forged_authority))
+    forged = json.loads(json.dumps(changes[0]))
+    forged["qualification"]["publication_evidence"]["source_sha256"] = hashlib.sha256(
+        independent_path.read_bytes()).hexdigest()
+    with pytest.raises(DeviceCatalogIntegrityError, match="qualification authority"):
+        repo.stage_revision([forged], actor="owner")
+    independent_path.write_bytes(original_packet)
     with pytest.raises(DeviceCatalogIntegrityError, match="duplicate exact ICPN"):
         repo.stage_revision([changes[0], changes[0]], actor="owner")
     with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
@@ -723,6 +766,119 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
     assert repo.read_active().revision_sha256 == before
     repo.rollback(published, actor="owner")
     assert repo.read_active().revision_sha256 == published
+
+
+def test_locked_source_admits_new_profile_without_python_exact_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A second source-locked Profile uses the same Publisher with no ID dispatch."""
+    from plasma_web.openocd_software_qualification import _git_blob_sha1
+    from plasma_web.runtime_evidence_root import default_runtime_evidence_root
+
+    source_root = default_runtime_evidence_root()
+    fixture_root = tmp_path / "authority"
+    source_qual = json.loads((source_root / "release/openocd-qualification/"
+        "openocd-0.12.0-stm32f103-low-density-12-v1.json").read_text())
+    source_app = json.loads((source_root / source_qual["applicability"]["path"]).read_text())
+    source_profile = json.loads((source_root / source_qual["programming_profile"]["path"]).read_text())
+    record = get_default_device_catalog().resolve("STMicroelectronics", "STM32F103C4T6A")
+    assert record is not None
+    new_profile_id = "independent-locked-profile-v1"
+    registry = get_default_programming_qualification_registry()
+    repo = CatalogSqliteShadowRepository(tmp_path / "new-profile.sqlite3")
+    repo.import_verified_manifest(default_catalog_manifest_path(), qualification_registry=registry)
+    before = repo.read_active()
+    assert all((q.get("programming") or {}).get("programming_profile_id") != new_profile_id
+               for q in before.qualifications.values())
+
+    def write_source(relative: str, content: bytes) -> None:
+        target = fixture_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+
+    app = json.loads(json.dumps(source_app))
+    app["records"] = [row for row in app["records"] if row["icpn"] == record.identifier]
+    app["records"][0]["programming_profile_id"] = new_profile_id
+    app_path = "release/openocd-qualification/independent-profile-app-v1.json"
+    app_bytes = json.dumps(app, sort_keys=True).encode()
+    write_source(app_path, app_bytes)
+    profile = json.loads(json.dumps(source_profile))
+    profile["profile_id"] = new_profile_id
+    profile_path = "data/ic-support/profiles/programming/independent-locked-profile-v1.json"
+    profile_bytes = json.dumps(profile, sort_keys=True).encode()
+    write_source(profile_path, profile_bytes)
+    qualification = json.loads(json.dumps(source_qual))
+    qualification["qualification_id"] = "independent-locked-profile-qualification-v1"
+    qualification["applicability"] = {"path": app_path, "git_blob_sha1": _git_blob_sha1(app_bytes)}
+    qualification["programming_profile"] = {"path": profile_path,
+        "git_blob_sha1": _git_blob_sha1(profile_bytes), "profile_id": new_profile_id}
+    qualification["manufacturer_programming_group"]["manufacturer_evidence"][
+        "programming_profile_id"] = new_profile_id
+    qualification["records"] = [row for row in qualification["records"]
+        if row["icpn"] == record.identifier]
+    qualification["records"][0]["programming_profile_id"] = new_profile_id
+    qualification_bytes = json.dumps(qualification, sort_keys=True).encode()
+    write_source("release/openocd-qualification/independent-profile-qualification-v1.json",
+                 qualification_bytes)
+    for relative in (qualification["source_lock"]["path"],
+                     app["production_catalog"]["path"],
+                     app["records"][0]["geometry_profile_path"]):
+        write_source(relative, (source_root / relative).read_bytes())
+
+    candidate = json.loads(json.dumps(registry.describe(record.vendor, record.identifier)))
+    candidate["programming"]["programming_profile_id"] = new_profile_id
+    packet_path = tmp_path / "independent-profile-reviewed.json"
+    _reviewed_l2_packet(record, candidate, packet_path)
+    packet = json.loads(packet_path.read_text())
+    monkeypatch.setattr("plasma_web.runtime_evidence_root.default_runtime_evidence_root",
+                        lambda: fixture_root)
+    identity_lock = app["production_catalog"]
+    identity_id = repo.acquire_exact_evidence(record, kind="locked_production_identity",
+        source_revision=identity_lock["git_blob_sha1"])
+    packet["official_exact_source"] = {"kind": "locked_production_identity",
+        "path": identity_lock["path"], "git_blob_sha1": identity_lock["git_blob_sha1"],
+        "exact_icpn": record.identifier, "evidence_id": identity_id}
+    exact = app["records"][0]
+    group = qualification["manufacturer_programming_group"]
+    packet["applicability"] = {"base_device": record.base_device,
+        "density_class": group["density_class"],
+        "provider_source_lock_id": qualification["provider_source_lock_id"],
+        "programming_group_id": group["group_id"],
+        "qualification_sha256": hashlib.sha256(qualification_bytes).hexdigest(),
+        "profile_git_blob_sha1": _git_blob_sha1(profile_bytes),
+        "geometry_git_blob_sha1": exact["geometry_git_blob_sha1"],
+        "exact_applicability_git_blob_sha1": _git_blob_sha1(app_bytes)}
+    packet["fact_references"] = {"identity": f"{identity_lock['path']}#{record.identifier}",
+        "route": f"{qualification['provider_source_lock_id']}#{record.target_config}",
+        "geometry": f"{exact['geometry_profile_path']}#{exact['geometry_git_blob_sha1']}",
+        "operations": f"{qualification['qualification_id']}#{group['group_id']}"}
+    packet_path.write_text(json.dumps(packet))
+    candidate["publication_evidence"]["source_sha256"] = hashlib.sha256(
+        packet_path.read_bytes()).hexdigest()
+    # A self-consistent reviewed packet cannot introduce an unqualified release.
+    forged = json.loads(json.dumps(qualification))
+    forged["provider"]["source_commit"] = "0" * 40
+    forged_bytes = json.dumps(forged, sort_keys=True).encode()
+    authority_path = fixture_root / "release/openocd-qualification/independent-profile-qualification-v1.json"
+    authority_path.write_bytes(forged_bytes)
+    packet["applicability"]["qualification_sha256"] = hashlib.sha256(forged_bytes).hexdigest()
+    packet_path.write_text(json.dumps(packet))
+    candidate["publication_evidence"]["source_sha256"] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    with pytest.raises(DeviceCatalogIntegrityError, match="Provider release is not qualified"):
+        repo.stage_revision([{"record": asdict(record), "qualification": candidate}], actor="owner")
+    authority_path.write_bytes(qualification_bytes)
+    packet["applicability"]["qualification_sha256"] = hashlib.sha256(qualification_bytes).hexdigest()
+    packet_path.write_text(json.dumps(packet))
+    candidate["publication_evidence"]["source_sha256"] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    with patch("plasma_web.programming_qualification.get_default_programming_qualification_registry",
+               side_effect=AssertionError("static Exact registry used by Publisher")):
+        stage = repo.stage_revision([{"record": asdict(record), "qualification": candidate}],
+                                    actor="owner")
+        revision = repo.publish_staged(stage, actor="owner")
+    assert revision != before.revision_sha256
+    published = repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]
+    assert published["programming"]["programming_profile_id"] == new_profile_id
+    assert published["execution_authorized"] is False
 
 
 def test_v2_schema_upgrade_keeps_revisions_and_audit(tmp_path: Path) -> None:
