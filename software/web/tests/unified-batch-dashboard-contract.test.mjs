@@ -10,6 +10,7 @@ const batchSummaryCss = fs.readFileSync(new URL("../app/operator-ui/batch-summar
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
 const serverBatchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-store.ts", import.meta.url), "utf8");
+const statistics = fs.readFileSync(new URL("../app/programming/batch-statistics.ts", import.meta.url), "utf8");
 const serverBatchRuntime = fs.readFileSync(new URL("../../python/plasma_web/batch_runtime.py", import.meta.url), "utf8");
 
 test("Production and Engineering share neutral operator summary primitives", () => {
@@ -33,27 +34,27 @@ test("Production and Engineering share neutral operator summary primitives", () 
 });
 
 test("Production KPI row separates equipment scope, planned IC quantity, and processed IC outcomes", () => {
-  for (const label of ["SITES", "TOTAL IC", "PROCESSED IC", "PASS", "FAIL", "YIELD", "BATCH TIME"]) {
-    assert.match(pmod, new RegExp(`label: \\\"${label}\\\"`));
+  // Batch Statistics v1: one KPI definition shared with EMode.
+  for (const label of ["SITES", "TOTAL IC", "PROCESSED IC", "PASS IC", "FAIL IC", "YIELD", "BATCH TIME",
+    "PHYSICAL IC", "TOTAL CYCLES", "SETTLED CYCLES", "PASS CYCLES", "FAIL CYCLES", "CYCLE PASS RATE"]) {
+    assert.match(statistics, new RegExp(`label: \\\"${label}\\\"`));
   }
-  assert.match(pmod, /value:\s*batchSnapshot\?\.sites\.length \?\? batchCounts\.sites/);
-  assert.match(pmod, /batchSnapshot\.sites\.length \* batchSnapshot\.execution_policy\.repeat_count/);
-  assert.match(pmod, /value:\s*plannedIcCount/);
+  assert.match(pmod, /snapshotStatistics\(\{\s*sites: batchSnapshot\.sites,\s*repeat: batchSnapshot\.execution_policy\.repeat_count,/);
+  assert.match(pmod, /batchStatistics\(\{ sites: batchCounts\.sites, repeat: repeatValue \?\? 0,/);
   assert.match(pmod, /formatBatchTime\(batchSnapshot, clockNow\)/);
-  assert.match(pmod, /label: \"PROCESSED IC\", value: manufacturing\.total/);
   assert.match(pmod, /displayedBatchSelection = serverBatchRunning \? serverBatchMembership : batchSelection/);
-  assert.match(batchSummaryCss, /grid-template-columns:\s*repeat\(7, minmax\(0, 1fr\)\)/);
+  // One column per KPI (7 Replace IC, 8 Same-IC Debug); 7 when unset.
+  assert.match(batchSummaryCss, /grid-template-columns:\s*repeat\(var\(--batch-summary-columns, 7\), minmax\(0, 1fr\)\)/);
 });
 
 test("Production manufacturing KPIs use server Batch truth and exclude cancelled work from Yield", () => {
   assert.match(snapshotStore, /latestSnapshot/);
   assert.match(serverBatchApi, /publishServerBatchSnapshot/);
   assert.equal((serverBatchApi.match(/return observeBatchSnapshot\(payload\.batch\);/g) ?? []).length, 4);
-  assert.match(pmod, /site\.completed_rounds/);
-  assert.match(pmod, /site\.final_failures/);
-  assert.match(pmod, /const total = pass \+ fail/);
-  const manufacturing = pmod.slice(pmod.indexOf("const manufacturing = useMemo"), pmod.indexOf("const repeatValue"));
-  assert.doesNotMatch(manufacturing, /cancelled/);
+  assert.match(statistics, /site\.pass_rounds \?\? site\.completed_rounds/);
+  assert.match(statistics, /site\.final_failures/);
+  const snapshot = statistics.slice(statistics.indexOf("export function snapshotStatistics"), statistics.indexOf("export function passRate"));
+  assert.doesNotMatch(snapshot, /cancelled/);
 });
 
 test("Production Site Selection stays tree-based and can be hidden without deleting the Production Set", () => {

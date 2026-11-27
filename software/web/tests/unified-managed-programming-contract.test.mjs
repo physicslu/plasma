@@ -11,12 +11,22 @@ const read = path => readFile(new URL(path, root), "utf8");
 
 const core = await read("app/programming/managed-programming.ts");
 const emode = await read("app/engineering/managed-programming-workspace.tsx");
+const pmode = await read("app/fleet/factory-console-v2.tsx");
 const router = await read("app/engineering/programming-workspace-v2.tsx");
 const api = await read("app/engineering/bundle-programming-api.ts");
 const bff = await read("app/api/manager/bootstrap-bff.ts");
 const panel = await read("app/operator-ui/programming-job-panel.tsx");
 const selector = await read("app/operator-ui/programming-source-selector.tsx");
 const view = await read("app/operator-ui/programming-run-view.tsx");
+
+test("both managed modes show one warning per PPU for a failed Batch time sync", () => {
+  assert.match(emode, /Object\.entries\(next\.time_sync \?\? \{\}\)/);
+  assert.match(emode, /loggedTimeSync\.current\.has\(key\)/);
+  assert.match(emode, /!\["SYNCED", "CORRECTED"\]\.includes\(observation\.status\)/);
+  assert.match(pmode, /Object\.entries\(batch\.time_sync \?\? \{\}\)/);
+  assert.match(pmode, /loggedRecords\.current\.has\(key\)/);
+  assert.match(pmode, /observation\.status === "SYNCED" \|\| observation\.status === "CORRECTED" \? "INFO" : "WARN"/);
+});
 
 test("formal Console routes EMode Programming to the Manager backend, never the Mock runtime", () => {
   assert.match(router, /apiMode === "managed" \? <ManagedProgrammingWorkspace \/> : <StandaloneProgrammingWorkspace \/>/);
@@ -52,18 +62,16 @@ test("ONLINE and Programming capability are judged separately with exact reasons
 });
 
 test("one Start: lock -> plan -> exactly one start -> observe; no retry of any write", () => {
-  // Only independent Read plans/starts a run in the Browser; programming
-  // submits one Manager Batch and the Manager owns every Site plan/Job.
-  assert.equal((core.match(/planProgramming\(/g) ?? []).length, 1);
-  assert.equal((core.match(/startProgramming\(/g) ?? []).length, 1);
+  // U2: programming and Read Memory each submit one Manager Batch; the
+  // Manager owns every Site plan/Job. The Browser never plans or starts a run.
+  assert.doesNotMatch(core, /planProgramming\(|startProgramming\(/);
   assert.match(core, /export async function runManagedRead\(/);
   // Both modes use the canonical Manager Batch entry point.
   assert.equal((emode.match(/runManagedBatch\(/g) ?? []).length, 1);
   assert.doesNotMatch(emode, /planProgramming\(|startProgramming\(/);
-  // The only loops are the read-only status polls (run, Batch).
+  // The only loops are the read-only Batch status polls (programming, Read).
   assert.equal((core.match(/\bwhile \(/g) ?? []).length, 2);
-  assert.match(core, /while \(run\.outcome == null\)/);
-  assert.match(core, /while \(batch\.outcome == null\)/);
+  assert.equal((core.match(/while \(batch\.outcome == null\)/g) ?? []).length, 2);
   assert.doesNotMatch(core, /for \(let (retry|attempt)/);
   assert.match(core, /MANAGED_JOB_POLICY = Object\.freeze\(\{ attempts: 1, auto_retry: "DISABLED" as const \}\)/);
   assert.match(core, /status != null && status >= 400 && status < 500/);
@@ -178,7 +186,7 @@ test("EMode sections are numbered 1 / 2 (2-1 … 2-4) / 3 / 4 and no current fea
 
 test("the standing PROGRAMMING PLAN panel is gone; the Backend plan still runs and is logged", () => {
   assert.doesNotMatch(emode, /PROGRAMMING PLAN|managed-plan|aria-label="Programming plan"/);
-  assert.match(core, /plan = await planProgramming\(request\.alias, \{/);
+  assert.match(core, /batch = await startProgrammingBatch\(\{[\s\S]{0,200}operation: "read",/);
   assert.match(core, /batch = await startProgrammingBatch\(input, startId\)/);
   assert.match(emode, /\[PLAN\] \$\{planned\.plan_id\} · Route/);
   assert.match(emode, /Resource SHA256 \$\{planned\.resource\.resource_set_sha256\} · Job Binding SHA256/);
@@ -196,7 +204,8 @@ test("EMode Batch Policy: Repeat / Retry / Stop Policy are decided by the Manage
   assert.doesNotMatch(api, /actor/);
   // One Batch request; the Browser has no retry loop and no plan / start of its own.
   assert.equal((emode.match(/runManagedBatch\(/g) ?? []).length, 1);
-  assert.equal((core.match(/startProgrammingBatch\(/g) ?? []).length, 1);
+  // One Batch request each for programming and Read Memory (U2).
+  assert.equal((core.match(/startProgrammingBatch\(/g) ?? []).length, 2);
   assert.doesNotMatch(emode, /runManagedProgramming\(|planProgramming\(|startProgramming\(/);
   assert.doesNotMatch(emode, /for \(let (retry|attempt)|while \(/);
   assert.match(emode, /retryMax: MAX_RETRY_LIMIT/);
@@ -224,11 +233,12 @@ test("Bundle source sends the user's bytes unchanged; the Browser builds nothing
   assert.doesNotMatch(core + emode + api, /manifest\.json|canonical_zip|owner_authorization/);
 });
 
-test("UI PASS needs the Manager receipt, single submission, verified SAFE_OFF and matching identities", () => {
-  assert.match(core, /if \(run\.outcome !== "PASS"\) return \{ verdict: run\.outcome, reason: run\.reason \}/);
-  for (const reason of ["RECEIPT_MISSING", "SAFE_OFF_NOT_VERIFIED", "JOB_SUBMISSION_COUNT_NOT_ONE",
-    "JOB_BINDING_NOT_CONFIRMED", "RESOURCE_SET_NOT_CONFIRMED", "READBACK_SHA256_MISMATCH"]) {
-    assert.match(core, new RegExp(reason));
+test("U9: the run verdict is the Manager's; the Browser keeps no second receipt check", () => {
+  // The Manager accepts a PASS only with its own full receipt proof.
+  assert.match(core, /export function runVerdict\(run: ProgrammingRun\): \{ verdict: RunVerdict; reason: string \| null \} \{\s*if \(run\.outcome == null\) return \{ verdict: "RUNNING", reason: null \};\s*return \{ verdict: run\.outcome, reason: run\.reason \};\s*\}/);
+  for (const reason of ["RECEIPT_MISSING", "JOB_SUBMISSION_COUNT_NOT_ONE", "JOB_BINDING_NOT_CONFIRMED",
+    "RESOURCE_SET_NOT_CONFIRMED", "READBACK_SHA256_MISMATCH", "LAST_ATTEMPT_NOT_PASS", "RUN_DOES_NOT_MATCH_BATCH"]) {
+    assert.doesNotMatch(core, new RegExp(reason));
   }
   // Progress is the PPU-reported value or nothing: no synthetic percentage.
   assert.match(core, /const value = run\.job\?\.progress_percent;/);
@@ -306,12 +316,15 @@ test("PMode retains Factory UI and no Mock is presented as HIL acceptance", () =
   assert.match(factory, /MOCK RESULT/);
   // P1: a Repeat Site's rounds are its settled Cycles (PASS + FAIL); PASS,
   // FAIL and Retry stay separate, and same-IC Debug never reads as IC output.
-  assert.match(factoryBackend, /completed_rounds: unit\.cycle && unit\.cycle\.planned > 1 \? unit\.cycle\.settled : passed \? 1 : 0/);
-  assert.match(factoryBackend, /pass_rounds: unit\.cycle && unit\.cycle\.planned > 1 \? unit\.cycle\.pass : passed \? 1 : 0/);
-  assert.match(factoryBackend, /final_failures: unit\.cycle && unit\.cycle\.planned > 1\s*\? unit\.cycle\.fail/);
-  assert.match(factory, /site\.pass_rounds \?\? site\.completed_rounds/);
-  assert.match(factory, /"total-ic": "TOTAL CYCLES · SAME IC"/);
-  assert.match(factory, /const sameIcDebug = batchSnapshot\?\.execution_policy\.replace_ic_before_next_cycle === false;/);
+  // Batch Statistics v1: the same per-Site Cycle tally as EMode, and the
+  // cumulative Manager attempt counters - never the current attempt list.
+  assert.match(factoryBackend, /const tally = unitCycleTally\(unit\.cycle, judged\.verdict\);/);
+  assert.match(factoryBackend, /completed_rounds: tally\.settled,\s*pass_rounds: tally\.pass,/);
+  assert.match(factoryBackend, /final_failures: tally\.fail,/);
+  assert.match(factoryBackend, /total_attempts: unit\.cycle\?\.attempts \?\? unit\.attempts\.length,/);
+  assert.doesNotMatch(factoryBackend, /total_attempts: unit\.attempts\.length,/);
+  assert.match(factory, /const kpis = statisticsKpis\(statistics, formatBatchTime\(batchSnapshot, clockNow\), "production-sites"\);/);
+  assert.match(factory, /const sameIcDebug = statistics\.mode === "SAME_IC_DEBUG";/);
 });
 
 // ------------------------------------------- EMode / PMode UI cleanup (Gate 1)
@@ -364,7 +377,7 @@ test("EMode and PMode number the same four chapters and the same Programming Job
 
 test("removing the duplicated UI keeps the Manager evidence and the safety gates", () => {
   // Admission, Job Binding, Resource identity and Start reconciliation are untouched.
-  assert.match(core, /plan = await planProgramming\(request\.alias, \{/);
+  assert.match(core, /batch = await startProgrammingBatch\(\{[\s\S]{0,200}operation: "read",/);
   assert.match(core, /batch = await startProgrammingBatch\(input, startId\)/);
   assert.match(emode, /async function reconcileStartHold/);
   assert.match(emode, /managed-start-hold/);
@@ -408,7 +421,11 @@ test("PR-C: the Console reaches the canonical Batch resource, never an alias-sco
   // Fail closed: an operation whose PPU cannot be established is refused.
   assert.match(bff, /if \(aliases === null \|\| aliases\.length === 0\)/);
   // The claim is never forwarded to the Manager.
-  assert.match(bff, /`\$\{managerApiBase\(\)\}\/api\/programming\/\$\{normalizedResource\}`/);
+  // Only the validated Cycle History cursor is forwarded as a query.
+  assert.match(bff, /`\$\{managerApiBase\(\)\}\/api\/programming\/\$\{normalizedResource\}\$\{query\}`/);
+  assert.match(bff, /const CYCLE_HISTORY_RESOURCE = new RegExp\(`\^batches\/\$\{RUN_ID\}\/cycles\$`\);/);
+  assert.match(bff, /for \(const name of \["offset", "limit"\]\)/);
+  assert.match(bff, /\/\^\\d\{1,9\}\$\/\.test\(value\)/);
 });
 
 test("PR-C: EMode selects many Sites of one PPU and sends one Target Set", () => {
@@ -431,12 +448,11 @@ test("PR-C: EMode selects many Sites of one PPU and sends one Target Set", () =>
 test("PR-C: every Site is judged on its own, and the Batch verdict never replaces a Site's", () => {
   assert.match(core, /export function batchSiteVerdict\(/);
   assert.match(core, /export function runOfUnit\(/);
-  // The aggregate is necessary but not sufficient: every Site must pass too.
-  assert.match(core, /for \(const unit of batch\.units\) \{\s*const judged = batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\);/);
-  // A Site is judged on the Manager's record of it, and on the full receipt
-  // whenever the Browser still holds that Site's run.
+  // U9: the Batch verdict is the Manager's aggregate; a Site's is the Manager's
+  // record of THAT Site, refused only when it names another PPU / Site / Batch.
+  assert.match(core, /export function batchVerdict\(batch: ProgrammingBatch\): \{ verdict: BatchVerdict; reason: string \| null \} \{\s*if \(batch\.outcome == null\) return \{ verdict: "RUNNING", reason: null \};\s*return \{ verdict: batch\.outcome, reason: batch\.reason \};/);
   assert.match(core, /const attempt = unit\.attempts\[unit\.attempts\.length - 1\];/);
-  assert.match(core, /attempt\.safe_off !== true \? "SAFE_OFF_NOT_VERIFIED"/);
+  assert.match(core, /return \{ verdict: "FAIL", reason: "ATTEMPT_IDENTITY_MISMATCH" \};/);
   assert.match(core, /run\.run_id !== attempt\.run_id\) return null;/);
   // The Site row shows that Site's verdict, not the Batch aggregate.
   assert.match(emode, /const rowVerdict = batch && unit\s*\? batchSiteVerdict\(batch, unit, runOfUnit\(batch, unit\)\)\.verdict : null;/);
@@ -453,7 +469,7 @@ test("concurrent lanes: each Site's run is read by run_id and each attempt is ke
   assert.match(core, /export async function loadAttemptRun\(/);
   assert.match(core, /run\.run_id === runId && run\.ppu_alias === alias && run\.site_id === siteId \? run : null/);
   // Attempts are keyed by Site AND Repeat Cycle: attempt 1 recurs every Cycle.
-  assert.match(emode, /const attemptKey = `\$\{attemptSite\}:\$\{attempt\.cycle_index \?\? 1\}:\$\{attempt\.attempt\}`;/);
+  assert.match(emode, /const attemptKey = `\$\{attemptSite\}:\$\{attempt\.cycle_index \?\? 1\}:\$\{attempt\.attempt\}:\$\{attempt\.plan_id\}`;/);
   assert.match(emode, /loadAttemptRun\(next, request\.alias, attemptSite, attempt\.run_id\)/);
   assert.match(emode, /await Promise\.allSettled\(pendingRunLogs\);/);
   assert.match(factory, /loadUnitRun\(batch, unit\)/);
@@ -482,4 +498,206 @@ test("E Mode stage-only progress uses per-Site events and reduced-motion styling
   assert.match(factory, /const POLL_INTERVAL_MS = 250;/);
   assert.match(styles, /engineeringStagePulse 1s ease-in-out infinite/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
+});
+
+// ------------------------------------------ Batch Statistics v1 (T16-T19, T10-T12)
+
+const ts = (await import("typescript")).default;
+const statisticsSource = await read("app/programming/batch-statistics.ts");
+const stats = await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(statisticsSource, {
+  compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+}).outputText).toString("base64")}`);
+const kpi = (items, key) => items.find(item => item.key === key)?.value;
+
+test("T19 Replace IC: 2 Sites x Repeat 10 all PASS is IC-oriented with YIELD", () => {
+  const s = stats.batchStatistics({ sites: 2, repeat: 10, replaceIc: true,
+    tally: { settled: 20, pass: 20, fail: 0 }, jobAttempts: 20, retryAttempts: 0, sitesCompleted: 2 });
+  const items = stats.statisticsKpis(s, "00:01:40");
+  assert.deepEqual(items.map(item => item.label),
+    ["SITES", "TOTAL IC", "PROCESSED IC", "PASS IC", "FAIL IC", "YIELD", "BATCH TIME"]);
+  assert.deepEqual([kpi(items, "total-ic"), kpi(items, "processed-ic"), kpi(items, "pass"), kpi(items, "fail"),
+    kpi(items, "yield")], [20, 20, 20, 0, "100.0%"]);
+  assert.match(stats.statisticsMeta(s), /Job Attempts 20 · Retry 0/);
+  assert.match(stats.statisticsLogLine(s), /operator-replaced, not identified/);
+});
+
+test("T18 Same-IC Debug: 2 Sites x Repeat 10 is Cycle-oriented and never shows YIELD", () => {
+  const s = stats.batchStatistics({ sites: 2, repeat: 10, replaceIc: false,
+    tally: { settled: 20, pass: 20, fail: 0 }, jobAttempts: 20, retryAttempts: 0, sitesCompleted: 2 });
+  const items = stats.statisticsKpis(s, "00:01:40");
+  assert.deepEqual(items.map(item => item.label), ["SITES", "PHYSICAL IC", "TOTAL CYCLES", "SETTLED CYCLES",
+    "PASS CYCLES", "FAIL CYCLES", "CYCLE PASS RATE", "BATCH TIME"]);
+  assert.deepEqual([kpi(items, "physical-ic"), kpi(items, "total-cycles"), kpi(items, "settled-cycles"),
+    kpi(items, "pass"), kpi(items, "fail"), kpi(items, "cycle-pass-rate")], [2, 20, 20, 20, 0, "100.0%"]);
+  assert.equal(items.some(item => /YIELD|TOTAL IC|PROCESSED IC/.test(item.label)), false);
+  assert.match(stats.statisticsLogLine(s), /no YIELD/);
+});
+
+test("rates are N/A without a settled Cycle, never 100%", () => {
+  for (const replaceIc of [true, false]) {
+    const s = stats.batchStatistics({ sites: 2, repeat: 10, replaceIc });
+    const items = stats.statisticsKpis(s, "00:00:00");
+    assert.equal(kpi(items, replaceIc ? "yield" : "cycle-pass-rate"), "N/A");
+  }
+  assert.equal(stats.passRate(1, 1), "50.0%");
+});
+
+test("T06/T07 Stop after the first Cycle: PARTIAL keeps 2 PASS Cycles, 18 remaining, 0/2 Sites completed", () => {
+  const s = stats.batchStatistics({ sites: 2, repeat: 10, replaceIc: true,
+    tally: { settled: 2, pass: 2, fail: 0 }, jobAttempts: 2, retryAttempts: 0, sitesCompleted: 0 });
+  assert.equal(s.passCycles, 2);
+  assert.equal(s.remainingCycles, 18);
+  assert.match(stats.statisticsMeta(s), /Cycles 2\/20 settled · 18 remaining · Sites completed 0\/2/);
+  assert.match(stats.statisticsLogLine(s), /Cycles PASS 2 · FAIL 0 · settled 2\/20 · remaining 18/);
+});
+
+test("T03/T09 Cycles are the Manager's counters; OUTCOME_UNKNOWN never counts as PASS", () => {
+  assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 1, pass: 1, fail: 0 }, "PASS"), { settled: 1, pass: 1, fail: 0 });
+  // U9: the Manager's counters are the tally; the Browser never re-judges them.
+  assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 1, pass: 0, fail: 1 }, "FAIL"), { settled: 1, pass: 0, fail: 1 });
+  assert.deepEqual(stats.unitCycleTally({ planned: 1, settled: 0, pass: 0, fail: 0 }, "OUTCOME_UNKNOWN"), { settled: 0, pass: 0, fail: 0 });
+  // A record from a Manager without counters falls back to its final outcome only.
+  assert.deepEqual(stats.unitCycleTally(null, "PASS"), { settled: 1, pass: 1, fail: 0 });
+  assert.deepEqual(stats.unitCycleTally(null, "OUTCOME_UNKNOWN"), { settled: 0, pass: 0, fail: 0 });
+  // Repeat: the Manager's settled counters; an unknown Cycle is not settled.
+  assert.deepEqual(stats.unitCycleTally({ planned: 3, settled: 1, pass: 1, fail: 0 }, "OUTCOME_UNKNOWN"), { settled: 1, pass: 1, fail: 0 });
+});
+
+test("T17 PMode snapshot statistics: same definitions, summed per Site, attempts cumulative", () => {
+  const site = (pass, fail, attempts, retries) => ({
+    completed_rounds: pass + fail, pass_rounds: pass, final_failures: fail, total_attempts: attempts, retry_count: retries });
+  const s = stats.snapshotStatistics({ sites: [site(9, 1, 11, 1), site(10, 0, 10, 0)], repeat: 10, replaceIc: true });
+  assert.deepEqual([s.settledCycles, s.passCycles, s.failCycles, s.jobAttempts, s.retryAttempts, s.sitesCompleted],
+    [20, 19, 1, 21, 1, 2]);
+  assert.equal(stats.passRate(s.passCycles, s.failCycles), "95.0%");
+});
+
+test("T10/T11/T12 Cycle History reader: cursor, order, no duplicate, catch-up and rebuild", async () => {
+  const records = Array.from({ length: 25 }, (_, seq) => ({ seq, type: "cycle", ppu_alias: "z2", site_id: 1 + (seq % 2), cycle_index: 1 + (seq >> 1) }));
+  let visible = 3;
+  const loads = [];
+  const load = async (offset, limit) => {
+    loads.push([offset, limit]);
+    const page = records.slice(offset, Math.min(visible, offset + limit));
+    return { total: visible, offset, next_offset: offset + page.length, records: page };
+  };
+  const seen = [];
+  const reader = stats.cycleHistoryReader(load, record => seen.push(record.seq), 4);
+  await reader.sync();
+  assert.deepEqual(seen, [0, 1, 2]);
+  await Promise.all([reader.sync(), reader.sync(), reader.sync()]);   // repeated polls
+  assert.deepEqual(seen, [0, 1, 2]);
+  visible = 25;                                                       // many polls missed
+  await reader.sync();
+  assert.deepEqual(seen, [...Array(25).keys()]);
+  assert.equal(reader.cursor, 25);
+  assert.ok(loads.every(([, limit]) => limit === 4));                 // bounded pages only
+  const rebuilt = [];
+  await stats.cycleHistoryReader(load, record => rebuilt.push(record.seq), 10).sync();   // browser refresh
+  assert.deepEqual(rebuilt, seen);
+});
+
+test("Cycle History lines carry Run / Job / SAFE_OFF / Readback / Job Binding and Retry history", () => {
+  const lines = stats.cycleHistoryLogLines({
+    seq: 4, type: "cycle", ppu_alias: "z2", site_id: 2, cycle_index: 3, outcome: "PASS",
+    attempts: [
+      { attempt: 1, run_id: "r1", job_id: "j1", outcome: "FAIL", reason: "VERIFY_MISMATCH", safe_off: true, retry: { decision: "RETRY", reason: "ELIGIBLE" } },
+      { attempt: 2, run_id: "r2", job_id: "j2", outcome: "PASS", reason: null, safe_off: true, retry: null },
+    ],
+    receipt: { run_id: "r2", job_id: "j2", job_state: "completed", safe_off: true, job_binding_confirmed: true,
+      readback_sha256: "ab".repeat(32), job_binding_sha256: "cd".repeat(32) },
+  }, 10, "Site 2").map(line => line.text);
+  assert.match(lines.join("\n"), /\[ATTEMPT 1\] Cycle 3\/10 Site 2 · FAIL · VERIFY_MISMATCH · Run r1 · Job j1 · SAFE_OFF VERIFIED · RETRY/);
+  assert.match(lines.join("\n"), /\[CYCLE 3\/10\] Site 2 · PASS · Run r2 · Job j2 · SAFE_OFF VERIFIED · attempts 2/);
+  assert.match(lines.join("\n"), new RegExp(`Readback SHA256 ${"ab".repeat(32)} · Job Binding confirmed ${"cd".repeat(32)}`));
+});
+
+test("T16 EMode: KPIs, Log totals and Cycle History come from the shared statistics, not the attempt list", () => {
+  assert.match(emode, /const kpis = statisticsKpis\(statistics, formatElapsed\(elapsed\)\);/);
+  assert.match(emode, /\? managedBatchStatistics\(batch\)/);
+  assert.doesNotMatch(emode, /final\.attempts\.length|\{ key: "total-ic", label: "TOTAL IC", value: siteCount \}/);
+  assert.match(emode, /cycle\?\.attempts \?\? unit\.attempts\.length\} attempt\(s\)/);
+  assert.match(emode, /appendLog\(statisticsLogLine\(stats\)/);
+  assert.match(emode, /managedCycleHistory\(next\.batch_id, record => logHistoryRecord/);
+  assert.match(emode, /await history\.reader\?\.sync\(\)/);
+  assert.match(core, /jobAttempts: batch\.cycles\?\.attempts \?\? batch\.counts\.attempts/);
+  assert.match(api, /`\$\{PROGRAMMING\}\/batches\/\$\{batchId\}\/cycles\?offset=\$\{offset\}&limit=\$\{limit\}`/);
+  assert.match(bff, /new RegExp\(`\^batches\/\$\{RUN_ID\}\/cycles\$`\),/);
+});
+
+test("T17 PMode: Factory Log reads the Cycle History by cursor and keeps TERMINAL after it", () => {
+  assert.match(factory, /const reader = managedCycleHistory\(batch\.batch_id, record => \{/);
+  assert.match(factory, /cycleHistoryLogLines\(record, repeat, label\)/);
+  assert.match(factory, /unitLogsRef\.current = Promise\.allSettled\(\[unitLogsRef\.current, read\]\);/);
+  assert.match(factory, /Job Attempts \$\{stats\.jobAttempts \?\? "—"\} · Retry \$\{stats\.retryAttempts \?\? "—"\}/);
+  // P Mode's existing PASS / FAIL Cycle counters are kept, now via the shared tally.
+  assert.match(factoryBackend, /unitCycleTally/);
+  assert.match(factoryBackend, /: batch\.outcome === "PARTIAL" \? "partial"/);
+});
+
+// ------------------------------- Site safety evidence v1 (SAFE_OFF state vs result)
+
+test("SAFE_OFF label quotes the Manager state and never confuses it with the result", () => {
+  assert.equal(stats.safeOffLabel("VERIFIED", true), "VERIFIED");
+  assert.equal(stats.safeOffLabel(undefined, true), "VERIFIED");  // older receipts
+  assert.equal(stats.safeOffLabel("NOT_TOUCHED", null), "N/A · hardware not touched");
+  assert.equal(stats.safeOffLabel("NOT_VERIFIED", null), "NOT VERIFIED");
+  assert.equal(stats.safeOffLabel(null, null), "NOT VERIFIED");
+  assert.equal(stats.safeOffLabel(null, null, false), "—");
+  // A PASS-looking or reason-looking value never upgrades the state.
+  assert.equal(stats.safeOffLabel("PASS", false), "NOT VERIFIED");
+});
+
+test("A pre-hardware denial is a BLOCKED history line, not a Cycle FAIL", () => {
+  const [line] = stats.cycleHistoryLogLines({
+    seq: 3, type: "blocked_dispatch", ppu_alias: "z2", site_id: 2, cycle_index: 15,
+    reason: stats.SITE_DENIED_BEFORE_HARDWARE,
+    attempts: [{ attempt: 1, run_id: "c5de59", job_id: "job-x", outcome: "BLOCKED",
+      reason: stats.SITE_DENIED_BEFORE_HARDWARE, safe_off: null, safe_off_state: "NOT_TOUCHED" }],
+    receipt: { run_id: "c5de59", job_id: "job-x", job_state: "error", safe_off: null,
+      safe_off_state: "NOT_TOUCHED", job_binding_confirmed: true,
+      site_safety: { class: "PRE_HARDWARE_DENIED", code: "ADMISSION_DENIED:PROC_SCAN_INCOMPLETE" } },
+  }, 20, "Site 2");
+  assert.match(line.text, /^\[BLOCKED\] Cycle 15\/20 Site 2 · denied before hardware · ADMISSION_DENIED:PROC_SCAN_INCOMPLETE/);
+  assert.match(line.text, /SAFE_OFF N\/A · hardware not touched · not counted as a Cycle · press Start to re-run admission/);
+  assert.doesNotMatch(line.text, /FAIL|NOT VERIFIED/);
+  // The existing next-Cycle dispatch block keeps its own wording.
+  const [next] = stats.cycleHistoryLogLines({ seq: 4, type: "blocked_dispatch", ppu_alias: "z2",
+    site_id: 2, cycle_index: 3, reason: "EXECUTION_PPU_BUSY", attempts: [] }, 20, "Site 2");
+  assert.match(next.text, /NEXT CYCLE BLOCKED · EXECUTION_PPU_BUSY · nothing submitted/);
+});
+
+test("Cycle and attempt lines show SAFE_OFF from the receipt state", () => {
+  const lines = stats.cycleHistoryLogLines({
+    seq: 0, type: "cycle", ppu_alias: "z2", site_id: 1, cycle_index: 1, outcome: "FAIL",
+    reason: "JOB_NOT_SUCCESS",
+    attempts: [{ attempt: 2, run_id: "r", job_id: "j", outcome: "FAIL", reason: "JOB_NOT_SUCCESS",
+      safe_off: true, safe_off_state: "VERIFIED", retry: null }],
+    receipt: { run_id: "r", job_id: "j", job_state: "error", safe_off: true,
+      safe_off_state: "VERIFIED", job_binding_confirmed: true },
+  }, 2, "Site 1");
+  assert.ok(lines.every(entry => !/NOT VERIFIED/.test(entry.text)));
+  assert.match(lines[1].text, /\[CYCLE 1\/2\] Site 1 · FAIL · JOB_NOT_SUCCESS .* SAFE_OFF VERIFIED/);
+});
+
+test("Console surfaces use the one SAFE_OFF label; READY stays the PPU Site capability", async () => {
+  const core = await read("app/programming/managed-programming.ts");
+  const runLog = await read("app/programming/programming-run-log.ts");
+  const workspace = await read("app/engineering/managed-programming-workspace.tsx");
+  const factory = await read("app/fleet/factory-console-v2.tsx");
+  const view = await read("app/operator-ui/programming-run-view.tsx");
+  assert.match(core, /cycle\.wait_reason === SITE_DENIED_BEFORE_HARDWARE\s*\? "BLOCKED · denied before hardware · not counted · press Start to re-run admission"/);
+  assert.match(core, /`SAFE_OFF \$\{safeOffLabel\(receipt\?\.safe_off_state, receipt\?\.safe_off\)\}`/);
+  assert.match(runLog, /return safeOffLabel\(state, safeOff, finished\);/);
+  assert.match(workspace, /safeOffLogLabel\(attempt\.safe_off, true, attempt\.safe_off_state\)/);
+  // A re-run Cycle restarts at attempt 1: its Log key includes the plan.
+  assert.match(workspace, /`\$\{attemptSite\}:\$\{attempt\.cycle_index \?\? 1\}:\$\{attempt\.attempt\}:\$\{attempt\.plan_id\}`/);
+  assert.match(factory, /SAFE_OFF \$\{safeOffLabel\(last\?\.safe_off_state, last\?\.safe_off\)\}/);
+  assert.match(view, /\{safeOffLabel\(receipt\.safe_off_state, receipt\.safe_off\)\}/);
+  for (const source of [core, workspace, factory, view]) {
+    assert.doesNotMatch(source, /safe_off === true \? "VERIFIED" : "NOT VERIFIED"/);
+  }
+  // Site READY is the PPU's own idle Site + Profile, never a Batch or SAFE_OFF guess.
+  assert.match(core, /if \(site\.current_job_id \|\| site\.state !== "idle"\) \{/);
+  assert.match(core, /return \{ programmable: true, label: "READY", reason: "" \};/);
 });

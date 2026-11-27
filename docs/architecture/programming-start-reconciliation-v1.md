@@ -5,7 +5,8 @@ PPU Gateway, Runtime, C-3 and FPGA are unchanged.
 
 ## Problem
 
-A Console Start (`POST programming/runs`, `POST programming/batches`) can lose
+A Console Start (`POST /api/programming/batches`; before U2 also the retired
+`POST programming/runs`) can lose
 its HTTP answer. The Manager may or may not have admitted it. Before this
 contract the Console had no identity to ask about, so its only release check
 was "the Site is idle with no Job", which proves nothing about the lost Start.
@@ -16,8 +17,12 @@ Every Start carries a **Manager-issued `start_id`** (32 hex):
 
 | Start | `start_id` | Issued by |
 |---|---|---|
-| run (READ, single programming run) | the plan's `plan_id` | `POST programming/plans` (existing) |
-| EMode Batch | a start ID | `POST /api/programming/starts` `{"kind":"batch"}` — Manager-owned, under no PPU since PR-C |
+| Batch (EMode / PMode programming, and Read Memory since U2) | a start ID | `POST /api/programming/starts` `{"kind":"batch"}` — Manager-owned, under no PPU since PR-C |
+| run (retired in U2) | the plan's `plan_id` | the retired `POST programming/plans`; a run Start journalled before U2 still reconciles read-only |
+
+A Read Memory Batch is admitted with `operation: "read"`, so its reconciliation
+identity reports `"read"`; a Batch start that is not admitted yet records no
+Operation of its own.
 
 The Console therefore holds the identity **before** the Start request leaves.
 A Batch request carries it as `start_id`; a `start_id` admits at most one

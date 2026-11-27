@@ -1130,3 +1130,183 @@ def test_batch_acceptance_reconciliation_recovery_and_untimed_history(tmp_path):
     view = historical.status_batch(accepted["batch_id"])["batch"]
     assert view["started_at"] is None
     assert view["finished_at"] is None
+
+
+# --- U1: Resources made Active before the Batch Reservation ------------------------
+
+ACTIVATION_STEPS = ["B1_UPLOAD", "B2_ADMIT", "B3_SUBMIT", "B3_ACTIVATE"]
+
+
+def test_a_batch_activates_missing_resources_once_before_its_reservation(tmp_path):
+    batches, workflow, gateways, coordinators = rig(tmp_path, aliases=("z2", "z2b"))
+    coord = coordinators["z2"]
+    coord.active_sha = None   # EMPTY Active Set: the Route's Resources are not Active
+    acquired_after_b3 = []
+    events = []
+    sync_tokens = []
+    relay = gateways["z2"].relay
+
+    def observe(method, path, **kwargs):
+        if method == "POST":
+            if path == "/api/resource-reservations":
+                action = json.loads(kwargs["body"])["action"]
+                if action == "acquire":
+                    acquired_after_b3.append("B3" in coord.calls)
+                    events.append("reserve")
+            elif path == "/api/pre-start-time-sync":
+                events.append("sync")
+                sync_tokens.append((json.loads(kwargs["body"])["token"],
+                                    gateways["z2"].resource_reservation["token"]))
+            elif path == "/api/jobs":
+                events.append("job")
+        return relay(method, path, **kwargs)
+
+    gateways["z2"].relay = observe
+    started = batches.start_batch(with_start(
+        workflow, [one("z2", 2, 3), one("z2b", 2)],
+        repeat=2, replace_ic_before_next_cycle=False))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS", batch
+    # One activation for the whole Batch (2 Sites x 2 Cycles), never an FPGA load.
+    assert coord.calls.count("B2") == 1 and coord.calls.count("B3") == 1
+    assert coord.b3_body["fpga_load"] is False and coord.b3_body["mode"] == "activate"
+    activation = batch["resource_activation"]
+    assert list(activation) == ["z2"]
+    assert activation["z2"]["result"] == "PASS" and activation["z2"]["fpga_load"] is False
+    assert [s["step"] for s in activation["z2"]["steps"]] == ACTIVATION_STEPS
+    # The Reservation is acquired only after B3 and every Job reuses the Resources.
+    assert acquired_after_b3 == [True]
+    assert events[:3] == ["reserve", "sync", "job"]
+    assert len(sync_tokens) == 1 and sync_tokens[0][0] == sync_tokens[0][1]
+    assert len(gateways["z2"].posts) == 4 and len(gateways["z2b"].posts) == 2
+    assert all(run.plan["activation_required"] is False for run in workflow._runs.values())
+    assert gateways["z2"].reservation_calls[0] == "acquire"
+    assert gateways["z2"].reservation_calls[-1] == "release"
+
+
+def test_already_active_resources_are_reused_without_activation(tmp_path):
+    batches, workflow, gateways, coordinators = rig(tmp_path)
+    started = batches.start_batch(with_start(workflow, [one("z2", 2)]))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS"
+    assert "resource_activation" not in batch
+    assert not {"B1_create", "B2", "B3"} & set(coordinators["z2"].calls)
+
+
+@pytest.mark.parametrize("b3, reason, domain", [
+    ({"b3_raises": True}, "B3_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT",
+     "TARGET_TRANSACTION_UNKNOWN"),
+    ({"status_raises_after_b3": True}, "B3_STATE_UNKNOWN_DO_NOT_RESUBMIT",
+     "TARGET_TRANSACTION_UNKNOWN"),
+    ({"b3_final": "failed"}, "B3_FAILED", "TARGET_NOT_READY"),
+])
+def test_a_failed_or_unknown_activation_blocks_its_ppu_and_touches_no_dut(
+        tmp_path, b3, reason, domain):
+    batches, workflow, gateways, coordinators = rig(tmp_path, aliases=("z2", "z2b"))
+    coord = coordinators["z2"]
+    coord.active_sha = None
+    for key, value in b3.items():
+        setattr(coord, key, value)
+    started = batches.start_batch(with_start(workflow, [one("z2", 2, 3), one("z2b", 2)]))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    # The healthy PPU still ran; the activating PPU submitted no Job and
+    # holds no Reservation, and B3 was sent exactly once (never resubmitted).
+    assert batch["outcome"] == "PARTIAL"
+    assert units_of(batch) == [("z2", 2, "BLOCKED", "BLOCKED"), ("z2", 3, "BLOCKED", "BLOCKED"),
+                               ("z2b", 2, "PASS", "FINISHED")]
+    assert {u["reason"] for u in batch["units"][:2]} == {f"ADMISSION_{reason}"}
+    assert {u["failure_domain"] for u in batch["units"][:2]} == {domain}
+    assert gateways["z2"].posts == [] and gateways["z2"].reservation_calls == []
+    assert coord.calls.count("B3") == 1
+    activation = batch["resource_activation"]["z2"]
+    assert activation["result"] == "BLOCKED" and activation["reason"] == reason
+
+
+def test_activation_needs_a_released_ppu(tmp_path):
+    batches, workflow, gateways, coordinators = rig(tmp_path, busy=True)
+    coordinators["z2"].active_sha = None
+    started = batches.start_batch(with_start(workflow, [one("z2", 2)]))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert units_of(batch) == [("z2", 2, "BLOCKED", "BLOCKED")]
+    assert batch["units"][0]["reason"] == "ADMISSION_PPU_BUSY"
+    assert "B1_create" not in coordinators["z2"].calls and gateways["z2"].posts == []
+
+
+def test_a_plan_inside_a_batch_never_activates(tmp_path):
+    from plasma_manager.programming import BatchPreparation
+    _b, workflow, _g, coordinators = rig(tmp_path)
+    coordinators["z2"].active_sha = None
+    request = {k: v for k, v in body([one("z2", 2)]).items() if k != "targets"}
+    with pytest.raises(ProgrammingError) as caught:
+        workflow.plan("z2", {**request, "site_id": 2}, preparation=BatchPreparation())
+    assert caught.value.code == "batch_resource_not_active"
+    assert "B1_create" not in coordinators["z2"].calls
+
+
+def test_resources_still_not_active_after_activation_submit_nothing(tmp_path):
+    batches, workflow, gateways, coordinators = rig(tmp_path)
+    coordinators["z2"].active_sha = None
+    gateways["z2"].resource_for = lambda _active: "d" * 64   # B3 did not yield the Route's Resources
+    started = batches.start_batch(with_start(workflow, [one("z2", 2)]))
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert units_of(batch) == [("z2", 2, "BLOCKED", "BLOCKED")]
+    assert batch["units"][0]["reason"] == "ADMISSION_RESOURCE_RESERVATION_REQUIRES_ACTIVE_SET"
+    assert coordinators["z2"].calls.count("B3") == 1
+    assert gateways["z2"].posts == [] and gateways["z2"].reservation_calls == []
+
+
+def test_a_bundle_source_batch_activates_the_users_exact_archive(tmp_path):
+    from .test_bundle_programming_workflow import user_bundle
+    batches, workflow, gateways, coordinators = rig(tmp_path)
+    coord = coordinators["z2"]
+    coord.active_sha = None
+    built = user_bundle()
+    request = {k: v for k, v in body([one("z2", 2)]).items()
+               if k not in ("image_base64", "image_filename")}
+    request["bundle_base64"] = base64.b64encode(built.archive).decode()
+    request["start_id"] = workflow.issue_batch_start({"kind": "batch"})["start"]["start_id"]
+    started = batches.start_batch(request)
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS" and batch["source"] == "bundle", batch
+    # B1 carried the user's own bytes and B3 activated exactly that identity.
+    assert bytes(coord.uploaded) == built.archive and coord.active_sha == built.archive_sha256
+    assert coord.b3_body["fpga_load"] is False
+    [post] = gateways["z2"].posts
+    assert base64.b64decode(post["asset_base64"]) == image()
+    assert not {"bundle_base64", "asset_set_sha256"} & set(post)
+
+
+def test_read_memory_is_a_one_site_batch_attempt(tmp_path):
+    batches, workflow, gateways, coordinators = rig(tmp_path)
+    request = {"icpn": ICPN, "targets": [one("z2", 2)], "operation": "read",
+               "address": 0x08000010, "length": 777,
+               "start_id": workflow.issue_batch_start({"kind": "batch"})["start"]["start_id"]}
+    started = batches.start_batch(request)
+    batch = batches.status_batch(started["batch"]["batch_id"])["batch"]
+    assert batch["outcome"] == "PASS", batch
+    assert batch["operation"] == "read" and batch["operations"] is None
+    assert batch["source"] == "range" and batch["counts"]["attempts"] == 1
+    [post] = gateways["z2"].posts
+    assert post["operation"] == "read" and "operations" not in post
+    assert "asset_base64" not in post and "image_asset" not in post
+    run = batch["current_run"]
+    assert run["plan"]["operation"] == "read" and run["receipt"]["read_output"]["bytes"] == 777
+    data, meta = workflow.read_output("z2", run["run_id"])
+    assert len(data) == 777 and meta["sha256"] == run["receipt"]["read_output"]["sha256"]
+    assert not {"B1_create", "B2", "B3"} & set(coordinators["z2"].calls)
+    # A lost answer reconciles as a READ Batch, never as a programming one.
+    view = batches.reconcile_start(request["start_id"])["reconciliation"]
+    assert view["kind"] == "batch" and view["state"] == "TERMINAL_CONFIRMED"
+    assert view["identity"]["operation"] == "read" and view["identity"]["operations"] is None
+
+
+def test_a_read_batch_never_activates(tmp_path):
+    batches, workflow, gateways, coordinators = rig(tmp_path)
+    coordinators["z2"].active_sha = None
+    request = {"icpn": ICPN, "targets": [one("z2", 2)], "operation": "read",
+               "address": 0x08000010, "length": 64,
+               "start_id": workflow.issue_batch_start({"kind": "batch"})["start"]["start_id"]}
+    batch = batches.status_batch(batches.start_batch(request)["batch"]["batch_id"])["batch"]
+    assert units_of(batch) == [("z2", 2, "BLOCKED", "BLOCKED")]
+    assert batch["units"][0]["reason"] == "ADMISSION_RESOURCE_ACTIVATION_REQUIRES_IMAGE"
+    assert "B1_create" not in coordinators["z2"].calls and gateways["z2"].posts == []

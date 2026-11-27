@@ -35,6 +35,8 @@
 - **Plan** · `Claude Code handoff` · `no implementation` — [OPF Local Owner Mode Claude 完整工作包](development/opf-local-owner-mode-claude-handoff-20261109.md)：D1–D8 技術決策、P2A/P2B/P1/P3/P4 的 PR 分解、程式修改候選、正負向驗收、網路／硬體停止條件；尚未交由 Claude 執行。
 - **Current** — [Glossary — current terms and retired codes](glossary.md)
 
+- **Plan** · `Gate 1` · `Draft PR #1528` · `Host-only` — [OPP FPGA Register Map v1](architecture/opp-fpga-register-map-v1.md)：全新 Common ABI、四組獨立 SWD Site 位址預留；尚未完成 AXI/C Driver/RTL HIL，不能視為已部署硬體。
+
 ## Architecture Decision Records
 
 - **Current** — [ADR Index](adr/README.md)：所有 ADR 與其 Proposed／Accepted／Superseded 狀態。
@@ -74,6 +76,7 @@
 - **Plan** · `Owner decision 2026-11-12` · `not implemented` — [OPF Target Finalization / Controlled Run Policy TODO](architecture/opf-target-finalization-controlled-run-todo.md)：普通 E/P/V 與 READ 預設不主動執行 `reset run`；僅允許具資格的燒錄必要 run-once 或明確授權的長時間測試。文件決策尚未實作、部署或驗證 MCU 停止狀態。
 - **Plan** · `WO-2 F2 M1 Gate 1` · `Host-only` · `Draft PR #1518` — [Per-Cycle Timing Gap Audit and Verified Batch Resource Snapshot](architecture/wo2-f2-m1-verified-resource-snapshot-gap-audit.md)：量測 First-Cycle Admission、Readiness、Bootstrap；資源驗證重用及失效條件僅設計，不實作快取或變更安全決策。 §6（WO-2 F2 M2）：Batch-once 準備、Admission evidence 重用與 PPU Verified Resource Snapshot（完整驗證保留）。
 - **Current** · `EMode Programming Restoration Gate 1` · `Host-only` — [EMode Batch Retry / Stop Policy v1](architecture/emode-batch-retry-stop-policy-v1.md)：Manager-owned Batch Coordinator；僅明確 FAIL（SAFE_OFF 已驗證、Site 已釋放）才以新 Plan／Job 重試；OUTCOME_UNKNOWN 永不重送；Stop 只停止尚未提交的 Attempt；Repeat 未實作。
+- **Current** · `SAFE_OFF_NOT_VERIFIED Root Cause Fix Gate 1` · `Host-only` — [Site Safety Evidence v1](architecture/site-safety-evidence-v1.md)：Site Worker 結構化安全證據（PRE_HARDWARE_DENIED／FAILED_SAFE_OFF_VERIFIED），Manager 與 PPU 以相同規則判定，不以錯誤碼字串推論；硬體前拒絕為 BLOCKED（不計 FAIL，等待 Continue）；Root Guard ESRCH 須確認 PID 已消失。未部署、HIL NOT_RUN。
 - **Current** · `Unified Programming Gate 1` · `Contract freeze` — [Unified Programming Architecture v1](architecture/unified-programming-architecture-v1.md)：EMode／PMode 共用一套 Programming Engine，差異僅在 Target Scope；凍結 owner 決策 D-1～D-6、統一 Target Set（ICPN 與 Image 為 Batch 層級）、Manager-owned 跨 PPU Batch、統一 Batch Policy、per-(PPU, Site, ICPN, operations) Route Admission、Device Personalization 的通用責任與擴充邊界；維持循序執行，八通道並行為 NOT_VERIFIED 且明文排除；尚未實作、無任何實機資格。
 - **Reference** · `PR #1428` · `Host-only` — [P-Mode Manager Batch Reload／Start Reconciliation 修復證據](evidence/pr1428-manager-batch-reload-2026-11-15/README.md)：記錄前端輪詢循環根因、重新載入與結果不明防重送回歸；Host-only 測試不代表並行實機驗收。
 - **Reference** · `PR #1428` · `2026-11-15` · `Site 1/2 HIL sequential PASS` — [Site 1／Site 2 真實獨立燒錄證據](evidence/pr1428-site12-hil-2026-11-15/README.md)：兩 Site 分別依序完成 E/P/V、Readback SHA256 與 SAFE_OFF；並非同時執行，也未取得 8 Site 量產資格。
@@ -287,6 +290,7 @@ STM32F103 OpenOCD qualification: [v7](architecture/openocd-software-qualificatio
 - **Current** — [Selected IC Profile v1](architecture/selected-ic-profile-v1.md)：將 exact ICPN 的 Device operating characteristics、Programming requirements、Backend evidence 與 PLASMA compatibility 分層組合；STM32F103C8T6 為第一個 manufacturer-first pilot。
 - **Current** · `Design-input contract` — [Programming Hardware and Socket Profile v1](architecture/programming-hardware-socket-profile-v1.md)：以 STM32F103C8T6/LQFP48/SWD 建立 physical pin map、全部供電/接地 contact、NRST/BOOT0 與 package geometry 的 machine-readable Socket design input；明確不宣稱 socket vendor、signal integrity、runtime hardware、HIL 或 execution readiness。
 - **Reference** · `source-only L2 proposal` — [STM32F103 Medium-density 非 LQFP 12 顆 exact-ICPN 資格擴展](architecture/stm32f103-medium-nonlqfp-l2-v9.md)：8 顆直接適用性、4 顆 TR 包裝等價；7 顆 VFQFPN36 命名／Geometry 缺口保留 L1，2 顆 R/RTR 特例排除。僅 OpenOCD 0.12.0 原始碼與 ST 原廠證據，不代表實體 HIL 或執行授權。
+- **Reference** · `PR #1147` · `Draft Gate 1` — [STM32F103 Low-density 12 顆 Exact ICPN v10](architecture/stm32f103-low-density-l2-v10.md)：ST DS5936 Rev 7、PM0075 Rev 2、OpenOCD 0.12.0 (0x412) 文件審查完成；12 顆新料號為 L2，原 77 顆保留現行 L3，L2+ 共 89 顆。三顆 T4/T6 封裝衝突仍 L1，無新料號 HIL 或燒錄，PDF 原始 bytes 尚未封存（NOT_ATTESTED）。
 - **Plan** · `Design-input only` — [STM32F103VBT6 LQFP100 Socket Reuse](architecture/stm32f103vbt6-lqfp100-socket-v1.md)：第四個 ST exact-ICPN 延伸樣板；原廠 DS5319 x8/xB LQFP100 共用 100-pin 接腳、17 個必要接點（含 VREF+/VREF−）、NC 保護；VBT6 獨立綁定 128 KiB／128 頁 L2 幾何，且保留 V8 的 64 KiB 封裝契約，僅 Host-only 驗證，不宣稱 L3／HIL。
 - **Plan** · `Design-input only` — [STM32F103V8T6 LQFP100 Socket Profile](architecture/stm32f103v8t6-lqfp100-socket-v1.md)：第三個 ST exact-ICPN 封裝樣板；以 LQFP100 原廠 100-pin map、VREF+/VREF−、5 組 VDD/VSS、NC 接點及 Host-only 負向測試定義獨立設計輸入；不宣稱 Socket/HIL/L3。
 - **Plan** · `Design-input only` — [STM32F103RBT6 LQFP64 Socket Reuse](architecture/stm32f103rbt6-lqfp64-socket-v1.md)：在官方 x8/xB 封裝適用性證據下，共用 LQFP64 實體接腳，但將 STM32F103RBT6 的 128 KiB／128 頁 Flash geometry 獨立綁定；不宣稱 HIL、L3 或 execution。

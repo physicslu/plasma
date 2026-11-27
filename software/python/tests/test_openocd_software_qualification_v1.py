@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from plasma_web.stm32f103_low_density_candidate import EXPECTED as LOW_DENSITY_EXACT
 from plasma_web.device_catalog import DeviceCatalogIntegrityError, get_default_device_catalog
 from plasma_web.openocd_software_qualification import (
     OpenOCDSoftwareQualificationRegistry,
@@ -58,7 +59,16 @@ EVIDENCE_FILES = (
 
 def copy_evidence_tree(destination: Path) -> None:
     assert ROOT is not None
-    for rel in EVIDENCE_FILES:
+    low_paths = [
+        "release/openocd-qualification/openocd-0.12.0-stm32f103-v10.json",
+        "release/openocd-qualification/openocd-0.12.0-stm32f103-low-density-12-v1.json",
+        "release/openocd-qualification/stm32f103-low-density-ds5936-source-lock-v1.json",
+        "release/openocd-qualification/stm32f103-low-density-exact-12-applicability-v1.json",
+        "data/ic-support/profiles/programming/stm32f1-low-density-flash-v0.json",
+    ]
+    low_paths += [f"data/ic-support/profiles/memory-geometry/stm32f103{base}-{size}k-v0.json"
+                  for base, size in (("c4", 16), ("c6", 32), ("r4", 16), ("r6", 32))]
+    for rel in (*EVIDENCE_FILES, *low_paths):
         src = ROOT / rel
         dst = destination / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -153,7 +163,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             "STM32F103VBH6",
             "STM32F103VBH7",
         )
-        expected = tuple(sorted((*expected, *extra)))
+        expected = tuple(sorted((*expected, *extra, *LOW_DENSITY_EXACT)))
         self.assertEqual(
             self.registry.supported_exact_icpns("STMicroelectronics"),
             expected,
@@ -402,21 +412,21 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
     def test_default_registry_is_available_in_full_source_tree(self):
         registry = get_default_openocd_software_qualification_registry()
         self.assertIsNotNone(registry)
-        self.assertEqual(registry.summary["supported_exact_icpns"], 77)
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 77)
+        self.assertEqual(registry.summary["supported_exact_icpns"], 89)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 89)
         self.assertEqual(
             registry.summary["unreviewed_default_unknown_exact_icpns"],
-            registry.summary["catalog_exact_icpns"] - 77,
+            registry.summary["catalog_exact_icpns"] - 89,
         )
         self.assertEqual(
             registry.summary["qualification_id"],
-            "adr0002-phase2-openocd-012-stm32f103-v9",
+            "adr0002-phase2-openocd-012-stm32f103-v10",
         )
         self.assertEqual(
             registry.summary["selector_visibility_rule"],
             "CATALOG_LEVEL_2_PROGRAMMABLE",
         )
-        self.assertEqual(len(registry.reviewed_exact_keys), 77)
+        self.assertEqual(len(registry.reviewed_exact_keys), 89)
 
     def test_new_exact_non_lqfp_medium_cohort_is_bounded(self):
         expected = {

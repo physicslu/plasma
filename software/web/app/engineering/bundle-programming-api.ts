@@ -1,4 +1,5 @@
 import { BootstrapApiError } from "./ppu-bootstrap-api";
+import type { CycleHistoryPage, SafeOffState } from "../programming/batch-statistics";
 
 // Console-driven Bundle programming (owner Gate 1, 2026-11-09; OFE-1B).
 // Browser -> same-origin BFF -> Manager. The Manager resolves the
@@ -7,7 +8,6 @@ import { BootstrapApiError } from "./ppu-bootstrap-api";
 // exactly one Job with the user-selected Operation and its Job Binding.
 // The Browser never builds or signs a Bundle and never talks to the PPU.
 
-export const PROGRAMMING_CONFIRM_TOKEN = "PROGRAM";
 export const PROGRAMMING_ACK_TOKEN = "OUTCOME_UNKNOWN_RECONCILED";
 
 export type ProgrammingRoute = {
@@ -143,7 +143,6 @@ export type ProgrammingRun = {
   state: string;
   outcome: ProgrammingRunOutcome | null;
   reason: string | null;
-  time_sync?: TimeSyncObservation | null;
   steps: Array<{ step: string; result: string; at: string; [key: string]: unknown }>;
   activation: Record<string, unknown>;
   job: {
@@ -195,7 +194,11 @@ export type ProgrammingRun = {
     safe_off: boolean | null;
     // Where SAFE_OFF was read: the Job details (any outcome) or, for a
     // definite Site Worker FAIL, the PPU Job error. Absent on older receipts.
-    safe_off_source?: "job_details" | "site_worker_failure" | null;
+    safe_off_source?: "job_details" | "site_worker_failure" | "site_worker_safety" | null;
+    /** The Site's end state, apart from the result (absent on older receipts). */
+    safe_off_state?: SafeOffState | null;
+    /** The Worker's trusted refusal class and code, when the Job was refused. */
+    site_safety?: { class: string; code: string } | null;
     flash_result: string | null;
     elapsed_ms: number | null;
   } | null;
@@ -253,50 +256,6 @@ export function bytesToBase64(bytes: Uint8Array): string {
 }
 
 
-
-/** One programming Job (`operations`) or a single-operation Job (`operation`). */
-type JobSelector = { operations: readonly SequenceOperation[] };
-
-export type PlanInput =
-  | ({ icpn: string; siteId: number; image: Uint8Array; filename: string } & JobSelector)
-  | ({ icpn: string; siteId: number; bundle: Uint8Array } & JobSelector)
-  // No Image: an erase-only list or the independent read Job on an explicit range.
-  | { icpn: string; siteId: number; operations: readonly ["erase"]; address: number; length: number }
-  | { icpn: string; siteId: number; operation: "read"; address: number; length: number };
-
-export async function planProgramming(alias: string, input: PlanInput): Promise<ProgrammingPlan> {
-  // The user's selection is sent as chosen; the Manager never rewrites it.
-  const selector = "operations" in input
-    ? { operations: [...input.operations] } : { operation: input.operation };
-  const body = "image" in input
-    ? {
-      icpn: input.icpn, site_id: input.siteId, ...selector,
-      image_base64: bytesToBase64(input.image), image_filename: input.filename,
-    }
-    : "bundle" in input
-    ? {
-      // The user's own Bundle bytes, unchanged; the Manager admits or refuses them.
-      icpn: input.icpn, site_id: input.siteId, ...selector,
-      bundle_base64: bytesToBase64(input.bundle),
-    }
-    : {
-      icpn: input.icpn, site_id: input.siteId, ...selector,
-      address: input.address, length: input.length,
-    };
-  const payload = await request<{ ok: true; plan: ProgrammingPlan }>(`${base(alias)}/plans`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  return payload.plan;
-}
-
-export async function startProgramming(alias: string, planId: string): Promise<ProgrammingRun> {
-  const payload = await request<{ ok: true; run: ProgrammingRun }>(`${base(alias)}/runs`, {
-    method: "POST",
-    body: JSON.stringify({ plan_id: planId, confirm: PROGRAMMING_CONFIRM_TOKEN }),
-  });
-  return payload.run;
-}
 
 export async function getProgrammingRun(alias: string, runId: string): Promise<ProgrammingRun> {
   const payload = await request<{ ok: true; run: ProgrammingRun }>(`${base(alias)}/runs/${runId}`);
@@ -357,7 +316,10 @@ export type ProgrammingBatchCycle = {
   settled: number;
   pass: number;
   fail: number;
+  /** Cumulative Retry attempts of this Site over every Cycle. */
   retry_attempts: number;
+  /** Cumulative Job attempts of this Site over every Cycle (Batch Statistics v1). */
+  attempts?: number;
   remaining: number;
   /** The pause the operator answers; echo it in the Continue. */
   continue_seq: number;
@@ -372,6 +334,7 @@ export type ProgrammingBatchCycle = {
     receipt: {
       run_id: string | null; job_id: string | null; job_state: string | null;
       flash_result: string | null; safe_off: boolean | null;
+      safe_off_state?: SafeOffState | null;
       job_binding_confirmed: boolean; reason: string | null;
     } | null;
   } | null;
@@ -394,6 +357,7 @@ export type ProgrammingBatchAttempt = {
   outcome: ProgrammingRunOutcome | null;
   reason: string | null;
   safe_off: boolean | null;
+  safe_off_state?: SafeOffState | null;
   /** Why a FAIL was or was not followed by another attempt. */
   retry: { eligible: boolean; reason: string; decision: "RETRY" | "NO_RETRY" } | null;
 };
@@ -454,7 +418,10 @@ export type ProgrammingBatch = {
   ppu_alias?: string;
   site_id?: number;
   icpn: string;
-  operations: SequenceOperation[];
+  /** The ordered E/P/V list; null for a Read Memory Batch. */
+  operations: SequenceOperation[] | null;
+  /** "read" for a Read Memory Batch; absent or null otherwise. */
+  operation?: "read" | null;
   source: ProgrammingSource | "range";
   policy: BatchPolicy;
   state: string;
@@ -465,19 +432,24 @@ export type ProgrammingBatch = {
   time_sync?: Record<string, TimeSyncObservation>;
   failure_domain: string | null;
   stop_requested: boolean;
-  /** Every attempt of every Site, in order. */
+  /**
+   * The CURRENT Cycle's attempts of every Site (live detail). Settled Cycles
+   * are in the Cycle History; never count Batch attempts from this list.
+   */
   attempts: ProgrammingBatchAttempt[];
   /** The run of the latest attempt (same record as a single run). */
   current_run: ProgrammingRun | null;
-  /** One Site is one IC: counted once, by its final outcome. */
+  /** Site final outcomes, one per Site; `attempts` is the cumulative Batch total. */
   counts: {
     pass: number; fail: number; blocked: number; unknown: number;
-    sites: number; attempts: number;
+    partial?: number; sites: number; attempts: number;
   };
   /** Cycle totals over every Site (Manual Repeat); absent before WP-02. */
   cycles?: {
     planned: number; settled: number; pass: number; fail: number;
     retry_attempts: number; remaining: number; awaiting_continue: number;
+    /** Batch Statistics v1: cumulative Job attempts and fully completed Sites. */
+    attempts?: number; sites_completed?: number;
   };
   auto_retry: "DISABLED";
 };
@@ -486,6 +458,8 @@ export type BatchInput = (
   | { icpn: string; operations: readonly SequenceOperation[]; image: Uint8Array; filename: string }
   | { icpn: string; operations: readonly SequenceOperation[]; bundle: Uint8Array }
   | { icpn: string; operations: readonly ["erase"]; address: number; length: number }
+  // Read Memory (U2): the independent read Job is a one-Site Batch attempt.
+  | { icpn: string; operation: "read"; address: number; length: number }
 ) & {
   alias: string;
   siteIds: readonly number[];
@@ -512,7 +486,7 @@ export async function startProgrammingBatch(
     targets: input.targets
       ? input.targets.map(target => ({ ppu_alias: target.ppu_alias, site_ids: [...target.site_ids] }))
       : [{ ppu_alias: input.alias, site_ids: [...input.siteIds] }],
-    operations: [...input.operations],
+    ...("operation" in input ? { operation: input.operation } : { operations: [...input.operations] }),
     retry_limit: input.retryLimit, stop_policy: input.stopPolicy,
     repeat: input.repeat ?? 1, replace_ic_before_next_cycle: input.replaceIc ?? true,
     // Manager-issued: admits at most one Batch and can be reconciled later.
@@ -533,6 +507,17 @@ export async function startProgrammingBatch(
 export async function getProgrammingBatch(batchId: string): Promise<ProgrammingBatch> {
   const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${PROGRAMMING}/batches/${batchId}`);
   return payload.batch;
+}
+
+/**
+ * One cursor page of a Batch's Cycle History (settled Cycles, blocked
+ * dispatches, Continue events). Read-only; `next_offset` is the next cursor.
+ */
+export async function getProgrammingBatchCycles(
+  batchId: string, offset: number, limit: number,
+): Promise<CycleHistoryPage> {
+  return request<CycleHistoryPage & { ok: true }>(
+    `${PROGRAMMING}/batches/${batchId}/cycles?offset=${offset}&limit=${limit}`);
 }
 
 /** Stop queuing: no further attempt is submitted. Never cancels a submitted Job. */

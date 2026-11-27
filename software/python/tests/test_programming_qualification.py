@@ -97,14 +97,14 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
         self.assertIs(registry_first, registry_second)
         self.assertIs(registry_first.summary, registry_first.summary)
 
-    def test_default_registry_preserves_st_65_and_derives_levels_from_routes(self):
+    def test_default_registry_preserves_st_77_and_adds_12_l2_without_downgrading_l3(self):
         registry = get_default_programming_qualification_registry()
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 78)
-        self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 77)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 90)
+        self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 89)
         self.assertEqual(registry.summary["catalog_level_3_verified_exact_icpns"], 77)
         self.assertEqual(registry.summary["catalog_level_3_direct_hil_exact_icpns"], 1)
         self.assertEqual(registry.summary["catalog_level_3_family_ready_exact_icpns"], 76)
-        self.assertEqual(registry.summary["catalog_level_counts"], {"0": 204, "1": 5604, "2": 0, "3": 77})
+        self.assertEqual(registry.summary["catalog_level_counts"], {"0": 204, "1": 5592, "2": 12, "3": 77})
 
         blue_pill = registry.describe("STMicroelectronics", "STM32F103C8T6")
         self.assertEqual(blue_pill["catalog_level"], 3)

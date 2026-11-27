@@ -39,6 +39,8 @@ Setup between Clocks
 
 def fixture_hwh() -> ET.Element:
     root = ET.Element("SYSTEM")
+    ET.SubElement(root, "SYSTEMINFO", BOARD="tul.com.tw:pynq-z2:part0:1.0",
+                  DEVICE="7z020", PACKAGE="clg400", SPEEDGRADE="-1")
     external = ET.SubElement(root, "EXTERNALPORTS")
     for name in ("DDR_addr", "FIXED_IO_mio", *swd.PINS):
         ET.SubElement(external, "PORT", NAME=name)
@@ -56,7 +58,18 @@ def fixture_hwh() -> ET.Element:
     ET.SubElement(reset, "PARAMETER", NAME="C_EXT_RESET_HIGH", VALUE="0")
     ET.SubElement(reset, "PORT", NAME="ext_reset_in",
                   SIGNAME="ps7_0_FCLK_RESET0_N")
-    ET.SubElement(root, "MODULE", INSTANCE="axi_interconnect_0")
+    fabric = ET.SubElement(root, "MODULE", INSTANCE="axi_interconnect_0")
+    ET.SubElement(fabric, "PARAMETER", NAME="NUM_MI", VALUE="3")
+    for clock in ("ACLK", "S00_ACLK", "M00_ACLK", "M01_ACLK", "M02_ACLK"):
+        ET.SubElement(fabric, "PORT", NAME=clock, SIGNAME="ps7_0_FCLK_CLK0")
+    for reset_pin in ("ARESETN", "S00_ARESETN", "M00_ARESETN",
+                      "M01_ARESETN", "M02_ARESETN"):
+        ET.SubElement(fabric, "PORT", NAME=reset_pin,
+                      SIGNAME="rst_ps7_0_100M_peripheral_aresetn")
+    ET.SubElement(fabric, "BUSINTERFACE", NAME="S00_AXI",
+                  BUSNAME="ps7_0_M_AXI_GP0")
+    ET.SubElement(ps, "BUSINTERFACE", NAME="M_AXI_GP0",
+                  BUSNAME="ps7_0_M_AXI_GP0")
     for name, value in swd.BASES.items():
         module = ET.SubElement(root, "MODULE", INSTANCE=name)
         ET.SubElement(module, "PARAMETER", NAME="SITE_ID",
@@ -67,26 +80,63 @@ def fixture_hwh() -> ET.Element:
                       SIGNAME="ps7_0_FCLK_CLK0")
         ET.SubElement(module, "PORT", NAME="s_axi_aresetn",
                       SIGNAME="rst_ps7_0_100M_peripheral_aresetn")
+        index = 0 if name.endswith("1") else 1
+        bus = f"axi_interconnect_0_M{index:02d}_AXI"
+        ET.SubElement(module, "BUSINTERFACE", NAME="S_AXI", BUSNAME=bus)
+        ET.SubElement(fabric, "BUSINTERFACE", NAME=f"M{index:02d}_AXI",
+                      BUSNAME=bus)
         ET.SubElement(root, "MEMRANGE", INSTANCE=name,
                       MASTERBUSINTERFACE="M_AXI_GP0",
+                      SLAVEBUSINTERFACE="S_AXI",
                       BASEVALUE=f"0x{value:08x}",
                       HIGHVALUE=f"0x{value + 0xfff:08x}")
+    common = ET.SubElement(root, "MODULE", INSTANCE="opp_common")
+    for key, value in {"IMAGE_ID": f"0x{swd.IMAGE_ID:032x}",
+                       "BUILD_ID": "0x" + "a" * 32,
+                       "SITE_PRESENT": "3", "SITE_READY": "0",
+                       "CAPABILITIES": "0", "PPU_STATUS": "0"}.items():
+        ET.SubElement(common, "PARAMETER", NAME=key, VALUE=value)
+    ET.SubElement(common, "PORT", NAME="s_axi_aclk",
+                  SIGNAME="ps7_0_FCLK_CLK0")
+    ET.SubElement(common, "PORT", NAME="s_axi_aresetn",
+                  SIGNAME="rst_ps7_0_100M_peripheral_aresetn")
+    ET.SubElement(common, "BUSINTERFACE", NAME="s_axi",
+                  BUSNAME="axi_interconnect_0_M02_AXI")
+    ET.SubElement(fabric, "BUSINTERFACE", NAME="M02_AXI",
+                  BUSNAME="axi_interconnect_0_M02_AXI")
+    ET.SubElement(root, "MEMRANGE", INSTANCE="opp_common",
+                  MASTERBUSINTERFACE="M_AXI_GP0", SLAVEBUSINTERFACE="s_axi",
+                  BASEVALUE="0x43c03000", HIGHVALUE="0x43c03fff")
     return root
 
 
-def test_hwh_two_real_slaves_are_not_f1b_composite():
-    result = swd.validate_hwh(fixture_hwh())
+def test_hwh_common_and_two_real_slaves_are_not_f1b_composite():
+    result = swd.validate_hwh(fixture_hwh(), "a" * 40)
     assert result["site_count_implemented"] == 2
     assert result["regions"]["swd_site1"]["base"] == "0x43C01000"
     assert result["regions"]["swd_site2"]["base"] == "0x43C02000"
+    assert result["regions"]["opp_common"]["base"] == "0x43C03000"
     assert result["real_target_qualified"] is False
 
 
+def test_hwh_common_parameter_literal_formats():
+    assert swd.wide_number(f"128'h{swd.IMAGE_ID:032x}") == swd.IMAGE_ID
+    assert swd.wide_number("32'h00000003") == 3
+    assert swd.wide_number("64'd0") == 0
+
+
 @pytest.mark.parametrize("tamper,expected", [
-    ("single_site", "SWD_HWH_REQUIRES_TWO_AXI_REGIONS"),
-    ("old_composite", "SWD_HWH_UNEXPECTED_OR_DUPLICATE_SITE"),
-    ("wrong_base", "SWD_HWH_SITE_WINDOW_MISMATCH"),
-    ("duplicate_site", "SWD_HWH_UNEXPECTED_OR_DUPLICATE_SITE"),
+    ("missing_common", "OPP_HWH_REQUIRES_THREE_AXI_REGIONS"),
+    ("missing_site", "OPP_HWH_REQUIRES_THREE_AXI_REGIONS"),
+    ("wrong_common_mem_intf", "OPP_HWH_UNEXPECTED_OR_DUPLICATE_SLAVE"),
+    ("wrong_common_bus_intf", "OPP_HWH_INTERCONNECT_ROUTE_MISMATCH"),
+    ("old_composite", "OPP_HWH_UNEXPECTED_OR_DUPLICATE_SLAVE"),
+    ("wrong_base", "OPP_HWH_WINDOW_MISMATCH"),
+    ("duplicate_site", "OPP_HWH_UNEXPECTED_OR_DUPLICATE_SLAVE"),
+    ("wrong_route", "OPP_HWH_INTERCONNECT_ROUTE_MISMATCH"),
+    ("wrong_fabric_reset", "OPP_HWH_INTERCONNECT_CLOCK_RESET_MISMATCH"),
+    ("wrong_build_id", "OPP_HWH_BUILD_ID_MISMATCH"),
+    ("false_ready", "OPP_HWH_COMMON_IDENTITY_OR_STATUS_MISMATCH"),
     ("wrong_clock", "SWD_HWH_FCLK_FREQUENCY_MISMATCH"),
     ("wrong_reset", "SWD_HWH_RESET_SOURCE_MISMATCH"),
     ("wrong_id", "SWD_HWH_SITE_PARAM_MISMATCH"),
@@ -97,14 +147,33 @@ def test_reject_unsafe_or_fabricated_hwh(tamper, expected):
     h = fixture_hwh()
     mem = list(h.iter("MEMRANGE"))
     modules = {m.get("INSTANCE"): m for m in h.iter("MODULE")}
-    if tamper == "single_site":
+    if tamper == "missing_common":
         h.remove(mem[-1])
+    elif tamper == "missing_site":
+        h.remove(mem[1])
+    elif tamper == "wrong_common_mem_intf":
+        mem[-1].set("SLAVEBUSINTERFACE", "S_AXI")
+    elif tamper == "wrong_common_bus_intf":
+        next(b for b in modules["opp_common"].iter("BUSINTERFACE")
+             if b.get("NAME") == "s_axi").set("NAME", "S_AXI")
     elif tamper == "old_composite":
         mem[0].set("INSTANCE", "mpe_0")
     elif tamper == "wrong_base":
         mem[1].set("BASEVALUE", "0x40000000")
     elif tamper == "duplicate_site":
         mem[1].set("INSTANCE", "swd_site1")
+    elif tamper == "wrong_route":
+        next(b for b in modules["opp_common"].iter("BUSINTERFACE")
+             if b.get("NAME") == "s_axi").set("BUSNAME", "unrelated")
+    elif tamper == "wrong_fabric_reset":
+        next(p for p in modules["axi_interconnect_0"].iter("PORT")
+             if p.get("NAME") == "M02_ARESETN").set("SIGNAME", "unrelated")
+    elif tamper == "wrong_build_id":
+        next(p for p in modules["opp_common"].iter("PARAMETER")
+             if p.get("NAME") == "BUILD_ID").set("VALUE", "0x0")
+    elif tamper == "false_ready":
+        next(p for p in modules["opp_common"].iter("PARAMETER")
+             if p.get("NAME") == "SITE_READY").set("VALUE", "3")
     elif tamper == "wrong_clock":
         modules["ps7_0"].find("PORT").set("CLKFREQUENCY", "50000000")
     elif tamper == "wrong_reset":
@@ -119,7 +188,7 @@ def test_reject_unsafe_or_fabricated_hwh(tamper, expected):
             if port.get("NAME") == "swdio_site2":
                 external.remove(port)
     with pytest.raises(swd.SWDBuildDenied, match=expected):
-        swd.validate_hwh(h)
+        swd.validate_hwh(h, "a" * 40)
 
 
 def test_artifact_requires_real_tcl_marker_and_records_no_hardware(tmp_path):
@@ -157,7 +226,16 @@ def test_artifact_requires_real_tcl_marker_and_records_no_hardware(tmp_path):
     # xdc/build_stdout. It must preserve every project-specific safety gate.
     (tmp_path / "vivado-stdout.log").write_text(
         "SWD_HOST_IMPL_REPORTS_TIMING_DRC_PASS setup=1.0 hold=0.1\n"
-        "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED\n")
+        "OPP_COMMON_SWD5_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED\n")
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "system_wrapper.bit").write_bytes(bit.read_bytes())
+    (artifacts / "system.hwh").write_bytes(hwh.read_bytes())
+    (artifacts / "system_wrapper.bin").write_bytes(b"synthetic bin fixture")
+    run = tmp_path / "project/z2_swd_independent.runs/impl_1"
+    run.mkdir(parents=True)
+    (run / "system_wrapper.bit").write_bytes(bit.read_bytes())
+    (run / "system_wrapper.bin").write_bytes(b"synthetic bin fixture")
     generic = swd.verify_artifacts(
         hwh=hwh, bit=bit, reports=reports, source_sha=sha, build=tmp_path)
     assert generic["map"] == result["hwh"]["regions"]
@@ -168,9 +246,16 @@ def test_artifact_requires_real_tcl_marker_and_records_no_hardware(tmp_path):
     assert generic["external_swd_io_timing"]["external_io_timing_qualified"] is False
     assert generic["physical_image_loaded"] == "NOT_RUN"
     assert generic["z2_hil"] == "NOT_RUN"
+    assert generic["manifest_sha256"] == swd.sha256(
+        artifacts / "plasma-image-manifest.json")
+    assert generic["bin_sha256"] == swd.sha256(artifacts / "system_wrapper.bin")
+    (artifacts / "system.hwh").write_bytes(hwh.read_bytes() + b"\n")
+    with pytest.raises(swd.SWDBuildDenied,
+                       match="OPP_PAIRED_ARTIFACT_MISMATCH"):
+        swd.pair_manifest(tmp_path, sha, hwh)
 
     (tmp_path / "vivado-stdout.log").write_text(
-        "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED\n")
+        "OPP_COMMON_SWD5_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED\n")
     with pytest.raises(swd.SWDBuildDenied,
                        match="SWD_BUILD_TCL_SIGNOFF_MARKER_MISSING"):
         swd.verify_artifacts(hwh=hwh, bit=bit, reports=reports,

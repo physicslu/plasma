@@ -93,7 +93,7 @@ from typing import Any, Callable, Generator, Mapping
 from .programming import (
     SHARED_CONTROL_FAILURE, TARGET_NOT_READY, TARGET_STATE_UNAVAILABLE,
     TARGET_TRANSACTION_UNKNOWN, BatchPreparation, BundleProgrammingWorkflow, JOB_TERMINAL,
-    ProgrammingError, _m0_timing,
+    PROGRAMMING, SITE_DENIED_BEFORE_HARDWARE, ProgrammingError, _m0_timing,
 )
 from .bootstrap import BootstrapManagerError
 from .client import PPUHTTPError
@@ -123,7 +123,7 @@ BATCH_TERMINAL = frozenset({"PASS", "FAIL", "PARTIAL", "OUTCOME_UNKNOWN", "BLOCK
 # A Target counts as executed only when a Job was submitted for it.
 EXECUTED_OUTCOMES = frozenset({"PASS", "FAIL", "OUTCOME_UNKNOWN"})
 SETTLED_UNIT_OUTCOMES = EXECUTED_OUTCOMES | {"PARTIAL"}
-PLAN_KEYS = frozenset({"icpn", "operations", "image_base64", "image_filename",
+PLAN_KEYS = frozenset({"icpn", "operations", "operation", "image_base64", "image_filename",
                        "bundle_base64", "address", "length"})
 TARGET_KEY = "targets"
 POLICY_KEYS = frozenset({"retry_limit", "stop_policy", "repeat", "replace_ic_before_next_cycle"})
@@ -261,6 +261,16 @@ def retry_eligibility(run: Mapping[str, Any]) -> tuple[bool, str]:
     return (True, "DEFINITE_FAIL_SAFE_OFF_VERIFIED") if trusted else (False, why)
 
 
+def _denied_before_hardware(run: Mapping[str, Any]) -> bool:
+    """The Manager's own trusted verdict that this Run's Job touched nothing
+    (``programming._job_site_safety``): the Site is left as it was."""
+    receipt = run.get("receipt") if isinstance(run.get("receipt"), dict) else {}
+    return (run.get("outcome") == "BLOCKED" and run.get("reason") == SITE_DENIED_BEFORE_HARDWARE
+            and receipt.get("safe_off_state") == "NOT_TOUCHED"
+            and isinstance(receipt.get("site_safety"), dict)
+            and receipt["site_safety"].get("class") == "PRE_HARDWARE_DENIED")
+
+
 def terminal_evidence(run: Mapping[str, Any] | None) -> tuple[bool, str]:
     """Did this run end in a trusted terminal state with SAFE_OFF verified?
 
@@ -276,13 +286,15 @@ def terminal_evidence(run: Mapping[str, Any] | None) -> tuple[bool, str]:
         return False, "JOB_SUBMISSION_NOT_EXACTLY_ONE"
     if type(receipt.get("job_id")) is not str or receipt.get("job_state") not in JOB_TERMINAL:
         return False, "NO_TRUSTED_TERMINAL_JOB_STATE"
-    if receipt.get("safe_off") is not True:
+    if receipt.get("safe_off") is not True and not _denied_before_hardware(run):
         return False, "SAFE_OFF_NOT_VERIFIED"
     if (receipt.get("observed_job_binding_sha256") != receipt.get("expected_job_binding_sha256")
             or receipt.get("observed_resource_set_sha256")
             != receipt.get("expected_resource_set_sha256")):
         # The PPU did not prove it ran the Job that was planned.
         return False, "JOB_IDENTITY_NOT_CONFIRMED"
+    if receipt.get("safe_off") is not True:
+        return True, "TERMINAL_HARDWARE_NOT_TOUCHED"
     return True, "TERMINAL_SAFE_OFF_VERIFIED"
 
 
@@ -324,12 +336,48 @@ def _unit_status(outcome: str | None, *, stopped: bool = False) -> str:
 
 
 def new_cycle(planned: int) -> dict[str, Any]:
-    """Per-Site Repeat accounting: counters plus the one current Cycle."""
+    """Per-Site Repeat accounting: counters plus the one current Cycle.
+
+    ``attempts_archived`` counts the attempt records already moved out of
+    ``unit["attempts"]`` into this Batch's cycle segment. Every attempt record
+    is therefore counted in exactly one place - the archive counter or the
+    current list - so the Site's cumulative attempts are their sum, read
+    without the segment (Batch Statistics v1).
+    """
     return {"planned": planned, "index": 1, "cycle_id": secrets.token_hex(16),
             "state": "ACTIVE", "disposition": None,
             "settled": 0, "pass": 0, "fail": 0, "retry_attempts": 0,
+            "attempts_archived": 0,
             "continue_seq": 0, "continued_seq": 0, "wait_reason": None,
             "last": None, "last_continue": None}
+
+
+def _current_cycle_settled(cycle: Mapping[str, Any]) -> bool:
+    """Whether the attempts still held for the current Cycle are already
+    accounted in its settled counters (``retry_attempts``)."""
+    if cycle.get("cycle_id") is None:
+        # Journalled before Manual Repeat: settled as its one Cycle on load.
+        return bool(cycle.get("settled"))
+    last = cycle.get("last")
+    return isinstance(last, Mapping) and last.get("cycle_id") == cycle["cycle_id"]
+
+
+def unit_statistics(unit: Mapping[str, Any]) -> dict[str, int]:
+    """Cumulative attempt counters of one Site, from O(1) journal state.
+
+    ``attempts``: every attempt record of every Cycle of this Site (one
+    Manager-planned Job attempt each, Retries included). ``retry_attempts``:
+    those beyond the first attempt of their Cycle - the settled Cycles'
+    counter plus the Retries of a Cycle that is still running or ended
+    unsettled (``OUTCOME_UNKNOWN`` / ``BLOCKED`` / stopped).
+    """
+    cycle = unit["cycle"]
+    current = unit.get("attempts") or []
+    retries = cycle.get("retry_attempts", 0)
+    if not _current_cycle_settled(cycle):
+        retries += sum(1 for attempt in current if (attempt.get("attempt") or 1) > 1)
+    return {"attempts": cycle.get("attempts_archived", 0) + len(current),
+            "retry_attempts": retries}
 
 
 def ensure_cycle(batch: dict[str, Any]) -> None:
@@ -364,9 +412,15 @@ def _receipt_summary(run: Mapping[str, Any] | None) -> dict[str, Any] | None:
         "job_id": receipt.get("job_id"), "job_state": receipt.get("job_state"),
         "flash_result": receipt.get("flash_result"), "safe_off": receipt.get("safe_off"),
         "safe_off_source": receipt.get("safe_off_source"),
+        "safe_off_state": receipt.get("safe_off_state"),
+        "site_safety": receipt.get("site_safety"),
         "job_binding_confirmed": (receipt.get("observed_job_binding_sha256") is not None
                                   and receipt.get("observed_job_binding_sha256")
                                   == receipt.get("expected_job_binding_sha256")),
+        "job_binding_sha256": receipt.get("observed_job_binding_sha256"),
+        "resource_set_sha256": receipt.get("observed_resource_set_sha256"),
+        "readback_sha256": receipt.get("readback_sha256"),
+        "bytes_verified": receipt.get("bytes_verified"),
         "elapsed_ms": receipt.get("elapsed_ms"),
     }
 
@@ -460,6 +514,10 @@ class ProgrammingBatchCoordinator:
         self._legacy_ids: set[str] = set()
         #: Cycle segments when no journal file is configured (Host tests).
         self._memory_ledger: dict[str, list[dict[str, Any]]] = {}
+        #: Byte offset of each complete record line of a file-backed cycle
+        #: segment, built once on first read and extended on append, so a
+        #: history page is a bounded seek + read - never the whole segment.
+        self._ledger_index: dict[str, list[int]] = {}
         self._load_journal()
 
     # ------------------------------------------------------------------ journal
@@ -586,9 +644,39 @@ class ProgrammingBatchCoordinator:
         batch.setdefault("started_at", None)
         batch.setdefault("finished_at", None)
         ensure_cycle(batch)
+        self._restore_attempt_counters(batch)
         if batch.get("outcome") is None:
             self._close_interrupted(batch)
         self._batches[batch["batch_id"]] = batch
+
+    def _restore_attempt_counters(self, batch: dict[str, Any]) -> None:
+        """A record journalled before Batch Statistics v1 has no
+        ``attempts_archived``: count it once, at load, from its own cycle
+        segment. Archived attempts are those of every ``blocked_dispatch``
+        record and of every settled Cycle other than the current one (whose
+        attempts are still held in the unit). Never repeated per read."""
+        units = [unit for unit in batch.get("units") or []
+                 if "attempts_archived" not in unit["cycle"]]
+        if not units:
+            return
+        records = self._ledger_records(batch["batch_id"])
+        for unit in units:
+            cycle = unit["cycle"]
+            # A crash after a segment append and before the main write leaves
+            # those attempts in the unit too: they are not archived yet.
+            held = {attempt.get("plan_id") for attempt in unit.get("attempts") or []}
+
+            def archived(record: Mapping[str, Any]) -> bool:
+                if (record.get("ppu_alias") != unit["ppu_alias"]
+                        or record.get("site_id") != unit["site_id"]):
+                    return False
+                if any(a.get("plan_id") in held for a in record.get("attempts") or []):
+                    return False
+                return (record.get("type") == "blocked_dispatch"
+                        or (record.get("type") == "cycle"
+                            and record.get("cycle_id") != cycle.get("cycle_id")))
+            cycle["attempts_archived"] = sum(
+                len(record.get("attempts") or []) for record in records if archived(record))
 
     def _close_interrupted(self, batch: dict[str, Any]) -> None:
         """A Batch the Manager was stopped in: decide from the run journal,
@@ -683,6 +771,7 @@ class ProgrammingBatchCoordinator:
         for batch_id in pruned:
             # A cycle segment shares its Batch's retention, never outlives it.
             self._memory_ledger.pop(batch_id, None)
+            self._ledger_index.pop(batch_id, None)
             segment = self._ledger_path(batch_id)
             if segment is not None:
                 segment.unlink(missing_ok=True)
@@ -728,16 +817,78 @@ class ProgrammingBatchCoordinator:
                 self._memory_ledger.setdefault(batch_id, []).append(dict(record))
                 return
             path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-            fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
-            with os.fdopen(fd, "a", encoding="utf-8") as stream:
-                stream.write(json.dumps(record, sort_keys=True) + "\n")
+            index = self._ledger_offsets(batch_id, path)
+            fd = os.open(path, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o600)
+            with os.fdopen(fd, "r+b") as stream:
+                end = os.fstat(stream.fileno()).st_size
+                line = json.dumps(record, sort_keys=True).encode("utf-8") + b"\n"
+                torn = bool(end) and os.pread(stream.fileno(), 1, end - 1) != b"\n"
+                if torn:
+                    # A torn final line (crash mid-append) ends here, so it
+                    # never swallows this record; it stays unreadable.
+                    line = b"\n" + line
+                stream.write(line)
                 stream.flush()
                 os.fsync(stream.fileno())
+            if torn:
+                # The torn line is a complete (unreadable) line now: rescan
+                # once so its ``seq`` is the same as after a restart.
+                self._ledger_index.pop(batch_id, None)
+            else:
+                index.append(end)
         except Exception as exc:
+            # The line may be on disk without its index entry: rescan on next read.
+            self._ledger_index.pop(batch_id, None)
             self._control_failure = f"BATCH_CYCLE_JOURNAL_{type(exc).__name__}"
             with self.workflow._lock:
                 self.workflow._control_failure = self._control_failure
             raise
+
+    def _ledger_offsets(self, batch_id: str, path: Path) -> list[int]:
+        """Start offsets of the segment's complete lines (scanned once)."""
+        index = self._ledger_index.get(batch_id)
+        if index is None:
+            index = []
+            if path.exists():
+                position = 0
+                with path.open("rb") as stream:
+                    for line in stream:
+                        if line.endswith(b"\n"):
+                            index.append(position)
+                        position += len(line)
+            self._ledger_index[batch_id] = index
+        return index
+
+    def _ledger_page(self, batch_id: str, offset: int,
+                     limit: int) -> tuple[int, list[tuple[int, dict[str, Any] | None]]]:
+        """``(total, [(seq, record), ...])`` for ``seq`` in ``offset..+limit``.
+
+        ``seq`` is the record's position in the append-only segment: stable,
+        gap-free and never reused while the Batch is retained. A torn line
+        keeps its ``seq`` with record ``None``, so a cursor never stalls.
+        """
+        path = self._ledger_path(batch_id)
+        if path is None:
+            records = self._memory_ledger.get(batch_id, [])
+            return len(records), [(seq, dict(records[seq]))
+                                  for seq in range(offset, min(len(records), offset + limit))]
+        index = self._ledger_offsets(batch_id, path)
+        total = len(index)
+        if offset >= total:
+            return total, []
+        end = min(total, offset + limit)
+        with path.open("rb") as stream:
+            stream.seek(index[offset])
+            stop = index[end] if end < total else None
+            blob = stream.read() if stop is None else stream.read(stop - index[offset])
+        page: list[tuple[int, dict[str, Any] | None]] = []
+        for seq, line in zip(range(offset, end), blob.split(b"\n")):
+            try:
+                record = json.loads(line)
+            except ValueError:
+                record = None
+            page.append((seq, record if isinstance(record, dict) else None))
+        return total, page
 
     def _ledger_records(self, batch_id: str) -> list[dict[str, Any]]:
         path = self._ledger_path(batch_id)
@@ -850,7 +1001,8 @@ class ProgrammingBatchCoordinator:
             run_id=run.get("run_id"), state="finished" if run.get("outcome") else "running",
             outcome=run.get("outcome"), reason=run.get("reason"),
             job_id=receipt.get("job_id") or job.get("job_id"),
-            safe_off=receipt.get("safe_off"), finished_at=run.get("updated_at"))
+            safe_off=receipt.get("safe_off"), safe_off_state=receipt.get("safe_off_state"),
+            finished_at=run.get("updated_at"))
 
     def _unit_progress(self, unit: Mapping[str, Any]) -> dict[str, Any] | None:
         """Read-only PPU progress of this Site's latest attempt.
@@ -894,22 +1046,35 @@ class ProgrammingBatchCoordinator:
         """
         units = [{**unit, "attempts": [dict(a) for a in unit.get("attempts") or []],
                   "cycle": {**unit["cycle"], "remaining":
-                            unit["cycle"]["planned"] - unit["cycle"]["settled"]},
+                            unit["cycle"]["planned"] - unit["cycle"]["settled"],
+                            # Cumulative over every Cycle of this Site, not
+                            # the current Cycle's list (Batch Statistics v1).
+                            **unit_statistics(unit)},
                   "progress": self._unit_progress(unit)}
                  for unit in batch["units"]]
         cycles = {key: sum(unit["cycle"][key] for unit in units)
-                  for key in ("planned", "settled", "pass", "fail", "retry_attempts", "remaining")}
+                  for key in ("planned", "settled", "pass", "fail", "retry_attempts",
+                              "remaining", "attempts")}
         cycles["awaiting_continue"] = sum(
             unit["cycle"]["state"] == AWAITING_CONTINUE for unit in units)
+        # A Site is fully completed when every planned Cycle settled.
+        cycles["sites_completed"] = sum(
+            unit["cycle"]["settled"] >= unit["cycle"]["planned"] for unit in units)
         attempts = [attempt for unit in units for attempt in unit["attempts"]]
         outcomes = [unit.get("outcome") for unit in units]
-        view = {**batch, "units": units, "attempts": attempts,
+        view = {**batch, "units": units,
+                # The CURRENT Cycle's attempts of every Site (live detail);
+                # settled Cycles are in the Cycle History (``/cycles``).
+                "attempts": attempts,
                 "current_run": self._current_run(batch),
-                # One Site is one IC: counted once, by its final outcome only.
+                # Site final outcomes: one per Site, never a Cycle count.
                 "counts": {"pass": outcomes.count("PASS"), "fail": outcomes.count("FAIL"),
+                           "partial": outcomes.count("PARTIAL"),
                            "blocked": outcomes.count("BLOCKED"),
                            "unknown": outcomes.count("OUTCOME_UNKNOWN"),
-                           "sites": len(units), "attempts": len(attempts)},
+                           "sites": len(units),
+                           # Cumulative Job attempts of the whole Batch.
+                           "attempts": cycles["attempts"]},
                 # Cycle accounting (Manual Repeat). Same-IC Debug PASS Cycles
                 # are Cycles, never distinct physical good units.
                 "cycles": cycles,
@@ -949,11 +1114,13 @@ class ProgrammingBatchCoordinator:
     def _start(self, body: Mapping[str, Any]) -> dict[str, Any]:
         if (not isinstance(body, Mapping)
                 or set(body) - PLAN_KEYS - {TARGET_KEY} - POLICY_KEYS - START_KEYS
-                or "operations" not in body or TARGET_KEY not in body):
+                or len({"operations", "operation"} & set(body)) != 1
+                or TARGET_KEY not in body):
             raise ProgrammingError(
                 400, "invalid_request",
                 "a batch requires icpn, targets, an operations list with its Programming "
-                "Image, Bundle or erase range, and optional retry_limit / stop_policy")
+                "Image, Bundle or erase range (or operation \"read\" with its range), and "
+                "optional retry_limit / stop_policy")
         if "start_id" not in body:
             raise ProgrammingError(
                 400, "invalid_request",
@@ -1006,7 +1173,9 @@ class ProgrammingBatchCoordinator:
                 "start_id": start_id,
                 "targets": [dict(target, site_ids=list(target["site_ids"]))
                             for target in targets],
-                "operations": plan_body["operations"],
+                # The ordered E/P/V list, or None for the independent read Job.
+                "operations": plan_body.get("operations"),
+                "operation": plan_body.get("operation"),
                 "source": _source_of(plan_body), "icpn": plan_body.get("icpn"),
                 "policy": policy, "state": "running",
                 "execution_status": "RUNNING", "outcome": None, "reason": None,
@@ -1020,7 +1189,8 @@ class ProgrammingBatchCoordinator:
             # never reconcile as "not accepted". Partial admission has still
             # consumed it, so a BLOCKED Target needs a NEW start.
             self.workflow.consume_batch_start(
-                start_id, batch["batch_id"], batch["targets"])
+                start_id, batch["batch_id"], batch["targets"],
+                batch["operation"] or PROGRAMMING)
             self._batches[batch["batch_id"]] = batch
             try:
                 self._persist_locked()
@@ -1211,15 +1381,25 @@ class ProgrammingBatchCoordinator:
             return {"ok": True, "duplicate": False, "batch": self._view(batch)}
 
     def cycle_records(self, batch_id: str, offset: int = 0, limit: int = 100) -> dict[str, Any]:
-        """Read-only page of a Batch's settled Cycles and Continue events."""
+        """Read-only Cycle History page: settled Cycles, blocked dispatches
+        and Continue events of one Batch, in append order.
+
+        ``offset`` is a cursor over the append-only segment: every record
+        carries its ``seq`` and the answer ``next_offset``, so a reader that
+        missed polls, reconnected or reloaded resumes at its cursor with no
+        gap and no duplicate. A page is bounded (``limit`` <= 1000) and read
+        by seek, never by re-reading the whole history. Records live exactly
+        as long as their Batch (same retention), and survive a restart.
+        """
         if not 0 <= offset or not 1 <= limit <= 1000:
             raise ProgrammingError(400, "invalid_request",
                                    "offset must be >= 0 and limit 1..1000")
         with self._lock:
             self._get(batch_id)
-            records = self._ledger_records(batch_id)
-        return {"ok": True, "batch_id": batch_id, "total": len(records),
-                "offset": offset, "records": records[offset:offset + limit]}
+            total, page = self._ledger_page(batch_id, offset, limit)
+        records = [{**record, "seq": seq} for seq, record in page if record is not None]
+        return {"ok": True, "batch_id": batch_id, "total": total, "offset": offset,
+                "next_offset": offset + len(page), "records": records}
 
     # ---------------------------------------------------------------- execution
     def _execute(self, batch: dict[str, Any], plan_body: Mapping[str, Any]) -> None:
@@ -1414,33 +1594,72 @@ class ProgrammingBatchCoordinator:
         prepared = self.workflow._prepared_for(preparation, {**plan_body, "site_id": 1})
         resource_sha = prepared.resources[1]
         reserved: list[str] = []
+
+        def refuse(alias: str, exc: Exception) -> None:
+            """A PPU-local refusal blocks that PPU; anything else is shared."""
+            if hasattr(exc, "failure_domain") and hasattr(exc, "reason"):
+                blocks[alias] = (exc.failure_domain, exc.reason)
+            elif isinstance(exc, ProgrammingError):
+                blocks[alias] = (TARGET_NOT_READY, exc.code.upper())
+            elif isinstance(exc, (BootstrapManagerError, PPUHTTPError,
+                                  TimeoutError, ConnectionError)):
+                blocks[alias] = (TARGET_STATE_UNAVAILABLE,
+                                 f"PPU_STATE_UNREADABLE_{type(exc).__name__}")
+            else:
+                for held_alias in reserved:
+                    try:
+                        self.workflow.end_batch_resource(held_alias, owner_id)
+                    except Exception:
+                        pass
+                self._reservation_blocks.pop(owner_id, None)
+                raise _SharedControlFailure(
+                    f"SITE_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}") from exc
+
+        observed: dict[str, tuple | None] = {}
+        # U1: every PPU's Resources are made Active (or found Active) BEFORE
+        # any Reservation, so no Reservation waits on another PPU's B3.
         for target in batch["targets"]:
             alias = target["ppu_alias"]
+            if self.workflow._unknown_latched(alias) is not None:
+                blocks[alias] = (TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED")
+                continue
+            if batch["stop_requested"]:
+                # Stop queuing: start no Platform mutation. The lanes report
+                # the stop exactly as they always have.
+                continue
+            steps: list[dict[str, Any]] = []
+
+            def record_step(name: str, result: str, _steps=steps, **detail: Any) -> None:
+                _steps.append({"step": name, "result": result, "at": _now(), **detail})
+
             try:
-                if self.workflow._unknown_latched(alias) is not None:
-                    blocks[alias] = (TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED")
-                    continue
+                observed[alias] = self.workflow.activate_batch_resource(
+                    alias, prepared, target["site_ids"][0], step=record_step,
+                    platform_block=lambda alias=alias: self._platform_block(alias))
+            except Exception as exc:
+                refuse(alias, exc)
+            finally:
+                if steps:   # B1 was reached: keep its evidence whatever followed
+                    done = alias in observed
+                    with self._lock:
+                        batch.setdefault("resource_activation", {})[alias] = {
+                            "steps": steps, "fpga_load": False,
+                            "result": "PASS" if done else "BLOCKED",
+                            "reason": None if done else blocks.get(
+                                alias, (None, "SHARED_CONTROL_FAILURE"))[1]}
+                        batch["updated_at"] = _now()
+                        self._persist_locked()
+        for target in batch["targets"]:
+            alias = target["ppu_alias"]
+            if alias in blocks:
+                continue
+            try:
                 self.workflow.begin_batch_resource(alias, owner_id, resource_sha,
-                                                   target["site_ids"][0])
+                                                   target["site_ids"][0],
+                                                   observed=observed.get(alias))
                 reserved.append(alias)
             except Exception as exc:
-                if hasattr(exc, "failure_domain") and hasattr(exc, "reason"):
-                    blocks[alias] = (exc.failure_domain, exc.reason)
-                elif isinstance(exc, ProgrammingError):
-                    blocks[alias] = (TARGET_NOT_READY, exc.code.upper())
-                elif isinstance(exc, (BootstrapManagerError, PPUHTTPError,
-                                      TimeoutError, ConnectionError)):
-                    blocks[alias] = (TARGET_STATE_UNAVAILABLE,
-                                     f"PPU_STATE_UNREADABLE_{type(exc).__name__}")
-                else:
-                    for held_alias in reserved:
-                        try:
-                            self.workflow.end_batch_resource(held_alias, owner_id)
-                        except Exception:
-                            pass
-                    self._reservation_blocks.pop(owner_id, None)
-                    raise _SharedControlFailure(
-                        f"SITE_AUTHORITY_UNJUDGEABLE_{type(exc).__name__}") from exc
+                refuse(alias, exc)
         for unit in batch["units"]:
             if unit["outcome"] is not None:
                 continue
@@ -1564,11 +1783,18 @@ class ProgrammingBatchCoordinator:
                     return self._conclude(unit, None, stopped)
                 self._begin_next_cycle(batch, unit)
                 continue
-            if outcome == "BLOCKED" and cycle["settled"]:
-                # The next Cycle was not submitted. It is neither failed nor
-                # skipped: it waits, with its reason, for the operator.
-                self._record_blocked_dispatch(batch, unit, reason)
-                stopped = yield from self._await_continue(batch, unit, f"NEXT_CYCLE_{reason}")
+            denied = outcome == "BLOCKED" and reason == SITE_DENIED_BEFORE_HARDWARE
+            if outcome == "BLOCKED" and (cycle["settled"] or denied):
+                # The next Cycle was not submitted, or its Job was refused
+                # before any hardware access. It is neither failed nor
+                # settled: it waits, with its reason, for the operator. Continue
+                # runs this Cycle again through every admission gate with a
+                # new plan, Run and Job (never a resend), this Site only.
+                attempts = unit.get("attempts") or []
+                last = self._run_of(alias, attempts[-1]) if denied and attempts else None
+                self._record_blocked_dispatch(batch, unit, reason, last)
+                stopped = yield from self._await_continue(
+                    batch, unit, reason if denied else f"NEXT_CYCLE_{reason}")
                 if stopped is not None:
                     return self._conclude(unit, None, stopped)
                 continue
@@ -1601,13 +1827,17 @@ class ProgrammingBatchCoordinator:
         with self._lock:
             cycle = unit["cycle"]
             cycle.update(index=cycle["index"] + 1, cycle_id=secrets.token_hex(16))
-            # The previous Cycle's attempts live in its segment record.
+            # The previous Cycle's attempts live in its segment record; the
+            # counter moves with them in the same journal write.
+            cycle["attempts_archived"] = (cycle.get("attempts_archived", 0)
+                                          + len(unit.get("attempts") or []))
             unit["attempts"] = []
             batch["updated_at"] = _now()
             self._persist_locked()
 
     def _record_blocked_dispatch(self, batch: dict[str, Any], unit: dict[str, Any],
-                                 reason: str | None) -> None:
+                                 reason: str | None,
+                                 run: Mapping[str, Any] | None = None) -> None:
         with self._lock:
             attempts = unit.get("attempts") or []
             if attempts:
@@ -1615,7 +1845,12 @@ class ProgrammingBatchCoordinator:
                     "type": "blocked_dispatch", "batch_id": batch["batch_id"],
                     "ppu_alias": unit["ppu_alias"], "site_id": unit["site_id"],
                     "cycle_index": unit["cycle"]["index"], "cycle_id": unit["cycle"]["cycle_id"],
-                    "reason": reason, "attempts": [dict(a) for a in attempts], "at": _now()})
+                    "reason": reason, "attempts": [dict(a) for a in attempts],
+                    # The refused Job's evidence (SITE_DENIED_BEFORE_HARDWARE).
+                    **({"receipt": _receipt_summary(run)} if run is not None else {}),
+                    "at": _now()})
+            unit["cycle"]["attempts_archived"] = (
+                unit["cycle"].get("attempts_archived", 0) + len(attempts))
             unit["attempts"] = []
             batch["updated_at"] = _now()
             self._persist_locked()
@@ -1794,6 +2029,11 @@ class ProgrammingBatchCoordinator:
                 self._record_attempt(attempt, run)
                 self._persist_locked()
             outcome = run["outcome"]
+            if outcome == "BLOCKED" and number > 1:
+                # A Retry the Site Worker refused before any hardware access:
+                # the earlier definite FAIL of this Cycle stands (never erased
+                # by a pause); the refused Retry touched nothing.
+                return "FAIL", f"RETRY_{run.get('reason')}"
             if outcome != "FAIL":
                 # PASS ends this Site; OUTCOME_UNKNOWN and BLOCKED are never retried.
                 return outcome, run.get("reason")

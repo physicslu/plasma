@@ -22,6 +22,7 @@ create_project z2_swd_independent [file join $build_dir project] \
     -part xc7z020clg400-1 -force
 set_property board_part $board_part [current_project]
 set sources [list \
+    [file join $pl_dir rtl bus opp_common_axi_lite_v1.sv] \
     [file join $pl_dir rtl swd plasma_swd_transaction_engine.sv] \
     [file join $pl_dir rtl swd plasma_swd_site_axi_lite.sv]]
 foreach p $sources {

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 import sys
 import tempfile
@@ -27,6 +28,53 @@ APPROVAL = {"task_id": "path2-work-order", "execution_path": "path2-cli",
 
 
 class GenericVivadoContracts(unittest.TestCase):
+    def test_paired_image_is_bound_to_receipt_source_and_upload_contract(self):
+        workflow = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
+        self.assertIn("candidate/pl/build/**/artifacts/system_wrapper.bin", workflow)
+        self.assertIn("candidate/pl/build/**/artifacts/plasma-image-manifest.json", workflow)
+        with tempfile.TemporaryDirectory() as temporary:
+            build_dir = Path(temporary) / "vivado-build"
+            artifacts = build_dir / "artifacts"
+            artifacts.mkdir(parents=True)
+            firmware = artifacts / "system_wrapper.bin"
+            manifest_path = artifacts / "plasma-image-manifest.json"
+            firmware.write_bytes(b"host-only-firmware")
+            bin_sha = hashlib.sha256(firmware.read_bytes()).hexdigest()
+            image_id = "z2-swd-opp-v1-" + SHA[:12]
+            manifest = {"firmware_name": firmware.name,
+                        "firmware_sha256": bin_sha, "image_id": image_id}
+
+            def write_manifest():
+                manifest_path.write_text(json.dumps(manifest))
+                return hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
+            receipt = {"source_sha": SHA, "bin_sha256": bin_sha,
+                       "manifest_sha256": write_manifest(),
+                       "manifest_path": str(manifest_path), "image_id": image_id}
+            build.verify_paired_image_outputs(build_dir, receipt, SHA)
+            for changed, error in (
+                    ({"source_sha": "b" * 40}, "SOURCE_OR_MANIFEST_MISMATCH"),
+                    ({"bin_sha256": "0" * 64}, "SHA_MISMATCH"),
+                    ({"manifest_sha256": "0" * 64}, "SHA_MISMATCH"),
+                    ({"manifest_path": str(build_dir / "other.json")}, "FILES_MISSING_OR_UNSAFE"),
+                    ({"image_id": "other"}, "SOURCE_OR_MANIFEST_MISMATCH")):
+                with self.subTest(changed=changed), self.assertRaisesRegex(
+                        build.BuildDenied, error):
+                    build.verify_paired_image_outputs(build_dir, {**receipt, **changed}, SHA)
+            manifest["firmware_sha256"] = "0" * 64
+            receipt["manifest_sha256"] = write_manifest()
+            with self.assertRaisesRegex(build.BuildDenied, "SOURCE_OR_MANIFEST_MISMATCH"):
+                build.verify_paired_image_outputs(build_dir, receipt, SHA)
+            manifest["firmware_sha256"] = bin_sha
+            receipt["manifest_sha256"] = write_manifest()
+            firmware.unlink()
+            with self.assertRaisesRegex(build.BuildDenied, "FILES_MISSING_OR_UNSAFE"):
+                build.verify_paired_image_outputs(build_dir, receipt, SHA)
+            firmware.write_bytes(b"host-only-firmware")
+            manifest_path.unlink()
+            with self.assertRaisesRegex(build.BuildDenied, "FILES_MISSING_OR_UNSAFE"):
+                build.verify_paired_image_outputs(build_dir, receipt, SHA)
+
     def test_two_projects_supply_the_same_interface(self):
         for name, expected in (("z2-identity", "z2_identity"),
                                ("z2-control-waveform", "z2_control_waveform")):
@@ -45,7 +93,7 @@ class GenericVivadoContracts(unittest.TestCase):
         self.assertEqual(plan["vivado_project"], "z2_swd_independent")
         self.assertEqual(plan["build_env"], "PLASMA_SWD_BUILD")
         self.assertEqual(plan["success_marker"],
-                         "SWD_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED")
+                         "OPP_COMMON_SWD5_HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED")
         self.assertEqual(set(plan["reports"]), {
             "timing_summary.rpt", "drc.rpt", "methodology.rpt",
             "utilization.rpt", "check_timing.rpt", "datasheet_io.rpt",

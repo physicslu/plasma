@@ -59,9 +59,9 @@ Implementation facts:
 - Web Console uses REST polling.
 - `plasma_manager` is optional and not required for local PPU execution.
 - Manager deployment is opt-in (`PLASMA_MANAGER_ENABLED=0` by default for the integration profile).
-- Manager fleet observation is read-only, but Manager also owns explicit bounded control relays. The managed allowlist includes health/status/settings surfaces plus the current Job, Batch, Programming Asset, Engineering session/target, Site Desired/runtime-activation and network-commissioning routes required by the Control Station product.
+- Manager fleet observation is read-only, but Manager also owns explicit bounded control relays. The managed allowlist includes health/status/settings surfaces plus current Job, Programming Asset, Engineering session/target, Site Desired/runtime-activation and network-commissioning routes. The legacy PPU `POST /api/batches` and its Batch/Target cancel writes are not relayed through Manager; canonical Batch writes use Manager's `/api/programming/batches` routes. Job relay remains for current Mock/CD and compatibility callers pending separate migration.
 - Managed routing is **not** a generic reverse proxy. Exact methods and paths are allowlisted in `software/python/plasma_manager/server.py`; Browser traffic reaches those routes through the same-origin BFF.
-- Job/Batch execution remains PPU/Gateway-owned. Manager relays commands and observations to the selected PPU; it is not a central Job scheduler and does not replace the PPU execution engine.
+- Job execution remains PPU/Gateway-owned. Programming Batches are Manager-owned (`/api/programming/batches`) and submit their Jobs through Manager's own PPU client, not through this relay. For other allowlisted routes Manager relays commands and observations to the selected PPU; it does not replace the PPU execution engine.
 - Site Desired reads/writes remain PPU-owned. Manager relays the allowlisted Site settings routes and the explicit `If-Match`/idempotency/security headers required by that contract.
 - Manager still does not provide automatic PPU discovery, a general Fleet write API, or an independent central authentication/scheduling policy layer.
 - Mock programming success does not prove hardware programming.
@@ -178,7 +178,7 @@ These facts must not be mistaken for implemented capabilities:
 3. Plasma Gateway is standard-library HTTP + REST polling, not FastAPI/WebSocket.
 6. Only binary Image Asset normalization is implemented; other declared Asset formats/types are extension points, not validated functionality.
 7. Programming Recipe/Package is an architectural direction, not yet an implemented execution contract.
-8. Plasma Manager currently implements explicit registry/fleet aggregation plus bounded managed PPU command routing for the current Control Station contract, including allowlisted Job/Batch/Programming Asset and Site/network operations. It is not a generic proxy or central scheduler; automatic discovery, general Fleet write orchestration, and an independent central auth/scheduling policy remain outside the current contract.
+8. Plasma Manager implements registry/fleet aggregation, Manager-owned programming Batch coordination, and bounded managed PPU command routing for the current Control Station contract. The PPU legacy Batch POST relay is denied; Job, Programming Asset and Site/network relays remain independently allowlisted. It is not a generic reverse proxy; automatic discovery, general Fleet write orchestration, and an independent central auth/scheduling policy remain outside the current contract.
 10. Site Desired persistence and Runtime activation are separate contracts. Current P3-capable deployments support explicit bounded runtime activation through the activation helper/server-control sockets; saving Desired state alone never implies that runtime activation occurred.
 
 Web-specific boundaries are owned by [plasma-web.md](plasma-web.md); hardware validation limits by [plasma-embedded.md](plasma-embedded.md). Global validation evidence requirements remain in [AGENTS.md](../../AGENTS.md).
@@ -192,8 +192,8 @@ cd software/python
 
 ## Programming operations (one Job, `operations` list)
 
-Erase / Program / Verify run as ONE `programming` Job with an ordered `operations` list (one Job ID, lease, Job Binding and receipt); `read` is an independent Job; `flash_cycle` is retired and rejected by current admission. Normative detail: [OPF Programming Operations v1](../architecture/opf-programming-operations-v1.md). Host-only tests are not a hardware qualification of any operation.
+Erase / Program / Verify run as ONE `programming` Job with an ordered `operations` list (one Job ID, lease, Job Binding and receipt); `read` is an independent Job submitted as its own one-Site, one-Cycle Manager Batch (`operation: "read"`; the alias-scoped single `programming/plans` + `runs` retired in U2 with `410 programming_route_retired`); `flash_cycle` is retired and rejected by current admission. Normative detail: [OPF Programming Operations v1](../architecture/opf-programming-operations-v1.md). Host-only tests are not a hardware qualification of any operation.
 
-EMode Batch Retry / Stop Policy is Manager-owned (`programming_batch.py`): [EMode Batch Retry / Stop Policy v1](../architecture/emode-batch-retry-stop-policy-v1.md). Repeat is not implemented.
+EMode Batch Retry / Stop Policy is Manager-owned (`programming_batch.py`): [EMode Batch Retry / Stop Policy v1](../architecture/emode-batch-retry-stop-policy-v1.md). Manual Repeat and its statistics (cumulative attempt counters, cursor-paged Cycle History `GET programming/batches/{id}/cycles`): [Batch Statistics v1](../architecture/unified-8site-scheduler-repeat-work-order-v1.md) §4.2. A Job the Site Worker refused before any hardware access is a BLOCKED Run (`SITE_DENIED_BEFORE_HARDWARE`, SAFE_OFF `NOT_TOUCHED`), never a Cycle FAIL; the Site waits for Continue. Only the structured Worker statement counts, judged identically by Manager and PPU: [Site Safety Evidence v1](../architecture/site-safety-evidence-v1.md).
 
 A Start whose HTTP answer was lost is reconciled against the Manager journal by its Manager-issued `start_id` (read-only `GET programming/starts/{start_id}`): [Programming Start Outcome Reconciliation v1](../architecture/programming-start-reconciliation-v1.md).

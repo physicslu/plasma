@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
-  BUNDLE, FIRMWARE, Z2, legacyRequests, mockManager, type Counters, type MockPpu, type RunScript,
+  BUNDLE, FIRMWARE, RESOURCE_SHA, Z2, legacyRequests, mockManager, sha,
+  type Counters, type MockPpu, type RunScript,
 } from "./managed-programming-helpers";
 
 // Host-only Console acceptance of PMode → Factory Console on the formal
@@ -87,20 +88,6 @@ test("one Manager Start and ONE canonical Batch serves two PPUs with separate Jo
   await expect(factoryLog(page)).toContainText("[EVIDENCE] Site interface: openocd");
   expect(legacyRequests(counters)).toEqual([]);
   await expect(page.locator("[data-receipt-site]")).toHaveCount(0);
-});
-
-test("a Manager-reported PASS without verified SAFE_OFF is NOT a PMode PASS", async ({ page }) => {
-  const counters = await mockManager(page, { script: () => ({ outcome: "PASS", safeOff: false }) });
-  const { job, start } = await prepare(page, [["z2", [2]]]);
-  await job.getByLabel("Site Retry Limit").fill("0");
-  await start.click();
-  await finished(page);
-  await expect(site(page, "z2", 2)).toHaveAttribute("data-site-state", "faulted");
-  await expect(summary(page)).not.toContainText("100.0%");
-  await expect(factoryLog(page)).toContainText("SAFE_OFF_NOT_VERIFIED");
-  await expect(factoryLog(page)).toContainText("MANAGER RUN PASS REJECTED");
-  expect(counters.batches).toHaveLength(1);
-  expect(counters.starts).toHaveLength(1);
 });
 
 test("Site PASS/FAIL is per-Unit, not inferred from Batch HTTP 200; yield counts once", async ({ page }) => {
@@ -497,4 +484,316 @@ test("Manual Repeat: with two Sites waiting, START continues only the tile marke
   await expect(job.getByRole("button", { name: /MARK THE REPLACED SITE/ })).toBeDisabled();
   await page.waitForTimeout(1500);
   expect(continues).toHaveLength(1);
+});
+
+// ---------------------------------------------------------------------------
+// Repeat evidence logging: Run Outcome, Cycle Outcome, Site Lane and Batch
+// Outcome are separate lifecycles. A Cycle's PASS run while its Site Lane is
+// still open (RUNNING / AWAITING_CONTINUE) is a normal intermediate state,
+// never an Evidence ERROR; a Receipt that fails `runVerdict` still is.
+// Scripted Manager views at the Browser boundary - host-only, not hardware.
+// ---------------------------------------------------------------------------
+
+type Tamper = "identity";
+type ScriptedAttempt = { cycle: number; attempt: number; outcome: "PASS" | "FAIL" | "OUTCOME_UNKNOWN" | null;
+  tamper?: Tamper; retry?: boolean };
+type ScriptedLane = { siteId: number; attempts: ScriptedAttempt[]; outcome: string | null;
+  cycle: { index: number; state: "ACTIVE" | "AWAITING_CONTINUE" | "ENDED"; settled: number; pass: number; fail: number;
+    continueSeq: number; continuedSeq: number; waitReason: string | null } };
+
+const IMAGE_SHA = sha("1");
+const runIdOf = (siteId: number, a: ScriptedAttempt) => `${siteId}${a.cycle}${a.attempt}`.padStart(32, "0");
+const jobIdOf = (siteId: number, a: ScriptedAttempt) => `job-s${siteId}-c${a.cycle}-a${a.attempt}`;
+const bindingOf = (siteId: number) => sha(String(siteId + 2));
+
+async function repeatManager(page: Page, options: { repeat?: number; replaceIc?: boolean; sites?: number[] } = {}) {
+  const repeat = options.repeat ?? 10;
+  const sites = options.sites ?? [1, 2];
+  await mockManager(page, { ppus: [{ ...Z2, enabledSites: sites }] });
+  const batchId = "7".repeat(32);
+  const lanes: ScriptedLane[] = sites.map(siteId => ({ siteId, attempts: [{ cycle: 1, attempt: 1, outcome: null }], outcome: null,
+    cycle: { index: 1, state: "ACTIVE", settled: 0, pass: 0, fail: 0, continueSeq: 0, continuedSeq: 0, waitReason: null } }));
+  const history: Array<Record<string, unknown>> = [];
+  const continues: Array<Record<string, unknown>> = [];
+  const runReads: string[] = [];
+  let started: Record<string, unknown> = {};
+  let outcome: string | null = null;
+
+  const run = (lane: ScriptedLane, a: ScriptedAttempt) => {
+    const operations = started.operations as string[];
+    const binding = bindingOf(lane.siteId);
+    return {
+      schema: "plasma.manager.bundle-programming-run.v1", run_id: runIdOf(lane.siteId, a), ppu_alias: "z2", site_id: lane.siteId,
+      state: a.outcome ? "finished" : "running", outcome: a.outcome,
+      reason: a.outcome === "PASS" || a.outcome == null ? null : a.outcome === "FAIL" ? "JOB_NOT_SUCCESS" : "JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT",
+      created_at: "t", updated_at: "t", steps: [{ step: "PREFLIGHT", result: "PASS", at: "t" }], activation: {},
+      job: { job_id: jobIdOf(lane.siteId, a), state: a.outcome ? "finished" : "running", stage: "programming",
+        progress_percent: a.outcome ? 100 : 40, attempt: 1 },
+      receipt: a.outcome !== "PASS" && a.outcome !== "FAIL" ? null : {
+        schema: "plasma.manager.programming-receipt.v3", job_id: jobIdOf(lane.siteId, a), job_state: "success",
+        operation: "programming", operations, observed_operations: operations, site_id: lane.siteId, target: "STM32F103C8T6",
+        range: { address: 134217728, length: 4096 }, expected_image_sha256: IMAGE_SHA, expected_image_size: 4096,
+        readback_sha256: IMAGE_SHA, bytes_verified: 4096,
+        expected_resource_set_sha256: RESOURCE_SHA, observed_resource_set_sha256: RESOURCE_SHA,
+        expected_job_binding_sha256: binding, observed_job_binding_sha256: binding,
+        resource_reuse: true, safe_off: true, safe_off_state: "VERIFIED",
+        flash_result: a.outcome, elapsed_ms: 7000,
+      },
+      job_submission_count: 1, auto_retry: "DISABLED", acknowledged: false,
+    };
+  };
+  const attemptOf = (lane: ScriptedLane, a: ScriptedAttempt) => ({
+    attempt: a.attempt, cycle_index: a.cycle,
+    job_key: { batch_id: batchId, ppu_alias: "z2", site_id: a.tamper === "identity" ? 99 : lane.siteId, cycle: a.cycle, attempt: a.attempt },
+    plan_id: `plan-${runIdOf(lane.siteId, a)}`, run_id: runIdOf(lane.siteId, a), job_id: jobIdOf(lane.siteId, a),
+    job_binding_sha256: bindingOf(lane.siteId), state: a.outcome ? "finished" : "running", outcome: a.outcome,
+    reason: a.outcome === "FAIL" ? "JOB_NOT_SUCCESS" : null, safe_off: a.outcome === "OUTCOME_UNKNOWN" ? null : a.outcome ? true : null,
+    safe_off_state: a.outcome && a.outcome !== "OUTCOME_UNKNOWN" ? "VERIFIED" : null,
+    retry: a.retry ? { eligible: true, reason: "DEFINITE_FAIL_SAFE_OFF_VERIFIED", decision: "RETRY" } : null,
+  });
+  const view = () => {
+    const units = lanes.map(lane => {
+      const current = lane.attempts.filter(a => a.cycle === lane.cycle.index || lane.cycle.state !== "ACTIVE");
+      return {
+        ppu_alias: "z2", site_id: lane.siteId, status: lane.outcome ? "COMPLETED" : lane.cycle.state === "AWAITING_CONTINUE" ? "AWAITING_CONTINUE" : "RUNNING",
+        outcome: lane.outcome, reason: lane.outcome && lane.outcome !== "PASS" ? "JOB_NOT_SUCCESS" : null, failure_domain: null,
+        attempts: current.slice(current.findIndex(a => a.cycle === current[current.length - 1].cycle)).map(a => attemptOf(lane, a)),
+        progress: null,
+        cycle: { planned: repeat, index: lane.cycle.index, cycle_id: `${lane.siteId}${lane.cycle.index}`.padStart(32, "0"),
+          state: lane.cycle.state, disposition: lane.outcome, settled: lane.cycle.settled, pass: lane.cycle.pass, fail: lane.cycle.fail,
+          retry_attempts: lane.attempts.filter(a => a.attempt > 1).length, attempts: lane.attempts.length,
+          remaining: repeat - lane.cycle.settled, continue_seq: lane.cycle.continueSeq, continued_seq: lane.cycle.continuedSeq,
+          wait_reason: lane.cycle.waitReason, last: null },
+      };
+    });
+    const first = lanes[0];
+    const settled = lanes.reduce((total, lane) => total + lane.cycle.settled, 0);
+    return {
+      schema: "plasma.manager.programming-batch.v2", batch_id: batchId, start_id: started.start_id,
+      targets: started.targets, icpn: started.icpn, operations: started.operations, source: "image",
+      policy: { repeat, replace_ic_before_next_cycle: options.replaceIc ?? true, retry_limit: 3, stop_policy: { kind: "never" } },
+      state: outcome ? "finished" : "running", execution_status: outcome ? "COMPLETED" : "RUNNING", outcome, reason: null,
+      failure_domain: null, stop_requested: false, units, attempts: units.flatMap(unit => unit.attempts),
+      current_run: run(first, first.attempts[first.attempts.length - 1]),
+      counts: { pass: lanes.filter(lane => lane.outcome === "PASS").length, fail: lanes.filter(lane => lane.outcome === "FAIL").length,
+        blocked: 0, unknown: 0, sites: lanes.length, attempts: lanes.reduce((total, lane) => total + lane.attempts.length, 0) },
+      cycles: { planned: repeat * lanes.length, settled, pass: lanes.reduce((t, l) => t + l.cycle.pass, 0),
+        fail: lanes.reduce((t, l) => t + l.cycle.fail, 0), retry_attempts: 0, remaining: repeat * lanes.length - settled,
+        attempts: lanes.reduce((total, lane) => total + lane.attempts.length, 0),
+        awaiting_continue: lanes.filter(lane => lane.cycle.state === "AWAITING_CONTINUE").length },
+      auto_retry: "DISABLED", created_at: null, started_at: "2026-11-23T00:00:00+00:00", finished_at: outcome ? "2026-11-23T00:01:00+00:00" : null,
+    };
+  };
+  await page.route(/\/api\/manager\/programming\/batches$/, async route => {
+    started = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({ status: 202, json: { ok: true, batch: view() } });
+  });
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}$/, route => route.fulfill({ json: { ok: true, batch: view() } }));
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}\/continue$/, async route => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    continues.push(body);
+    await route.fulfill({ json: { ok: true, duplicate: false, batch: view() } });
+  });
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}\/cycles\?/, async route => {
+    const url = new URL(route.request().url());
+    const offset = Number(url.searchParams.get("offset"));
+    const records = history.slice(offset);
+    await route.fulfill({ json: { ok: true, batch_id: batchId, total: history.length, offset, next_offset: offset + records.length, records } });
+  });
+  // A Site's run read by run_id: only runs the scripted lanes hold.
+  await page.route(/\/bootstrap\/programming\/runs\/[0-9a-f]{32}$/, async route => {
+    const runId = new URL(route.request().url()).pathname.split("/").pop()!;
+    runReads.push(runId);
+    for (const lane of lanes) {
+      const found = lane.attempts.find(a => runIdOf(lane.siteId, a) === runId);
+      if (found) return route.fulfill({ json: { ok: true, run: run(lane, found) } });
+    }
+    await route.fulfill({ status: 404, json: { ok: false, error: { code: "programming_run_not_found", message: "no such run" } } });
+  });
+
+  const lane = (siteId: number) => lanes.find(item => item.siteId === siteId)!;
+  /** The Manager settles a Cycle of one Site and appends its History record. */
+  const settle = (siteId: number, next: "AWAITING_CONTINUE" | "ACTIVE" | "ENDED") => {
+    const item = lane(siteId);
+    const cycleAttempts = item.attempts.filter(a => a.cycle === item.cycle.index);
+    const last = cycleAttempts[cycleAttempts.length - 1];
+    const passed = last.outcome === "PASS";
+    item.cycle.settled += 1;
+    if (passed) item.cycle.pass += 1; else item.cycle.fail += 1;
+    history.push({ seq: history.length, type: "cycle", batch_id: batchId, ppu_alias: "z2", site_id: siteId,
+      cycle_index: item.cycle.index, outcome: last.outcome, reason: passed ? null : "JOB_NOT_SUCCESS",
+      attempts: cycleAttempts.map(a => ({ ...attemptOf(item, a) })),
+      receipt: { run_id: runIdOf(siteId, last), job_id: jobIdOf(siteId, last), job_state: "success", safe_off: true,
+        safe_off_state: "VERIFIED", job_binding_confirmed: true, readback_sha256: IMAGE_SHA, job_binding_sha256: bindingOf(siteId) } });
+    if (next === "AWAITING_CONTINUE") {
+      item.cycle.state = "AWAITING_CONTINUE";
+      item.cycle.continueSeq += 1;
+      item.cycle.waitReason = passed ? "REPLACE_IC" : "FAIL_REVIEW";
+    } else if (next === "ACTIVE") {
+      item.cycle.index += 1;
+      item.attempts.push({ cycle: item.cycle.index, attempt: 1, outcome: null });
+    } else {
+      item.cycle.state = "ENDED";
+      item.outcome = passed ? "PASS" : "FAIL";
+    }
+  };
+  /** Operator Continue reached the Manager: the next Cycle starts on that Site only. */
+  const resume = (siteId: number) => {
+    const item = lane(siteId);
+    history.push({ seq: history.length, type: "continue", batch_id: batchId, ppu_alias: "z2", site_id: siteId,
+      continue_seq: item.cycle.continueSeq, after_cycle_index: item.cycle.index, wait_reason: item.cycle.waitReason });
+    item.cycle.continuedSeq = item.cycle.continueSeq;
+    item.cycle.state = "ACTIVE";
+    item.cycle.waitReason = null;
+    item.cycle.index += 1;
+    item.attempts.push({ cycle: item.cycle.index, attempt: 1, outcome: null });
+  };
+  const finishAttempt = (siteId: number, result: "PASS" | "FAIL" | "OUTCOME_UNKNOWN", tamper?: Tamper) => {
+    const item = lane(siteId);
+    Object.assign(item.attempts[item.attempts.length - 1], { outcome: result, tamper });
+  };
+  const retry = (siteId: number) => {
+    const item = lane(siteId);
+    const last = item.attempts[item.attempts.length - 1];
+    last.retry = true;
+    item.attempts.push({ cycle: last.cycle, attempt: last.attempt + 1, outcome: null });
+  };
+  return { lane, settle, resume, finishAttempt, retry, continues, runReads,
+    end: (value: string) => { outcome = value; } };
+}
+
+async function startRepeat(page: Page, repeat = "10", replaceIc = true) {
+  const { job, start } = await prepare(page, [["z2", [1, 2]]]);
+  await job.getByLabel("Repeat Count").fill(repeat);
+  await job.getByLabel("Site Retry Limit").fill("3");
+  if (!replaceIc) await job.getByLabel("Replace IC before next Cycle").uncheck();
+  await start.click();
+  await expect(page.getByRole("status", { name: "BATCH STATUS" })).toHaveText(/RUNNING|WAITING/);
+  return job;
+}
+
+const logLines = async (page: Page, pattern: RegExp) =>
+  (await factoryLog(page).locator("span").allInnerTexts()).filter(line => pattern.test(line));
+const errorLines = (page: Page) => factoryLog(page).locator('span[data-level="error"]').allInnerTexts();
+/** Let the 250 ms poll run several times over an unchanged Manager view. */
+const settlePolls = (page: Page) => page.waitForTimeout(1500);
+
+test("Repeat 10: Cycle 1 PASS while each Site Lane is open is not an Evidence ERROR; each wait is logged once", async ({ page }) => {
+  const manager = await repeatManager(page);
+  await startRepeat(page);
+  manager.finishAttempt(1, "PASS");
+  manager.finishAttempt(2, "PASS");
+  // Site 1: Cycle 1 settled, its Lane still RUNNING (before the wait); Site 2: waiting for a replaced IC.
+  manager.settle(2, "AWAITING_CONTINUE");
+  await expect(factoryLog(page)).toContainText(/\[CYCLE 1\/10\] PPU z2 .* SITE-02 · PASS/);
+  await expect(factoryLog(page)).toContainText(/\[SITE\] PPU z2 .* SITE-02 · Cycle 1\/10 · PASS 1 .* REPLACE IC · press Start/);
+  manager.settle(1, "AWAITING_CONTINUE");
+  await expect(factoryLog(page)).toContainText(/\[CYCLE 1\/10\] PPU z2 .* SITE-01 · PASS/);
+  await expect(factoryLog(page)).toContainText(/SITE-01 · Cycle 1\/10 .* REPLACE IC · press Start/);
+  await settlePolls(page);
+  await expect(factoryLog(page)).not.toContainText("PASS REJECTED");
+  await expect(factoryLog(page)).not.toContainText(/\[SITE\] .* · RUNNING/);
+  expect(await errorLines(page)).toEqual([]);
+  // Same polling events never repeat a line.
+  expect(await logLines(page, /\[CYCLE 1\/10\]/)).toHaveLength(2);
+  expect(await logLines(page, /REPLACE IC · press Start/)).toHaveLength(2);
+  // Each Site is continued on its own; the other keeps waiting.
+  await page.getByLabel(/SITE-02 IC replaced$/).check();
+  await page.getByRole("button", { name: /CONTINUE z2 SITE-02$/ }).click();
+  await expect.poll(() => manager.continues.length).toBe(1);
+  expect(manager.continues[0]).toMatchObject({ ppu_alias: "z2", site_id: 2, continue_seq: 1 });
+  manager.resume(2);
+  manager.finishAttempt(2, "PASS");
+  manager.settle(2, "AWAITING_CONTINUE");
+  await expect(factoryLog(page)).toContainText(/\[CYCLE 2\/10\] PPU z2 .* SITE-02 · PASS/);
+  await expect(factoryLog(page)).toContainText(/\[CONTINUE\] PPU z2 .* SITE-02 · after Cycle 1 · REPLACE_IC/);
+  expect(await logLines(page, /SITE-01 · Cycle .* REPLACE IC · press Start/)).toHaveLength(1);
+  expect(await logLines(page, /SITE-02 · Cycle 2\/10 .* REPLACE IC · press Start/)).toHaveLength(1);
+  expect(manager.continues).toHaveLength(1);
+  // A reload rebuilds the Log from the Manager: still no Evidence ERROR, no duplicates.
+  await page.reload();
+  await expect(factoryLog(page)).toContainText(/\[CYCLE 2\/10\] PPU z2 .* SITE-02 · PASS/);
+  await settlePolls(page);
+  expect(await errorLines(page)).toEqual([]);
+  expect(await logLines(page, /\[CYCLE 1\/10\]/)).toHaveLength(2);
+  expect(await logLines(page, /\[CYCLE 2\/10\]/)).toHaveLength(1);
+});
+
+test("Repeat same-IC Debug: PASS Cycles continue without a Continue; each Cycle's run is judged by run_id", async ({ page }) => {
+  const manager = await repeatManager(page, { repeat: 3, replaceIc: false });
+  await startRepeat(page, "3", false);
+  manager.finishAttempt(1, "PASS");
+  manager.settle(1, "ACTIVE");
+  manager.finishAttempt(2, "PASS");
+  manager.settle(2, "ACTIVE");
+  await expect(factoryLog(page)).toContainText(/\[CYCLE 1\/3\] PPU z2 .* SITE-02 · PASS/);
+  // Cycle 2 restarts at attempt 1: its run is a different record, judged on its own.
+  manager.finishAttempt(2, "PASS");
+  await settlePolls(page);
+  expect(manager.continues).toEqual([]);
+  expect(await logLines(page, /PASS REJECTED/)).toHaveLength(0);
+  expect((await errorLines(page)).filter(line => line.includes("SITE-01"))).toEqual([]);
+  await expect(factoryLog(page)).not.toContainText("press Start");
+});
+
+test("Repeat with Retry: a FAIL attempt then a legal Retry PASS keeps both in the Log", async ({ page }) => {
+  const manager = await repeatManager(page);
+  await startRepeat(page);
+  manager.finishAttempt(1, "FAIL");
+  await expect(factoryLog(page)).toContainText(/\[RUN\] FAIL · JOB_NOT_SUCCESS .* SITE-01/);
+  manager.retry(1);
+  manager.finishAttempt(1, "PASS");
+  manager.settle(1, "AWAITING_CONTINUE");
+  await expect(factoryLog(page)).toContainText(/\[CYCLE 1\/10\] PPU z2 .* SITE-01 · PASS .* attempts 2/);
+  await expect(factoryLog(page)).toContainText(/\[ATTEMPT 1\] Cycle 1\/10 PPU z2 .* SITE-01 · FAIL .* RETRY/);
+  await expect(factoryLog(page)).toContainText(/\[ATTEMPT 2\] Cycle 1\/10 PPU z2 .* SITE-01 · PASS/);
+  await settlePolls(page);
+  await expect(factoryLog(page)).not.toContainText("PASS REJECTED");
+  expect(await logLines(page, /\[RUN\] FAIL · JOB_NOT_SUCCESS/)).toHaveLength(1);
+});
+
+// U9: the Manager judges the receipt; the Browser only refuses a record that
+// names another Site (ATTEMPT_IDENTITY_MISMATCH).
+for (const [tamper, reason] of [
+  ["identity", "ATTEMPT_IDENTITY_MISMATCH"],
+] as const) {
+  test(`Repeat: an open Site Lane still rejects a Manager PASS with ${reason}, only on that Site`, async ({ page }) => {
+    const manager = await repeatManager(page);
+    await startRepeat(page);
+    manager.finishAttempt(1, "PASS");
+    // Site 2 is NOT the Batch's current_run: its run is read by run_id.
+    manager.finishAttempt(2, "PASS", tamper);
+    await expect(factoryLog(page)).toContainText(new RegExp(`MANAGER RUN PASS REJECTED · ${reason} · PPU z2 .* SITE-02`));
+    await settlePolls(page);
+    expect(await logLines(page, /PASS REJECTED/)).toHaveLength(1);
+    expect((await errorLines(page)).filter(line => line.includes("SITE-01"))).toEqual([]);
+  });
+}
+
+test("Repeat: OUTCOME_UNKNOWN on an open Lane is reported, never PASS, and nothing is resubmitted", async ({ page }) => {
+  const manager = await repeatManager(page);
+  await startRepeat(page);
+  manager.finishAttempt(2, "OUTCOME_UNKNOWN");
+  await expect(factoryLog(page)).toContainText(/\[RUN\] OUTCOME UNKNOWN .* SITE-02/);
+  await settlePolls(page);
+  expect(await logLines(page, /SITE-02 · PASS|\[CYCLE 1\/10\] .* SITE-02/)).toEqual([]);
+  expect(await logLines(page, /\[RUN\] OUTCOME UNKNOWN/)).toHaveLength(1);
+  expect(manager.continues).toEqual([]);
+});
+
+test("Repeat ends: the final Site and Batch outcomes are logged once", async ({ page }) => {
+  const manager = await repeatManager(page, { repeat: 2, replaceIc: false });
+  await startRepeat(page, "2", false);
+  for (const siteId of [1, 2]) {
+    manager.finishAttempt(siteId, "PASS");
+    manager.settle(siteId, "ACTIVE");
+    manager.finishAttempt(siteId, "PASS");
+    manager.settle(siteId, "ENDED");
+  }
+  manager.end("PASS");
+  await finished(page);
+  await expect(factoryLog(page)).toContainText(/\[BAT\] TERMINAL · SUCCESS/);
+  expect(await logLines(page, /\[SITE\] PPU z2 .* · PASS · Run/)).toHaveLength(2);
+  expect(await logLines(page, /\[CYCLE [12]\/2\]/)).toHaveLength(4);
+  expect(await errorLines(page)).toEqual([]);
 });

@@ -23,15 +23,11 @@ const BOOTSTRAP_POST_ACTIONS = [
   /^deployments$/,
   new RegExp(`^uploads/${UPLOAD_ID}/chunks$`),
   new RegExp(`^uploads/${UPLOAD_ID}/commit$`),
-  // Console-driven Bundle programming (Gate 1, 2026-11-09). The Manager builds
-  // the Bundle and owns B1/B2/B3 + programming; the Browser only plans,
-  // confirms, starts once and reads the run.
-  /^programming\/plans$/,
-  /^programming\/runs$/,
+  // The OUTCOME_UNKNOWN acknowledgement of one PPU-scoped run.
   new RegExp(`^programming/runs/${RUN_ID}/acknowledge$`),
-  // The EMode Batch and its start are NOT here: a Batch is owned by the
-  // Manager, not by a PPU, and lives at /api/manager/programming (PR-C,
-  // ADR 5.8). A PPU-scoped run, plan and acknowledgement still belong here.
+  // Programming is NOT here: every Job, Read Memory included, belongs to a
+  // Manager-owned Batch at /api/manager/programming (PR-C, ADR 5.8).
+  // The single plan + run retired in U2.
 ];
 // Read Memory binary of a PASS read run. The Manager re-hashes the bytes
 // against the run receipt; the Browser never reads from a PPU.
@@ -56,8 +52,27 @@ const PROGRAMMING_POST_RESOURCES = [
 ];
 const PROGRAMMING_GET_RESOURCES = [
   new RegExp(`^batches/${RUN_ID}$`),
+  // Cycle History of one Batch: read-only, cursor-paged (Batch Statistics v1).
+  new RegExp(`^batches/${RUN_ID}/cycles$`),
   new RegExp(`^starts/${RUN_ID}$`),
 ];
+const CYCLE_HISTORY_RESOURCE = new RegExp(`^batches/${RUN_ID}/cycles$`);
+
+/**
+ * The only query a programming read forwards: the Cycle History cursor, as
+ * plain decimal integers. Anything else is dropped, never passed through.
+ */
+function programmingReadQuery(request: Request, resource: string): string {
+  if (request.method !== "GET" || !CYCLE_HISTORY_RESOURCE.test(resource)) return "";
+  const params = new URL(request.url).searchParams;
+  const kept = new URLSearchParams();
+  for (const name of ["offset", "limit"]) {
+    const value = params.get(name);
+    if (value != null && /^\d{1,9}$/.test(value)) kept.set(name, value);
+  }
+  const query = kept.toString();
+  return query ? `?${query}` : "";
+}
 
 function json(status: number, payload: object): Response {
   return Response.json(payload, {
@@ -414,7 +429,8 @@ export async function relayManagerProgrammingRequest(
         },
       });
     }
-    const response = await fetch(`${managerApiBase()}/api/programming/${normalizedResource}`, {
+    const query = programmingReadQuery(request, normalizedResource);
+    const response = await fetch(`${managerApiBase()}/api/programming/${normalizedResource}${query}`, {
       method: request.method,
       headers: {
         Accept: "application/json",

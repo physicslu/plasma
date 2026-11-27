@@ -1,5 +1,6 @@
 import type { ProgrammingRun } from "../engineering/bundle-programming-api";
 import { runProgressPercent, runVerdict } from "../programming/managed-programming";
+import { safeOffLabel } from "../programming/batch-statistics";
 import "./programming-source-selector.css";
 
 function verdictLabel(run: ProgrammingRun, verdict: string): string {
@@ -84,7 +85,7 @@ export function ProgrammingRunView({
           <dd data-testid="receipt-resource-sha"><code>{receipt.observed_resource_set_sha256 ?? "—"}</code></dd>
           <dt>Job Binding SHA256</dt>
           <dd data-testid="receipt-binding-sha"><code>{receipt.observed_job_binding_sha256 ?? "—"}</code></dd>
-          <dt>SAFE_OFF</dt><dd data-testid="receipt-safe-off">{receipt.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}</dd>
+          <dt>SAFE_OFF</dt><dd data-testid="receipt-safe-off">{safeOffLabel(receipt.safe_off_state, receipt.safe_off)}</dd>
         </dl>
       )}
       {plan && (

@@ -23,6 +23,7 @@ const fixture = fileURLToPath(new URL("./fixtures/manager-read-output-server.py"
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
 
 let relay;
+let relayProgramming;
 let manager;
 let facts;
 let workDir;
@@ -41,8 +42,9 @@ async function loadBff() {
   }
   await copyFile(new URL("maintenance-capability.mjs", bffDir),
     join(workDir, "maintenance-capability.mjs"));
-  return (await import(pathToFileURL(join(workDir, "bootstrap-bff.mjs")).href))
-    .relayManagerBootstrapRequest;
+  const loaded = await import(pathToFileURL(join(workDir, "bootstrap-bff.mjs")).href);
+  relayProgramming = loaded.relayManagerProgrammingRequest;
+  return loaded.relayManagerBootstrapRequest;
 }
 
 function useManager(port) {
@@ -217,4 +219,45 @@ test("the READ binary path adds no retry and no second Content-Length producer",
     ["target of targets", "target of targets", "alias of aliases"]);
   assert.doesNotMatch(handler, /["']Content-Length["']/);
   assert.match(server, /def _raw_response[\s\S]*?send_header\("Content-Length", str\(len\(body\)\)\)/);
+});
+
+// Batch Statistics v1: the Cycle History is a read-only Manager resource. The
+// BFF forwards only its decimal cursor (offset / limit) and nothing else.
+test("Console BFF relays the Cycle History cursor and drops every other query", async () => {
+  const seen = [];
+  const server = createServer(socket => {
+    socket.once("data", chunk => {
+      seen.push(chunk.toString("latin1").split("\r\n")[0]);
+      const body = '{"ok":true,"total":0,"offset":0,"next_offset":0,"records":[]}';
+      socket.end(`HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n${body}`);
+    });
+    socket.on("error", () => {});
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    useManager(server.address().port);
+    const id = "a".repeat(32);
+    const read = async query => {
+      const response = await relayProgramming(new Request(
+        `http://console.local/api/manager/programming/batches/${id}/cycles${query}`), `batches/${id}/cycles`);
+      assert.equal(response.status, 200);
+    };
+    await read("?offset=40&limit=200&ppu_alias=z2&extra=1");
+    await read("?offset=-1&limit=1e3");
+    await read("");
+    assert.deepEqual(seen, [
+      `GET /api/programming/batches/${id}/cycles?offset=40&limit=200 HTTP/1.1`,
+      `GET /api/programming/batches/${id}/cycles HTTP/1.1`,
+      `GET /api/programming/batches/${id}/cycles HTTP/1.1`,
+    ]);
+    // The Batch read itself forwards no query at all.
+    await relayProgramming(new Request(`http://console.local/api/manager/programming/batches/${id}?offset=3`), `batches/${id}`);
+    assert.equal(seen.at(-1), `GET /api/programming/batches/${id} HTTP/1.1`);
+    // A write to the History is not a route.
+    const post = await relayProgramming(new Request(`http://console.local/api/manager/programming/batches/${id}/cycles`,
+      { method: "POST", body: "{}" }), `batches/${id}/cycles`);
+    assert.equal(post.status, 404);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
 });

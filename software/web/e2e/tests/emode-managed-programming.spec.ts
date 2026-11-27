@@ -335,10 +335,16 @@ test("READ sits on the qualified Site row, reads the whole Flash and writes the 
   const digest = createHash("sha256").update(FULL_FLASH).digest("hex");
   await expect(log).toContainText(`[READ] SAVED · SITE-02 · dump.bin · 65536 B · SHA256 ${digest}`);
   await expect(log).toContainText(/\[READ\] PASS · SITE-02 · Run \S+ · Job \S+ · SAFE_OFF VERIFIED/);
-  // Not a Batch: no Batch run, no PASS / FAIL / Yield, no E / P / V Site result.
+  // U2: READ is its own one-Site, one-Cycle Batch, never the programming Batch:
+  // no [RUN] / [ATTEMPT] lines, no PASS / FAIL / Yield, no E / P / V Site result.
   await expect(jobLog(workspace)).not.toContainText("[RUN] ");
   await expect(jobLog(workspace)).not.toContainText("[ATTEMPT");
-  expect(counters.batches).toHaveLength(0);
+  expect(counters.batches).toHaveLength(1);
+  const { start_id: readStart, ...readBatch } = counters.batches[0].body;
+  expect(typeof readStart).toBe("string");
+  expect(readBatch).toEqual({ icpn: "STM32F103C8T6", targets: [{ ppu_alias: "z2", site_ids: [2] }], operation: "read",
+    address: 0x08000000, length: 65536, retry_limit: 0, stop_policy: { kind: "never" }, repeat: 1,
+    replace_ic_before_next_cycle: true });
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary).toContainText("Run Preview");
   await expect(summary).not.toContainText("100.0%");
@@ -486,7 +492,7 @@ test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming
   await expect(hold).toContainText("the READ Start request on PPU z2 · SITE-02 got no answer");
   await expect(hold).toContainText("Nothing was resubmitted");
   // The hold names the Manager-issued start (the plan ID) it will reconcile.
-  await expect(hold).toContainText(`reconciles Start ${"1".padStart(32, "0")}`);
+  await expect(hold).toContainText(`reconciles Start ${"5a001".padStart(32, "0")}`);
   expect((await pickerProbe(page)).saves).toEqual([]);
   // The PPU is held: neither a second READ nor a Programming Start can be sent.
   await expect(button).toBeDisabled();
@@ -497,7 +503,8 @@ test("a lost READ Start answer is OUTCOME UNKNOWN: no second Job, no Programming
   await page.waitForTimeout(2500);
   expect(counters.plans).toHaveLength(1);
   expect(counters.starts).toHaveLength(1);
-  expect(counters.batches).toHaveLength(0);
+  // The one READ Batch request whose answer was lost; never a second one.
+  expect(counters.batches).toHaveLength(1);
   expect(counters.polls).toBe(0);
   // Nothing is reconciled, voided or acknowledged on its own.
   expect(counters.reconciles).toEqual([]);
@@ -545,7 +552,7 @@ test("a READ Start the Manager admitted whose answer was lost is reconciled to i
   // Later: the same run ended PASS. The hold is released against that run.
   await parts.reconcile.click();
   await expect(parts.hold).toHaveCount(0);
-  await expect(parts.log).toContainText(/reconciled with the Manager · the Manager admitted this Start as Run [0-9a-f]{32} and it ended PASS/);
+  await expect(parts.log).toContainText(/reconciled with the Manager · the Manager admitted this Start as Batch [0-9a-f]{32} and it ended PASS/);
   await expect(parts.read).toBeEnabled();
   // Exactly one start was ever sent; reconciling created no Job, no ack, no void.
   expect(counters.plans).toHaveLength(1);
@@ -1028,15 +1035,6 @@ test("SAFE_OFF not verified is never PASS, even if a run record claims PASS", as
   await expect(first.workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("FAIL");
 });
 
-test("a PASS claim without verified SAFE_OFF in the receipt is shown as FAIL", async ({ page }) => {
-  await mockManager(page, { script: () => ({ outcome: "PASS", safeOff: false }) });
-  const { workspace, start } = await configure(page);
-  await start.click();
-  await expect(jobLog(workspace)).toContainText("[RUN] FAIL ·");
-  await expect(jobLog(workspace)).toContainText("[RUN] FAIL · SAFE_OFF_NOT_VERIFIED ·");
-  await expect(page.getByRole("region", { name: "Engineering Batch Summary" })).toContainText("0.0%");
-});
-
 const blockedCases: Array<{ name: string; ppu: MockPpu; label: string; reason: RegExp }> = [
   { name: "Offline", ppu: { ...Z2, transport: "unreachable" }, label: "PPU OFFLINE", reason: /cannot reach this PPU Gateway/ },
   { name: "Degraded", ppu: { ...Z2, execution: "unavailable" }, label: "PPU DEGRADED", reason: /not ready for execution/ },
@@ -1123,14 +1121,6 @@ test("Readback mismatch is FAIL, whether the Manager reports it or a PASS record
   await expect(jobLog(workspace)).toContainText("[RUN] FAIL · READBACK_SHA256_MISMATCH ·");
   await expect(jobLog(workspace)).toContainText(`Readback SHA256 ${"0".repeat(64)}`);
   await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("FAIL");
-});
-
-test("a PASS record whose readback differs from the expected Image is shown as FAIL", async ({ page }) => {
-  await mockManager(page, { script: () => ({ outcome: "PASS", readbackOk: false }) });
-  const { workspace, start } = await configure(page);
-  await start.click();
-  await expect(jobLog(workspace)).toContainText("[RUN] FAIL ·");
-  await expect(jobLog(workspace)).toContainText("[RUN] FAIL · READBACK_SHA256_MISMATCH ·");
 });
 
 test("switching the Programming Source cannot bypass an unresolved OUTCOME_UNKNOWN lock", async ({ page }) => {
@@ -1236,7 +1226,7 @@ test("a definite FAIL is retried by the Manager with a new plan, run and Job; th
   await setPolicy(job, "2");
   await start.dblclick();
   await expect(jobLog(workspace)).toContainText(
-    /\[RESULT\] PASS · Batch \S+ · 1 Site\(s\) · PASS 1 · FAIL 0 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\) · one IC per Site/,
+    /\[RESULT\] PASS · Batch \S+ · 1 Site\(s\) · Site final PASS 1 · FAIL 0 · PARTIAL 0 · BLOCKED 0 · UNKNOWN 0 · Job Attempts 2 · Retry 1/,
     { timeout: 20_000 });
   // Exactly one Batch request from the Browser; the Manager submitted two Jobs.
   expect(counters.batches).toHaveLength(1);
@@ -1331,7 +1321,7 @@ test("a lost Batch response is OUTCOME UNKNOWN: the Browser never resends it", a
   expect(counters.polls).toBe(0);
 });
 
-test("READ ignores the Batch Policy: one Job, no Batch, no retry", async ({ page }) => {
+test("READ ignores the Batch Policy: one Job in its own Batch, no retry", async ({ page }) => {
   await stubSavePicker(page, "save");
   const counters = await mockManager(page, { script: () => ({ outcome: "FAIL", reason: "READ_NOT_PASS" }) });
   const { workspace, job } = await configure(page);
@@ -1340,7 +1330,10 @@ test("READ ignores the Batch Policy: one Job, no Batch, no retry", async ({ page
   const status = workspace.getByRole("status", { name: "SITE 2 Read status" });
   await expect(status).toHaveText("FAIL");
   await expect(status).toHaveAttribute("title", "READ_NOT_PASS");
-  expect(counters.batches).toHaveLength(0);
+  // Its own Batch with Retry 0 / Repeat 1 / Stop never, whatever the Policy says.
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.batches[0].body).toMatchObject({ operation: "read", retry_limit: 0, repeat: 1,
+    stop_policy: { kind: "never" } });
   expect(counters.starts).toHaveLength(1);
   await expect(jobLog(workspace)).not.toContainText("[ATTEMPT");
   await expect(workspace.locator('tr[data-site-selected="true"] .engineeringResult')).toHaveText("—");
@@ -1363,7 +1356,7 @@ test("EMode programs many Sites of one PPU as ONE Batch, and each Site is judged
   await job.getByRole("button", { name: /START PROGRAMMING/ }).click();
 
   await expect(jobLog(workspace)).toContainText(
-    /\[RESULT\] FAIL · \S+ · Batch \S+ · 2 Site\(s\) · PASS 1 · FAIL 1 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\) · one IC per Site/,
+    /\[RESULT\] FAIL · \S+ · Batch \S+ · 2 Site\(s\) · Site final PASS 1 · FAIL 1 · PARTIAL 0 · BLOCKED 0 · UNKNOWN 0 · Job Attempts 2 · Retry 0/,
     { timeout: 20_000 });
   // ONE Batch carrying ONE Target Set, and one Job per Site: the Manager
   // runs every Site of the Target Set and the Browser never starts a second Batch.
@@ -1405,7 +1398,7 @@ test("concurrent Site lanes: every Site's attempt and Manager run receipt is log
 
   const log = jobLog(workspace);
   await expect(log).toContainText(
-    /\[RESULT\] PASS · Batch \S+ · 2 Site\(s\) · PASS 2 · FAIL 0 · BLOCKED 0 · UNKNOWN 0 · 2 attempt\(s\)/,
+    /\[RESULT\] PASS · Batch \S+ · 2 Site\(s\) · Site final PASS 2 · FAIL 0 · PARTIAL 0 · BLOCKED 0 · UNKNOWN 0 · Job Attempts 2 · Retry 0/,
     { timeout: 20_000 });
   for (const site of ["SITE-02", "SITE-03"]) {
     await expect(log).toContainText(`[ATTEMPT 1/1] ${site} · PASS`);
@@ -1510,7 +1503,7 @@ test("Manual Repeat: a paused Site is continued by the same START, once, with it
     cycle: {
       planned: 2, index: settled + (state === "ENDED" ? 0 : 1), cycle_id: "d".repeat(32), state,
       disposition: state === "ENDED" ? "COMPLETED_WITH_FAILURES" : null, settled,
-      pass: settled > 1 ? 1 : 0, fail: 1, retry_attempts: 0, remaining: 2 - settled,
+      pass: settled > 1 ? 1 : 0, fail: 1, retry_attempts: 0, attempts: settled, remaining: 2 - settled,
       continue_seq: seq, continued_seq: state === "ENDED" ? seq : 0,
       wait_reason: state === "AWAITING_CONTINUE" ? "FAIL_REVIEW" : null,
       last: { cycle_index: 1, cycle_id: "e".repeat(32), outcome: "FAIL", reason: "JOB_NOT_SUCCESS", attempts: 1,
@@ -1525,9 +1518,10 @@ test("Manual Repeat: a paused Site is continued by the same START, once, with it
     state: u.outcome ? "finished" : "running", execution_status: u.outcome ? "COMPLETED" : "RUNNING",
     outcome: u.outcome, reason: u.reason, failure_domain: null, stop_requested: false,
     units: [u], attempts: [], current_run: null, ppu_alias: "z2", site_id: 2,
-    counts: { pass: 0, fail: u.outcome ? 1 : 0, blocked: 0, unknown: 0, sites: 1, attempts: 0 },
+    counts: { pass: 0, fail: u.outcome ? 1 : 0, partial: 0, blocked: 0, unknown: 0, sites: 1, attempts: u.cycle.attempts },
     cycles: { planned: 2, settled: u.cycle.settled, pass: u.cycle.pass, fail: 1, retry_attempts: 0,
-      remaining: u.cycle.remaining, awaiting_continue: u.cycle.state === "AWAITING_CONTINUE" ? 1 : 0 },
+      remaining: u.cycle.remaining, awaiting_continue: u.cycle.state === "AWAITING_CONTINUE" ? 1 : 0,
+      attempts: u.cycle.attempts, sites_completed: u.cycle.remaining === 0 ? 1 : 0 },
     auto_retry: "DISABLED", created_at: null, started_at: null, finished_at: null,
   });
   let started: Record<string, unknown> = {};
@@ -1544,6 +1538,26 @@ test("Manual Repeat: a paused Site is continued by the same START, once, with it
     view = record(started, unit("ENDED", 2, 1));
     await route.fulfill({ json: { ok: true, duplicate: false, batch: view } });
   });
+  // Batch Statistics v1: the Manager's Cycle History, read by cursor.
+  const cycleRecord = (seq: number, index: number, outcome: string) => ({
+    seq, type: "cycle", batch_id: batchId, ppu_alias: "z2", site_id: 2, cycle_index: index,
+    cycle_id: `${index}`.repeat(32), outcome, reason: outcome === "PASS" ? null : "JOB_NOT_SUCCESS",
+    attempts: [{ attempt: 1, cycle_index: index, run_id: `${index}`.repeat(32), job_id: `job-cycle-${index}`,
+      outcome, reason: null, safe_off: true, retry: null }],
+    receipt: { run_id: `${index}`.repeat(32), job_id: `job-cycle-${index}`, job_state: outcome === "PASS" ? "completed" : "failed",
+      safe_off: true, job_binding_confirmed: true, readback_sha256: `${index}a`.repeat(32), job_binding_sha256: "b".repeat(64) },
+  });
+  const cursors: string[] = [];
+  await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}\/cycles\?/, async route => {
+    const url = new URL(route.request().url());
+    cursors.push(url.search);
+    const all = (view as { cycles?: { settled: number } } | null)?.cycles?.settled === 2
+      ? [cycleRecord(0, 1, "FAIL"), cycleRecord(1, 2, "PASS")] : [cycleRecord(0, 1, "FAIL")];
+    const offset = Number(url.searchParams.get("offset"));
+    const records = all.slice(offset);
+    await route.fulfill({ json: { ok: true, batch_id: batchId, total: all.length, offset,
+      next_offset: offset + records.length, records } });
+  });
   await start.click();
   const resume = job.getByRole("button", { name: /CONTINUE SITE-02/ });
   await expect(resume).toBeEnabled();
@@ -1553,7 +1567,17 @@ test("Manual Repeat: a paused Site is continued by the same START, once, with it
   await expect(workspace.locator('[data-site-fail-detail="2"]')).toContainText("Cycle 1 FAIL · JOB_NOT_SUCCESS · Job job-cycle-1");
   await expect(workspace.locator('[data-site-cycle="2"]')).toContainText("Cycle 2/2 · PASS 0 · FAIL 1");
   await resume.dblclick();
-  await expect(jobLog(workspace)).toContainText("[CYCLES] planned 2 · settled 2");
+  const log = jobLog(workspace);
+  await expect(log).toContainText("[STATISTICS] Replace IC · Sites 1 (completed 1) · Cycles PASS 1 · FAIL 1 · settled 2/2 · remaining 0 · Job Attempts 2 · Retry 0");
+  // Every settled Cycle is in the Log once, from the History, with its evidence.
+  await expect(log).toContainText("[CYCLE 1/2] SITE-02 · FAIL · JOB_NOT_SUCCESS · Run");
+  await expect(log).toContainText("[CYCLE 2/2] SITE-02 · PASS · Run");
+  await expect(log).toContainText(`Readback SHA256 ${"2a".repeat(32)}`);
+  const text = await log.textContent() ?? "";
+  expect(text.split("[CYCLE 1/2]").length - 1).toBe(1);
+  expect(text.split("[CYCLE 2/2]").length - 1).toBe(1);
+  expect(cursors[0]).toBe("?offset=0&limit=200");
+  expect(cursors.every(cursor => /^\?offset=[0-9]+&limit=200$/.test(cursor))).toBe(true);
   // One Continue, echoing the pause it answers; no actor is ever sent by the Browser.
   expect(continues).toEqual([{ ppu_alias: "z2", site_id: 2, continue_seq: 1 }]);
 });

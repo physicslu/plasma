@@ -73,6 +73,8 @@ class GenericImageRootTests(unittest.TestCase):
         self.port = FakePort(self.release)
         self.stack.enter_context(patch.object(stage, "STATE", self.folder / "state.json"))
         self.stack.enter_context(patch.object(stage, "CHILD", self.folder / "child.json"))
+        self.reservation = self.folder / "ppu-resource-reservation.json"
+        self.stack.enter_context(patch.object(stage, "RUNTIME_RESERVATION", self.reservation))
         self.stack.enter_context(patch.object(stage, "trusted_local"))
         self.stack.enter_context(patch.object(stage, "_state_file_trusted"))
         self.stack.enter_context(patch.object(stage.guard, "RootZ2TargetPort",
@@ -291,6 +293,35 @@ class GenericImageRootTests(unittest.TestCase):
             self.release.firmware_name, self.release.recovery_name])
         self.assertEqual(stage.read_state(self.release)["status"], "RECOVERY")
         self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+
+    def test_no_operator_pl_change_while_a_batch_holds_the_ppu(self):
+        """U11: download / test / restore refuse an ACTIVE Runtime Reservation."""
+        self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+        writes = list(self.port.writes)
+        self.reservation.write_text(json.dumps({"state": "ACTIVE", "owner_id": "batch-1"}))
+        for verb in ("download", "test", "restore"):
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "RUNTIME_RESOURCE_RESERVATION_ACTIVE"):
+                stage.run(verb)
+        self.assertEqual(self.port.writes, writes)
+        # A settled or isolated Reservation does not block operator recovery.
+        for state in ("RECOVERY_REQUIRED", "RELEASED"):
+            self.reservation.write_text(json.dumps({"state": state}))
+            self.assertEqual(stage.run("test")["result"], "IDENTITY_PASS")
+
+    def test_an_unreadable_runtime_reservation_fails_closed(self):
+        self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+        for content in (b"not json", b"[]", b'{"state": 1}'):
+            self.reservation.write_bytes(content)
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "RUNTIME_RESERVATION_UNREADABLE"):
+                stage.run("test")
+        # A link (e.g. to a device) is never followed.
+        self.reservation.unlink()
+        self.reservation.symlink_to("/dev/zero")
+        with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                    "RUNTIME_RESERVATION_UNREADABLE"):
+            stage.run("test")
 
     def test_identity_requires_manual_download_first(self):
         for verb in ("test", "restore"):
@@ -760,6 +791,135 @@ class SiteAdmissionVanishedPidPolicyTests(unittest.TestCase):
             result, detail = self.scan("skip")
         self.assertEqual(result, (False, ["1000"]))
         self.assertEqual(detail["status"], "PID_REUSED_DURING_SCAN")
+
+    # ------------------------------------- ESRCH (2-Site HIL 2026-11-23)
+    def esrch_on(self, victim, phase, *, after=None, error=ProcessLookupError):
+        """Raise ``error`` when ``phase`` of PID ``victim`` is read.
+
+        ``after(directory)`` runs first: remove the entry (confirmed exit),
+        recreate it (PID reuse) or leave it (live / zombie task).
+        """
+        import contextlib
+        directory = self.proc / str(victim)
+        leaf = {"STAT": "stat", "MAPS": "maps", "FD": "fd"}[phase]
+        target = directory / leaf
+        original_read, original_iterdir = Path.read_text, Path.iterdir
+        fired = []
+
+        def fire():
+            fired.append(phase)
+            if after is not None:
+                after(directory)
+            raise error("synthetic procfs " + error.__name__)
+
+        def read(path, *args, **kwargs):
+            if path == target and not fired:
+                fire()
+            return original_read(path, *args, **kwargs)
+
+        def iterdir(path):
+            if path == target and not fired:
+                fire()
+            return original_iterdir(path)
+
+        stack = contextlib.ExitStack()
+        stack.enter_context(patch.object(Path, "read_text", new=read))
+        stack.enter_context(patch.object(Path, "iterdir", new=iterdir))
+        return stack
+
+    @staticmethod
+    def remove(directory):
+        import shutil
+        shutil.rmtree(directory)
+
+    def test_esrch_with_confirmed_exit_is_skipped_in_every_phase(self):
+        for phase in ("STAT", "FD", "MAPS"):
+            with self.subTest(phase=phase):
+                self.pid(1000)
+                self.pid(2000)
+                with self.esrch_on(1000, phase, after=self.remove):
+                    result, detail = self.scan("skip")
+                self.assertEqual(result, (True, []))
+                self.assertEqual((detail["status"], detail["attempt"], detail["rescans"],
+                                  detail["vanished_skipped"], detail["observed"]),
+                                 ("COMPLETE", 1, 0, 1, 1))
+                self.remove(self.proc / "2000")
+
+    def test_esrch_of_a_present_pid_fails_closed_in_every_phase(self):
+        """A live or zombie task (entry still listed) is not a confirmed exit."""
+        for phase in ("STAT", "FD", "MAPS"):
+            with self.subTest(phase=phase):
+                self.pid(1000)
+                with self.esrch_on(1000, phase):
+                    result, detail = self.scan("skip")
+                self.assertEqual(result, (False, ["1000"]))
+                self.assertEqual((detail["status"], detail["phase"], detail["error"]),
+                                 ("PROC_VISIBILITY_DENIED", phase, "ProcessLookupError"))
+                self.remove(self.proc / "1000")
+
+    def test_esrch_then_pid_reused_fails_closed(self):
+        def reuse(directory):
+            self.remove(directory)
+            self.pid(1000, start=4242)  # a new process already owns the PID
+        self.pid(1000, start=7)
+        with self.esrch_on(1000, "MAPS", after=reuse):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+
+    def test_esrch_with_unprovable_disappearance_fails_closed(self):
+        """EACCES (or any error) on the confirming stat proves nothing."""
+        self.pid(1000)
+        original_stat = Path.stat
+        def stat(path, *args, **kwargs):
+            if path == self.proc / "1000":
+                raise PermissionError("cannot establish PID disappearance")
+            return original_stat(path, *args, **kwargs)
+        with self.esrch_on(1000, "MAPS"), patch.object(Path, "stat", new=stat):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual(detail["status"], "PROC_VISIBILITY_DENIED")
+
+    def test_eacces_is_never_an_exit_even_when_the_entry_is_gone(self):
+        self.pid(1000)
+        self.pid(2000)
+        with self.esrch_on(1000, "MAPS", after=self.remove, error=PermissionError):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (False, ["1000"]))
+        self.assertEqual((detail["status"], detail["error"]),
+                         ("PROC_VISIBILITY_DENIED", "PermissionError"))
+
+    def test_esrch_exit_under_maintenance_policy_rescans_and_stays_bounded(self):
+        self.pid(1000)
+        self.pid(2000)
+        with self.esrch_on(1000, "MAPS", after=self.remove):
+            result, detail = self.scan("rescan")
+        self.assertEqual(result, (True, []))
+        self.assertEqual((detail["status"], detail["rescans"], detail["attempt"]),
+                         ("COMPLETE", 1, 2))
+        # Every pass loses a PID to ESRCH: the bounded rescan is exhausted.
+        import shutil
+        original = Path.read_text
+        victims = {"1000", "1001", "1002", "1003"}
+        for number in (1000, 1001, 1002, 1003):
+            self.pid(number)
+        def read(path, *args, **kwargs):
+            if path.name == "maps" and path.parent.name in victims and path.parent.exists():
+                shutil.rmtree(path.parent)
+                raise ProcessLookupError("synthetic reaped task")
+            return original(path, *args, **kwargs)
+        with patch.object(Path, "read_text", new=read):
+            result, detail = self.scan("rescan")
+        self.assertFalse(result[0])
+        self.assertEqual(detail["status"], "VANISHED_PID_RESCAN_EXHAUSTED")
+
+    def test_conflict_is_still_refused_when_another_pid_exits_with_esrch(self):
+        self.pid(1000, fds=("/dev/uio1",))
+        self.pid(2000)
+        with self.esrch_on(2000, "MAPS", after=self.remove):
+            result, detail = self.scan("skip")
+        self.assertEqual(result, (True, ["1000"]))
+        self.assertEqual((detail["status"], detail["vanished_skipped"]), ("PROC_CONFLICT", 1))
 
     def test_stable_pid_identity_is_unchanged_behaviour(self):
         self.pid(1000, start=5)

@@ -1,0 +1,623 @@
+{
+  "schema_version": 1,
+  "qualification_id": "adr0002-phase2-openocd-012-stm32f103-low-density-12-v1",
+  "adr": "ADR-0002",
+  "status": "reviewed_source_only",
+  "provider": {
+    "provider_id": "openocd-upstream",
+    "version": "0.12.0",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "target_config": "tcl/target/stm32f1x.cfg",
+    "flash_driver": "stm32f1x",
+    "low_density_device_id": "0x412",
+    "runtime_id": "0.12.0-9ea7f3d647c8"
+  },
+  "applicability": {
+    "path": "release/openocd-qualification/stm32f103-low-density-exact-12-applicability-v1.json",
+    "git_blob_sha1": "04190c5e6b383df1756f941bff0c056e6b676bed"
+  },
+  "source_lock": {
+    "path": "release/openocd-qualification/stm32f103-low-density-ds5936-source-lock-v1.json",
+    "git_blob_sha1": "9efb62f463e9180457f7afbc63a30aabdb75b7de"
+  },
+  "programming_profile": {
+    "path": "data/ic-support/profiles/programming/stm32f1-low-density-flash-v0.json",
+    "git_blob_sha1": "3710f3bdece84d420835eeda6862a81a9b2271c2",
+    "profile_id": "stm32f1-low-density-flash-v0"
+  },
+  "records": [
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C4T6A",
+      "base_device": "STM32F103C4",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103c4-16k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 16384,
+      "page_count": 16
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6T6A",
+      "base_device": "STM32F103C6",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103c6-32k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 32768,
+      "page_count": 32
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6T6ATR",
+      "base_device": "STM32F103C6",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103c6-32k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 32768,
+      "page_count": 32
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6T7A",
+      "base_device": "STM32F103C6",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103c6-32k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 32768,
+      "page_count": 32
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6T7ATR",
+      "base_device": "STM32F103C6",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103c6-32k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 32768,
+      "page_count": 32
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103C6U6A",
+      "base_device": "STM32F103C6",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103c6-32k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 32768,
+      "page_count": 32
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R4H6A",
+      "base_device": "STM32F103R4",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103r4-16k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 16384,
+      "page_count": 16
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R4T6A",
+      "base_device": "STM32F103R4",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103r4-16k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 16384,
+      "page_count": 16
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R6H6A",
+      "base_device": "STM32F103R6",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103r6-32k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 32768,
+      "page_count": 32
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R6T6A",
+      "base_device": "STM32F103R6",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103r6-32k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 32768,
+      "page_count": 32
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R6T6ATR",
+      "base_device": "STM32F103R6",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103r6-32k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 32768,
+      "page_count": 32
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103R6T7A",
+      "base_device": "STM32F103R6",
+      "software_state": "SUPPORTED",
+      "memory_geometry_profile_id": "stm32f103r6-32k-v0",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "operations": {
+        "probe": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "erase": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "program": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "read": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        },
+        "verify": {
+          "state": "SUPPORTED",
+          "source_implementation_present": true,
+          "exact_icpn_qualified": true
+        }
+      },
+      "qualification_blockers": [],
+      "main_flash_size_bytes": 32768,
+      "page_count": 32
+    }
+  ],
+  "supported_exact_icpn_count": 12,
+  "candidate_exact_icpn_count": 12,
+  "excluded_exact_icpns": [
+    "STM32F103T4U6A",
+    "STM32F103T6U6A",
+    "STM32F103T6U7A"
+  ],
+  "non_authorizations": [
+    "catalog_L2_promotion",
+    "production_execution",
+    "hardware_programming",
+    "installed_runtime_attestation"
+  ],
+  "safety_contract": {
+    "read_flash_size_fail_closed": true,
+    "refuse_flash_size_override_as_evidence": true,
+    "refuse_full_bank_erase_without_separate_safety_gate": true,
+    "deny_option_write_readout_unlock_mass_erase": true
+  },
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1",
+  "manufacturer_programming_group": {
+    "group_id": "st-stm32f103-low-density-programming-v1",
+    "manufacturer": "STMicroelectronics",
+    "family": "STM32F1",
+    "series": "STM32F103",
+    "density_class": "low",
+    "silicon_identity": {
+      "openocd_device_id": "0x412",
+      "openocd_class": "STM32F10x low-density",
+      "identity_assumption": "genuine ST silicon matching the exact selected commercial ICPN",
+      "revision_policy": "Order code A is not a silicon revision. stm32x_get_info recognizes low-density revision A (0x1000); unknown revisions and clones are not positive exact-part identity evidence."
+    },
+    "debug_transport": [
+      "SWD",
+      "JTAG"
+    ],
+    "programming_electrical": {
+      "vdd_programming_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "external_vpp_required": false
+    },
+    "shared_flash_geometry": {
+      "main_flash_start": "0x08000000",
+      "erase_unit": "page",
+      "erase_unit_bytes": 1024,
+      "program_unit": "halfword",
+      "program_unit_bytes": 2
+    },
+    "manufacturer_evidence": {
+      "source_lock_path": "release/openocd-qualification/stm32f103-low-density-ds5936-source-lock-v1.json",
+      "programming_profile_id": "stm32f1-low-density-flash-v0",
+      "programming_profile_path": "data/ic-support/profiles/programming/stm32f1-low-density-flash-v0.json",
+      "direct_applicability_id": "st-stm32f103-low-density-exact-12-v1"
+    },
+    "operation_qualification": {
+      "probe": {
+        "state": "SUPPORTED",
+        "openocd_basis": [
+          "stm32x_probe",
+          "device ID 0x412 low-density branch"
+        ],
+        "manufacturer_basis": [
+          "DS5936 Rev7 Tables 1/2/58",
+          "PM0075 Rev2 Table 2, sections 2.3/2.4"
+        ]
+      },
+      "erase": {
+        "state": "SUPPORTED",
+        "scope": "resolved Main Flash page erase; full-bank requests excluded (implicit mass erase)",
+        "openocd_basis": [
+          "stm32x_erase",
+          "flash erase_address framework"
+        ],
+        "manufacturer_basis": [
+          "DS5936 Rev7 Tables 1/2/58",
+          "PM0075 Rev2 Table 2, sections 2.3/2.4"
+        ]
+      },
+      "program": {
+        "state": "SUPPORTED",
+        "scope": "resolved Main Flash",
+        "implicit_erase": false,
+        "openocd_basis": [
+          "stm32x_write",
+          "flash write_image framework"
+        ],
+        "manufacturer_basis": [
+          "DS5936 Rev7 Tables 1/2/58",
+          "PM0075 Rev2 Table 2, sections 2.3/2.4"
+        ]
+      },
+      "read": {
+        "state": "SUPPORTED",
+        "scope": "resolved Main Flash while security state permits debug read",
+        "openocd_basis": [
+          "default_flash_read",
+          "Flash read framework"
+        ],
+        "manufacturer_basis": [
+          "DS5936 Rev7 Tables 1/2/58",
+          "PM0075 Rev2 Table 2, sections 2.3/2.4"
+        ]
+      },
+      "verify": {
+        "state": "SUPPORTED",
+        "scope": "explicit readback/image verification while security state permits debug read",
+        "openocd_basis": [
+          "flash verify_image framework",
+          "flash_driver_read"
+        ],
+        "manufacturer_basis": [
+          "DS5936 Rev7 Tables 1/2/58",
+          "PM0075 Rev2 Table 2, sections 2.3/2.4"
+        ]
+      }
+    },
+    "blocked_operations": [
+      "OPTION_PROGRAM",
+      "OPTION_ERASE",
+      "RDP_ENABLE",
+      "RDP_DISABLE",
+      "WRITE_PROTECTION_CHANGE",
+      "MASS_ERASE",
+      "FULL_BANK_ERASE"
+    ],
+    "backend_constraints": [
+      "erase/program require halted target and legal VDD 2.0-3.6 V",
+      "PROGRAM writes erased aligned halfwords; no implicit erase",
+      "require successful raw Flash-size register read matching selected 16/32-KiB exact geometry; 0/0xffff/read failure fallback and manual FLASH_SIZE overrides are not authority",
+      "require genuine matching 0x412 silicon and resolved revision/protection; unknown identity/security fails closed",
+      "deny full-bank erase requests because stm32x_erase redirects these to mass erase; page erases may be separately selected",
+      "read/verify require permitted debug reads; mismatch, I/O failure or timeout is failure",
+      "option bytes, RDP unlock and security mutation excluded; no execution authorization"
+    ]
+  }
+}

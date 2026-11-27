@@ -16,7 +16,6 @@ hil = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hil)
 
 S = "c" * 64
-PLAN_ID = "a" * 32
 START_ID = "b" * 32
 BATCH_ID = "d" * 32
 META = hil.IMAGES["v0.1"]
@@ -62,22 +61,15 @@ class StubManager:
 
     def call(self, method: str, route: str, body=None):
         self.calls.append((method, route, body))
-        if route.endswith("/programming/plans"):
-            return {"ok": True, "plan": {
-                "plan_id": PLAN_ID, "activation_required": self.activation,
-                "resource": {"reuse": not self.activation,
-                             "resource_set_sha256": S},
-                "fpga_load": False,
-                "image_asset": {"sha256": IMAGE["sha256"], "size": IMAGE["size"]},
-            }}
-        if route.endswith("/void"):
-            return {"ok": True, "reconciliation": {"state": "NOT_ACCEPTED"}}
         if route == "/api/programming/starts":
             return {"ok": True, "start": {"start_id": START_ID}}
         if route == "/api/programming/batches":
             if self.fail_batch:
                 raise hil.HILFailure("POST outcome unknown")
-            return {"ok": True, "batch": make_batch()}
+            batch = make_batch()
+            if self.activation:
+                batch["resource_activation"] = {"z2": {"result": "PASS", "fpga_load": False}}
+            return {"ok": True, "batch": batch}
         raise AssertionError(route)
 
 
@@ -108,14 +100,13 @@ def test_wrong_image_sha_rejected(tmp_path: Path) -> None:
         hil.image_spec(image, "v0.1")
 
 
-def test_reuse_preflight_refuses_activation_before_any_batch() -> None:
+def test_a_batch_that_activated_is_never_a_pass_or_a_resend() -> None:
+    # U2: no plan preview exists; a Batch that activated (U1) is BLOCKED evidence.
     manager = StubManager(activation=True)
     with pytest.raises(hil.HILFailure, match="RESOURCE_REUSE_NOT_PROVEN"):
         hil.one_attempt(manager, "z2", 2, IMAGE, 10, 1)
     assert [x[1] for x in manager.calls] == [
-        "/api/registry/z2/bootstrap/programming/plans",
-        f"/api/programming/starts/{PLAN_ID}/void",
-    ]
+        "/api/programming/starts", "/api/programming/batches"]
 
 
 def test_manager_batch_e2e_validates_receipt_without_real_hardware() -> None:
@@ -125,8 +116,6 @@ def test_manager_batch_e2e_validates_receipt_without_real_hardware() -> None:
     assert result["safe_off"] is True
     assert raw["start_id"] == START_ID
     assert [x[1] for x in manager.calls] == [
-        "/api/registry/z2/bootstrap/programming/plans",
-        f"/api/programming/starts/{PLAN_ID}/void",
         "/api/programming/starts",
         "/api/programming/batches",
     ]
@@ -151,7 +140,7 @@ def test_receipt_negative_cases(bad_field, bad_value) -> None:
     batch = make_batch()
     batch["current_run"]["receipt"][bad_field] = bad_value
     with pytest.raises(hil.HILFailure, match="Receipt"):
-        hil.validate_receipt(batch, "z2", 2, IMAGE, S)
+        hil.validate_receipt(batch, "z2", 2, IMAGE)
 
 
 def test_no_auto_deploy_or_legacy_programmer() -> None:
@@ -216,35 +205,6 @@ def _runner_args(tmp_path: Path) -> argparse.Namespace:
     )
 
 
-def test_preview_void_uncertain_preserves_start_identity_in_evidence(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    class UncertainVoidManager(StubManager):
-        def __init__(self, url: str):
-            super().__init__()
-            self.last_start_id = None
-            self.last_batch_id = None
-            self.last_preview_plan_id = None
-
-        def call(self, method: str, route: str, body=None):
-            if route.endswith("/void"):
-                self.calls.append((method, route, body))
-                raise hil.HILFailure("VOID outcome unobservable; do not resubmit")
-            return super().call(method, route, body)
-
-    monkeypatch.setattr(hil, "Manager", UncertainVoidManager)
-    monkeypatch.setattr(hil, "image_spec", lambda path, version: IMAGE)
-    monkeypatch.setattr(hil, "require_swpc_hostname", lambda hostname: None)
-    prior_umask = hil.os.umask(0o077)
-    try:
-        assert hil.run(_runner_args(tmp_path)) == 2
-    finally:
-        hil.os.umask(prior_umask)
-    summary = json.loads(next(tmp_path.glob("*/summary.json")).read_text())
-    assert summary["result"] == "BLOCKED"
-    assert summary["last_preview_plan_id"] == PLAN_ID
-    assert summary["last_start_id"] is None
-    assert summary["last_batch_id"] is None
 
 
 def test_cdc_decode_error_writes_terminal_evidence(
@@ -255,7 +215,6 @@ def test_cdc_decode_error_writes_terminal_evidence(
             super().__init__()
             self.last_start_id = None
             self.last_batch_id = None
-            self.last_preview_plan_id = None
 
     def malformed_cdc(*args, **kwargs):
         raise UnicodeDecodeError("ascii", bytes([0xFF]), 0, 1, "invalid ASCII")
@@ -271,7 +230,6 @@ def test_cdc_decode_error_writes_terminal_evidence(
         hil.os.umask(prior_umask)
     summary = json.loads(next(tmp_path.glob("*/summary.json")).read_text())
     assert summary["result"] == "BLOCKED"
-    assert summary["last_preview_plan_id"] == PLAN_ID
     assert summary["last_start_id"] == START_ID
     assert summary["last_batch_id"] == BATCH_ID
     assert "UnicodeDecodeError" in summary["reason"]

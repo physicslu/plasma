@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useI18n } from "../i18n";
 import { OperatorPanelHeader } from "./operator-panel";
 import "./batch-summary.css";
@@ -29,7 +29,7 @@ export function BatchSummary({
   return (
     <section className={`batchSummary ${title ? "has-title" : ""}`.trim()} aria-label={ariaLabel}>
       {title && <OperatorPanelHeader title={title} meta={meta} />}
-      <div className="batchSummaryGrid">
+      <div className="batchSummaryGrid" style={{ "--batch-summary-columns": items.length } as CSSProperties}>
         {items.map(item => (
           <article key={item.key} data-kpi={item.key} data-tone={item.tone ?? "neutral"}>
             <small>{item.label}</small>

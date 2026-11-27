@@ -59,6 +59,9 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.parse import quote
 
+from plasma_opf.site_safety import (  # noqa: F401 - re-exported for Receipt readers
+    FAILED_SAFE_OFF_VERIFIED, PRE_HARDWARE_DENIED, SITE_SAFETY_SCHEMA, site_safety_class,
+)
 from plasma_opf import bundle_v3
 from .shared_control import SharedControlError, shared_boundary, shared_control_reason
 from .bootstrap import BootstrapManagerError
@@ -266,7 +269,6 @@ class _Run:
     receipt: dict[str, Any] | None = None
     job_submission_count: int = 0
     acknowledged: bool = False
-    time_sync: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -278,7 +280,6 @@ class _Run:
             "job": self.job, "receipt": self.receipt,
             "job_submission_count": self.job_submission_count,
             "auto_retry": "DISABLED", "acknowledged": self.acknowledged,
-            "time_sync": self.time_sync,
         }
 
     @classmethod
@@ -292,7 +293,6 @@ class _Run:
         run.activation = dict(data.get("activation") or {})
         run.job_submission_count = int(data.get("job_submission_count") or 0)
         run.acknowledged = bool(data.get("acknowledged"))
-        run.time_sync = dict(data["time_sync"]) if isinstance(data.get("time_sync"), dict) else None
         return run
 
 
@@ -305,6 +305,43 @@ def _strict_base64(value: object, field: str = "image") -> bytes:
         raise ProgrammingError(400, f"{field}_invalid",
                                f"{field}_base64 is not strict base64") from exc
 
+
+
+#: Structured C-3 Site Worker safety evidence: one shared judgment
+#: (plasma_opf.site_safety), also used by the PPU Runtime.
+#: A Run whose Job the Site Worker refused before any hardware access.
+SITE_DENIED_BEFORE_HARDWARE = "SITE_DENIED_BEFORE_HARDWARE"
+#: Receipt ``safe_off_state``: what is known about the Site's end state,
+#: kept apart from the programming result.
+SAFE_OFF_VERIFIED = "VERIFIED"
+SAFE_OFF_NOT_TOUCHED = "NOT_TOUCHED"
+SAFE_OFF_NOT_VERIFIED = "NOT_VERIFIED"
+
+
+
+
+def _job_site_safety(run: _Run, plan: _Plan, job: Mapping[str, Any],
+                     result: Mapping[str, Any], binding_confirmed: bool) -> str | None:
+    """The trusted safety class of ONE refused Job of this Run, or None.
+
+    Beyond the Worker statement itself: the PPU Job is this Run's single
+    terminal attempt, every identity (Job, Site, operation) agrees across the
+    Job, its result and its error, and the PPU echoed the planned Binding.
+    """
+    error = result.get("error")
+    context = error.get("context") if isinstance(error, dict) else None
+    job_id = job.get("job_id")
+    if not (isinstance(error, dict) and isinstance(context, dict)
+            and binding_confirmed
+            and job.get("state") in ("failed", "error")
+            and result.get("state") == job.get("state")
+            and type(result.get("attempts")) is int and result.get("attempts") == 1
+            and type(job_id) is str and error.get("job_id") == job_id
+            and job.get("site_id") == run.site and error.get("site_id") == run.site
+            and job.get("operation") == plan.operation):
+        return None
+    return site_safety_class(context, job_id=job_id, site_id=run.site,
+                             operation=plan.operation)
 
 
 def _site_worker_failure(run: _Run, plan: _Plan, job: Mapping[str, Any],
@@ -701,9 +738,57 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(409, "resource_reservation_refused", "PPU refused Resource Reservation")
         return reservation
 
-    def begin_batch_resource(self, alias: str, owner_id: str,
-                             resource_sha: str, site: int) -> None:
-        """One Bootstrap asset read, then atomic PPU reservation on that identity."""
+    def activate_batch_resource(self, alias: str, prepared: _Prepared, site: int, *,
+                                step: Callable[..., None],
+                                platform_block: Callable[[], tuple[str, str] | None]
+                                = lambda: None) -> tuple | None:
+        """Make this Batch's Programming Resources Active BEFORE its Reservation (U1).
+
+        Returns the identity it read when the Resources are already Active and
+        verified by the PPU (reused untouched, and handed to the Reservation so
+        a Batch still reads it once), or None when B1/B2/B3 ran. Otherwise the Batch must carry its own
+        Bundle or Image and the PPU must be released (no run, no lease, Site
+        idle); then the one Manager activation runs, never with an FPGA load.
+        Nothing here touches a DUT. The Reservation acquired afterwards
+        re-derives the identity under the PPU's own lock, so a change in
+        between fails closed, and B3 needs the asset quiesce lease that a held
+        Reservation refuses, so no activation can happen inside a Batch run.
+        """
+        _resource, resource_sha, built, _image, _asset = prepared.resources
+        observed = self._batch_resource_identity(alias, site)
+        active, _ppu_id, report = observed
+        if report.get("state") == "VERIFIED":
+            if not (active.get("state") == "ACTIVE"
+                    and report.get("asset_set_sha256") == active.get("asset_set_sha256")):
+                raise ProgrammingError(409, "active_set_report_inconsistent",
+                                       "PPU Runtime and Bootstrap report different Active Sets")
+            if report.get("resource_set_sha256") == resource_sha:
+                return observed
+        elif report.get("state") != "UNAVAILABLE":
+            raise ProgrammingError(409, "ppu_runtime_resource_identity_unsupported",
+                                   "PPU Resource identity report is not recognized")
+        if built is None:
+            raise ProgrammingError(409, "resource_activation_requires_image",
+                                   "these Programming Resources must already be Active; "
+                                   "program an Image first")
+        if self._active_run(alias) is not None:
+            raise _StepFailure("RUN_IN_PROGRESS", outcome="BLOCKED")
+        # The existing gates, asked only when a Platform mutation is needed.
+        blocked = platform_block() or self.target_block(alias, site)
+        if blocked is not None:
+            raise _StepFailure(blocked[1], outcome="BLOCKED", failure_domain=blocked[0])
+        try:
+            self._activate_bundle(alias, built, step=step)
+        except _OutcomeUnknown as exc:
+            # B3 may have run: never resubmitted. The Bootstrap refuses a
+            # second deployment while one runs, and the next Batch re-reads
+            # the Active Set instead of assuming either result.
+            raise _StepFailure(exc.reason, outcome="OUTCOME_UNKNOWN",
+                               failure_domain=TARGET_TRANSACTION_UNKNOWN) from exc
+        return None
+
+    def _batch_resource_identity(self, alias: str, site: int) -> tuple:
+        """One Bootstrap asset read and one PPU status read: (Active Set, ppu_id, report)."""
         active = self._timed_bootstrap_read(alias, self.coordinator.assets, "assets")
         if active.get("state") == "RECOVERY_REQUIRED":
             raise _StepFailure("PPU_RECOVERY_REQUIRED", outcome="BLOCKED")
@@ -712,6 +797,14 @@ class BundleProgrammingWorkflow:
         status = self._gateway_get(client, f"/api/status?site={site}")
         ppu = status.get("ppu") if isinstance(status.get("ppu"), dict) else {}
         ppu_id, report = self._resource_report(ppu.get("ppu_id"), ppu.get("active_resources"))
+        return active, ppu_id, report
+
+    def begin_batch_resource(self, alias: str, owner_id: str,
+                             resource_sha: str, site: int, *,
+                             observed: tuple | None = None) -> None:
+        """One identity read (or the one ``activate_batch_resource`` just made),
+        then atomic PPU reservation on that identity."""
+        active, ppu_id, report = observed or self._batch_resource_identity(alias, site)
         expected = {"ppu_id": ppu_id, "asset_set_sha256": active.get("asset_set_sha256"),
                     "generation": report.get("generation"),
                     "resource_set_sha256": resource_sha}
@@ -834,7 +927,7 @@ class BundleProgrammingWorkflow:
             if self._unknown_latched(alias) is not None:
                 return TARGET_NOT_READY, "OUTCOME_UNKNOWN_UNRESOLVED"
             active = [r for r in self._runs.values() if r.alias == alias and r.outcome is None]
-            if any(r.site == site or r.plan.get("activation_required")
+            if any(r.site == site
                    or not r.plan.get("execution_owner_id")
                    or (execution_owner_id is not None
                        and r.plan.get("execution_owner_id") != execution_owner_id)
@@ -1128,7 +1221,7 @@ class BundleProgrammingWorkflow:
             prepared = self._prepared_for(preparation, body)
         parsed = prepared.parsed
         operations, operation = parsed["operations"], parsed["operation"]
-        label, archive = parsed["label"], parsed["archive"]
+        archive = parsed["archive"]
         address, length = parsed["address"], parsed["length"]
         route = prepared.route
         resource, resource_sha, built, image, image_asset = prepared.resources
@@ -1168,11 +1261,12 @@ class BundleProgrammingWorkflow:
         else:
             raise ProgrammingError(409, "ppu_runtime_resource_identity_unsupported",
                                    "PPU Resource identity report is not recognized")
-        activation_required = not resource_reuse
-        if activation_required and built is None:
-            raise ProgrammingError(409, "resource_activation_requires_image",
-                                   f"{label} needs these Programming Resources already Active; "
-                                   "program an Image first")
+        if not resource_reuse:
+            # Every plan belongs to a Batch, which activates its Resources
+            # before its Reservation (U1); a plan never activates (U2).
+            raise ProgrammingError(409, "batch_resource_not_active",
+                                   "the Batch's Programming Resources are no longer Active "
+                                   "on this PPU; nothing was submitted")
         try:
             binding = bundle_v3.job_image_binding(
                 resource, image_asset, ppu_id=ppu_id, site_id=site, operation=operation,
@@ -1203,11 +1297,10 @@ class BundleProgrammingWorkflow:
             "job_binding": binding, "job_binding_sha256": binding_sha,
             "active_asset_set": {"state": active.get("state"),
                                  "asset_set_sha256": active.get("asset_set_sha256")},
-            "activation_required": activation_required,
+            # Kept for readers of the plan schema: a plan never activates (U2).
+            "activation_required": False,
             "fpga_load": False,
-            "steps": (["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"] if activation_required
-                      else ["RESOURCE_REUSE"])
-                     + [f"{operation.upper()}_JOB", "VERIFY_RECEIPT"]
+            "steps": ["RESOURCE_REUSE", f"{operation.upper()}_JOB", "VERIFY_RECEIPT"]
                      + (["FETCH_READ_OUTPUT"] if operation == "read" else []),
             "catalog_gate": "NOT_USED",
             "confirm_required": CONFIRM_TOKEN,
@@ -1268,7 +1361,6 @@ class BundleProgrammingWorkflow:
             if active and (execution_owner_id is None or any(
                     r.site == plan.site
                     or r.plan.get("execution_owner_id") != execution_owner_id
-                    or r.plan.get("activation_required") or plan.payload["activation_required"]
                     or r.plan.get("resource") != plan.payload["resource"]
                     or r.plan.get("image_asset") != plan.payload["image_asset"]
                     or r.plan.get("active_asset_set") != plan.payload["active_asset_set"]
@@ -1351,7 +1443,8 @@ class BundleProgrammingWorkflow:
                     "expired; nothing was started")
 
     def consume_batch_start(self, start_id: str, batch_id: str,
-                            targets: list[dict[str, Any]]) -> None:
+                            targets: list[dict[str, Any]],
+                            operation: str = PROGRAMMING) -> None:
         """One start ID admits one Batch; journalled before the Batch exists.
 
         The record carries the whole Target Set, because that is what was
@@ -1367,7 +1460,8 @@ class BundleProgrammingWorkflow:
                 "operation": PROGRAMMING, "operations": None, "job_binding_sha256": None,
                 "run_id": None, "issued_at": _now()})
             sites = [site for target in targets for site in target["site_ids"]]
-            record.update(state="CONSUMED", batch_id=batch_id,
+            # A Read Memory Batch (U2) is admitted as "read", never "programming".
+            record.update(state="CONSUMED", batch_id=batch_id, operation=operation,
                           targets=[dict(target) for target in targets],
                           site_id=sites[0] if len(sites) == 1 else None,
                           updated_at=_now())
@@ -1475,7 +1569,8 @@ class BundleProgrammingWorkflow:
                 view.update(kind="batch", batch=batch, outcome=batch.get("outcome"), identity={
                     "ppu_alias": single, "site_id": sites[0] if len(sites) == 1 else None,
                     "targets": targets, "ppu_id": None,
-                    "operation": PROGRAMMING, "operations": batch.get("operations"),
+                    "operation": batch.get("operation") or PROGRAMMING,
+                    "operations": batch.get("operations"),
                     "job_binding_sha256": (attempts[-1].get("job_binding_sha256")
                                            if attempts else None)})
                 outcome = batch.get("outcome")
@@ -1568,31 +1663,13 @@ class BundleProgrammingWorkflow:
             if signer is not None and hasattr(client, "write_signer"):
                 client.write_signer = signer(run.alias)
             self._update(run, state="preflight")
-            if plan.payload.get("execution_owner_id") is None:
-                self._update(run, time_sync=self.pre_start_time_sync(
-                    run.alias, run.run_id, plan.binding["ppu_id"]))
-            started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
-            try:
-                self._readiness(client, run.site, plan.route.site_interface,
-                                plan.payload.get("execution_owner_id"), run.alias)
-            finally:
-                if started is not None:
-                    _m0_timing("manager_preflight", run_id=run.run_id, plan_id=plan.plan_id,
-                               ppu_alias=run.alias, site_id=run.site,
-                               duration_ms=round((self.monotonic() - started) * 1000, 3))
-            self._step(run, "PREFLIGHT", "PASS")
-            activated = plan.payload["activation_required"]
-            if activated:
-                self._activate(run, plan)
             session = self._batch_session(run.alias, plan.payload.get("execution_owner_id"))
             active = (session["assets"] if session is not None else
                       self._timed_bootstrap_read(run.alias, self.coordinator.assets, "assets"))
-            expected_set = (plan.bundle.archive_sha256 if activated
-                            else plan.payload["active_asset_set"]["asset_set_sha256"])
+            expected_set = plan.payload["active_asset_set"]["asset_set_sha256"]
             if not (active.get("state") == "ACTIVE"
                     and active.get("asset_set_sha256") == expected_set):
-                raise _StepFailure("ACTIVE_SET_MISMATCH_AFTER_ACTIVATION" if activated
-                                   else "ACTIVE_SET_CHANGED_SINCE_PLAN")
+                raise _StepFailure("ACTIVE_SET_CHANGED_SINCE_PLAN")
             self._update(run, state="submitting")
             started = self.monotonic() if os.environ.get("PLASMA_M0_TIMING") == "1" else None
             try:
@@ -1603,6 +1680,11 @@ class BundleProgrammingWorkflow:
                     _m0_timing("manager_presubmit_readiness", run_id=run.run_id,
                                plan_id=plan.plan_id, ppu_alias=run.alias, site_id=run.site,
                                duration_ms=round((self.monotonic() - started) * 1000, 3))
+            # U4: this one readiness read, immediately before the single
+            # submission, is the run's preflight. An earlier identical read
+            # (two PPU HTTP calls and one full Active Set verification per
+            # attempt) proved nothing this one does not prove later.
+            self._step(run, "PREFLIGHT", "PASS")
             # The PPU itself must prove the Resources the Job is bound to.
             report = ready.get("active_resources")
             if not (isinstance(report, dict) and report.get("state") == "VERIFIED"
@@ -1610,11 +1692,10 @@ class BundleProgrammingWorkflow:
                     and report.get("resource_set_sha256") == plan.resource_set_sha256
                     and ready.get("ppu_id") == plan.binding["ppu_id"]):
                 raise _StepFailure("RESOURCE_IDENTITY_NOT_CONFIRMED")
-            if not activated:
-                self._step(run, "RESOURCE_REUSE", "PPU_VERIFIED",
-                           asset_set_sha256=expected_set,
-                           resource_set_sha256=plan.resource_set_sha256,
-                           generation=report.get("generation"))
+            self._step(run, "RESOURCE_REUSE", "PPU_VERIFIED",
+                       asset_set_sha256=expected_set,
+                       resource_set_sha256=plan.resource_set_sha256,
+                       generation=report.get("generation"))
             job_id = self._submit_once(run, plan, client)
             self._update(run, state="running")
             job = self._poll_job(run, client, job_id)
@@ -1640,13 +1721,20 @@ class BundleProgrammingWorkflow:
                     pass  # failure latch prevents any subsequent Start
 
 
-    def _activate(self, run: _Run, plan: _Plan) -> None:
-        alias, archive = run.alias, plan.bundle.archive
-        digest = plan.bundle.archive_sha256
+    def _activate_bundle(self, alias: str, bundle: bundle_v3.ProgrammingBundle, *,
+                         step: Callable[..., None], began: Callable[[], None] = lambda: None,
+                         on_queued: Callable[[dict[str, Any]], None] = lambda _a: None) -> None:
+        """B1 upload -> B2 admit -> B3 activate one Bundle (never an FPGA load).
+
+        The one implementation of Manager-driven activation. A failure up to
+        B2 is definitive (``_StepFailure``); once B3 may have been submitted
+        a failure is ``_OutcomeUnknown`` and is never resubmitted.
+        """
+        archive, digest = bundle.archive, bundle.archive_sha256
         if not self.gate.try_begin_platform_launch(alias):
             raise _StepFailure("PPU_CONTROL_PLANE_BUSY", outcome="BLOCKED")
         try:
-            self._update(run, state="activating")
+            began()
             try:
                 status, created = self.coordinator.create_upload(
                     alias, {"size": len(archive), "sha256": digest})
@@ -1667,7 +1755,7 @@ class BundleProgrammingWorkflow:
                 if status != 200 or not isinstance(got, dict) or got.get("state") != "committed" \
                         or got.get("sha256") != digest:
                     raise _StepFailure("B1_COMMIT_REJECTED")
-                self._step(run, "B1_UPLOAD", "PASS", upload_id=upload_id, size=len(archive))
+                step("B1_UPLOAD", "PASS", upload_id=upload_id, size=len(archive))
                 status, admitted = self.coordinator.start_deployment(
                     alias, {"kind": "bundle", "upload_id": upload_id, "archive_sha256": digest})
                 b2 = admitted.get("deployment") if isinstance(admitted, dict) else None
@@ -1675,7 +1763,7 @@ class BundleProgrammingWorkflow:
                         or type(b2.get("transaction_id")) is not str:
                     raise _StepFailure("B2_ADMISSION_REJECTED")
                 admission_tx = b2["transaction_id"]
-                self._step(run, "B2_ADMIT", "PASS", transaction_id=admission_tx)
+                step("B2_ADMIT", "PASS", transaction_id=admission_tx)
             except _StepFailure:
                 raise
             except Exception as exc:  # B1/B2 never activate anything: definitive failure.
@@ -1692,10 +1780,9 @@ class BundleProgrammingWorkflow:
             if status not in (200, 202) or not isinstance(b3, dict) or type(b3.get("transaction_id")) is not str:
                 raise _OutcomeUnknown("B3_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT")
             b3_tx = b3["transaction_id"]
-            self._update(run, activation={"upload_id": upload_id, "admission_transaction_id": admission_tx,
-                                          "b3_transaction_id": b3_tx, "mode": "activate",
-                                          "fpga_load": False})
-            self._step(run, "B3_SUBMIT", "QUEUED", transaction_id=b3_tx)
+            on_queued({"upload_id": upload_id, "admission_transaction_id": admission_tx,
+                    "b3_transaction_id": b3_tx, "mode": "activate", "fpga_load": False})
+            step("B3_SUBMIT", "QUEUED", transaction_id=b3_tx)
         finally:
             self.gate.end_platform_launch(alias)
         deadline = self.monotonic() + self.deployment_deadline_s
@@ -1712,7 +1799,7 @@ class BundleProgrammingWorkflow:
                 result = deployment.get("result")
                 if not isinstance(result, dict) or result.get("result") != "PASS":
                     raise _OutcomeUnknown("B3_SUCCESS_EVIDENCE_MISSING")
-                self._step(run, "B3_ACTIVATE", "PASS", transaction_id=b3_tx)
+                step("B3_ACTIVATE", "PASS", transaction_id=b3_tx)
                 return
             if state in ("failed",):
                 raise _StepFailure("B3_FAILED")
@@ -1896,12 +1983,27 @@ class BundleProgrammingWorkflow:
         steps = evidence.get("steps") if isinstance(evidence.get("steps"), dict) else {}
         echo = job.get("job_binding") if isinstance(job.get("job_binding"), dict) else {}
         binding = plan.binding
+        job_range = binding["range"]
+        binding_confirmed = (
+            echo.get("job_binding_sha256") == plan.binding_sha256
+            and echo.get("resource_set_sha256") == plan.resource_set_sha256
+            and echo.get("image_asset_sha256") == binding["image_asset_sha256"]
+            and echo.get("operation") == plan.operation
+            and echo.get("operations") == plan.operations
+            and echo.get("range") == job_range
+            and echo.get("site_id") == run.site
+            and echo.get("ppu_id") == binding["ppu_id"])
+        # A refused run carries no details and no Worker result: its
+        # structured safety statement is the only evidence (never the code).
+        safety = (None if evidence or failure
+                  else _job_site_safety(run, plan, job, result, binding_confirmed))
+        if safety == FAILED_SAFE_OFF_VERIFIED:
+            safe_off = True
         expected_sha = None if plan.image is None else bundle_v3.sha256_hex(plan.image)
         expected_size = None if plan.image is None else len(plan.image)
         # The Job Binding range is the write window; flash_base is only the
         # bank start. The PPU reports the range it actually executed.
         unit = plan.route.flash_profile["erase_granularity"]
-        job_range = binding["range"]
         address, length = job_range["address"], job_range["length"]
         erase_length = -(-length // unit) * unit
         operations = plan.operations
@@ -1979,10 +2081,18 @@ class BundleProgrammingWorkflow:
             "observed_image_asset_sha256": echo.get("image_asset_sha256"),
             "active_asset_set_sha256": echo.get("asset_set_sha256"),
             "active_generation": echo.get("generation"),
-            "resource_reuse": not plan.payload["activation_required"],
+            "resource_reuse": True,
             "safe_off": safe_off,
             "safe_off_source": ("site_worker_failure" if failure
-                                else "job_details" if evidence else None),
+                                else "job_details" if evidence
+                                else "site_worker_safety" if safety else None),
+            # The Site's end state, separate from the programming result:
+            # NOT_TOUCHED only for a trusted refusal before any hardware access.
+            "safe_off_state": (SAFE_OFF_VERIFIED if safe_off is True
+                               else SAFE_OFF_NOT_TOUCHED if safety == PRE_HARDWARE_DENIED
+                               else SAFE_OFF_NOT_VERIFIED),
+            "site_safety": ({"class": safety, "code": result["error"]["context"]
+                             ["site_worker_safety"]["code"]} if safety else None),
             "flash_result": failure.get("result") if failure else evidence.get("result"),
             "attempts": result.get("attempts"), "error": result.get("error"),
             "elapsed_ms": result.get("elapsed_ms"),
@@ -1998,14 +2108,7 @@ class BundleProgrammingWorkflow:
             (job.get("state") == "success" and result.get("state") == "success", "JOB_NOT_SUCCESS"),
             (job.get("site_id") == run.site and job.get("operation") == plan.operation,
              "JOB_IDENTITY_MISMATCH"),
-            (echo.get("job_binding_sha256") == plan.binding_sha256
-             and echo.get("resource_set_sha256") == plan.resource_set_sha256
-             and echo.get("image_asset_sha256") == binding["image_asset_sha256"]
-             and echo.get("operation") == plan.operation
-             and echo.get("operations") == operations
-             and echo.get("range") == job_range
-             and echo.get("site_id") == run.site
-             and echo.get("ppu_id") == binding["ppu_id"], "JOB_BINDING_NOT_CONFIRMED"),
+            (binding_confirmed, "JOB_BINDING_NOT_CONFIRMED"),
             (image_ok, "IMAGE_IDENTITY_MISMATCH"),
             (result.get("attempts") == 1, "JOB_ATTEMPTS_NOT_ONE"),
         ]
@@ -2026,6 +2129,10 @@ class BundleProgrammingWorkflow:
             ]
         failed = [reason for ok, reason in checks if not ok]
         outcome = "PASS" if not failed else "FAIL"
+        if safety == PRE_HARDWARE_DENIED:
+            # Nothing was executed on the Site: not a programming FAIL and no
+            # Cycle result. The Batch pauses it for the operator (no resend).
+            outcome, failed = "BLOCKED", [SITE_DENIED_BEFORE_HARDWARE]
         if outcome == "PASS" and read_bytes is not None:
             try:
                 self._store_read_output(run, read_bytes)

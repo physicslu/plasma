@@ -142,6 +142,8 @@ class MockAdapter:
                 time.sleep(0.01)
         if b == "deny":
             raise worker.TransportDenied("ADMISSION_DENIED")
+        if b == "fail_safe":
+            raise worker.TransportFailed("OPERATION_TIMEOUT")
         if b == "unknown":
             raise worker.TransportUnknown("SAFE_OFF_NOT_VERIFIED")
         if b == "crash":
@@ -380,10 +382,42 @@ def test_denied_before_hardware_keeps_site_usable(rig):
     rig.adapter.behaviour = "deny"
     child = rig.package(PROBE2)
     s = rig.open(child)
-    assert rig.go(child) == [{"ok": False, "error": "TRANSPORT_DENIED:ADMISSION_DENIED"}]
+    # The refusal carries the Worker's structured statement for THIS Job,
+    # Site, session and stage; consumers judge it, never the code text.
+    assert rig.go(child) == [{"ok": False, "error": "TRANSPORT_DENIED:ADMISSION_DENIED",
+                              "safety": {
+        "schema": "plasma.ppu.site-safety.v1", "class": "PRE_HARDWARE_DENIED",
+        "job_id": JOB, "session_id": s["session_id"], "site": 2, "operation": "probe",
+        "stage": "run", "code": "ADMISSION_DENIED", "hardware_touched": False,
+        "safe_off": None}}]
     assert rig.client.close_session(s["session_id"])["sealed_sites"] == []
     assert rig.client.call("status")["sealed_sites"] == []
     assert not (rig.seals / "site2.sealed").exists()
+
+
+def test_failed_with_safe_off_verified_states_it_and_keeps_site_usable(rig):
+    rig.adapter.behaviour = "fail_safe"
+    child = rig.package(PROBE2)
+    s = rig.open(child)
+    [reply] = rig.go(child)
+    assert reply["error"] == "OPERATION_FAILED_SAFE:OPERATION_TIMEOUT"
+    assert reply["safety"] == {
+        "schema": "plasma.ppu.site-safety.v1", "class": "FAILED_SAFE_OFF_VERIFIED",
+        "job_id": JOB, "session_id": s["session_id"], "site": 2, "operation": "probe",
+        "stage": "run", "code": "OPERATION_TIMEOUT", "hardware_touched": True,
+        "safe_off": True}
+    assert rig.client.close_session(s["session_id"])["sealed_sites"] == []
+    assert not (rig.seals / "site2.sealed").exists()
+
+
+def test_refusals_before_the_adapter_carry_no_safety_statement(rig):
+    """SITE_BUSY / lease / session refusals prove nothing about the Site."""
+    child = rig.package(PROBE2)
+    rig.open(child)
+    rig.lease.clear()  # the Job lease ends before run: JOB_LEASE_NOT_HELD
+    [reply] = rig.go(child)
+    assert reply["ok"] is False and "safety" not in reply
+    assert rig.adapter.calls == []
 
 
 def test_guard_not_durable_prevents_all_hardware_operations(rig, monkeypatch):

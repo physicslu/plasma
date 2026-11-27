@@ -311,8 +311,8 @@ def test_retry_serializes_same_site_without_waiting_for_peer(tmp_path):
     assert batch["outcome"] == "PASS" and len(gateway.posts) == 3
 
 
-@pytest.mark.parametrize("mismatch", ["owner", "resource", "image", "activation"])
-def test_overlapping_run_requires_same_owner_resources_image_and_no_activation(tmp_path, mismatch):
+@pytest.mark.parametrize("mismatch", ["owner", "resource", "image"])
+def test_overlapping_run_requires_same_owner_resources_and_image(tmp_path, mismatch):
     h = Harness(tmp_path, (1, 2))
     h.start([one("z2", 1)])
     gateway = h.gateways["z2"]
@@ -325,10 +325,8 @@ def test_overlapping_run_requires_same_owner_resources_image_and_no_activation(t
             owner = "foreign-batch"
         elif mismatch == "resource":
             payload["resource"] = {**payload["resource"], "resource_set_sha256": "f" * 64}
-        elif mismatch == "image":
-            payload["image_asset"] = {**payload["image_asset"], "sha256": "f" * 64}
         else:
-            payload["activation_required"] = True
+            payload["image_asset"] = {**payload["image_asset"], "sha256": "f" * 64}
         with pytest.raises(ProgrammingError) as caught:
             h.workflow.start("z2", {"plan_id": payload["plan_id"], "confirm": "PROGRAM"}, execution_owner_id=owner)
         assert caught.value.code == "programming_run_in_progress" and len(gateway.posts) == 1

@@ -88,10 +88,19 @@ OWNER_PACKAGE = "package_action"
 OWNER_REST_JOB = "rest_job"
 
 
+#: Structured safety evidence attached to a refused ``run`` (see
+#: docs/architecture/site-safety-evidence-v1.md). The Runtime and the Manager
+#: judge it against the Job, Site, session and stage; never the code text alone.
+SAFETY_SCHEMA = "plasma.ppu.site-safety.v1"
+PRE_HARDWARE_DENIED = "PRE_HARDWARE_DENIED"
+FAILED_SAFE_OFF_VERIFIED = "FAILED_SAFE_OFF_VERIFIED"
+
+
 class SiteWorkerDenied(Exception):
-    def __init__(self, code: str):
+    def __init__(self, code: str, safety: dict[str, Any] | None = None):
         super().__init__(code)
         self.code = code
+        self.safety = safety
 
 
 class TransportDenied(Exception):
@@ -305,6 +314,22 @@ class SiteTransportAdapter(Protocol):
             operations: tuple[str, ...] | None = None) -> Mapping[str, Any]: ...
 
 
+def _safety(session: Any, site: int, operation: str, kind: str, code: str) -> dict[str, Any]:
+    """The Worker's own statement of why a refused ``run`` left the Site safe.
+
+    Issued ONLY on the two Adapter contracts that prove it: ``TransportDenied``
+    (refused before any SWD/MMIO/OpenOCD hardware access) and
+    ``TransportFailed`` / an unproven verify-only receipt (hardware was
+    touched, the native owner released and SAFE_OFF was verified). Every
+    other refusal carries no safety statement and stays unproven.
+    """
+    touched = kind != PRE_HARDWARE_DENIED
+    return {"schema": SAFETY_SCHEMA, "class": kind, "job_id": session.job_id,
+            "session_id": session.session_id, "site": site, "operation": operation,
+            "stage": "run", "code": code, "hardware_touched": touched,
+            "safe_off": True if touched else None}
+
+
 def _require(ok: bool, code: str) -> None:
     if not ok:
         raise SiteWorkerDenied(code)
@@ -472,6 +497,8 @@ class SiteWorkerCore:
                 return {"ok": True, "result": self._control(op, request, peer, event_sink)}
             return {"ok": True, "result": self._transport(op, request, peer)}
         except SiteWorkerDenied as exc:
+            if exc.safety is not None:
+                return {"ok": False, "error": exc.code, "safety": dict(exc.safety)}
             return {"ok": False, "error": exc.code}
 
     def _control(self, op: str, request: dict, peer: tuple[int, int, int],
@@ -808,11 +835,13 @@ class SiteWorkerCore:
             except TransportDenied as exc:
                 # Contract: Adapter refused before hardware was touched.
                 safe_to_clear_guard = True
-                raise SiteWorkerDenied("TRANSPORT_DENIED:" + exc.code) from None
+                raise SiteWorkerDenied("TRANSPORT_DENIED:" + exc.code, _safety(
+                    s, site, op, PRE_HARDWARE_DENIED, exc.code)) from None
             except TransportFailed as exc:
                 # Contract: native owner release and SAFE_OFF verified.
                 safe_to_clear_guard = True
-                raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + exc.code) from None
+                raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + exc.code, _safety(
+                    s, site, op, FAILED_SAFE_OFF_VERIFIED, exc.code)) from None
             except TransportUnknown as exc:
                 self._seal(site, exc.code, s)
                 raise SiteWorkerDenied("OUTCOME_UNKNOWN_SITE_SEALED:" + exc.code) from None
@@ -858,7 +887,8 @@ class SiteWorkerCore:
             safe_to_clear_guard = True
             if unproven is not None:
                 # verify-only / read never write: SAFE_OFF is proven, the result is not.
-                raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + unproven)
+                raise SiteWorkerDenied("OPERATION_FAILED_SAFE:" + unproven, _safety(
+                    s, site, op, FAILED_SAFE_OFF_VERIFIED, unproven))
             # A cancelled or invalidated Session must not claim Job PASS even
             # when its adapter eventually completes with proven SAFE_OFF.
             # Serialize the final decision against close/restart invalidation.

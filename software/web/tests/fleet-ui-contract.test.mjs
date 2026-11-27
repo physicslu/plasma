@@ -98,7 +98,8 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /productionSet\[facilityId\]\?\.\[ppuId\]/);
   assert.match(source, /const serverBatchState = batchSnapshot\?\.state \?\? null/);
   assert.match(source, /displayedBatchSelection = serverBatchRunning \? serverBatchMembership : batchSelection/);
-  assert.match(source, /label: "PROCESSED IC", value: manufacturing\.total/);
+  // Batch Statistics v1: PMode KPIs come from the shared statistics module.
+  assert.match(source, /const kpis = statisticsKpis\(statistics, formatBatchTime\(batchSnapshot, clockNow\), "production-sites"\);/);
   assert.doesNotMatch(source, /setBatchState/);
   assert.match(source, /Batch select \$\{active\.target\.display_name\}/);
   assert.match(source, /Batch select \$\{active\.target\.display_name\} \$\{siteLabel\(site\.id\)\}/);
@@ -136,18 +137,15 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(abortFunction, /cancelServerBatch\(/);
   assert.doesNotMatch(abortFunction, /ppu_id|site_id|cancelServerBatchPPU/);
 
-  assert.match(source, /site\.completed_rounds/);
-  assert.match(source, /site\.final_failures/);
-  assert.match(source, /const total = pass \+ fail/);
-  assert.doesNotMatch(source.slice(source.indexOf("const manufacturing = useMemo"), source.indexOf("const repeatValue")), /cancelled/);
-  assert.match(source, /label: "SITES"/);
-  assert.match(source, /label: "TOTAL IC"/);
-  assert.match(source, /label: "PROCESSED IC"/);
-  assert.match(source, /value: manufacturing\.total/);
-  assert.match(source, /label: "PASS"/);
-  assert.match(source, /label: "FAIL"/);
-  assert.match(source, /label: "YIELD"/);
-  assert.match(source, /label: "BATCH TIME"/);
+  const statistics = await fs.readFile(new URL("../app/programming/batch-statistics.ts", import.meta.url), "utf8");
+  assert.match(source, /snapshotStatistics\(\{\s*sites: batchSnapshot\.sites,/);
+  assert.match(statistics, /site\.pass_rounds \?\? site\.completed_rounds/);
+  assert.match(statistics, /site\.final_failures/);
+  assert.doesNotMatch(statistics.slice(statistics.indexOf("export function snapshotStatistics"), statistics.indexOf("export function passRate")), /cancelled/);
+  for (const label of ["SITES", "TOTAL IC", "PROCESSED IC", "PASS IC", "FAIL IC", "YIELD", "BATCH TIME",
+    "PHYSICAL IC", "TOTAL CYCLES", "SETTLED CYCLES", "PASS CYCLES", "FAIL CYCLES", "CYCLE PASS RATE"]) {
+    assert.match(statistics, new RegExp(`label: "${label}"`));
+  }
   assert.match(source, /programmingJobCollapsed/);
   assert.match(source, /collapsed=\{programmingJobCollapsed\}/);
 

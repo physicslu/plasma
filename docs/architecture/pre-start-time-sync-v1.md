@@ -1,7 +1,7 @@
 # Pre-Start Time Synchronization v1
 
-This is a best-effort observation and correction before a managed Programming
-Run or the first Job of each PPU in a Manager Batch. It is not Programming
+This is a best-effort observation and correction before the first Job of each
+PPU in a Manager Batch, including a managed Single Run. It is not Programming
 Admission. `SYNCED` and `CORRECTED` are time-sync outcomes, never Flash PASS.
 
 ## Existing service audit
@@ -40,10 +40,9 @@ is changed.
 
 ## Trigger and exclusion
 
-The Manager journals acceptance before any PPU call. A standalone managed
-Run records one time-sync observation at the beginning of its execution,
-before B3 activation or Job submission. A Batch acquires each PPU's existing
-Resource Reservation and then its first Site lane makes one PPU-wide call;
+The Manager journals acceptance before any PPU call. The canonical Batch
+activates Resources before Reservation, then acquires each PPU's existing
+Resource Reservation. Its first Site lane makes one PPU-wide call before any Job;
 other lanes on that PPU share its result. Each PPU runs independently. Repeat,
 Retry, Continue, Job polling, and Direct/Unmanaged PPU Job APIs make no
 additional time-sync call. Direct/Unmanaged callers are not promised automatic
@@ -70,7 +69,7 @@ total command budget to 1000 ms (`PLASMA_PRESTART_TIME_SYNC_BUDGET_MS`,
 out subprocess is terminated, and the result is a warning. No `burst` or
 future-step command is issued that could intentionally step during a Batch.
 
-The existing Run/Batch journal records the status, PPU ID, source/service,
+The existing Batch journal records the status, PPU ID, source/service,
 measured offsets when available, elapsed time, adjustment flag, warning code,
 UTC observation time and dispersion. EMode and PMode show one log line per PPU
 through their existing Batch polling UI. No new Dashboard or settings page is

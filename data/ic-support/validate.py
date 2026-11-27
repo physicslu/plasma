@@ -128,7 +128,9 @@ def load_profiles(known_sources: set[str]) -> dict[str, dict[str, Any]]:
             require(kind == expected_kind, f"{path}: kind {kind!r} does not match directory {dirname!r}")
             require(kind in EXPECTED_KINDS, f"{path}: unsupported profile kind {kind!r}")
             status = profile.get("status")
-            require(isinstance(status, str) and status.startswith("pilot"), f"{path}: pilot status required")
+            # Source-reviewed profiles remain data inputs; only ProgrammingQualification can grant L2.
+            require(isinstance(status, str) and (status.startswith("pilot") or status == "reviewed_source_only"),
+                    f"{path}: pilot or reviewed_source_only status required")
             validate_evidence(profile, known_sources, pid)
             require(isinstance(profile.get("scope"), dict), f"{pid}: scope object is required")
             require(isinstance(profile.get("data"), dict), f"{pid}: data object is required")

@@ -405,6 +405,27 @@ Bundle-source denials happen at plan time, before any PPU contact.
 | `UNSUPPORTED` / unknown state | — | 409 `ppu_runtime_resource_identity_unsupported` |
 | status read fails | — | 503 `ppu_resource_identity_unknown` |
 
+**Where the decision is taken (U1, 2026-11-23).** A Manager Batch takes this
+table once per PPU in `ProgrammingBatchCoordinator._run_units`, **before** its
+Resource Reservation (`BundleProgrammingWorkflow.activate_batch_resource`):
+Reuse reads nothing more and hands its identity read to the Reservation; a
+B1/B2/B3 decision first asks the existing Platform gate and `target_block`
+(PPU released, no run, no lease, Site idle), then runs the one Manager
+activation (`_activate_bundle`, `fpga_load=false`) under the Platform launch
+gate. Every PPU is activated before any Reservation is acquired, so no
+Reservation TTL waits on another PPU's B3. The Reservation then re-derives the
+identity under the PPU's own lock (a change in between fails closed), and a
+held Reservation refuses the asset quiesce lease B3 needs, so no activation
+can happen inside a Batch run; a Batch plan that would need one is refused
+(`batch_resource_not_active`). A definite B1/B2/B3 failure blocks that PPU's
+Sites; a B3 whose outcome is unknown blocks them with failure domain
+`TARGET_TRANSACTION_UNKNOWN` and is never resubmitted. No DUT is touched in
+either case. The evidence is kept in the Batch's `resource_activation`.
+**U2:** the alias-scoped single run (`programming/plans` + `runs`) is retired
+(`410 programming_route_retired`); every programming and Read Memory Job is a
+Batch attempt, a plan never activates (`batch_resource_not_active`), and
+`_activate_bundle` has exactly one caller, the Batch.
+
 Activation needed but no Image (`erase`/`read`) → 409
 `resource_activation_requires_image`. Before submission the Manager requires
 the Bootstrap Active Set to be the activated archive (or, for reuse, the

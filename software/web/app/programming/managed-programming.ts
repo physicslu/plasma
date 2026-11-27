@@ -11,13 +11,12 @@ import { getManagerPpuBootstrap, sha256Hex, type ManagerBootstrapStatus } from "
 import {
   continueProgrammingBatch,
   getProgrammingBatch,
+  getProgrammingBatchCycles,
   getProgrammingRoutes,
   getProgrammingRun,
   getReadOutput,
   issueBatchStart,
-  planProgramming,
   SEQUENCE_OPERATIONS,
-  startProgramming,
   startProgrammingBatch,
   type BatchInput,
   type ProgrammingBatch,
@@ -33,6 +32,10 @@ import {
 } from "../engineering/bundle-programming-api";
 import { getManagerFleet, getManagerRegistry, type ManagerRegistryPayload } from "../engineering/ppu-registry-api";
 import type { FleetPPUView, FleetSiteView, FleetWebPayload } from "../fleet/fleet-contract";
+import {
+  batchStatistics, cycleHistoryReader, safeOffLabel, SITE_DENIED_BEFORE_HARDWARE, unitCycleTally,
+  type BatchStatistics, type CycleHistoryRecord,
+} from "./batch-statistics";
 
 export type { ProgrammingBatch, ProgrammingOperation, ProgrammingPlan, ProgrammingRoute, ProgrammingRun, ProgrammingSource, StopPolicy };
 
@@ -392,7 +395,11 @@ export function decideStartReconciliation(
   }
   const identity = answer.identity;
   if (identity) {
-    const wantedKind = hold.kind === "READ" ? "run" : "batch";
+    // U2: Read Memory is a Batch too. A READ hold taken before the upgrade
+    // named a run Start with its Job Binding, and still reconciles as that run.
+    const wantedKind = hold.kind === "READ" && hold.jobBindingSha256 != null ? "run" : "batch";
+    // A Batch start not yet admitted records no Operation of its own.
+    const admitted = !(answer.state === "ACCEPTANCE_PENDING" || answer.state === "NOT_ACCEPTED");
     const wantedSites = [...hold.siteIds].sort((left, right) => left - right);
     const recorded = recordedSites(identity, hold.alias);
     const sitesKnown = recorded !== null;
@@ -402,7 +409,7 @@ export function decideStartReconciliation(
       || (sitesKnown && JSON.stringify(recorded) !== JSON.stringify(wantedSites))
       // Only a Batch that was never admitted has no Site on record yet.
       || (!sitesKnown && !(wantedKind === "batch" && (answer.state === "ACCEPTANCE_PENDING" || answer.state === "NOT_ACCEPTED")))
-      || (hold.kind === "READ" && identity.operation !== "read")
+      || (hold.kind === "READ" && identity.operation !== "read" && (admitted || wantedKind === "run"))
       || (hold.kind === "PROGRAMMING" && identity.operation !== "programming")
       || (hold.jobBindingSha256 != null && identity.job_binding_sha256 !== hold.jobBindingSha256)) {
       return blocked("the Manager record does not match this PPU, Site, Operation or Job Binding");
@@ -446,27 +453,6 @@ function errorParts(reason: unknown): { status: number | null; code: string | nu
   };
 }
 
-async function observeRun(
-  alias: string,
-  started: ProgrammingRun,
-  events: ManagedRunEvents,
-  signal?: AbortSignal,
-): Promise<ProgrammingRun> {
-  let run = started;
-  while (run.outcome == null) {
-    await new Promise(resolve => setTimeout(resolve, MANAGED_POLL_MS));
-    if (signal?.aborted) return run;
-    try {
-      run = await getProgrammingRun(alias, run.run_id);
-      events.onRun?.(run);
-    } catch (reason) {
-      // Reads are safe to repeat; the run itself is never resubmitted.
-      events.onPollError?.(`${errorParts(reason).message}; the run was NOT resubmitted`);
-    }
-  }
-  return run;
-}
-
 export type ManagedReadRequest = { alias: string; siteId: number; icpn: string; address: number; length: number };
 export type ManagedReadResult = {
   run: ProgrammingRun;
@@ -477,50 +463,92 @@ export type ManagedReadResult = {
 };
 
 /**
- * Read Memory: an independent Job (never part of a Batch, never counted in
- * PASS / FAIL / Yield). Plan -> exactly one start -> observe -> fetch the
- * binary through the Manager and re-hash it against the receipt.
+ * Read Memory: its own one-Site, one-Cycle Batch (U2), separate from any
+ * programming Batch and never counted in its PASS / FAIL / Yield. Manager
+ * start -> exactly one Batch request -> observe -> fetch the binary through
+ * the Manager and re-hash it against the receipt. Nothing is ever resent.
  */
 export async function runManagedRead(
   request: ManagedReadRequest,
   events: ManagedRunEvents = {},
   signal?: AbortSignal,
 ): Promise<ManagedReadResult> {
-  let plan: ProgrammingPlan;
+  let startId: string;
   try {
-    plan = await planProgramming(request.alias, {
-      icpn: request.icpn, siteId: request.siteId, operation: "read",
-      address: request.address, length: request.length,
-    });
+    startId = await issueBatchStart(request.alias);
+    if (!/^[0-9a-f]{32}$/.test(startId)) throw new Error("the Manager issued no start ID");
   } catch (reason) {
     const { code, message } = errorParts(reason);
-    throw new ManagedProgrammingBlocked("plan", code, message);
+    throw new ManagedProgrammingBlocked("plan", code,
+      `The Manager did not issue a start ID (${message}); nothing was started.`);
   }
-  const range = plan.job_binding.range;
-  if (plan.ppu_alias !== request.alias || plan.site_id !== request.siteId || plan.operation !== "read"
-    || plan.operations != null || plan.source !== "range" || plan.image_asset != null
-    || plan.activation_required !== false || plan.fpga_load !== false
-    || plan.route.icpn !== request.icpn
-    || range.address !== request.address || range.length !== request.length) {
-    throw new ManagedProgrammingBlocked("plan", "plan_echo_mismatch",
-      "The Manager plan is not exactly this Read Memory request; nothing was started.");
-  }
-  events.onPlan?.(plan);
-  let run: ProgrammingRun;
+  const identity: StartIdentity = { startId, kind: "batch", siteIds: [request.siteId],
+    operation: "read", jobBindingSha256: null };
+  let batch: ProgrammingBatch;
   try {
-    run = await startProgramming(request.alias, plan.plan_id);
+    batch = await startProgrammingBatch({
+      icpn: request.icpn, alias: request.alias, siteIds: [request.siteId], operation: "read",
+      address: request.address, length: request.length,
+      retryLimit: 0, stopPolicy: { kind: "never" }, repeat: 1, replaceIc: true,
+    }, startId);
   } catch (reason) {
     const { status, code, message } = errorParts(reason);
+    // A 4xx is a definite refusal: no Batch exists and no Job was submitted.
     if (status != null && status >= 400 && status < 500) {
-      throw new ManagedProgrammingBlocked("start", code, message);
+      throw new ManagedProgrammingBlocked("plan", code, message);
     }
-    throw new ManagedStartOutcomeUnknown(plan.plan_id,
-      `The Read Memory start outcome is unknown (${message}). Nothing was resubmitted.`,
-      { startId: plan.plan_id, kind: "run", siteIds: [plan.site_id], operation: "read",
-        jobBindingSha256: plan.job_binding_sha256 });
+    throw new ManagedStartOutcomeUnknown(startId,
+      `The Read Memory start outcome is unknown (${message}). Nothing was resubmitted.`, identity);
   }
-  events.onRun?.(run);
-  run = await observeRun(request.alias, run, events, signal);
+  const [target] = batch.targets;
+  if (batch.start_id !== startId || batch.operation !== "read" || batch.operations != null
+    || batch.icpn !== request.icpn || batch.targets.length !== 1 || target.ppu_alias !== request.alias
+    || target.site_ids.length !== 1 || target.site_ids[0] !== request.siteId) {
+    throw new ManagedStartOutcomeUnknown(startId,
+      "The Manager Batch reply is not exactly this Read Memory request; do not resubmit.", identity);
+  }
+  let planned = false;
+  const observe = (next: ProgrammingBatch) => {
+    const run = next.current_run;
+    if (!run) return;
+    if (!planned && run.plan) {
+      const plan = run.plan;
+      const range = plan.job_binding.range;
+      if (plan.ppu_alias !== request.alias || plan.site_id !== request.siteId || plan.operation !== "read"
+        || plan.operations != null || plan.source !== "range" || plan.image_asset != null
+        || plan.activation_required !== false || plan.fpga_load !== false
+        || plan.route.icpn !== request.icpn
+        || range.address !== request.address || range.length !== request.length) {
+        throw new ManagedStartOutcomeUnknown(startId,
+          "The Manager plan is not exactly this Read Memory request; do not resubmit.", identity);
+      }
+      planned = true;
+      events.onPlan?.(plan);
+    }
+    events.onRun?.(run);
+  };
+  observe(batch);
+  while (batch.outcome == null) {
+    await new Promise(resolve => setTimeout(resolve, MANAGED_POLL_MS));
+    if (signal?.aborted) break;
+    try {
+      batch = await getProgrammingBatch(batch.batch_id);
+      observe(batch);
+    } catch (reason) {
+      if (reason instanceof ManagedStartOutcomeUnknown) throw reason;
+      events.onPollError?.(`${errorParts(reason).message}; the Read was NOT resubmitted`);
+    }
+  }
+  const run = batch.current_run;
+  if (!run) {
+    if (batch.outcome == null) {
+      throw new ManagedStartOutcomeUnknown(startId,
+        "Observation stopped before the Read Memory Job was visible; do not resubmit.", identity);
+    }
+    const reason = batch.units[0]?.reason ?? batch.reason ?? "read_not_submitted";
+    throw new ManagedProgrammingBlocked("plan", reason,
+      `The Read Memory Batch submitted no Job (${reason}); nothing was read.`);
+  }
   if (runVerdict(run).verdict !== "PASS") return { run, data: null, downloadError: null };
   const output = run.receipt?.read_output;
   try {
@@ -698,6 +726,8 @@ export function unitCycleLabel(unit: ProgrammingBatchUnit): string | null {
   const state = cycle.state === "AWAITING_CONTINUE"
     ? (cycle.wait_reason === "REPLACE_IC" ? "REPLACE IC · press Start"
       : cycle.wait_reason === "FAIL_REVIEW" ? "FAIL · replace IC · press Start"
+      : cycle.wait_reason === SITE_DENIED_BEFORE_HARDWARE
+        ? "BLOCKED · denied before hardware · not counted · press Start to re-run admission"
       : `WAITING · ${cycle.wait_reason ?? ""} · press Start`)
     : cycle.state === "ENDED" ? (cycle.disposition ?? "ENDED") : "RUNNING";
   return `Cycle ${Math.min(cycle.index, cycle.planned)}/${cycle.planned} · PASS ${cycle.pass} · FAIL ${cycle.fail}`
@@ -712,7 +742,7 @@ export function unitFailDetail(unit: ProgrammingBatchUnit): string | null {
   return [`Cycle ${last.cycle_index} FAIL`, last.reason, receipt?.job_id ? `Job ${receipt.job_id}` : null,
     receipt?.job_state ? `state ${receipt.job_state}` : null,
     receipt?.flash_result ? `result ${receipt.flash_result}` : null,
-    `SAFE_OFF ${receipt?.safe_off === true ? "verified" : "NOT verified"}`,
+    `SAFE_OFF ${safeOffLabel(receipt?.safe_off_state, receipt?.safe_off)}`,
     `${last.attempts} attempt${last.attempts === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
 }
 
@@ -735,53 +765,77 @@ export function batchSiteVerdict(
 ): { verdict: BatchVerdict; reason: string | null } {
   if (unit.outcome == null) return { verdict: "RUNNING", reason: null };
   if (unit.outcome !== "PASS") return { verdict: unit.outcome, reason: unit.reason };
-  const attempt = unit.attempts[unit.attempts.length - 1];
-  if (!attempt) return { verdict: "FAIL", reason: "ATTEMPT_RECORD_MISSING" };
-  const key = attempt.job_key;
-  const failed = attempt.outcome !== "PASS" ? "LAST_ATTEMPT_NOT_PASS"
-    // Site identity: the attempt must be the Manager's record of THIS Site of
-    // THIS PPU in THIS Batch, never another Site's evidence read across.
-    : key == null || key.ppu_alias !== unit.ppu_alias || key.site_id !== unit.site_id
-      || key.batch_id !== batch.batch_id ? "ATTEMPT_IDENTITY_MISMATCH"
-    : attempt.safe_off !== true ? "SAFE_OFF_NOT_VERIFIED"
-    : !attempt.job_binding_sha256 ? "JOB_BINDING_MISSING"
-    : !attempt.run_id ? "RUN_ID_MISSING"
-    : null;
-  if (failed) return { verdict: "FAIL", reason: failed };
-  if (run) {
-    const judged = runVerdict(run);
-    if (judged.verdict !== "PASS") return { verdict: "FAIL", reason: judged.reason ?? "LAST_RUN_NOT_PASS" };
-    if (run.ppu_alias !== unit.ppu_alias || run.site_id !== unit.site_id
-      || JSON.stringify(run.receipt?.operations) !== JSON.stringify(batch.operations)) {
-      return { verdict: "FAIL", reason: "RUN_DOES_NOT_MATCH_BATCH" };
-    }
-  }
-  return { verdict: "PASS", reason: null };
+  return attemptVerdict(batch, unit, run);
 }
 
 /**
- * Batch verdict, derived from the Sites and never instead of them.
- *
- * The Manager's aggregate is necessary but not sufficient: a PASS also needs
- * EVERY Site to pass `batchSiteVerdict`, and the Browser only ever holds the
- * run of the latest attempt, so a Site whose run it cannot see is not proven.
- * Worst wins, in the Manager's own priority order.
+ * The verdict of one Site's LAST attempt (Run Outcome), whatever the Site
+ * lane is doing: a Repeat lane stays open (RUNNING / AWAITING_CONTINUE) after
+ * a Cycle's run has passed. A PASS attempt passes only with the evidence
+ * `batchSiteVerdict` requires of a PASS Site - the same checks, not a copy.
  */
+export function attemptVerdict(
+  batch: ProgrammingBatch, unit: ProgrammingBatchUnit, run: ProgrammingRun | null,
+): { verdict: RunVerdict; reason: string | null } {
+  const attempt = unit.attempts[unit.attempts.length - 1];
+  if (!attempt) return { verdict: "FAIL", reason: "ATTEMPT_RECORD_MISSING" };
+  if (attempt.outcome == null) return { verdict: "RUNNING", reason: null };
+  // U9: the Manager judged the receipt (SAFE_OFF, Binding, Resources,
+  // readback, operations); its outcome is the verdict. The Browser checks only
+  // that the record it shows is THIS Site of THIS PPU in THIS Batch, so no
+  // other Site's evidence is ever displayed as this one's.
+  const key = attempt.job_key;
+  if (key == null || key.ppu_alias !== unit.ppu_alias || key.site_id !== unit.site_id
+      || key.batch_id !== batch.batch_id
+      || (run != null && (run.ppu_alias !== unit.ppu_alias || run.site_id !== unit.site_id))) {
+    return { verdict: "FAIL", reason: "ATTEMPT_IDENTITY_MISMATCH" };
+  }
+  return { verdict: attempt.outcome, reason: attempt.reason };
+}
+
+/** Batch verdict: the Manager's aggregate (U9: the Manager is the authority). */
 export function batchVerdict(batch: ProgrammingBatch): { verdict: BatchVerdict; reason: string | null } {
   if (batch.outcome == null) return { verdict: "RUNNING", reason: null };
-  if (batch.outcome !== "PASS" && batch.outcome !== "PARTIAL") {
-    return { verdict: batch.outcome, reason: batch.reason };
-  }
-  const order: BatchVerdict[] = ["OUTCOME_UNKNOWN", "FAIL", "BLOCKED", "PARTIAL", "RUNNING", "PASS"];
-  let worst: { verdict: BatchVerdict; reason: string | null } = { verdict: "PASS", reason: null };
+  return { verdict: batch.outcome, reason: batch.reason };
+}
+
+/**
+ * Batch Statistics v1 of a Manager Batch - the one projection both Consoles
+ * show. Cycles come from each Site's Manager counters (a one-Cycle Site from
+ * its verified verdict); Job / Retry attempts are the Manager's cumulative
+ * totals, never the current Cycle's attempt list.
+ */
+export function managedBatchStatistics(batch: ProgrammingBatch): BatchStatistics {
+  // U9: the Manager's own Cycle counters, never a second tally in the Browser.
+  const tally = { settled: 0, pass: 0, fail: 0 };
   for (const unit of batch.units) {
-    const judged = batchSiteVerdict(batch, unit, runOfUnit(batch, unit));
-    if (order.indexOf(judged.verdict) < order.indexOf(worst.verdict)) worst = judged;
+    const site = unitCycleTally(unit.cycle, unit.outcome ?? "RUNNING");
+    tally.settled += site.settled;
+    tally.pass += site.pass;
+    tally.fail += site.fail;
   }
-  if (batch.outcome === "PARTIAL" && worst.verdict === "PASS") {
-    return { verdict: "PARTIAL", reason: batch.reason };
-  }
-  return worst;
+  return batchStatistics({
+    sites: batch.units.length,
+    repeat: batch.policy.repeat,
+    replaceIc: batch.policy.replace_ic_before_next_cycle ?? true,
+    tally: batch.cycles ? { settled: batch.cycles.settled, pass: batch.cycles.pass, fail: batch.cycles.fail } : tally,
+    jobAttempts: batch.cycles?.attempts ?? batch.counts.attempts,
+    retryAttempts: batch.cycles?.retry_attempts
+      ?? batch.units.reduce((total, unit) => total + Math.max(0, unit.attempts.length - 1), 0),
+    sitesCompleted: batch.cycles?.sites_completed
+      ?? batch.units.filter(unit => unit.outcome != null).length,
+  });
+}
+
+/**
+ * Incremental reader of one Batch's Cycle History through the BFF: each
+ * record once, in Manager order, resuming at its cursor after missed polls
+ * or a reconnect. A new reader (browser refresh) rebuilds from the start.
+ */
+export function managedCycleHistory(
+  batchId: string, deliver: (record: CycleHistoryRecord) => void,
+) {
+  return cycleHistoryReader((offset, limit) => getProgrammingBatchCycles(batchId, offset, limit), deliver);
 }
 
 /**
@@ -828,32 +882,14 @@ export function loadUnitRun(
 export type RunVerdict = "RUNNING" | "PASS" | "FAIL" | "BLOCKED" | "OUTCOME_UNKNOWN";
 
 /**
- * UI verdict. PASS needs the Manager outcome AND a receipt that proves a single
- * submission, verified SAFE_OFF, the bound Job Binding / Resources and, when an
- * Image was written, a matching readback. Anything short of that is not PASS.
+ * UI verdict of one run: the Manager's outcome. The Manager accepts a PASS
+ * only with its full receipt proof (single submission, verified SAFE_OFF,
+ * confirmed Job Binding / Resources, readback, operations, Read output);
+ * U9 removed the Browser's second copy of those checks.
  */
 export function runVerdict(run: ProgrammingRun): { verdict: RunVerdict; reason: string | null } {
   if (run.outcome == null) return { verdict: "RUNNING", reason: null };
-  if (run.outcome !== "PASS") return { verdict: run.outcome, reason: run.reason };
-  const receipt = run.receipt;
-  const failed = !receipt ? "RECEIPT_MISSING"
-    : receipt.safe_off !== true ? "SAFE_OFF_NOT_VERIFIED"
-    : run.job_submission_count !== 1 ? "JOB_SUBMISSION_COUNT_NOT_ONE"
-    : run.auto_retry !== "DISABLED" ? "AUTO_RETRY_NOT_DISABLED"
-    : !receipt.job_id ? "JOB_ID_MISSING"
-    : receipt.observed_job_binding_sha256 !== receipt.expected_job_binding_sha256 ? "JOB_BINDING_NOT_CONFIRMED"
-    : receipt.observed_resource_set_sha256 !== receipt.expected_resource_set_sha256 ? "RESOURCE_SET_NOT_CONFIRMED"
-    // A readback is owed only when the Job verifies: the legacy cycle or a list with Verify.
-    : receipt.operations?.includes("verify")
-      && (receipt.expected_image_sha256 == null || receipt.readback_sha256 !== receipt.expected_image_sha256)
-      ? "READBACK_SHA256_MISMATCH"
-    : receipt.operation === "programming"
-      && JSON.stringify(receipt.observed_operations) !== JSON.stringify(receipt.operations)
-      ? "OPERATIONS_NOT_CONFIRMED"
-    : receipt.operation === "read" && receipt.read_output?.available !== true
-      ? "READ_OUTPUT_UNAVAILABLE"
-    : null;
-  return failed ? { verdict: "FAIL", reason: failed } : { verdict: "PASS", reason: null };
+  return { verdict: run.outcome, reason: run.reason };
 }
 
 /** Real Manager / PPU progress only; null when the PPU has not reported any. */
@@ -906,7 +942,7 @@ export function unitStageStatuses(batch: ProgrammingBatch, unit: ProgrammingBatc
   for (const event of events) {
     if (event.attempt !== jobAttempt) continue; // PPU retries have separate Sessions.
     if (event.job_id !== jobId || event.site_id !== unit.site_id
-        || !batch.operations.includes(event.stage)
+        || !(batch.operations ?? []).includes(event.stage)
         || !event.session_id || (session !== null && session !== event.session_id)
         || event.sequence !== sequence + 1) break;
     session = event.session_id;
@@ -920,7 +956,8 @@ export function unitStageStatuses(batch: ProgrammingBatch, unit: ProgrammingBatc
   // Old Manager/PPU snapshots have no event list; their terminal Receipt is
   // still authoritative and no in-flight stage is invented.
   const verdict = batchSiteVerdict(batch, unit, held).verdict;
-  return batch.operations.map(name => {
+  // A Read Memory Batch (operations null) has no E/P/V stage rows.
+  return (batch.operations ?? []).map(name => {
     const event = states[name];
     const state = verdict === "PASS" ? "completed"
       : event === "completed" ? "completed"

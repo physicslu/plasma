@@ -9,6 +9,10 @@ import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
 import { PROGRAMMING_SOURCE_ACCEPT } from "../operator-ui/programming-source-selector";
 import { programmingRunLogLines, safeOffLogLabel } from "../programming/programming-run-log";
 import {
+  batchStatistics, cycleHistoryLogLines, statisticsKpis, statisticsLogLine, statisticsMeta,
+  type CycleHistoryRecord,
+} from "../programming/batch-statistics";
+import {
   awaitingUnits,
   batchSiteVerdict,
   batchVerdict,
@@ -16,6 +20,8 @@ import {
   continueMarkKey,
   sitesToContinue,
   loadAttemptRun,
+  managedBatchStatistics,
+  managedCycleHistory,
   runOfUnit,
   describeBlocked,
   loadManagedTopology,
@@ -705,6 +711,22 @@ export default function ManagedProgrammingWorkspace() {
     abortRef.current = abort;
     // Run receipts read by run_id log before the Site and Batch results.
     const pendingRunLogs: Promise<void>[] = [];
+    // Cycle History: settled Cycles the live attempt list no longer holds.
+    const history: { reader: ReturnType<typeof managedCycleHistory> | null; settled: number } = {
+      reader: null, settled: -1,
+    };
+    const logHistoryRecord = (record: CycleHistoryRecord, repeat: number, retryLimit: number) => {
+      const label = siteLabel(record.site_id);
+      for (const line of cycleHistoryLogLines(record, repeat, label, attempt => {
+        // An attempt the live poll already logged as finished is not repeated.
+        const key = `${record.site_id}:${record.cycle_index ?? 1}:${attempt.attempt}`;
+        if (loggedAttempts.current.get(key) === "finished") return false;
+        loggedAttempts.current.set(key, "finished");
+        return true;
+      })) {
+        appendLog(line.text.replace(/^\[ATTEMPT (\d+)\]/, `[ATTEMPT $1/${retryLimit + 1}]`), line.failed, "PPU");
+      }
+    };
     // The [PLAN] detail of one Site attempt, once, labelled with that Site.
     const logPlan = (siteRun: ProgrammingRun, planId: string) => {
       const planned = siteRun.plan;
@@ -737,6 +759,16 @@ export default function ManagedProgrammingWorkspace() {
                 ? "never"
                 : `${next.policy.stop_policy.threshold} failed Site(s)`}`, false, "BAT");
           }
+          if (!history.reader && next.policy.repeat > 1) {
+            const repeat = next.policy.repeat, retryLimit = next.policy.retry_limit;
+            history.reader = managedCycleHistory(next.batch_id, record => logHistoryRecord(record, repeat, retryLimit));
+          }
+          // Read only what was appended: on a newly settled Cycle or the end.
+          const settledNow = next.cycles?.settled ?? 0;
+          if (history.reader && (settledNow !== history.settled || next.outcome != null)) {
+            history.settled = settledNow;
+            void history.reader.sync().catch(() => undefined);
+          }
           setBatch(next);
           for (const [alias, observation] of Object.entries(next.time_sync ?? {})) {
             const key = `${next.batch_id}:${alias}`;
@@ -754,7 +786,8 @@ export default function ManagedProgrammingWorkspace() {
           // in the Log and in Receipts & Diagnostics, not in a standing panel.
           for (const attempt of next.attempts) {
             const attemptSite = attempt.job_key.site_id;
-            const attemptKey = `${attemptSite}:${attempt.cycle_index ?? 1}:${attempt.attempt}`;
+            // plan_id: a Cycle re-run after a BLOCKED pause restarts at attempt 1.
+            const attemptKey = `${attemptSite}:${attempt.cycle_index ?? 1}:${attempt.attempt}:${attempt.plan_id}`;
             const cycleLabel = next.policy.repeat > 1 ? ` Cycle ${attempt.cycle_index ?? 1}/${next.policy.repeat}` : "";
             const attemptLabel = `[ATTEMPT ${attempt.attempt}/${next.policy.retry_limit + 1}]${cycleLabel} ${siteLabel(attemptSite)}`;
             const seen = loggedAttempts.current.get(attemptKey);
@@ -768,16 +801,17 @@ export default function ManagedProgrammingWorkspace() {
             if (attempt.outcome && seen !== "finished") {
               loggedAttempts.current.set(attemptKey, "finished");
               const retry = attempt.retry ? ` · ${attempt.retry.decision === "RETRY" ? "RETRY" : "NO RETRY"} (${attempt.retry.reason})` : "";
-              appendLog(`${attemptLabel} · ${attempt.outcome.replace("_", " ")}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"} · SAFE_OFF ${safeOffLogLabel(attempt.safe_off, true)}${retry}`,
+              appendLog(`${attemptLabel} · ${attempt.outcome.replace("_", " ")}${attempt.reason ? ` · ${attempt.reason}` : ""} · Run ${attempt.run_id ?? "—"} · Job ${attempt.job_id ?? "—"} · SAFE_OFF ${safeOffLogLabel(attempt.safe_off, true, attempt.safe_off_state)}${retry}`,
                 attempt.outcome !== "PASS", "PPU");
               // The Log is the only on-screen operation record: the Manager run
               // identities and its Receipt summary, never the whole JSON Receipt.
               // Concurrent lanes: this attempt's run may not be the Batch's
               // current_run, so it is read from the Manager by its run_id.
-              const failed = attempt.outcome !== "PASS";
               pendingRunLogs.push(loadAttemptRun(next, request.alias, attemptSite, attempt.run_id).then(finishedRun => {
                 if (!finishedRun) return;
                 logPlan(finishedRun, attempt.plan_id);
+                // A Manager PASS whose Receipt fails `runVerdict` is an error line, as in PMode.
+                const failed = attempt.outcome !== "PASS" || runVerdict(finishedRun).verdict !== "PASS";
                 for (const line of programmingRunLogLines(finishedRun, {
                   executionInterface: interfaceOf(finishedRun.site_id),
                 })) {
@@ -790,23 +824,28 @@ export default function ManagedProgrammingWorkspace() {
         onPollError: message => setStatusNote(message),
       }, abort.signal);
       await Promise.allSettled(pendingRunLogs);
+      // Every settled Cycle reaches the Log from the Manager's Cycle History,
+      // including Cycles that started and finished between two polls.
+      await history.reader?.sync().catch(() => appendLog("[CYCLE HISTORY] not loaded from the Manager; the Manager keeps it", true, "PPU"));
       const { verdict, reason } = batchVerdict(final);
       for (const unit of final.units) {
         const site = batchSiteVerdict(final, unit, runOfUnit(final, unit));
+        const cycle = unit.cycle;
         appendLog(`[SITE RESULT] ${siteLabel(unit.site_id)} · ${site.verdict.replace("_", " ")}${site.reason ? ` · ${site.reason}` : ""}${
-          unit.failure_domain ? ` · ${unit.failure_domain}` : ""} · ${unit.attempts.length} attempt(s)`,
+          unit.failure_domain ? ` · ${unit.failure_domain}` : ""}${cycle && cycle.planned > 1
+          ? ` · Cycles PASS ${cycle.pass} · FAIL ${cycle.fail} · settled ${cycle.settled}/${cycle.planned}` : ""} · ${
+          cycle?.attempts ?? unit.attempts.length} attempt(s) · Retry ${cycle?.retry_attempts ?? Math.max(0, unit.attempts.length - 1)}`,
           site.verdict !== "PASS", "PPU");
       }
+      const stats = managedBatchStatistics(final);
+      // Site final outcomes (one per Site) and Cycle / attempt totals are
+      // separate numbers: a stopped Site may be PARTIAL with PASS Cycles.
       appendLog(`[RESULT] ${verdict.replace("_", " ")}${reason ? ` · ${reason}` : ""} · Batch ${final.batch_id} · ${
-        final.counts.sites} Site(s) · PASS ${final.counts.pass} · FAIL ${final.counts.fail} · BLOCKED ${
-        final.counts.blocked} · UNKNOWN ${final.counts.unknown} · ${final.attempts.length} attempt(s) · one IC per Site`,
+        final.counts.sites} Site(s) · Site final PASS ${final.counts.pass} · FAIL ${final.counts.fail} · PARTIAL ${
+        final.counts.partial ?? 0} · BLOCKED ${final.counts.blocked} · UNKNOWN ${final.counts.unknown} · Job Attempts ${
+        stats.jobAttempts ?? "—"} · Retry ${stats.retryAttempts ?? "—"}`,
         verdict !== "PASS", "PPU");
-      if (final.cycles && final.policy.repeat > 1) {
-        appendLog(`[CYCLES] planned ${final.cycles.planned} · settled ${final.cycles.settled} · PASS ${final.cycles.pass} · FAIL ${
-          final.cycles.fail} · Retry ${final.cycles.retry_attempts} · remaining ${final.cycles.remaining}${
-          final.policy.replace_ic_before_next_cycle ? "" : " · same-IC Debug: PASS Cycles are not distinct ICs"}`,
-          final.cycles.fail > 0 || final.cycles.remaining > 0, "PPU");
-      }
+      appendLog(statisticsLogLine(stats), stats.failCycles > 0 || stats.remainingCycles > 0, "PPU");
       if (final.outcome === "OUTCOME_UNKNOWN" && final.current_run) setUnresolved(final.current_run);
     } catch (reason) {
       if (reason instanceof ManagedProgrammingBlocked) {
@@ -899,7 +938,7 @@ export default function ManagedProgrammingWorkspace() {
       abortRef.current = abort;
       setReadPhase("planning");
       appendLog(`[READ] START · PPU ${alias} · ${label} · ${icpn} · ${hex(address)} + ${length} B (whole Flash) · ${
-        handle ? `save to ${handle.name}` : "Browser download"} · independent Job, not part of the Batch`, false, "USR");
+        handle ? `save to ${handle.name}` : "Browser download"} · its own one-Site Batch, not part of the programming Batch`, false, "USR");
       const result = await runManagedRead({ alias, siteId: id, icpn, address, length }, {
         onPlan: next => appendLog(`[READ] PLAN ${next.plan_id} · Route ${next.route.route_id} · Job Binding SHA256 ${next.job_binding_sha256}`, false, "DAT"),
         onRun: next => setReadPhase(next.outcome == null ? "running" : "saving"),
@@ -908,7 +947,7 @@ export default function ManagedProgrammingWorkspace() {
       const { verdict, reason } = runVerdict(result.run);
       const output = result.run.receipt?.read_output ?? null;
       appendLog(`[READ] ${verdict.replace("_", " ")}${reason ? ` · ${reason}` : ""} · ${label} · Run ${result.run.run_id} · Job ${result.run.receipt?.job_id ?? "—"} · SAFE_OFF ${
-        result.run.receipt?.safe_off === true ? "VERIFIED" : "NOT VERIFIED"}${
+        safeOffLogLabel(result.run.receipt?.safe_off, true, result.run.receipt?.safe_off_state)}${
         output ? ` · ${output.bytes} B · SHA256 ${output.sha256 ?? "—"}` : ""}${result.downloadError ? ` · binary rejected: ${result.downloadError}` : ""}`,
         verdict !== "PASS" || Boolean(result.downloadError), "PPU");
       if (result.run.outcome === "OUTCOME_UNKNOWN") setUnresolved(result.run);
@@ -974,25 +1013,9 @@ export default function ManagedProgrammingWorkspace() {
     }
   }
 
-  // One Site is one IC: counted once by its own final verdict, whatever the
-  // attempts. The Batch verdict is the aggregate and never a Site's result.
+  // The Batch verdict is the aggregate and never a Site's result.
   const verdict = batch ? batchVerdict(batch).verdict : null;
-  const siteVerdicts = batch
-    ? batch.units.map(unit => batchSiteVerdict(batch, unit, runOfUnit(batch, unit)).verdict)
-    : [];
-  const pass = siteVerdicts.filter(item => item === "PASS").length;
-  const fail = siteVerdicts.filter(item => item === "FAIL").length;
-  const siteCount = batch ? batch.counts.sites : (runContext?.siteIds.length ?? siteIds.length);
   const elapsed = runContext ? (runContext.finishedAt ?? clock) - runContext.startedAt : null;
-  const kpis = [
-    { key: "sites", label: "SITES", value: siteCount },
-    { key: "total-ic", label: "TOTAL IC", value: siteCount },
-    { key: "processed-ic", label: "PROCESSED IC", value: pass + fail },
-    { key: "pass", label: "PASS", value: pass, tone: "pass" as const },
-    { key: "fail", label: "FAIL", value: fail, tone: "fail" as const },
-    { key: "yield", label: "YIELD", value: pass + fail > 0 ? `${((pass / (pass + fail)) * 100).toFixed(1)}%` : "—", tone: "info" as const },
-    { key: "batch-time", label: "BATCH TIME", value: formatElapsed(elapsed) },
-  ];
   const sourceLabel = source === "bundle" ? "Bundle" : "Image";
   const imageName = file?.name
     ?? (source === "bundle" ? "Select canonical Bundle v3 (.zip)..." : "Select programming image (.bin)...");
@@ -1006,6 +1029,16 @@ export default function ManagedProgrammingWorkspace() {
   const repeatParsed = /^\d+$/.test(repeatCount.trim()) ? Number(repeatCount.trim()) : NaN;
   const repeatValue = Number.isSafeInteger(repeatParsed) && repeatParsed >= 1 && repeatParsed <= MAX_REPEAT
     ? repeatParsed : null;
+  // Batch Statistics v1, shared with PMode: Replace IC is IC-oriented with
+  // YIELD; Same-IC Debug is Cycle-oriented with a Cycle PASS rate, no YIELD.
+  const statistics = batch
+    ? managedBatchStatistics(batch)
+    : batchStatistics({
+      sites: runContext?.siteIds.length ?? siteIds.length,
+      repeat: repeatValue ?? 1,
+      replaceIc,
+    });
+  const kpis = statisticsKpis(statistics, formatElapsed(elapsed));
   const waiting = awaitingUnits(batch);
   const continuing = batch ? sitesToContinue(
     waiting.map(unit => ({ unit, alias: unit.ppu_alias, siteId: unit.site_id, continueSeq: unit.cycle!.continue_seq })),
@@ -1036,7 +1069,7 @@ export default function ManagedProgrammingWorkspace() {
           items={kpis}
           ariaLabel="Engineering Batch Summary"
           title="BATCH SUMMARY"
-          meta={`${runContext ? "Current Run" : "Run Preview"} · ${kpis[0].value} Sites · ${kpis[1].value} ICs`}
+          meta={`${runContext ? "Current Run" : "Run Preview"} · ${statisticsMeta(statistics)}`}
         />
 
         <div className="productionProgrammingWorkflow">

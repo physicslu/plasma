@@ -114,7 +114,8 @@ class FakeGateway:
     def __init__(self, *, image: bytes, safe_off=True, readback_ok=True,
                  post_status=202, post_raises=False, busy=False, job_final="success",
                  status_target=ICPN, status_interface="openocd", coordinator=None, resource_for=None,
-                 resources_state=None, status_raises=False, echo=True, ppu_id="z2-hil"):
+                 resources_state=None, status_raises=False, echo=True, ppu_id="z2-hil",
+                 worker_refusal=None):
         self.image = image
         self.coordinator = coordinator
         self.resource_for = resource_for or (lambda _active: ROUTE_RESOURCE_SHA)
@@ -139,11 +140,14 @@ class FakeGateway:
         self.read_file_tamper = False
         self.downloads = 0
         self.posts: list[dict] = []
-        self.time_sync_calls: list[dict] = []
         # The real C-3 PPU shape of a definite Site Worker FAIL: Job ``error``,
         # empty ``details``, Worker result in ``error.context``. A dict tampers
         # ``site_worker_result`` (key "context" tampers the context instead).
         self.worker_failure: bool | dict = False
+        # The real C-3 PPU shape of a refused ``run`` (site_worker_c3._refusal):
+        # "denied" (TransportDenied), "failed_safe" (TransportFailed) or a dict
+        # {"mode": ..., "safety": {tamper} | None, "context": {tamper}}.
+        self.worker_refusal = worker_refusal
         self.polls = 0
         self.resource_reservation = None
 
@@ -151,14 +155,6 @@ class FakeGateway:
         return status, {"Content-Type": "application/json"}, json.dumps(payload).encode()
 
     def relay(self, method, path, *, headers, body, timeout_s, max_response_bytes):
-        if method == "POST" and path == "/api/pre-start-time-sync":
-            self.time_sync_calls.append(json.loads(body))
-            return self._resp(200, {"time_sync": {
-                "ppu_id": self.ppu_id, "status": "SYNCED", "source": "chronyd",
-                "service": "chrony", "before_offset_ms": 1.0,
-                "after_offset_ms": 1.0, "uncertainty_ms": 1.0,
-                "elapsed_ms": 1.0, "adjustment_performed": False,
-                "warning_code": None, "observed_at_utc": "2026-11-20T00:00:00+00:00"}})
         if method == "POST" and path == "/api/resource-reservations":
             request = json.loads(body)
             if request["action"] == "acquire":
@@ -254,6 +250,8 @@ class FakeGateway:
             error, details = None, {kind: evidence}
             if self.worker_failure and state in ("failed", "error"):
                 error, details = self._worker_error(post, kind, binding), {}
+            if self.worker_refusal and state in ("failed", "error"):
+                error, details = self._refusal_error(post, kind, binding), {}
             return self._resp(200, {"job": {
                 "job_id": self._job_id(), "state": state,
                 # The Site the Job was submitted for, not a fixed one: a Batch
@@ -296,6 +294,36 @@ class FakeGateway:
                 "job_id": self._job_id(), "operation": kind, "retry_count": 0,
                 "context": context}
 
+    def _refusal_error(self, post, kind, binding):
+        site = post.get("site_id", 2)
+        spec = (dict(self.worker_refusal) if isinstance(self.worker_refusal, dict)
+                else {"mode": self.worker_refusal})
+        denied = spec["mode"] == "denied"
+        code = ("ADMISSION_DENIED:PROC_SCAN_INCOMPLETE:PROC_VISIBILITY_DENIED:5704:MAPS:"
+                "ProcessLookupError" if denied else "OPERATION_TIMEOUT")
+        full = ("TRANSPORT_DENIED:" if denied else "OPERATION_FAILED_SAFE:") + code
+        safety = {"schema": "plasma.ppu.site-safety.v1",
+                  "class": "PRE_HARDWARE_DENIED" if denied else "FAILED_SAFE_OFF_VERIFIED",
+                  "job_id": self._job_id(), "session_id": "5" * 32, "site": site,
+                  "operation": kind, "stage": "run", "code": code,
+                  "hardware_touched": not denied, "safe_off": None if denied else True}
+        if spec.get("safety", {}) is None:
+            safety = None
+        else:
+            safety.update(spec.get("safety") or {})
+        context = {"site_worker_stage": "run", "site_worker_code": full,
+                   "outcome_unknown": False, "job_id": self._job_id(), "site_id": site,
+                   "icpn": ICPN, "operation": kind,
+                   **({"operations": post["operations"], "address": binding["range"]["address"],
+                       "length": binding["range"]["length"]} if kind == "programming" else {}),
+                   **({"site_worker_safety": safety} if safety is not None else {}),
+                   **spec.get("context", {})}
+        return {"error_code": "E5002", "error_type": "INTERFACE_FAILURE",
+                "message": "C-3 Site Worker run refused: " + full,
+                "recoverable": not denied, "failure_source": "infrastructure",
+                "site_id": site, "job_id": self._job_id(), "operation": kind,
+                "retry_count": 0, "context": context}
+
     def _job_id(self):
         # Every submitted Job has its own identity.
         return "job-20261109-120000-%08x" % (0x0123abcd + len(self.posts) - 1)
@@ -335,8 +363,13 @@ def image() -> bytes:
     return V01.read_bytes()
 
 
+#: The PPU's Active Set already carries the Route's Resources: since U2 a
+#: plan never activates (a Batch activates before its Reservation, U1).
+ACTIVE_SET_SHA = "e" * 64
+
+
 def make(tmp_path, *, coordinator=None, gateway=None, registry=None, journal=True):
-    coordinator = coordinator or FakeCoordinator()
+    coordinator = coordinator or FakeCoordinator(active_sha=ACTIVE_SET_SHA)
     gateway = gateway or FakeGateway(image=image())
     if gateway.coordinator is None:
         gateway.coordinator = coordinator
@@ -393,36 +426,6 @@ def test_user_bundle_is_canonical_and_verifiable(tmp_path):
         "platform-provider", "programming-profile", "firmware-asset"]
 
 
-def test_success_with_activation_runs_b1_b2_b3_then_one_programming_job(tmp_path):
-    workflow, coord, gateway = make(tmp_path)
-    planned, run = run_once(workflow)
-    assert planned["activation_required"] is True
-    assert planned["catalog_gate"] == "NOT_USED"
-    assert run["outcome"] == "PASS", run
-    assert coord.calls.count("B2") == 1 and coord.calls.count("B3") == 1
-    assert bytes(coord.uploaded) and coord.upload_sha == planned["bundle"]["archive_sha256"]
-    assert len(gateway.posts) == 1 and run["job_submission_count"] == 1
-    assert len(gateway.time_sync_calls) == 1
-    assert run["time_sync"]["status"] == "SYNCED"
-    post = gateway.posts[0]
-    assert post["operations"] == ["erase", "program", "verify"] and post["site_id"] == 2
-    assert "operation" not in post
-    # Job Image source: Binding + Image Asset; never the Bundle reference.
-    assert not {"asset_set_sha256", "asset_package_id", "bundle_asset_sha256"} & set(post)
-    assert post["job_binding"] == planned["job_binding"]
-    assert post["image_asset"]["sha256"] == hashlib.sha256(image()).hexdigest()
-    assert base64.b64decode(post["asset_base64"]) == image()
-    receipt = run["receipt"]
-    assert receipt["readback_sha256"] == receipt["expected_image_sha256"] \
-        == receipt["observed_image_sha256"]
-    assert receipt["bytes_verified"] == len(image()) and receipt["safe_off"] is True
-    assert receipt["resource_reuse"] is False
-    assert [s["step"] for s in run["steps"]] == [
-        "PREFLIGHT", "B1_UPLOAD", "B2_ADMIT", "B3_SUBMIT", "B3_ACTIVATE",
-        "PROGRAMMING_SUBMIT", "VERIFY_RECEIPT"]
-    # journal is durable and holds no image/bundle bytes
-    journal = (tmp_path / "runs.json").read_text()
-    assert run["run_id"] in journal and base64.b64encode(image()[:64]).decode() not in journal
 
 
 def test_already_active_skips_b1_b2_b3(tmp_path):
@@ -520,7 +523,7 @@ def test_route_interface_mismatch_blocks_before_b1_b2_b3(tmp_path):
     gateway = FakeGateway(image=image(), status_interface="fpga")
     workflow, coordinator, gateway = make(tmp_path, gateway=gateway)
     planned = workflow.plan(ALIAS, plan_body(site=1))["plan"]
-    assert planned["activation_required"] is True
+    assert planned["activation_required"] is False
     started = workflow.start(
         ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN})
     run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
@@ -583,27 +586,10 @@ def test_job_post_timeout_is_outcome_unknown_and_latches_without_retry(tmp_path)
     assert len(gateway.posts) == 2  # only after explicit operator acknowledgement
 
 
-def test_b3_outcome_unknown_never_submits_job(tmp_path):
-    coord = FakeCoordinator(b3_raises=True)
-    workflow, _c, gateway = make(tmp_path, coordinator=coord)
-    _planned, run = run_once(workflow)
-    assert run["outcome"] == "OUTCOME_UNKNOWN"
-    assert run["reason"] == "B3_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT"
-    assert coord.calls.count("B3") == 1 and gateway.posts == []
 
 
-def test_b3_status_timeout_is_outcome_unknown(tmp_path):
-    coord = FakeCoordinator(status_raises_after_b3=True)
-    workflow, _c, gateway = make(tmp_path, coordinator=coord)
-    _planned, run = run_once(workflow)
-    assert run["outcome"] == "OUTCOME_UNKNOWN" and gateway.posts == []
 
 
-def test_b3_failed_is_definitive_failure_without_job(tmp_path):
-    coord = FakeCoordinator(b3_final="failed")
-    workflow, _c, gateway = make(tmp_path, coordinator=coord)
-    _planned, run = run_once(workflow)
-    assert run["outcome"] == "FAIL" and run["reason"] == "B3_FAILED" and gateway.posts == []
 
 
 def test_safe_off_failure_is_reported_as_distinct_fail(tmp_path):
@@ -783,18 +769,17 @@ def plan_run(workflow, body):
 def test_same_resources_firmware_a_then_b_without_b1_b2_b3(tmp_path):
     workflow, coord, gateway = make(tmp_path)
     plan_a, run_a = plan_run(workflow, plan_body(image()))
-    assert run_a["outcome"] == "PASS" and plan_a["activation_required"] is True
-    b3_calls = coord.calls.count("B3")
+    assert run_a["outcome"] == "PASS" and plan_a["activation_required"] is False
     gateway.polls = 0
     plan_b, run_b = plan_run(workflow, plan_body(other_image()))
     assert run_b["outcome"] == "PASS", run_b
     # Firmware B: same Resource SHA, different Image SHA, no B1/B2/B3, no FPGA load.
     assert plan_b["activation_required"] is False and plan_b["resource"]["reuse"] is True
-    assert coord.calls.count("B3") == b3_calls and coord.calls.count("B1_create") == 1
+    assert not {"B1_create", "B2", "B3"} & set(coord.calls)
     assert plan_a["resource"]["resource_set_sha256"] == plan_b["resource"]["resource_set_sha256"]
     assert plan_a["image_asset"]["sha256"] != plan_b["image_asset"]["sha256"]
     assert plan_a["bundle"]["archive_sha256"] != plan_b["bundle"]["archive_sha256"]
-    assert coord.active_sha == plan_a["bundle"]["archive_sha256"]  # Bundle A stays Active
+    assert coord.active_sha == ACTIVE_SET_SHA  # the Active Set is untouched
     assert plan_b["fpga_load"] is False and len(gateway.posts) == 2
     assert base64.b64decode(gateway.posts[1]["asset_base64"]) == other_image()
     receipt = run_b["receipt"]
@@ -804,24 +789,8 @@ def test_same_resources_firmware_a_then_b_without_b1_b2_b3(tmp_path):
     assert receipt["observed_resource_set_sha256"] == plan_a["resource"]["resource_set_sha256"]
 
 
-def test_different_ppu_resources_take_the_canonical_b1_b2_b3_path(tmp_path):
-    coord = FakeCoordinator(active_sha="e" * 64)
-    gateway = FakeGateway(image=image(), coordinator=coord,
-                          resource_for=lambda active: "d" * 64 if active == "e" * 64
-                          else ROUTE_RESOURCE_SHA)
-    workflow, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway)
-    planned, run = plan_run(workflow, plan_body())
-    assert planned["activation_required"] is True and planned["resource"]["reuse"] is False
-    assert run["outcome"] == "PASS" and coord.calls.count("B3") == 1
 
 
-def test_resources_unconfirmed_after_activation_never_submit(tmp_path):
-    coord = FakeCoordinator()
-    gateway = FakeGateway(image=image(), coordinator=coord, resource_for=lambda _a: "d" * 64)
-    workflow, _c, _g = make(tmp_path, coordinator=coord, gateway=gateway)
-    _planned, run = plan_run(workflow, plan_body())
-    assert run["outcome"] == "FAIL" and run["reason"] == "RESOURCE_IDENTITY_NOT_CONFIRMED"
-    assert gateway.posts == []
 
 
 @pytest.mark.parametrize("gateway_kw, status, code", [
@@ -1030,15 +999,23 @@ def test_erase_read_ranges_follow_flash_geometry(tmp_path, op, address, length, 
     assert planned["job_binding"]["image_asset_sha256"] is None
 
 
-def test_erase_without_active_matching_resources_needs_an_image_first(tmp_path):
-    workflow, coord, gateway = make(tmp_path)
-    for body in (ops_body(["erase"]),
+@pytest.mark.parametrize("active_sha, resource_for", [
+    (None, None),                                  # EMPTY Active Set
+    ("e" * 64, lambda _active: "d" * 64),          # another Resource Set is Active
+])
+def test_a_plan_never_activates(tmp_path, active_sha, resource_for):
+    """U2: a plan reuses PPU-verified Resources or refuses. Activation is the
+    Batch's job before its Reservation (U1), never a plan's or a run's."""
+    coord = FakeCoordinator(active_sha=active_sha)
+    gateway = FakeGateway(image=image(), coordinator=coord, resource_for=resource_for)
+    workflow, coord, gateway = make(tmp_path, coordinator=coord, gateway=gateway)
+    for body in (plan_body(), ops_body(["erase"]),
                  {"icpn": ICPN, "site_id": 2, "operation": "read",
                   "address": 0x08000000, "length": 64}):
         with pytest.raises(ProgrammingError) as caught:
             workflow.plan(ALIAS, body)
-        assert caught.value.code == "resource_activation_requires_image"
-    assert "B1_create" not in coord.calls and gateway.posts == []
+        assert caught.value.code == "batch_resource_not_active"
+    assert not {"B1_create", "B2", "B3"} & set(coord.calls) and gateway.posts == []
 
 
 # --------------------------------------------------------------- Read Memory
@@ -1204,26 +1181,6 @@ def _rezip(archive: bytes, mutate) -> bytes:
     return bundle_v3.canonical_zip(contents)
 
 
-def test_bundle_source_cache_miss_admits_the_users_exact_archive(tmp_path):
-    workflow, coord, gateway = make(tmp_path)
-    built = user_bundle()
-    planned, run = plan_run(workflow, bundle_body(built.archive))
-    assert planned["source"] == "bundle" and planned["activation_required"] is True
-    assert planned["bundle"]["archive_sha256"] == built.archive_sha256
-    assert planned["bundle"]["bundle_name"] == "customer-release"
-    assert planned["steps"][:3] == ["B1_UPLOAD", "B2_ADMIT", "B3_ACTIVATE"]
-    assert run["outcome"] == "PASS", run
-    # B1 carried the user's own bytes; B3 activated exactly that identity.
-    assert bytes(coord.uploaded) == built.archive and coord.active_sha == built.archive_sha256
-    assert coord.b3_body["fpga_load"] is False
-    assert len(gateway.posts) == 1 and run["job_submission_count"] == 1
-    post = gateway.posts[0]
-    assert base64.b64decode(post["asset_base64"]) == image()
-    assert post["job_binding"] == planned["job_binding"]
-    assert not {"bundle_base64", "asset_set_sha256"} & set(post)
-    receipt = run["receipt"]
-    assert receipt["resource_reuse"] is False and receipt["safe_off"] is True
-    assert receipt["readback_sha256"] == hashlib.sha256(image()).hexdigest()
 
 
 def test_bundle_source_reuses_ppu_verified_resources_without_b1_b2_b3(tmp_path):
