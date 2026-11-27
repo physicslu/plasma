@@ -58,7 +58,7 @@ Implementation facts:
 - It does **not use WebSocket**.
 - Web Console uses REST polling.
 - `plasma_manager` is optional and not required for local PPU execution.
-- Manager deployment is opt-in (`PLASMA_MANAGER_ENABLED=0` by default for the integration profile).
+- Manager deployment is required: the Control Station is Manager-managed only (U10); the integration profile accepts only `PLASMA_MANAGER_ENABLED=1` (schema v7).
 - Manager fleet observation is read-only, but Manager also owns explicit bounded control relays. The managed allowlist includes health/status/settings surfaces plus current Job, Programming Asset, Engineering session/target, Site Desired/runtime-activation and network-commissioning routes. The legacy PPU `POST /api/batches` and its Batch/Target cancel writes are not relayed through Manager; canonical Batch writes use Manager's `/api/programming/batches` routes. Job relay remains for current Mock/CD and compatibility callers pending separate migration.
 - Managed routing is **not** a generic reverse proxy. Exact methods and paths are allowlisted in `software/python/plasma_manager/server.py`; Browser traffic reaches those routes through the same-origin BFF.
 - Job execution remains PPU/Gateway-owned. Programming Batches are Manager-owned (`/api/programming/batches`) and submit their Jobs through Manager's own PPU client, not through this relay. For other allowlisted routes Manager relays commands and observations to the selected PPU; it does not replace the PPU execution engine.

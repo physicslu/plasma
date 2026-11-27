@@ -256,8 +256,7 @@ Manager-level cache metadata remains separate from per-PPU stale age and observa
 `scripts/plasmactl` manages an optional user-level `plasma-manager.service`. Manager remains opt-in:
 
 ```text
-PLASMA_MANAGER_ENABLED=0   -> standalone PPU services only
-PLASMA_MANAGER_ENABLED=1   -> add plasma-manager.service
+PLASMA_MANAGER_ENABLED=1   -> plasma-manager.service (required since U10, schema v7; 0 is refused)
 ```
 
 The operator-local Manager config remains selected by:

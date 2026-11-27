@@ -83,7 +83,7 @@ The deployment contract is:
 - run validation before restart;
 - regenerate systemd units before start/restart;
 - perform health checks after restart;
-- start/restart Manager only when `PLASMA_MANAGER_ENABLED=1`;
+- start/restart Manager (`PLASMA_MANAGER_ENABLED` must be `1`; U10);
 - validate Manager YAML before activating an enabled Manager service;
 - require an explicit `PLASMA_MANAGER_PPU_ALIAS` that already exists in the Manager registry when Manager is enabled;
 - add Engineering Mock Provider Plasma Gateway arguments only when `PLASMA_ENGINEERING_MOCK_ENABLED=1`;
@@ -124,9 +124,9 @@ PLASMA_CORS_ORIGIN='*'
 PLASMA_VITE_HOST=127.0.0.1
 PLASMA_VITE_PORT=5173
 PLASMA_PUBLIC_API_URL=
-PLASMA_MANAGER_ENABLED=0
+PLASMA_MANAGER_ENABLED=1
 PLASMA_MANAGER_CONFIG=/absolute/operator/local/path/manager.yaml
-PLASMA_MANAGER_PPU_ALIAS=
+PLASMA_MANAGER_PPU_ALIAS=<registry alias>
 PLASMA_ENGINEERING_MOCK_ENABLED=0
 PLASMA_ENGINEERING_MOCK_ROOT=/absolute/operator/local/state/engineering-mock
 ```
@@ -135,7 +135,7 @@ PLASMA_ENGINEERING_MOCK_ROOT=/absolute/operator/local/state/engineering-mock
 
 `PLASMA_PUBLIC_API_URL` is compatibility state and is empty in schema v6; current Browser routing is same-origin rather than Browser-owned remote Plasma Gateway Endpoint configuration.
 
-`PLASMA_MANAGER_ENABLED=0` is the default so upgrading a standalone PPU/integration host cannot accidentally create a fleet-control dependency. When Manager is enabled, `PLASMA_MANAGER_PPU_ALIAS` must explicitly select an alias already present in `PLASMA_MANAGER_CONFIG`; deployment does not infer the first registry entry. `PLASMA_ENGINEERING_MOCK_ENABLED=0` is also the default; simulation must be explicit.
+The Control Station is Manager-managed only (U10): schema v7 migrates `PLASMA_MANAGER_ENABLED` to `1` and refuses `0`; units are not written until `PLASMA_MANAGER_PPU_ALIAS` is set. `PLASMA_MANAGER_PPU_ALIAS` must explicitly select an alias already present in `PLASMA_MANAGER_CONFIG`; deployment does not infer the first registry entry. `PLASMA_ENGINEERING_MOCK_ENABLED=0` is also the default; simulation must be explicit.
 
 Runtime output/log state and Manager registry/config belong outside the Git worktree.
 

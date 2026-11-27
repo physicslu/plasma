@@ -51,14 +51,12 @@ The Vite unit also declares `plasma-manager.service` in `After=` and `Wants=` so
 
 `vite.config.ts` then bridges these host-process values into the Vinext/Worker runtime. The BFF route independently keeps its loopback-only URL and alias validation.
 
-## Manager-disabled contract
+## Manager is required (U10, schema v7)
 
-When `PLASMA_MANAGER_ENABLED=0`:
-
-- Plasma remains a standalone PPU deployment.
-- `plasma-manager.service` is not part of the active service set.
-- Manager BFF environment is not injected into `plasma-vite.service`.
-- Existing PPU-local Gateway and programming execution remain independent of Manager.
+`PLASMA_MANAGER_ENABLED=0` is refused: the Control Station has no standalone
+mode. Schema v7 migrates older files to `1`; until `PLASMA_MANAGER_PPU_ALIAS`
+is set, units are not written. The PPU-local Gateway and accepted Jobs remain
+independent of the Manager's liveness, but the PPU runs no Batch.
 
 ## Schema v4 to v5 migration
 

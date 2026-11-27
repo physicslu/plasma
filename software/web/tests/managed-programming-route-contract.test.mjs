@@ -30,7 +30,8 @@ test("Gateway transport isolates bootstrap reads until WorkspaceSession resolves
   assert.match(gatewayTransport, /if \(isStateChanging\(requestMethod\(currentInput, init\)\)\) return routingUnresolvedResponse\(\)/);
   assert.match(gatewayTransport, /await gatewayRoutingReady/);
   assert.match(gatewayTransport, /const rebasedUrl = `\$\{resolvedGatewayApiBase\}\$\{directPath\}\$\{search\}`/);
-  assert.match(workspace, /const managed = managedApiBase\(\);\s*setApiBaseState\(managed\);\s*markGatewayRoutingResolved\(managed\);\s*setHydrated\(true\)/);
+  assert.match(workspace, /markGatewayRoutingResolved\(managedApiBase\(\)\);/);
+  assert.match(workspace, /const apiBase = hydrated \? managedApiBase\(\) : "";/);
 });
 
 test("Managed routing remains authoritative after bootstrap and rebases stale direct Gateway paths", () => {
@@ -61,7 +62,8 @@ test("macOS Control Station declares managed routing intent independently from B
 });
 
 test("PMode and EMode keep one shared WorkspaceSession apiBase", () => {
-  assert.match(workspace, /const \[apiBase, setApiBaseState\] = useState\(""\)/);
+  assert.match(workspace, /const hydrated = useSyncExternalStore\(subscribeNever, \(\) => true, \(\) => false\);/);
+  assert.match(workspace, /const apiBase = hydrated \? managedApiBase\(\) : "";/);
   assert.match(workspace, /apiBase,/);
   assert.doesNotMatch(workspace, /ensureEngineeringSession|restartEngineeringSession|programmingImage|pmodOperations/);
 });
