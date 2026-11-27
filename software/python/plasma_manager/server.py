@@ -191,6 +191,12 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         return
 
+    def end_headers(self) -> None:
+        # HTTP/1.0: every connection carries exactly one exchange. Say so
+        # explicitly, so a pooling client never reuses a closed connection.
+        self.send_header("Connection", "close")
+        super().end_headers()
+
     def _json(self, status: int, payload: dict[str, Any]) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
