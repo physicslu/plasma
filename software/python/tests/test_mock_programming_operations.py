@@ -344,3 +344,92 @@ def test_a_resource_set_from_another_ppu_is_refused(tmp_path: Path):
         finally:
             await manager.shutdown()
     asyncio.run(scenario())
+
+
+# ------------------------------------------------ U10: a bound Read's receipt
+
+
+def read_request(identity: dict, address: int, length: int, *,
+                 section: tuple[int, int] | None = None) -> JobRequest:
+    resource = identity["resource_set"]
+    binding = bundle_v3.job_image_binding(
+        resource, None, ppu_id=PPU_ID, site_id=SITE, operation="read",
+        address=address, length=length)
+    kinds = {package["kind"]: package["id"] for package in resource["packages"]}
+    sec_address, sec_length = section or (address, length)
+    return JobRequest(site_id=SITE, operation=Operation.READ, image=b"", target=ICPN,
+                      max_retries=0, timeout_s=10.0,
+                      map_data={"sections": [{"name": "read", "address": sec_address,
+                                              "length": sec_length}]},
+                      metadata={"provider": kinds["platform-provider"],
+                                "profile": kinds["programming-profile"],
+                                "job_binding": binding})
+
+
+def test_a_bound_read_publishes_the_c3_shaped_receipt_from_flash(tmp_path: Path):
+    async def scenario():
+        manager, identity = await started_manager(mock_config(tmp_path))
+        try:
+            await program_image(manager, identity, IMAGE_A)
+            result = await manager.submit(read_request(identity, LOAD_ADDRESS, LENGTH))
+            assert result.state is JobState.SUCCESS, result.error
+            evidence = result.details["read"]
+            assert evidence == {
+                "result": "PASS", "read_address": LOAD_ADDRESS, "read_length": LENGTH,
+                "bytes_read": LENGTH, "sha256": sha(IMAGE_A), "safe_off": True,
+            }
+            interface = manager.interfaces[SITE]
+            assert isinstance(interface, MockInterface)
+            # The receipt never outlives its Job.
+            assert interface.operation_evidence is None
+            assert interface.site_safe is True
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_a_bound_read_of_blank_flash_reports_the_blank_bytes(tmp_path: Path):
+    async def scenario():
+        manager, identity = await started_manager(mock_config(tmp_path))
+        try:
+            result = await manager.submit(read_request(identity, FLASH_BASE, GRANULARITY))
+            assert result.state is JobState.SUCCESS, result.error
+            assert result.details["read"]["sha256"] == sha(b"\xff" * GRANULARITY)
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_a_bound_read_with_a_failed_closing_step_publishes_no_receipt(tmp_path: Path):
+    async def scenario():
+        manager, identity = await started_manager(mock_config(tmp_path, safe_off_fails=True))
+        try:
+            result = await manager.submit(read_request(identity, LOAD_ADDRESS, LENGTH))
+            assert result.state is not JobState.SUCCESS
+            assert result.error.context.get("safe_off") is False
+            assert "read" not in (result.details or {})
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_a_read_section_outside_its_binding_is_refused(tmp_path: Path):
+    async def scenario():
+        manager, identity = await started_manager(mock_config(tmp_path))
+        try:
+            with pytest.raises(PlasmaError, match="JOB_RANGE_MISMATCH"):
+                await manager.submit(read_request(
+                    identity, LOAD_ADDRESS, LENGTH,
+                    section=(LOAD_ADDRESS + GRANULARITY, LENGTH)))
+        finally:
+            await manager.shutdown()
+    asyncio.run(scenario())
+
+
+def test_an_unbound_read_keeps_the_legacy_behaviour(tmp_path: Path):
+    async def scenario():
+        interface = MockInterface(flash_size=4096)
+        data = await interface.read(0, 16)
+        assert data == b"\xff" * 16
+        assert interface.operation_evidence is None
+    asyncio.run(scenario())

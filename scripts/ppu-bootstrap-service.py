@@ -87,6 +87,10 @@ class BootstrapServiceError(RuntimeError):
     pass
 
 
+# The Runtime's fixed control socket; the B3 Deployment Engine defaults to it.
+RUNTIME_CONTROL_SOCKET = Path("/run/plasma-server/control.sock")
+
+
 @dataclass(frozen=True)
 class ServicePaths:
     product_root: Path = Path("/opt/plasma")
@@ -104,7 +108,7 @@ class ServicePaths:
     button_profile: Path = Path("/etc/plasma/ppu-enrollment-button.json")
     admission_socket: Path = Path("/run/plasma-bootstrap/controller-admission.sock")
     seal_dir: Path = Path("/var/lib/plasma-site-worker/seals")
-    runtime_control_socket: Path = Path("/run/plasma-server/control.sock")
+    runtime_control_socket: Path = RUNTIME_CONTROL_SOCKET
     reload_fence: Path = Path("/run/lock/plasma-mmio.lock")
     site_recovery_script: Path = Path("/opt/plasma/bootstrap/ppu_site_recovery.py")
     # The Runtime Gateway port observed by the P0 reconciliation (read-only).
@@ -677,6 +681,14 @@ def run_bundle_install_subprocess(
         "--installer", str(paths.z2_installer_script),
         "--bootstrap-state-root", str(paths.state_root),
         "--product-root", str(paths.product_root),
+    ]
+    # U10 D2: the Engine borrows the Runtime Job-admission lease from the
+    # socket this service is configured with. Service configuration only; the
+    # request body above is an exact key set and can never name a socket. The
+    # production argv is unchanged because the Engine defaults to that socket.
+    if paths.runtime_control_socket != RUNTIME_CONTROL_SOCKET:
+        argv += ["--runtime-control-socket", str(paths.runtime_control_socket)]
+    argv += [
         "install-bundle", "--release-artifact", str(upload.committed),
         "--artifact-sha256", request["archive_sha256"],
         "--platform", request["target"]["platform"],

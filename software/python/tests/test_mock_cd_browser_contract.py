@@ -18,12 +18,19 @@ def test_browser_stack_reuses_canonical_mock_cd_harness() -> None:
     assert 'BASELINE_HARNESS = ROOT / "scripts" / "mock-cd.py"' in source
     assert "load_baseline_harness()" in source
     assert "cd.PPUS" in source
-    assert "cd.validate_manager_fleet" in source
     assert "cd.validate_web_fleet" in source
-    assert 'output_root = work / f"{item[\'ppu_id\']}-output"' in source
-    assert '"--output-root"' in source
-    assert "str(output_root)" in source
+    # U10: the Mock PPUs (Runtime + real Bootstrap + G13 Gateway) and the
+    # Manager Programming Engine come from the canonical harness.
+    assert "cd.start_managed_ppus(" in source
+    assert "cd.start_manager(" in source
+    assert "cd.enroll_mock_ppus(" in source
     assert '"state": "ready"' in source
+    # Read downloads are served from the Job output directory the Runtime writes.
+    harness = (ROOT / "scripts" / "mock-cd.py").read_text(encoding="utf-8")
+    assert '"output": root / f"{item[\'ppu_id\']}-output"' in harness
+    assert '"--output-root", str(paths["output"])' in harness
+    # start_manager still validates the two-PPU Fleet before anything else.
+    assert "validate_manager_fleet(manager_fleet)" in harness
 
 
 def test_browser_workflow_is_mock_only_and_fail_closed() -> None:

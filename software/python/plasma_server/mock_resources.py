@@ -13,6 +13,8 @@ Mock route is never ``hardware_runtime_ready``.
 """
 from __future__ import annotations
 
+from functools import partial
+from pathlib import Path
 from typing import Any
 
 from plasma_core.config import PlasmaConfig, SiteConfig
@@ -76,7 +78,31 @@ def mock_route(
     profile_id: str = MOCK_PROFILE_ID,
 ) -> bundle_v3.ProgrammingRoute:
     """One simulated Programming Route, validated by the real route parser."""
-    return bundle_v3.parse_route({
+    return bundle_v3.parse_route(mock_route_document(
+        icpn=icpn, flash_base=flash_base, flash_size=flash_size,
+        erase_granularity=erase_granularity, max_image_bytes=max_image_bytes,
+        operations=operations, route_id=route_id, provider_id=provider_id,
+        profile_id=profile_id))
+
+
+def mock_route_document(
+    *,
+    icpn: str,
+    flash_base: int = DEFAULT_FLASH_BASE,
+    flash_size: int = DEFAULT_FLASH_SIZE,
+    erase_granularity: int = DEFAULT_ERASE_GRANULARITY,
+    max_image_bytes: int | None = None,
+    operations: tuple[str, ...] = MOCK_OPERATIONS,
+    route_id: str = MOCK_ROUTE_ID,
+    provider_id: str = MOCK_PROVIDER_ID,
+    profile_id: str = MOCK_PROFILE_ID,
+) -> dict[str, Any]:
+    """The Route file document of one simulated Programming Route.
+
+    The same document a Programming Routes root holds; ``mock_route`` parses
+    exactly this with the real route parser.
+    """
+    return {
         "schema": bundle_v3.ROUTE_SCHEMA,
         "route_id": route_id,
         "target": dict(MOCK_PLATFORM),
@@ -109,7 +135,7 @@ def mock_route(
                 "erase_granularity": erase_granularity,
             },
         },
-    })
+    }
 
 
 def mock_resource_identity(route: bundle_v3.ProgrammingRoute, *,
@@ -183,3 +209,30 @@ def install_mock_resources(manager: Any, *, generation: int = 1) -> dict[str, An
     manager._active_resource_resolver = lambda: dict(identity)
     manager._active_asset_set_reader = lambda: dict(active)
     return identity
+
+
+def install_bootstrap_asset_set(manager: Any, *, product_root: Path,
+                                control_plane: Path) -> None:
+    """Mock PPU: pin the Active Set the PPU Bootstrap B3 really published.
+
+    Instead of self-declaring an identity, the Mock PPU reads the Active Set
+    and re-derives its Resource identity from ``product_root`` through the
+    same ``ppu_asset_set.py`` helper a Z2 Runtime is wired with. Until a B3
+    activation has run, there is no identity and Job admission fails closed.
+
+    Allowed only on a PPU whose every Site is a Mock Site, and never over an
+    existing wiring.
+    """
+    sites = list(manager.config.sites)
+    _need(bool(sites) and all(site.interface == "mock" for site in sites),
+          "MOCK_ASSET_SET_REQUIRES_MOCK_SITES")
+    _need(getattr(manager, "_active_resource_resolver", None) is None
+          and getattr(manager, "_active_asset_set_reader", None) is None,
+          "MOCK_RESOURCES_ALREADY_WIRED")
+    from .package_actions import _load
+
+    helper = _load(Path(control_plane), "ppu_asset_set.py")
+    root = Path(product_root)
+    _need(root.is_absolute(), "MOCK_ASSET_SET_PRODUCT_ROOT_NOT_ABSOLUTE")
+    manager._active_asset_set_reader = partial(helper.read_active, root)
+    manager._active_resource_resolver = partial(helper.read_active_resource_identity, root)
