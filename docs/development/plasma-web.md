@@ -75,7 +75,7 @@ PPU Runtime → Provider/FPGA/DUT.
   PASS/FAIL/Yield and Factory Log. EMode retains its engineering diagnostics,
   per-Site READ and Engineering Job Log. They share backend truth, not screens.
 - **Real Manager Batch Repeat** is Manual Repeat v1 (1–10000 Cycles per Site);
-  the Standalone Mock's own repetition is not physical qualification.
+  the retired standalone PPU Batch runtime (U10) was never physical qualification.
 - Browser/Playwright and Mock PPU results are Host-only. Historical
   Site 1 2MHz/LA2016 and Site 2 real HIL evidence remain historical;
   multi-PPU/multi-Site v2 physical qualification is NOT_RUN.

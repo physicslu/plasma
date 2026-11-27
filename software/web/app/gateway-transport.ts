@@ -2,20 +2,17 @@
  * Browser Gateway routing transport.
  *
  * Gateway REST paths issued by the Console are held until the workspace has
- * resolved its routing (standalone Gateway origin or Manager-managed
- * `/api/manager/ppu/...` prefix) and are then rebased onto that route. A
- * state-changing request issued before routing is resolved is refused rather
- * than sent to an unknown target.
+ * resolved its routing and are then rebased onto the Manager-managed
+ * `/api/manager/ppu/...` prefix. The Console never talks to a PPU Gateway
+ * directly (U10: no standalone mode). A state-changing request issued before
+ * routing is resolved is refused rather than sent to an unknown target.
  *
  * This module carries no credential. PPU write authority is the enrolled
  * controller credential held by the Manager (LOM-P2A-2 G13); the retired
  * browser Bearer transport and the opt-in Bearer-principal Gateway are gone.
  */
-type GatewayRoutingMode = "managed" | "standalone";
-
 const MANAGED_PPU_PREFIX = "/api/manager/ppu";
 let gatewayRoutingResolved = false;
-let gatewayRoutingMode: GatewayRoutingMode = "standalone";
 let resolvedGatewayApiBase: string | null = null;
 let releaseGatewayRouting!: () => void;
 const gatewayRoutingReady = new Promise<void>(resolve => { releaseGatewayRouting = resolve; });
@@ -24,7 +21,6 @@ let uninstallTransport: (() => void) | null = null;
 const gatewayPathPrefixes = [
   "/api/status",
   "/api/jobs",
-  "/api/batches",
   "/api/settings/gateway",
   "/api/mock/runtime",
   "/api/engineering",
@@ -32,13 +28,12 @@ const gatewayPathPrefixes = [
   "/api/node",
 ];
 
-export function markGatewayRoutingResolved(apiBase: string, mode: GatewayRoutingMode): void {
+export function markGatewayRoutingResolved(apiBase: string): void {
   const trimmed = apiBase.trim();
   const normalized = trimmed
     ? new URL(trimmed, window.location.href).toString().replace(/\/$/, "")
     : window.location.origin;
   resolvedGatewayApiBase = normalized;
-  gatewayRoutingMode = mode;
   if (gatewayRoutingResolved) return;
   gatewayRoutingResolved = true;
   releaseGatewayRouting();
@@ -115,7 +110,7 @@ export function installGatewayTransport(): () => void {
       await gatewayRoutingReady;
       if (!resolvedGatewayApiBase) return routingUnresolvedResponse();
       currentInput = rebaseInput(currentInput, directPath, url.search);
-    } else if (gatewayRoutingMode === "managed" && resolvedGatewayApiBase) {
+    } else if (resolvedGatewayApiBase) {
       currentInput = rebaseInput(currentInput, directPath, url.search);
     }
     return await originalFetch(currentInput, init);

@@ -18,11 +18,16 @@ const apiBaseStorageMigration = `
     const apiKey = "plasma-api-base";
     if (!migrationComplete) {
       // Schema v3 retires Browser-owned direct Gateway endpoints. Clear any
-      // previously stored absolute endpoint and let runtime routing resolve to
-      // same-origin standalone or Manager-owned managed transport.
+      // previously stored absolute endpoint; runtime routing resolves to the
+      // same-origin Manager-owned transport.
       window.localStorage.removeItem(apiKey);
       window.localStorage.setItem(versionKey, "3");
     }
+    // The Control Station is Manager-managed only: the retired standalone
+    // API mode and the standalone PPU-local Batch reconnect handles are stale.
+    window.localStorage.removeItem("plasma-api-mode");
+    window.sessionStorage.removeItem("plasma-production-active-batch-v1");
+    window.sessionStorage.removeItem("plasma-engineering-active-batch-v1");
   } catch {
     // Storage is optional; runtime routing remains authoritative.
   }

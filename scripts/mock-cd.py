@@ -404,7 +404,9 @@ def run() -> None:
             env={
                 "PLASMA_FLEET_UI_ENABLED": "1",
                 "PLASMA_MANAGER_API_URL": f"http://127.0.0.1:{MANAGER_PORT}",
-                "PLASMA_GATEWAY_PROXY_URL": f"http://127.0.0.1:{PPUS[0]['gateway_port']}",
+                # The Console is Manager-managed only (U10).
+                "PLASMA_CONTROL_STATION_MODE": "managed",
+                "PLASMA_MANAGER_PPU_ALIAS": str(PPUS[0]["name"]),
             },
         )
         processes.append(("web", web))

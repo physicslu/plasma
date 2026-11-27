@@ -10,7 +10,7 @@ import {
 import type { ProgrammingBatch, ProgrammingBatchUnit } from "../engineering/bundle-programming-api";
 import { unitCycleTally } from "../programming/batch-statistics";
 import type { ProgrammingCapabilityCatalog } from "../programming-capabilities";
-import type { BatchSiteSnapshot, ServerBatchSiteState, ServerBatchSnapshot, ServerBatchState } from "../server-batch-api";
+import type { BatchSiteSnapshot, ServerBatchSiteState, ServerBatchSnapshot, ServerBatchState } from "../batch-snapshot";
 
 /** Factory catalog keyed by Manager Alias; the device PPU ID is shown, never routed on. */
 export function managedFactoryCatalog(topology: ManagedTopology): ProgrammingCapabilityCatalog {

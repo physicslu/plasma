@@ -21,14 +21,6 @@ export function gatewayHealthFromError(error: unknown): GatewayHealthState {
   return error instanceof PlasmaApiError && error.status !== undefined ? "online" : "unreachable";
 }
 
-export function gatewayHealthFromSettled(results: PromiseSettledResult<unknown>[]): GatewayHealthState {
-  if (results.some(result => result.status === "fulfilled")) return "online";
-  if (results.some(result => result.status === "rejected" && gatewayHealthFromError(result.reason) === "online")) {
-    return "online";
-  }
-  return "unreachable";
-}
-
 export function summarizePPUHealth(
   gatewayHealth: GatewayHealthState,
   catalogAvailable: boolean,

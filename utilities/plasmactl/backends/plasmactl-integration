@@ -6,7 +6,7 @@ default_repo="$(cd "$(dirname "$script_path")/../../.." && pwd)"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
 config_file="${PLASMACTL_CONFIG:-$config_home/plasma/plasmactl.env}"
-current_config_version=6
+current_config_version=7
 default_public_api_url=""
 default_manager_config="$config_home/plasma/manager.yaml"
 
@@ -34,7 +34,7 @@ cors_origin="${PLASMA_CORS_ORIGIN:-*}"
 vite_host="${PLASMA_VITE_HOST:-127.0.0.1}"
 vite_port="${PLASMA_VITE_PORT:-5173}"
 public_api_url="${PLASMA_PUBLIC_API_URL:-$default_public_api_url}"
-manager_enabled="${PLASMA_MANAGER_ENABLED:-0}"
+manager_enabled="${PLASMA_MANAGER_ENABLED:-1}"
 manager_config="${PLASMA_MANAGER_CONFIG:-$default_manager_config}"
 manager_ppu_alias="${PLASMA_MANAGER_PPU_ALIAS:-}"
 engineering_mock_enabled="${PLASMA_ENGINEERING_MOCK_ENABLED:-0}"
@@ -89,8 +89,10 @@ require_user_units() {
 }
 
 validate_manager_settings() {
-  [[ "$manager_enabled" == "0" || "$manager_enabled" == "1" ]] || \
-    die "PLASMA_MANAGER_ENABLED 只接受 0 或 1：$manager_enabled"
+  # The Control Station is Manager-managed only (U10): there is no standalone
+  # direct-Gateway Console, so the Manager is a required service.
+  [[ "$manager_enabled" == "1" ]] || \
+    die "PLASMA_MANAGER_ENABLED 必須為 1：Control Station 只支援 Manager 管理模式（standalone 已退役）：$manager_enabled"
   [[ "$manager_config" == /* ]] || \
     die "PLASMA_MANAGER_CONFIG 必須是絕對路徑：$manager_config"
   if [[ -n "$manager_ppu_alias" ]]; then
@@ -283,6 +285,13 @@ migrate_config() {
     replace_config_assignment PLASMA_PUBLIC_API_URL "$public_api_url"
   fi
 
+  if (( config_version < 7 )); then
+    # Schema v7 retires the standalone Console (U10): the Manager is required.
+    manager_enabled=1
+    PLASMA_MANAGER_ENABLED=1
+    replace_config_assignment PLASMA_MANAGER_ENABLED "$manager_enabled"
+  fi
+
   if (( config_version < current_config_version )); then
     replace_config_assignment PLASMA_CONFIG_VERSION "$current_config_version"
     config_version="$current_config_version"
@@ -318,7 +327,7 @@ PLASMA_VITE_HOST=$vite_host
 PLASMA_VITE_PORT=$vite_port
 # Compatibility field. Leave empty: Browser traffic uses same-origin routing.
 PLASMA_PUBLIC_API_URL=$public_api_url
-# Plasma Manager is an optional control-plane service. Existing PPU deployments remain standalone by default.
+# Plasma Manager is required: the Control Station is Manager-managed only (U10). Only 1 is accepted.
 PLASMA_MANAGER_ENABLED=$manager_enabled
 # Operator-local Manager registry/configuration; keep fleet endpoints outside the Git worktree.
 PLASMA_MANAGER_CONFIG=$manager_config

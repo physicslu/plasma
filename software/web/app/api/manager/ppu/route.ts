@@ -16,9 +16,8 @@ function responseHeaders(extra?: Record<string, string>): HeadersInit {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  let managedRequired = false;
   try {
-    managedRequired = managerRoutingRequired();
+    managerRoutingRequired();
   } catch {
     return Response.json(
       {
@@ -28,13 +27,6 @@ export async function GET(request: Request): Promise<Response> {
         error: { code: "manager_bff_misconfigured", message: "Managed PPU routing mode is invalid" },
       },
       { status: 503, headers: responseHeaders() },
-    );
-  }
-
-  if (!managedRequired) {
-    return Response.json(
-      { ok: true, managed: false, configured: false, ppu_alias: null },
-      { status: 200, headers: responseHeaders() },
     );
   }
 
@@ -60,12 +52,7 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    if (!managerRoutingRequired()) {
-      return Response.json(
-        { ok: false, error: { code: "manager_not_enabled", message: "Manager mode is not enabled for this Control Station" } },
-        { status: 503, headers: responseHeaders() },
-      );
-    }
+    managerRoutingRequired();
     managerApiBase();
   } catch {
     return Response.json(

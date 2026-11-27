@@ -5,10 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./i18n";
 import {
-  getPpuExecutionActivityCount,
-  subscribePpuExecutionActivity,
-} from "./plasma-api";
-import {
   getBatchExecutionActivityCount,
   subscribeBatchExecutionActivity,
 } from "./batch-execution-activity";
@@ -25,17 +21,11 @@ export function GlobalNav() {
   const pathname = usePathname();
   const { locale, setLocale, t } = useI18n();
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
-  const ppuExecutionCount = useSyncExternalStore(
-    subscribePpuExecutionActivity,
-    getPpuExecutionActivityCount,
-    () => 0,
-  );
-  const batchExecutionCount = useSyncExternalStore(
+  const executionCount = useSyncExternalStore(
     subscribeBatchExecutionActivity,
     getBatchExecutionActivityCount,
     () => 0,
   );
-  const executionCount = ppuExecutionCount + batchExecutionCount;
 
   // Render is a client-routed Vite shell. After hydration the browser URL is
   // authoritative even if a framework pathname adapter is temporarily stale.
