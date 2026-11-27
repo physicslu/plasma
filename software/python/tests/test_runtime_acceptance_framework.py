@@ -15,12 +15,13 @@ def test_runtime_acceptance_python_sources_compile() -> None:
     assert {path.name for path in sources} >= {
         "common.py",
         "managed_ps_loopback.py",
-        "emode_programming.py",
-        "job_cancel.py",
-        "pmode_batch.py",
-        "eight_site_batch.py",
         "run.py",
     }
+    # The PPU no longer runs Batches (U10); the scenarios that drove PPU
+    # /api/batches are retired, not kept as dead source.
+    for retired in ("emode_programming.py", "job_cancel.py", "pmode_batch.py",
+                    "eight_site_batch.py"):
+        assert not (HARNESS / retired).exists()
     for path in sources:
         compile(path.read_text(encoding="utf-8"), str(path), "exec")
 
@@ -35,35 +36,15 @@ def test_runtime_acceptance_cli_exposes_expected_scenarios_without_network() -> 
     )
     assert completed.returncode == 0, completed.stderr
     output = completed.stdout
-    for scenario in (
-        "ps-loopback",
-        "emode-programming",
-        "job-cancel",
-        "pmode-batch",
-        "eight-site-batch",
-        "managed-software",
-    ):
+    for scenario in ("ps-loopback", "managed-software"):
         assert scenario in output
-    assert "--allow-real-hardware" in output
+    for retired in ("emode-programming", "job-cancel", "pmode-batch", "eight-site-batch"):
+        assert retired not in output
 
 
-def test_emode_runtime_acceptance_uses_current_server_side_batch_contract() -> None:
-    source = (HARNESS / "emode_programming.py").read_text(encoding="utf-8")
-    assert '"/api/batches"' in source
-    assert "server-side-batch-envelope" in source
-    assert "api/programming-assets/check" not in source
-    assert 'f"{client.target_url(target)}/api/jobs"' not in source
-
-
-def test_managed_job_cancel_uses_server_batch_as_operator_authority() -> None:
-    source = (HARNESS / "job_cancel.py").read_text(encoding="utf-8")
-    assert '"/api/batches"' in source
-    assert 'f"/api/batches/{encoded_batch}/cancel"' in source
-    assert 'cancel_snapshot.get("cancel_requested") is not True' in source
-    assert 'final_batch.get("state") != "cancelled"' in source
-    assert 'final_sites[0].get("state") != "cancelled"' in source
-    assert 'final_job.get("state") != "cancelled"' in source
-    assert 'f"{client.target_url(target)}/api/jobs/{encoded}/cancel"' not in source
+def test_runtime_acceptance_never_calls_ppu_batches() -> None:
+    for path in HARNESS.glob("*.py"):
+        assert "/api/batches" not in path.read_text(encoding="utf-8"), path.name
 
 
 def test_managed_runtime_acceptance_fails_closed_on_direct_gateway_base() -> None:

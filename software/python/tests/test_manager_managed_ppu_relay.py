@@ -228,27 +228,27 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
         self.assertEqual(observed["body"], asset)
         self.assertIn("session_id=s1", observed["path"])
 
-    def test_legacy_batch_post_routes_are_denied_before_ppu_contact(self):
-        # A Manager-owned Batch is started through /api/programming/batches,
-        # never by forwarding a legacy Gateway /api/batches write.
+    def test_retired_ppu_batch_routes_are_denied_before_ppu_contact(self):
+        # A Manager-owned Batch is started through /api/programming/batches;
+        # the PPU runs no Batch, so no /api/batches route is relayed (U10).
         before = len(FakeManagedPPUGatewayHandler.requests)
-        for path in (
-            "/api/batches",
-            "/api/batches/batch-1/cancel",
-            "/api/batches/batch-1/targets/ppu-01/1/cancel",
+        for method, path in (
+            ("POST", "/api/batches"),
+            ("POST", "/api/batches/batch-1/cancel"),
+            ("POST", "/api/batches/batch-1/targets/ppu-01/1/cancel"),
+            ("GET", "/api/batches/batch-1"),
         ):
-            with self.subTest(path=path):
+            with self.subTest(method=method, path=path):
                 status, _, data = self.relay(
-                    "POST", path, body=b"{}",
-                    headers={"Content-Type": "application/json"},
+                    method, path, body=b"{}" if method == "POST" else None,
+                    headers={"Content-Type": "application/json"} if method == "POST" else None,
                 )
                 self.assertEqual(status, 404, data)
                 self.assertEqual(json.loads(data)["error"]["code"], "managed_route_not_allowed")
                 self.assertEqual(len(FakeManagedPPUGatewayHandler.requests), before)
 
-    def test_retained_job_relay_and_batch_status_read_still_reach_ppu(self):
-        # U3 denies only legacy Batch writes. The Job relay (Mock/CD and
-        # Render smoke callers) and the read-only Batch status relay stay.
+    def test_retained_job_relay_still_reaches_ppu(self):
+        # The Job relay (Mock/CD and Render smoke callers) stays.
         status, _, data = self.relay(
             "POST", "/api/jobs", body=b"{}",
             headers={"Content-Type": "application/json", "Idempotency-Key": "job-1"},
@@ -257,11 +257,6 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
         observed = FakeManagedPPUGatewayHandler.requests[-1]
         self.assertEqual((observed["method"], observed["path"]), ("POST", "/api/jobs"))
         self.assertEqual(observed["idempotency_key"], "job-1")
-
-        status, _, data = self.relay("GET", "/api/batches/batch-1")
-        self.assertEqual(status, 200, data)
-        observed = FakeManagedPPUGatewayHandler.requests[-1]
-        self.assertEqual((observed["method"], observed["path"]), ("GET", "/api/batches/batch-1"))
 
     def test_managed_workspace_settings_routes_preserve_security_headers(self):
         for path in ("/api/settings/gateway", "/api/settings/ppu-network", "/api/mock/runtime"):

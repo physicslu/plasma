@@ -103,8 +103,10 @@ def test_manager_no_longer_relays_device_search_to_a_ppu():
     handler = manager_server.PlasmaManagerHandler
     assert not handler._managed_route_allowed("GET", "/api/devices/search")
     # Programming / Health relays are unchanged.
-    for path in ("/api/status", "/api/health/ready", "/api/batches/b-1"):
+    for path in ("/api/status", "/api/health/ready"):
         assert handler._managed_route_allowed("GET", path), path
+    # The PPU runs no Batch (U10); its former Batch read is not relayed.
+    assert not handler._managed_route_allowed("GET", "/api/batches/b-1")
 
 
 # --- packaged Control Station Manager --------------------------------------------------

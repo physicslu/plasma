@@ -2,32 +2,19 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 import urllib.parse
 from pathlib import Path
 
 from common import AcceptanceError, Client, DEFAULT_BASE_URL
-import eight_site_batch
-import emode_programming
-import job_cancel
 import managed_ps_loopback
-import pmode_batch
 
 SCENARIOS = {
     managed_ps_loopback.SCENARIO: managed_ps_loopback.run,
-    emode_programming.SCENARIO: emode_programming.run,
-    job_cancel.SCENARIO: job_cancel.run,
-    pmode_batch.SCENARIO: pmode_batch.run,
-    eight_site_batch.SCENARIO: eight_site_batch.run,
 }
 SUITES = {
     "managed-software": [
         "ps-loopback",
-        "emode-programming",
-        "job-cancel",
-        "pmode-batch",
-        "eight-site-batch",
     ]
 }
 
@@ -52,14 +39,6 @@ def parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("artifacts/runtime-acceptance"),
         help="directory for machine-readable evidence",
-    )
-    result.add_argument(
-        "--allow-real-hardware",
-        action="store_true",
-        help=(
-            "allow write-capable scenarios against a non-Mock provider; use only when "
-            "real-hardware execution is explicitly approved"
-        ),
     )
     return result
 
@@ -87,7 +66,6 @@ def main(argv: list[str] | None = None) -> int:
     client = Client(
         args.base_url,
         environment=args.environment,
-        allow_real_hardware=args.allow_real_hardware,
         evidence_root=args.evidence_root,
     )
     selected = SUITES.get(args.scenario, [args.scenario])

@@ -96,7 +96,6 @@ _MANAGED_GET_PATTERNS = tuple(
         rf"^/api/jobs/{_SEGMENT}/files/{_SEGMENT}$",
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/status$",
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/jobs/{_SEGMENT}/files/{_SEGMENT}$",
-        rf"^/api/batches/{_SEGMENT}$",
     )
 )
 _MANAGED_POST_PATTERNS = tuple(
@@ -110,11 +109,9 @@ _MANAGED_POST_PATTERNS = tuple(
         r"^/api/engineering/diagnostics/loopback$",
         r"^/api/engineering/diagnostics/openocd-control-plane$",
         r"^/api/engineering/session$",
-        # The legacy PPU Gateway Batch writes (POST /api/batches and its Batch /
-        # Target cancels) are deliberately absent: a Browser must not start or
-        # cancel a PPU-local Batch through Manager. Programming Batches are
-        # Manager-owned and start only at /api/programming/batches (U3). The
-        # read-only GET /api/batches/{id} relay above is retained.
+        # The PPU no longer runs Batches (U10): no /api/batches route is
+        # relayed in either direction. Programming Batches are Manager-owned
+        # and start only at /api/programming/batches (U3).
         r"^/api/jobs$",
         rf"^/api/jobs/{_SEGMENT}/cancel$",
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/programming-assets/check$",

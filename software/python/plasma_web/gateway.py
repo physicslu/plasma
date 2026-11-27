@@ -1,28 +1,22 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import re
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from plasma_core.assets import ProgrammingAsset
-from plasma_core.batch import BatchExecutionPolicy, BatchTarget
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 
 from . import gateway_base as base
-from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
-from .durable_batch_runtime import DurableBatchRuntimeManager
 from .engineering_targets import EngineeringPPUProvider
 from .gateway_communication import ppu_response_budget_ms, request_with_gateway_policy
 from .gateway_settings import GatewayCommunicationPolicy, GatewaySettingsController
-from .persistent_mock_batch_runtime import PersistentMockAwareBatchRuntimeManager
 from .ppu_network_settings import PPUNetworkSettingsController
 from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
@@ -34,14 +28,6 @@ GATEWAY_SERVICE_NAME = base.GATEWAY_SERVICE_NAME
 # The Device Selector is Catalog-only and owned by Plasma Manager (OPF S5-B).
 # The PPU Gateway has no Selector route, imports no Catalog module and answers
 # the former Selector path like any unknown route (404).
-
-
-def _batch_payload(snapshot: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "ok": True,
-        "rest_contract_version": WEB_REST_CONTRACT_VERSION,
-        "batch": snapshot,
-    }
 
 
 def _mock_runtime_payload(settings: dict[str, Any]) -> dict[str, Any]:
@@ -76,52 +62,30 @@ def _ppu_network_settings_payload(settings: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+@dataclass(frozen=True, slots=True)
+class TargetDeviceSnapshot:
+    """An Engineering Job's exact target CLAIM (never Catalog qualification)."""
+
+    vendor: str
+    family: str
+    identifier: str
+    identifier_kind: str
+    icpn: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "vendor": self.vendor,
+            "family": self.family,
+            "identifier": self.identifier,
+            "identifier_kind": self.identifier_kind,
+            "icpn": self.icpn,
+        }
+
+
 def _require_object(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be an object")
     return value
-
-
-def _parse_policy(body: dict[str, Any]) -> BatchExecutionPolicy:
-    raw = _require_object(body.get("execution_policy", {}), "execution_policy")
-    base._require_declared_keys(
-        raw,
-        allowed={"repeat_count", "site_retry_limit", "failed_site_stop_threshold"},
-        label="Batch execution_policy",
-    )
-    threshold = raw.get("failed_site_stop_threshold")
-    return BatchExecutionPolicy(
-        repeat_count=raw.get("repeat_count", 1),
-        site_retry_limit=raw.get("site_retry_limit", 0),
-        failed_site_stop_threshold=threshold,
-    )
-
-
-def _parse_targets(value: Any) -> tuple[BatchTarget, ...]:
-    if not isinstance(value, list) or not value:
-        raise ValueError("Batch targets must be a non-empty array")
-    targets: list[BatchTarget] = []
-    for index, raw in enumerate(value):
-        item = _require_object(raw, f"Batch target {index}")
-        base._require_declared_keys(
-            item,
-            allowed={"facility_id", "ppu_id", "site_ids"},
-            required={"facility_id", "ppu_id", "site_ids"},
-            label=f"Batch target {index}",
-        )
-        site_ids = item["site_ids"]
-        if not isinstance(site_ids, list) or not site_ids:
-            raise ValueError(f"Batch target {index} site_ids must be a non-empty array")
-        for raw_site_id in site_ids:
-            site_id = base._parse_site_id(raw_site_id)
-            targets.append(
-                BatchTarget(
-                    facility_id=str(item["facility_id"]),
-                    ppu_id=str(item["ppu_id"]),
-                    site_id=site_id,
-                )
-            )
-    return tuple(targets)
 
 
 def _validated_target_claim(value: Any, *, label: str) -> str:
@@ -136,7 +100,7 @@ def _parse_target_device(
     value: Any,
     *,
     label: str = "target_device",
-) -> BatchTargetDeviceSnapshot | None:
+) -> TargetDeviceSnapshot | None:
     if value is None:
         return None
     raw = _require_object(value, label)
@@ -153,14 +117,14 @@ def _parse_target_device(
     if not isinstance(identifier, str) or not identifier.strip():
         raise ValueError(f"{label} identifier is required")
     # User-supplied target identity is a CLAIM, not Catalog qualification.
-    # No Catalog dependency is permitted in Programming Job / Batch submission.
+    # No Catalog dependency is permitted in Programming Job submission.
     # The selected Runtime Provider must separately resolve exact-target
     # capabilities and refuse unsupported operations before any hardware I/O.
     vendor = vendor.strip()
     identifier = _validated_target_claim(identifier.strip(), label=label)
     if len(vendor) > 128 or any(ord(c) < 32 or ord(c) == 127 for c in vendor):
         raise ValueError(f"{label} target identity is invalid")
-    return BatchTargetDeviceSnapshot(
+    return TargetDeviceSnapshot(
         vendor=vendor,
         family="",
         identifier=identifier,
@@ -169,62 +133,15 @@ def _parse_target_device(
     )
 
 
-def _parse_asset(value: Any) -> ProgrammingAsset | None:
-    if value is None:
-        return None
-    raw = _require_object(value, "Batch asset")
-    required = {
-        "asset_name",
-        "asset_type",
-        "asset_format",
-        "asset_size",
-        "asset_sha256",
-        "asset_base64",
-    }
-    base._require_declared_keys(raw, allowed=required, required=required, label="Batch asset")
-    encoded = raw["asset_base64"]
-    if not isinstance(encoded, str) or not encoded:
-        raise ValueError("Batch asset_base64 is required")
-    try:
-        data = base64.b64decode(encoded, validate=True)
-    except ValueError as exc:
-        raise ValueError("Batch asset_base64 is invalid") from exc
-    asset = ProgrammingAsset.from_upload(
-        name=str(raw["asset_name"]),
-        asset_type=str(raw["asset_type"]),
-        asset_format=str(raw["asset_format"]),
-        data=data,
-        sha256=str(raw["asset_sha256"]),
-    )
-    declared_size = raw["asset_size"]
-    if isinstance(declared_size, bool) or not isinstance(declared_size, int) or declared_size != asset.size:
-        raise ValueError("Batch asset_size does not match decoded Asset length")
-    return asset
-
-
-def _parse_read(value: Any) -> tuple[int, int]:
-    if value is None:
-        return 0, 256
-    raw = _require_object(value, "Batch read")
-    base._require_declared_keys(raw, allowed={"offset", "length"}, label="Batch read")
-    offset = raw.get("offset", 0)
-    length = raw.get("length", 256)
-    if (
-        isinstance(offset, bool)
-        or not isinstance(offset, int)
-        or offset < 0
-        or isinstance(length, bool)
-        or not isinstance(length, int)
-        or length <= 0
-    ):
-        raise ValueError("Batch read offset/length is invalid")
-    return offset, length
-
-
 class PlasmaWebHandler(base.PlasmaWebHandler):
-    """Canonical Plasma Web REST Gateway with server-side Batch orchestration."""
+    """Canonical Plasma Web REST Gateway.
 
-    batch_runtime: BatchRuntimeManager | None = None
+    The PPU no longer runs Batches (U10). Every Batch, including a single
+    Programming of 1 Site x 1 Cycle, is owned by the Plasma Manager
+    Programming Batch Coordinator (``/api/programming/batches``); the former
+    PPU ``/api/batches`` routes answer 410 Gone.
+    """
+
     gateway_settings = GatewaySettingsController()
     ppu_network_settings = PPUNetworkSettingsController()
     engineering_status_retry_backoff_s = 1.0
@@ -235,6 +152,20 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
         if len(parts) < 2 or parts[:2] != ["api", "batches"]:
             return None
         return parts[2:]
+
+    def _batch_retired(self) -> None:
+        self._json(
+            HTTPStatus.GONE,
+            {
+                "ok": False,
+                "error": {
+                    "error_code": "PPU_BATCH_RETIRED",
+                    "error_type": "PPU_BATCH_RETIRED",
+                    "message": ("The PPU no longer runs Batches; submit Programming "
+                                "to the Plasma Manager /api/programming/batches"),
+                },
+            },
+        )
 
     @staticmethod
     def _is_mock_runtime_path(path: str) -> bool:
@@ -370,38 +301,6 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 },
             },
         )
-
-    def _batch_unavailable(self) -> None:
-        self._json(
-            HTTPStatus.SERVICE_UNAVAILABLE,
-            {
-                "ok": False,
-                "error": {
-                    "error_code": ErrorCode.BATCH_INFRASTRUCTURE_ERROR.value,
-                    "error_type": "BATCH_INFRASTRUCTURE_ERROR",
-                    "message": "Server-side Batch runtime is not enabled",
-                },
-            },
-        )
-
-    def _batch_error(self, exc: Exception) -> None:
-        if isinstance(exc, PlasmaError) and exc.code in {
-            ErrorCode.JOB_NOT_FOUND,
-            ErrorCode.BATCH_NOT_FOUND,
-        }:
-            self._json(
-                HTTPStatus.NOT_FOUND,
-                {
-                    "ok": False,
-                    "error": {
-                        "error_code": exc.code.value,
-                        "error_type": exc.error_type,
-                        "message": exc.message,
-                    },
-                },
-            )
-            return
-        self._error(exc)
 
     def _communication_unavailable(self, exc: PlasmaError) -> None:
         base._gateway_diagnostic(
@@ -568,20 +467,10 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
         if self._engineering_status_request(parsed):
             return
 
-        tail = self._batch_path(parsed.path)
-        if tail is None:
-            super().do_GET()
+        if self._batch_path(parsed.path) is not None:
+            self._batch_retired()
             return
-        try:
-            if self.batch_runtime is None:
-                self._batch_unavailable()
-                return
-            if len(tail) == 1:
-                self._json(HTTPStatus.OK, _batch_payload(self.batch_runtime.get(tail[0])))
-                return
-            self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
-        except Exception as exc:
-            self._batch_error(exc)
+        super().do_GET()
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
@@ -631,94 +520,10 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 self._error(exc)
             return
 
-        tail = self._batch_path(parsed.path)
-        if tail is None:
-            super().do_POST()
+        if self._batch_path(parsed.path) is not None:
+            self._batch_retired()
             return
-        try:
-            if self.batch_runtime is None:
-                self._batch_unavailable()
-                return
-            if not tail:
-                body = self._body()
-                base._require_declared_keys(
-                    body,
-                    allowed={
-                        "session_id",
-                        "targets",
-                        "operations",
-                        "execution_policy",
-                        "target_device",
-                        "asset",
-                        "read",
-                    },
-                    required={"targets", "operations", "execution_policy"},
-                    label="Batch request",
-                )
-                session_id = body.get("session_id")
-                if session_id is not None and not isinstance(session_id, str):
-                    raise ValueError("Batch session_id must be a string")
-                operations = body["operations"]
-                if not isinstance(operations, list):
-                    raise ValueError("Batch operations must be an array")
-                read_offset, read_length = _parse_read(body.get("read"))
-                snapshot = self.batch_runtime.create_batch(
-                    targets=_parse_targets(body["targets"]),
-                    operations=operations,
-                    policy=_parse_policy(body),
-                    session_id=session_id,
-                    target_device=_parse_target_device(
-                        body.get("target_device"),
-                        label="Batch target_device",
-                    ),
-                    asset=_parse_asset(body.get("asset")),
-                    read_offset=read_offset,
-                    read_length=read_length,
-                )
-                self._json(HTTPStatus.ACCEPTED, _batch_payload(snapshot))
-                return
-            if len(tail) == 2 and tail[1] == "cancel":
-                body = self._body()
-                base._require_declared_keys(body, allowed=set(), label="Batch cancel request")
-                self._json(HTTPStatus.OK, _batch_payload(self.batch_runtime.cancel(tail[0])))
-                return
-            if len(tail) == 5 and tail[1] == "targets" and tail[4] == "cancel":
-                body = self._body()
-                base._require_declared_keys(body, allowed=set(), label="Batch PPU cancel request")
-                self._json(
-                    HTTPStatus.OK,
-                    _batch_payload(
-                        self.batch_runtime.cancel_ppu(
-                            tail[0],
-                            tail[2],
-                            tail[3],
-                        )
-                    ),
-                )
-                return
-            self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
-        except Exception as exc:
-            self._batch_error(exc)
-
-
-def _build_batch_runtime(
-    engineering_provider: EngineeringPPUProvider | None,
-    *,
-    settings: GatewaySettingsController,
-    output_root: Path,
-) -> BatchRuntimeManager | None:
-    if isinstance(engineering_provider, SharedImageMockEngineeringPPUProvider):
-        return PersistentMockAwareBatchRuntimeManager(
-            engineering_provider,
-            gateway_settings=settings,
-        )
-    if engineering_provider is not None:
-        return DurableBatchRuntimeManager(
-            engineering_provider,
-            state_path=output_root / "batch-state.sqlite3",
-            gateway_settings=settings,
-        )
-    return None
+        super().do_POST()
 
 
 def serve(
@@ -738,11 +543,6 @@ def serve(
     PlasmaWebHandler.engineering_provider = engineering_provider
     PlasmaWebHandler.gateway_settings = settings
     PlasmaWebHandler.ppu_network_settings = network_settings
-    PlasmaWebHandler.batch_runtime = _build_batch_runtime(
-        engineering_provider,
-        settings=settings,
-        output_root=output_root,
-    )
     PlasmaWebHandler.allowed_origins = frozenset(cors_origins)
     PlasmaWebHandler.output_root = output_root.resolve()
     PlasmaWebHandler.static_root = static_root.resolve() if static_root is not None else None
@@ -754,10 +554,6 @@ def serve(
         pass
     finally:
         server.server_close()
-        runtime = PlasmaWebHandler.batch_runtime
-        PlasmaWebHandler.batch_runtime = None
-        if runtime is not None:
-            runtime.close()
 
 
 def main() -> None:

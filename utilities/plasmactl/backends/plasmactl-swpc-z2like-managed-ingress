@@ -166,23 +166,6 @@ server {
         proxy_pass $gateway_root;
     }
 
-    location = /api/batches {
-        limit_except POST { deny all; }
-        proxy_pass $gateway_root;
-    }
-    location ~ ^/api/batches/[^/]+$ {
-        limit_except GET { deny all; }
-        proxy_pass $gateway_root;
-    }
-    location ~ ^/api/batches/[^/]+/cancel$ {
-        limit_except POST { deny all; }
-        proxy_pass $gateway_root;
-    }
-    location ~ ^/api/batches/[^/]+/targets/[^/]+/[^/]+/cancel$ {
-        limit_except POST { deny all; }
-        proxy_pass $gateway_root;
-    }
-
     location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/status$ {
         limit_except GET { deny all; }
         proxy_pass $gateway_root;

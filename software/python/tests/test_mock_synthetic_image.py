@@ -4,18 +4,15 @@ import hashlib
 import json
 import tempfile
 import threading
-import time
 import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 from plasma_core.assets import ProgrammingAsset
-from plasma_core.batch import BatchExecutionPolicy, BatchTarget
 from plasma_core.enums import Operation
 from plasma_core.models import JobRequest
 from plasma_web.gateway import PlasmaWebHandler
-from plasma_web.mock_batch_runtime import MockAwareBatchRuntimeManager
 from plasma_web.mock_synthetic_image import build_synthetic_mock_asset
 from plasma_web.shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
@@ -84,31 +81,18 @@ class MockSyntheticRuntimeTests(unittest.TestCase):
         )
         self.provider.start()
         self.provider.update_mock_runtime_settings(zero_error_settings(64 * 1024))
-        self.manager = MockAwareBatchRuntimeManager(self.provider, poll_interval_s=0.005)
         self.session_id = self.provider.begin_session()["session"]["session_id"]
 
     def tearDown(self) -> None:
-        self.manager.close()
         self.provider.close()
         self.temporary.cleanup()
 
-    def wait_terminal(self, batch_id: str, timeout_s: float = 8.0) -> dict[str, object]:
-        deadline = time.monotonic() + timeout_s
-        while time.monotonic() < deadline:
-            snapshot = self.manager.get(batch_id)
-            if snapshot["state"] in {"success", "partial", "error", "cancelled"}:
-                return snapshot
-            time.sleep(0.01)
-        self.fail(f"Batch {batch_id} did not reach terminal state")
-
     def request_gateway_job(self, provider: object, body: dict[str, object]) -> tuple[int, dict[str, object]]:
         previous_provider = PlasmaWebHandler.engineering_provider
-        previous_runtime = PlasmaWebHandler.batch_runtime
         server = None
         thread = None
         try:
             PlasmaWebHandler.engineering_provider = provider  # type: ignore[assignment]
-            PlasmaWebHandler.batch_runtime = self.manager if provider is self.provider else None
             server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -132,43 +116,6 @@ class MockSyntheticRuntimeTests(unittest.TestCase):
             if thread is not None:
                 thread.join()
             PlasmaWebHandler.engineering_provider = previous_provider
-            PlasmaWebHandler.batch_runtime = previous_runtime
-
-    def test_batch_without_uploaded_image_uses_frozen_profile_size(self) -> None:
-        started = self.manager.create_batch(
-            targets=(
-                BatchTarget("mock-facility-01", "mock-facility-01-ppu-01", 1),
-                BatchTarget("mock-facility-01", "mock-facility-01-ppu-01", 2),
-            ),
-            operations=["program", "verify"],
-            policy=BatchExecutionPolicy(repeat_count=1, site_retry_limit=0),
-            session_id=self.session_id,
-            asset=None,
-        )
-        self.provider.update_mock_runtime_settings(zero_error_settings(128 * 1024))
-
-        self.assertEqual(started["asset"]["name"], "mock-synthetic-64KiB.bin")
-        self.assertEqual(started["asset"]["size_bytes"], 64 * 1024)
-        self.assertEqual(started["mock_runtime"]["profile"]["default_image_size_bytes"], 64 * 1024)
-
-        final = self.wait_terminal(str(started["batch_id"]))
-        self.assertEqual(final["state"], "success")
-        self.assertEqual(final["site_counts"]["success"], 2)
-        self.assertEqual(final["asset"]["size_bytes"], 64 * 1024)
-
-    def test_user_image_overrides_synthetic_image(self) -> None:
-        asset = user_asset(b"user-image" * 1024)
-        started = self.manager.create_batch(
-            targets=(BatchTarget("mock-facility-01", "mock-facility-01-ppu-01", 1),),
-            operations=["program", "verify"],
-            policy=BatchExecutionPolicy(),
-            session_id=self.session_id,
-            asset=asset,
-        )
-        self.assertEqual(started["asset"]["name"], asset.name)
-        self.assertEqual(started["asset"]["sha256"], asset.sha256)
-        final = self.wait_terminal(str(started["batch_id"]))
-        self.assertEqual(final["state"], "success")
 
     def test_direct_mock_job_can_use_synthetic_image_without_asset_sha(self) -> None:
         request = JobRequest(
