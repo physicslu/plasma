@@ -152,6 +152,105 @@ def sha_file(path: Path, expected: str) -> str:
     return digest.hexdigest()
 
 
+# Site admission image digest cache (U12). Lives in the root-only tmpfs owner
+# directory, so a reboot empties it; the boot ID is also part of every entry.
+IMAGE_SHA_CACHE = OWNER_DIR / "image-sha-cache.json"
+IMAGE_SHA_CACHE_MAX_BYTES = 65536
+# An entry is written only when the file's last change is older than this, so
+# a write landing in the same coarse timestamp tick cannot keep an old stat.
+IMAGE_SHA_CACHE_SETTLE_NS = 2_000_000_000
+_STAT_KEYS = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
+
+
+def _stat_identity(info: os.stat_result) -> list[int]:
+    return [int(getattr(info, key)) for key in _STAT_KEYS]
+
+
+def _read_image_sha_cache(path: Path) -> dict:
+    """Best-effort read; anything unexpected means "no cache", never a denial.
+
+    The owner must be the caller (root in production: the Root Guard runs as
+    euid 0) and the file must not be readable or writable by anyone else.
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return {}
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or
+                info.st_mode & 0o077 or info.st_size > IMAGE_SHA_CACHE_MAX_BYTES):
+            return {}
+        data = json.loads(os.read(fd, IMAGE_SHA_CACHE_MAX_BYTES + 1))
+    except (OSError, ValueError):
+        return {}
+    finally:
+        os.close(fd)
+    entries = data.get("entries") if isinstance(data, dict) else None
+    return entries if isinstance(entries, dict) else {}
+
+
+def _write_image_sha_cache(path: Path, entries: dict) -> None:
+    """Atomic root-only replace; a failure only costs the next full hash."""
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}")
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            os.write(fd, json.dumps({"version": 1, "entries": entries},
+                                    sort_keys=True).encode())
+        finally:
+            os.close(fd)
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
+def sha_file_cached(path: Path, expected: str, *, boot_id: str) -> tuple[str, str]:
+    """``sha_file`` for Site admission, reusing a proven digest.
+
+    Returns ``(digest, "CACHE" | "FULL")``. A cached digest is reused only
+    when the protected file's device, inode, size, mtime and ctime and the
+    boot ID equal those recorded when the same bytes were fully hashed and
+    matched ``expected``. Any replacement or rewrite of the file changes its
+    ctime, which userspace cannot set. A miss, an unreadable cache or a file
+    changed while being hashed falls back to (or stays) the full hash; the
+    cache can never turn a mismatch into a match. FPGA Manager load, test and
+    restore keep ``sha_file`` without the cache.
+    """
+    need(type(expected) is str and re.fullmatch(r"[0-9a-f]{64}", expected) is not None,
+         "PINNED_IMAGE_HASH_DENIED")
+    protected(path)
+    need(path.parent == FIRMWARE and path.is_file() and
+         0 < path.stat().st_size <= 16_000_000, "FIRMWARE_LOCATION_DENIED")
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        identity = _stat_identity(before)
+        entries = _read_image_sha_cache(IMAGE_SHA_CACHE)
+        entry = entries.get(path.name)
+        if (isinstance(entry, dict) and entry.get("boot_id") == boot_id and
+                entry.get("stat") == identity and entry.get("sha256") == expected):
+            return expected, "CACHE"
+        digest = hashlib.sha256()
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            for chunk in iter(lambda: stream.read(1 << 20), b""):
+                digest.update(chunk)
+        after = os.fstat(fd)
+    finally:
+        os.close(fd)
+    need(digest.hexdigest() == expected, "FIRMWARE_BYTES_CHANGED")
+    if (_stat_identity(after) == identity and
+            time.time_ns() - before.st_ctime_ns > IMAGE_SHA_CACHE_SETTLE_NS):
+        entries = {name: value for name, value in entries.items()
+                   if name != path.name and isinstance(value, dict)}
+        entries[path.name] = {"boot_id": boot_id, "stat": identity, "sha256": expected}
+        _write_image_sha_cache(IMAGE_SHA_CACHE, entries)
+    return expected, "FULL"
+
+
 def overlaps(start: int, size: int, base: int, length: int) -> bool:
     return size > 0 and start < base + length and start + size > base
 
@@ -202,7 +301,7 @@ def _site_record(site: int) -> dict | None:
     path = OWNER_DIR / f"swd-site{site}-admission"
     try:
         info = os.lstat(path)
-        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or
                 info.st_mode & 0o077 or info.st_size > 8192):
             return None
         fields = dict(line.split("=", 1)
@@ -524,7 +623,8 @@ def scan_proc_consumers(*, procroot: Path, release,
 
 def read_live_z2_facts(*, release, runtime_program_session: bool = False,
                        cooperating=None, timing_ms: dict[str, float] | None = None,
-                       vanished_pids: str = "rescan") -> dict:
+                       vanished_pids: str = "rescan",
+                       image_hash_cache: bool = False) -> dict:
     """Keep kernel/image guards; runtime WordPort does not census all PIDs.
 
     Runtime call requires the same protected FPGA lock and is NOT a safe
@@ -539,8 +639,16 @@ def read_live_z2_facts(*, release, runtime_program_session: bool = False,
     boot_before = (PROC / "sys/kernel/random/boot_id").read_text().strip()
     need(bool(boot_before), "BOOT_ID_UNAVAILABLE")
     hash_start_ns = time.monotonic_ns()
-    candidate_sha = sha_file(candidate, release.firmware_sha256)
-    recovery_sha = sha_file(recovery, GOLDEN_RECOVERY_SHA256)
+    need(type(image_hash_cache) is bool, "INVALID_IMAGE_HASH_POLICY")
+    if image_hash_cache:
+        candidate_sha, candidate_source = sha_file_cached(
+            candidate, release.firmware_sha256, boot_id=boot_before)
+        recovery_sha, recovery_source = sha_file_cached(
+            recovery, GOLDEN_RECOVERY_SHA256, boot_id=boot_before)
+    else:
+        candidate_sha = sha_file(candidate, release.firmware_sha256)
+        recovery_sha = sha_file(recovery, GOLDEN_RECOVERY_SHA256)
+        candidate_source = recovery_source = "FULL"
     if timing_ms is not None:
         timing_ms["image_hash"] = round((time.monotonic_ns() - hash_start_ns) / 1e6, 3)
     kernel_start_ns = time.monotonic_ns()
@@ -573,6 +681,8 @@ def read_live_z2_facts(*, release, runtime_program_session: bool = False,
         "uio_overlaps": uio, "platform_overlaps": platform,
         "proc_complete": complete, "proc_conflicts": conflicts,
         "proc_scan_diagnostic": proc_diagnostic,
+        "image_hash_source": {"candidate": candidate_source,
+                              "recovery": recovery_source},
         "observation_kind": "LIVE_ROOT_READ_ONLY",
         "axi_isolation_evidence": "UNPROVEN",
         "active_image_attestation": "UNPROVEN",
@@ -711,7 +821,9 @@ class RootZ2TargetPort:
         return read_live_z2_facts(
             release=self.release, cooperating=cooperating,
             timing_ms=self.admission_timing_ms if self._site is not None else None,
-            vanished_pids="skip" if self._site is not None else "rescan")
+            vanished_pids="skip" if self._site is not None else "rescan",
+            # Only Site admission reuses a proven image digest (U12).
+            image_hash_cache=self._site is not None)
 
     def runtime_program_facts(self) -> dict:
         """Read-only program admission, never FPGA reconfiguration authority."""
