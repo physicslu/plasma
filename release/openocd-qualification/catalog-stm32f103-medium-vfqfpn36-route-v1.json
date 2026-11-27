@@ -25,5 +25,6 @@
   },
   "catalog_package": "UFQFPN",
   "pin_count": "36",
-  "source_lock_key": "st_ds5319_rev20"
+  "source_lock_key": "st_ds5319_rev20",
+  "geometry_source_lock_key": "st_pm0075_rev2"
 }

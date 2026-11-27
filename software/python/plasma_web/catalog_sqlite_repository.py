@@ -864,6 +864,7 @@ class CatalogSqliteShadowRepository:
                 or record.identifier not in route_authority["exact_icpns"]):
             raise DeviceCatalogIntegrityError("L2 package route lacks data-only applicability review")
         package_route = route_authority.get("package_route")
+        geometry_source_key = route_authority.get("geometry_source_lock_key")
         if (not isinstance(package_route, dict)
                 or not package_route.get("package")
                 or package_route.get("transport") != "SWD"
@@ -871,11 +872,11 @@ class CatalogSqliteShadowRepository:
                 or not isinstance(package_route.get("swclk"), dict)
                 or package_route.get("source_sha256") != group[
                     "manufacturer_evidence"]["source_lock"].get(
-                        route_authority.get("source_lock_key"))):
+                        route_authority.get("source_lock_key"))
+                or not isinstance(geometry_source_key, str)
+                or not group["manufacturer_evidence"]["source_lock"].get(geometry_source_key)):
             raise DeviceCatalogIntegrityError("L2 package route source mismatch")
         exact_source = reviewed.get("official_exact_source")
-        expected_url = ("https://www.st.com/en/microcontrollers-microprocessors/"
-                        f"{record.base_device.lower()}.html")
         if not isinstance(exact_source, dict):
             raise DeviceCatalogIntegrityError("L2 official Exact source missing")
         if exact_source.get("kind") == "locked_production_identity":
@@ -895,8 +896,14 @@ class CatalogSqliteShadowRepository:
                 raise DeviceCatalogIntegrityError("L2 official Exact identity lock mismatch")
             self._validate_exact_content(record, "locked_production_identity", identity_bytes, metadata[2])
         elif exact_source.get("kind") == "manufacturer_https":
+            expected_url = exact_source.get("url")
             identity_reference = f"{expected_url}#{record.identifier}"
-            if (exact_source.get("url") != expected_url
+            source_page = urlsplit(band["source_url"])
+            identity_page = urlsplit(expected_url) if isinstance(expected_url, str) else None
+            if (identity_page is None or identity_page.scheme != "https"
+                    or identity_page.netloc != source_page.netloc
+                    or record.base_device.lower() not in identity_page.path.lower()
+                    or identity_page.query or identity_page.fragment
                     or not isinstance(exact_source.get("sha256"), str)):
                 raise DeviceCatalogIntegrityError("L2 official Exact source missing")
             metadata, source_bytes = self._read_evidence(exact_source.get("evidence_id"))
@@ -950,7 +957,7 @@ class CatalogSqliteShadowRepository:
             "identity": identity_reference,
             "route": f"{provider.source_lock_id}#{provider.provider['target_config']}",
             "geometry": (f"{band['source_url']}#{band['document']};"
-                         f"st_pm0075_rev2:{group['manufacturer_evidence']['source_lock']['st_pm0075_rev2']}"),
+                         f"{geometry_source_key}:{group['manufacturer_evidence']['source_lock'][geometry_source_key]}"),
             "operations": f"{provider.qualification_id}#{group['group_id']}",
         }
         if (q.get("schema_version") != "2.0.0"

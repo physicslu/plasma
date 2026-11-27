@@ -466,6 +466,11 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     bad_route["applicability"]["package_route_source"]["sha256"] = "0" * 64
     with pytest.raises(DeviceCatalogIntegrityError, match="package route source lock drift"):
         stage_packet(bad_route)
+    bad_identity = json.loads(json.dumps(packet))
+    bad_identity["official_exact_source"]["url"] = (
+        "https://example.test/stm32f103t8.html")
+    with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source missing"):
+        stage_packet(bad_identity)
     source_response[0] = b"<html>STM32F103C8T6 only</html>"
     with pytest.raises(DeviceCatalogIntegrityError, match="official Exact source"):
         repo.acquire_exact_evidence(record, kind="manufacturer_https", source_revision="bad-page-v1")
