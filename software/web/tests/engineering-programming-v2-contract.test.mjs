@@ -2,18 +2,24 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import test from "node:test";
 
+// U10: EMode Programming is the Manager-managed workspace only. The standalone
+// Programming Workspace v2 (direct PPU Jobs, PPU-local server Batch, per-Site
+// Job cancel) is retired; these contracts hold for the managed workspace.
+
 async function source(path) {
   return await fs.readFile(new URL(path, import.meta.url), "utf8");
 }
 
+const WORKSPACE = "../app/engineering/managed-programming-workspace.tsx";
+
 test("Engineering Programming uses the approved status-first single-PPU workflow", async () => {
   const page = await source("../app/engineering/page.tsx");
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const workspace = await source(WORKSPACE);
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
   const sharedPanel = await source("../app/operator-ui/operator-panel.tsx");
   const refresh = await source("../app/engineering/engineering-workspace-refresh.css");
 
-  assert.match(page, /ProgrammingWorkspaceV2/);
+  assert.match(page, /<ManagedProgrammingWorkspace \/>/);
   assert.match(workspace, /SINGLE PPU PROGRAMMING/);
   assert.match(workspace, /title="SYSTEM SETUP & TARGETING"/);
   assert.match(workspace, /PROGRAMMING JOB/);
@@ -23,7 +29,7 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.match(workspace, /LIVE SITE STATUS/);
   assert.match(workspace, /aria-label=\{`\$\{setupCollapsed \? "Expand" : "Collapse"\} System Setup`\}/);
   assert.match(workspace, /<ProgrammingJobPanel[\s\S]*mode="engineering"/);
-  assert.match(workspace, /collapsed=\{programmingJobCollapsed\}/);
+  assert.match(workspace, /collapsed=\{jobCollapsed\}/);
   assert.match(sharedJob, /<OperatorPanelToggle/);
   assert.match(sharedPanel, /export function OperatorPanelToggle/);
   assert.match(sharedPanel, /aria-expanded=\{expanded\}/);
@@ -56,37 +62,32 @@ test("Engineering shell uses the approved dark EMode sidebar and supports collap
 });
 
 test("LIVE SITE STATUS owns Batch Site selection while keeping every PPU Site visible", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const workspace = await source(WORKSPACE);
 
   assert.match(workspace, /aria-label="Engineering Site selection"/);
-  assert.match(workspace, /aria-label="Select all Engineering batch Sites"/);
-  assert.match(workspace, /aria-label=\{`Batch select SITE \$\{site\.id\}`\}/);
-  assert.match(workspace, /\{sites\.map\(site => \{/);
-  assert.doesNotMatch(workspace, /\{selectedSites\.map\(site => \{/);
-  assert.match(workspace, /const siteIds = \[\.\.\.selectedSiteIds\];/);
-  assert.match(workspace, /disabled=\{batchRunning \|\| !site\.enabled \|\| isRunning\(site\)\}/);
+  assert.match(workspace, /aria-label=\{`Select SITE \$\{site\.site_id\} for programming`\}/);
+  // Every Site the Manager Fleet reports is a row, selected or not.
+  assert.match(workspace, /\{\(ppu\?\.sites \?\? \[\]\)\.map\(site => \{/);
+  assert.match(workspace, /const started = \[\.\.\.siteIds\];/);
+  assert.match(workspace, /disabled=\{active \|\| !capability\?\.programmable\}/);
 });
 
-test("Engineering Batch Summary uses server Batch manufacturing outcomes and Production KPI vocabulary", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+test("Engineering Batch Summary uses Manager Batch statistics and Production KPI vocabulary", async () => {
+  const workspace = await source(WORKSPACE);
+  const statistics = await source("../app/programming/batch-statistics.ts");
 
   assert.match(workspace, /title="BATCH SUMMARY"/);
-  for (const label of ["SITES", "TOTAL IC", "PROCESSED IC", "PASS", "FAIL", "YIELD", "BATCH TIME"]) {
-    assert.match(workspace, new RegExp(`label: "${label}"`));
+  for (const label of ["SITES", "TOTAL IC", "PROCESSED IC", "PASS IC", "FAIL IC", "YIELD", "BATCH TIME"]) {
+    assert.match(statistics, new RegExp(`label: "${label}"`));
   }
-  assert.match(workspace, /const previewTotalIc = selectedSiteIds\.length \* \(repeatValue \?\? 0\)/);
-  assert.match(workspace, /const batchManufacturing = useMemo\(\(\) => \{/);
-  assert.match(workspace, /site\.completed_rounds/);
-  assert.match(workspace, /site\.final_failures/);
-  assert.match(workspace, /totalIc: batchSnapshot\.sites\.length \* batchSnapshot\.execution_policy\.repeat_count/);
-  assert.match(workspace, /const completedIc = displayedBatch\.pass \+ displayedBatch\.fail/);
-  assert.match(workspace, /label: "PROCESSED IC", value: completedIc/);
+  assert.match(workspace, /\? managedBatchStatistics\(batch\)/);
+  assert.match(workspace, /const kpis = statisticsKpis\(statistics, formatElapsed\(elapsed\)\);/);
   assert.doesNotMatch(workspace, /CYCLE TIME/);
 });
 
 test("Production and Engineering use the same Batch Summary and shared Panel Header primitives", async () => {
   const production = await source("../app/fleet/factory-console-v2.tsx");
-  const engineering = await source("../app/engineering/programming-workspace-v2.tsx");
+  const engineering = await source(WORKSPACE);
   const batchSummary = await source("../app/operator-ui/batch-summary.tsx");
   const sharedPanel = await source("../app/operator-ui/operator-panel.tsx");
 
@@ -101,93 +102,83 @@ test("Production and Engineering use the same Batch Summary and shared Panel Hea
   assert.match(engineering, /title="BATCH SUMMARY"/);
 });
 
-test("Engineering keeps direct single-Site jobs separate from server-owned Batch execution", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
-  const controller = await source("../app/engineering/engineering-server-batch.ts");
+test("Engineering programming and per-Site READ are separate Manager Batches; the Browser submits no Job", async () => {
+  const workspace = await source(WORKSPACE);
 
-  assert.match(workspace, /startJob\(/);
-  assert.match(workspace, /cancelJob\(/);
-  assert.match(workspace, /startEngineeringServerBatch\(/);
-  assert.match(workspace, /restoreEngineeringServerBatch\(/);
-  assert.match(workspace, /abortEngineeringServerBatch\(/);
-  assert.match(controller, /createServerBatch\(/);
-  assert.match(controller, /getServerBatch\(/);
-  assert.match(controller, /cancelServerBatch\(/);
+  assert.equal((workspace.match(/runManagedBatch\(request, \{/g) ?? []).length, 1);
+  assert.match(workspace, /await runManagedRead\(\{ alias, siteId: id, icpn, address, length \}/);
+  assert.doesNotMatch(workspace, /startJob\(|cancelJob\(|startEngineeringServerBatch|restoreEngineeringServerBatch|abortEngineeringServerBatch/);
+  assert.doesNotMatch(workspace, /createServerBatch|getServerBatch|cancelServerBatch/);
 });
 
 test("Engineering Read Memory is an independent per-Site Job, not a Batch operation", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const workspace = await source(WORKSPACE);
+  const api = await source("../app/engineering/bundle-programming-api.ts");
   const driver = await source("../e2e/tests/programming-job-test-helpers.ts");
 
-  assert.match(workspace, /const operationOrder: Operation\[\] = \["erase", "program", "verify"\]/);
-  assert.match(workspace, /const selectedBatchOperations = operationOrder\.filter\(operation => selectedOperations\.includes\(operation\)\)/);
-  assert.match(workspace, /readSelected: false/);
-  assert.match(workspace, /snapshot\.operations\.filter\(operation => operation !== "read"\)/);
-  assert.match(workspace, /aria-label=\{`SITE \$\{site\.id\} Read Memory`\}/);
-  assert.match(workspace, /onClick=\{\(\) => runSingleSite\(site\.id, "read"\)\}/);
-  assert.match(workspace, /OPERATIONS \(E\/P\/V\)/);
+  assert.match(api, /export const SEQUENCE_OPERATIONS = \["erase", "program", "verify"\] as const;/);
+  assert.match(workspace, /const canRead = routeDeclaring\(routes, icpn, site\.site_id, \["read"\]\) != null;/);
+  assert.match(workspace, /aria-label=\{`Read SITE \$\{site\.site_id\} Flash`\}/);
+  assert.match(workspace, /Read the whole Flash to a file \(independent Job\)/);
   assert.match(driver, /engineering: \["erase", "program", "verify"\]/);
 });
 
-test("Engineering Target IC is optional and crosses both direct-Job and server-Batch boundaries", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+test("Engineering Target IC is required and crosses into the Manager Batch and READ requests", async () => {
+  const workspace = await source(WORKSPACE);
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
-  const api = await source("../app/plasma-api.ts");
-  const batchApi = await source("../app/server-batch-api.ts");
 
   assert.match(sharedJob, /ICPickerField/);
   assert.match(workspace, /targetDevice=\{targetDevice\}/);
   assert.match(workspace, /onTargetChange=\{selectTargetDevice\}/);
-  assert.match(workspace, /targetDevice:\s*targetDevice\s*\?/);
-  assert.match(api, /targetDevice\?:\s*JobTargetDeviceRequest/);
-  assert.match(api, /body\.target_device\s*=/);
-  assert.match(api, /engineeringTarget\s*&&\s*options\.targetDevice/);
-  assert.match(batchApi, /targetDevice\?:\s*BatchTargetDeviceRequest/);
-  assert.match(batchApi, /target_device:\s*options\.targetDevice/);
+  assert.match(workspace, /const icpn = targetDevice\?\.icpn \?\? targetDevice\?\.identifier \?\? null;/);
+  assert.match(workspace, /if \(!icpn\) return notReady\("NO TARGET", "Select a Target IC\."\);/);
+  assert.match(workspace, /\{ alias: ppu\.alias, siteIds: started, icpn, operations, source, file, \.\.\.policy \}/);
 });
 
 test("Engineering retains explicit Retry while the former Production single-PPU route is retired", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const workspace = await source(WORKSPACE);
   const retiredProductionRoute = await source("../app/fleet/programming/page.tsx");
 
-  assert.match(workspace, /Site Retry Limit/);
-  assert.match(workspace, /useState\("3"\)/);
+  assert.match(workspace, /retryAriaLabel: "Site Retry Limit"/);
+  assert.match(workspace, /const \[retryLimit, setRetryLimit\] = useState\(0\);/);
   assert.match(retiredProductionRoute, /redirect\("\/fleet"\)/);
 });
 
-test("Engineering v2 advertises only the implemented binary Programming Image normalizer", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+test("Engineering advertises only the binary Programming Image or a canonical Bundle", async () => {
+  const workspace = await source(WORKSPACE);
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
+  const selector = await source("../app/operator-ui/programming-source-selector.tsx");
 
   assert.match(sharedJob, /accept=\{image\.accept \?\? "\.bin,application\/octet-stream"\}/);
-  assert.match(workspace, /imageLabel="Programming Image"/);
+  assert.match(selector, /image: "\.bin,application\/octet-stream"/);
+  assert.match(selector, /bundle: "\.zip,application\/zip"/);
+  assert.match(workspace, /accept: PROGRAMMING_SOURCE_ACCEPT\[source\]/);
+  assert.match(workspace, /imageLabel="Programming Source"/);
   assert.match(workspace, /Binary Programming Image \(\.bin\)\./);
   assert.doesNotMatch(sharedJob, /\.hex/);
   assert.doesNotMatch(workspace, /\.hex/);
 });
 
 test("Engineering READ is whole-region Main Flash and Browser owns no numeric range", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const workspace = await source(WORKSPACE);
   const session = await source("../app/workspace-session.tsx");
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
-  const api = await source("../app/plasma-api.ts");
-  const batchApi = await source("../app/server-batch-api.ts");
 
-  assert.match(workspace, /MAIN FLASH/);
+  // The range is the Programming Route's whole Flash, never Browser input.
+  assert.match(workspace, /const address = route\.flash_base;\s*const length = route\.flash_size;/);
   assert.doesNotMatch(workspace, /ENGINEERING_READ_OFFSET|ENGINEERING_READ_LENGTH|readOffset:|readLength:/);
-  assert.doesNotMatch(api, /offset\?:\s*number|length\?:\s*number|body\.offset\s*=|body\.length\s*=/);
-  assert.doesNotMatch(batchApi, /readOffset\?:\s*number|readLength\?:\s*number|options\.readOffset|options\.readLength/);
   assert.doesNotMatch(workspace, /Engineering READ offset|Engineering READ length|engineeringReadRow/);
   assert.doesNotMatch(session, /emodeReadOffset|emodeReadLength/);
   assert.doesNotMatch(sharedJob, /compatibilityFields|programmingJobCompatibility/);
 });
 
-test("Engineering v2 retains per-Site cancellation, polling and full audit evidence", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+test("Engineering retains Manager Fleet polling, STOP QUEUING and full audit evidence", async () => {
+  const workspace = await source(WORKSPACE);
 
-  assert.match(workspace, /Cancel SITE \$\{site\.id\}/);
-  assert.match(workspace, /window\.setTimeout\(poll, POLL_INTERVAL_MS\)/);
+  assert.match(workspace, /const TOPOLOGY_POLL_MS = 3000;/);
+  assert.match(workspace, /timer = setTimeout\(refresh, TOPOLOGY_POLL_MS\)/);
+  assert.match(workspace, /onAbort=\{stopQueuing\}/);
+  // A running Manager Job is never cancelled from the Browser.
+  assert.doesNotMatch(workspace, /Cancel SITE/);
   assert.match(workspace, /EngineeringLogPanel/);
-  assert.match(workspace, /CACHE CHECK/);
-  assert.match(workspace, /\[TARGET\] RESTORED/);
 });

@@ -17,15 +17,10 @@ test("Production Mode exposes one Factory Console surface without a local worksp
 
 test("retired Production Single PPU route redirects to the Factory Console", async () => {
   const programmingPage = await source("../app/fleet/programming/page.tsx");
-  const renderEntry = await source("../render/main.tsx");
-  const renderNavigation = await source("../render/next-navigation.ts");
 
   assert.match(programmingPage, /redirect\("\/fleet"\)/);
-  assert.doesNotMatch(renderEntry, /FleetProgrammingPage/);
-  assert.match(renderEntry, /RetiredFleetProgrammingRoute/);
-  assert.match(renderEntry, /replaceRoute\("\/fleet"\)/);
-  assert.match(renderNavigation, /export function replaceRoute/);
-  assert.match(renderNavigation, /window\.history\.replaceState/);
+  // U10: the standalone Render SPA that mirrored this redirect is retired.
+  await assert.rejects(fs.access(new URL("../render", import.meta.url)));
 });
 
 test("Factory Console v2 owns the Production viewport without retired selector layout CSS", async () => {

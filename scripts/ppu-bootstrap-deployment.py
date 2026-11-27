@@ -13,6 +13,7 @@ import fcntl
 import hashlib
 import re
 from contextlib import ExitStack, contextmanager
+from functools import partial
 import importlib.util
 import json
 import os
@@ -337,6 +338,7 @@ class DeploymentCoordinator:
         root_bundle_loader: Callable[[str], Mapping[str, Any]] | None = None,
         quiescence_lease: Callable[[], Any] | None = None,
         runtime_restart_quiesce: Callable[[], Any] | None = None,
+        runtime_control_socket: Path | None = None,
     ) -> None:
         self.paths = paths
         self.installer = installer
@@ -348,6 +350,10 @@ class DeploymentCoordinator:
         self.root_bundle_loader = root_bundle_loader
         self.quiescence_lease = quiescence_lease
         self.runtime_restart_quiesce = runtime_restart_quiesce
+        # The Runtime control socket the Job-admission lease is borrowed from.
+        # ``None`` keeps the helper's fixed production socket. Only the
+        # Bootstrap service configuration supplies another one (U10 D2).
+        self.runtime_control_socket = runtime_control_socket
 
     @staticmethod
     def qualify_bundle_v3_admission(
@@ -458,7 +464,7 @@ class DeploymentCoordinator:
                 and previous.asset_activation_fpga is False
                 and previous.state in {"activating", "recovery_required"}):
             helper = self._asset_helper()
-            lease = self.quiescence_lease or helper.held_runtime_asset_lease
+            lease = self._runtime_asset_lease(helper)
             try:
                 with lease():
                     helper.restore_previous(
@@ -782,7 +788,7 @@ class DeploymentCoordinator:
     ) -> Mapping[str, Any]:
         """Reuse the same Runtime lease and atomic Active Set publisher under deployment.lock."""
         helper = self._asset_helper()
-        lease = self.quiescence_lease or helper.held_runtime_asset_lease
+        lease = self._runtime_asset_lease(helper)
         try:
             hold = lease()
             with hold:
@@ -818,6 +824,18 @@ class DeploymentCoordinator:
         return {"asset_set_sha256": active["asset_set_sha256"],
                 "generation": active["generation"],
                 "already_active": active["already_active"]}
+
+    def _runtime_asset_lease(self, helper: ModuleType) -> Callable[[], Any]:
+        """The connection-held Runtime Job-admission lease for an Active Set switch.
+
+        Same lease and the same trusted-socket checks either way; only the
+        socket location can come from the service configuration.
+        """
+        if self.quiescence_lease is not None:
+            return self.quiescence_lease
+        if self.runtime_control_socket is None:
+            return helper.held_runtime_asset_lease
+        return partial(helper.held_runtime_asset_lease, self.runtime_control_socket)
 
     def _asset_helper(self) -> ModuleType:
         helper_path = Path(__file__).with_name("ppu_asset_set.py")
@@ -856,7 +874,7 @@ class DeploymentCoordinator:
                 self.paths.product_root, asset_set_sha256)
         except Exception as exc:
             raise deny("b3_fpga_handoff_denied", exc) from exc
-        lease = self.quiescence_lease or helper.held_runtime_asset_lease
+        lease = self._runtime_asset_lease(helper)
         hold = ExitStack()
         try:
             # Connection-held for the whole load + active.json publish.
@@ -1732,6 +1750,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime-state-root", type=Path, default=Path("/var/lib/plasma"))
     parser.add_argument("--log-root", type=Path, default=Path("/var/log/plasma"))
     parser.add_argument("--systemd-root", type=Path, default=Path("/etc/systemd/system"))
+    parser.add_argument(
+        "--runtime-control-socket", type=Path, default=None,
+        help=("Runtime control socket that grants the Active Set Job-admission lease "
+              "(default: the Runtime's fixed /run/plasma-server/control.sock)"),
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     deploy = sub.add_parser("deploy", help="verify, stage, activate and health-check one PPU release")
@@ -1790,7 +1813,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             mode=args.mode, fpga_load=bool(args.fpga_load),
         )
         try:
-            result = DeploymentCoordinator(paths=paths, installer=installer).execute_bundle_v3_install(request)
+            result = DeploymentCoordinator(
+                paths=paths, installer=installer,
+                runtime_control_socket=args.runtime_control_socket,
+            ).execute_bundle_v3_install(request)
         except DeploymentError as exc:
             print("ppu-bootstrap-deployment: B3 install denied: " + str(exc), file=sys.stderr)
             return 2
@@ -1811,7 +1837,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         api_transaction_id=args.api_transaction_id,
     )
     try:
-        result = DeploymentCoordinator(paths=paths, installer=installer).execute(request)
+        result = DeploymentCoordinator(
+            paths=paths, installer=installer,
+            runtime_control_socket=args.runtime_control_socket,
+        ).execute(request)
     except DeploymentError as exc:
         print(f"ppu-bootstrap-deployment: {exc}", file=sys.stderr)
         return 2

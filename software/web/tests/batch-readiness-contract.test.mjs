@@ -12,7 +12,7 @@ test("PMode and Engineering Programming share one batch readiness source of trut
   const readiness = await read("batch-readiness.ts");
   const pmodRoute = await read("fleet/page.tsx");
   const pmod = await read("fleet/factory-console-v2.tsx");
-  const emode = await read("engineering/programming-workspace-v2.tsx");
+  const emode = await read("engineering/managed-programming-workspace.tsx");
   const sharedJob = await read("operator-ui/programming-job-panel.tsx");
 
   for (const label of [
@@ -29,19 +29,23 @@ test("PMode and Engineering Programming share one batch readiness source of trut
     "CANCELLING",
   ]) assert.match(readiness, new RegExp(label.replace(/ /g, "\\s")));
 
-  assert.match(readiness, /export function evaluateBatchReadiness/);
+  assert.match(readiness, /export type BatchReadinessCode/);
+  assert.match(readiness, /export function batchReadinessGuidanceFromLabel/);
   assert.match(pmodRoute, /factory-console-v2/);
-  assert.match(pmod, /evaluateBatchReadiness\(/);
-  assert.match(emode, /evaluateBatchReadiness\(/);
+  // U10: PMode readiness is the Manager admission, typed by the shared codes.
+  assert.match(pmod, /import type \{ BatchReadinessCode \} from "\.\.\/batch-readiness";/);
+  assert.match(pmod, /const batchReadiness = managedReadiness;/);
+  assert.match(sharedJob, /batchReadinessGuidanceFromLabel/);
   // Manual Repeat: the same START is the Continue of waiting Sites; otherwise readiness gates it.
   assert.match(pmod, /startDisabled=\{waitingSites\.length \? !continuingSites\.length : !batchReadiness\.ready \|\| !policyValid\}/);
-  assert.match(emode, /startDisabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
+  // EMode readiness comes from the Manager Route/Fleet admission (U10: managed only).
+  assert.match(emode, /startDisabled=\{waiting\.length \? !continuing\.length : !readiness\.ready \|\| repeatValue == null\}/);
   assert.match(sharedJob, /disabled=\{startDisabled\}/);
 });
 
 test("Production and Engineering feed mode behavior into one ProgrammingJobPanel", async () => {
   const pmod = await read("fleet/factory-console-v2.tsx");
-  const emode = await read("engineering/programming-workspace-v2.tsx");
+  const emode = await read("engineering/managed-programming-workspace.tsx");
   const sharedPanel = await read("operator-ui/operator-panel.tsx");
   const sharedJob = await read("operator-ui/programming-job-panel.tsx");
 

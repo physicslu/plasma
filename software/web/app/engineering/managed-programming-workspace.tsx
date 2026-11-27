@@ -273,6 +273,7 @@ export default function ManagedProgrammingWorkspace() {
   // Plan IDs whose [PLAN] detail lines were written (one set per Site attempt).
   const loggedPlans = useRef(new Set<string>());
   const loggedBatchId = useRef<string | null>(null);
+  const loggedTimeSync = useRef(new Set<string>());
   const readUrls = useRef(new Map<number, string>());
   const logSequence = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -591,6 +592,7 @@ export default function ManagedProgrammingWorkspace() {
     loggedAttempts.current = new Map();
     loggedPlans.current = new Set();
     loggedBatchId.current = null;
+    loggedTimeSync.current.clear();
     setRun(null);
     setRunContext(null);
     setBlockedMessage(null);
@@ -768,6 +770,15 @@ export default function ManagedProgrammingWorkspace() {
             void history.reader.sync().catch(() => undefined);
           }
           setBatch(next);
+          for (const [alias, observation] of Object.entries(next.time_sync ?? {})) {
+            const key = `${next.batch_id}:${alias}`;
+            if (loggedTimeSync.current.has(key)) continue;
+            loggedTimeSync.current.add(key);
+            appendLog(`[TIME SYNC] PPU ${alias} · ${observation.status} · ${observation.service ?? "service unknown"}${
+              observation.after_offset_ms == null ? "" : ` · offset ${observation.after_offset_ms} ms`}${
+              observation.warning_code ? ` · ${observation.warning_code}` : ""} · ${observation.elapsed_ms} ms`,
+              !["SYNCED", "CORRECTED"].includes(observation.status), "PPU");
+          }
           setRun(next.current_run);
           setPhase(next.attempts.length ? "running" : "starting");
           setStatusNote(null);

@@ -34,6 +34,15 @@ ROUTE_SCHEMA = "plasma.opf.programming-route.v1"
 CAPABILITIES_SCHEMA = "plasma.ppu.provider-capabilities.v2"
 OPTIONS_SCHEMA = "plasma.ppu.provider-options.v1"
 FLASH_PROFILE_SCHEMA = "plasma.ppu.openocd-flash-profile.v1"
+# Controlled compatibility map: (Flash Profile schema, Driver ABI) -> the Site
+# interface a Route requires (U10). The physical SWD Driver ABI keeps
+# "openocd"; the Mock Driver ABI requires a "mock" Site, so a Mock Route can
+# never qualify on a physical (openocd) Site and vice versa. Anything else is
+# ROUTE_SITE_INTERFACE_UNSUPPORTED.
+SITE_INTERFACE_BY_PROFILE_ABI: dict[tuple[str, str], str] = {
+    (FLASH_PROFILE_SCHEMA, "plasma_swd:5"): "openocd",
+    (FLASH_PROFILE_SCHEMA, "mock-simulated:1"): "mock",
+}
 # Same identifier/version grammar as the PPU Bundle v3 verifier.
 SAFE_NAME = re.compile(r"[a-z][a-z0-9_.-]{0,63}\Z")
 SAFE_VERSION = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}\Z")
@@ -105,11 +114,14 @@ class ProgrammingRoute:
     def site_interface(self) -> str:
         """Site interface required by the validated Profile, not a Site allowlist.
 
-        New Profile schema families require a separately qualified mapping.
+        Derived only from the explicit (Flash Profile schema, Driver ABI)
+        compatibility map below. An unknown or incompatible combination fails
+        closed; there is no default. New Profile schema families or Driver
+        ABIs require a separately qualified mapping.
         """
-        _need(self.flash_profile["schema"] == FLASH_PROFILE_SCHEMA,
-              "ROUTE_SITE_INTERFACE_UNSUPPORTED")
-        return "openocd"
+        key = (self.flash_profile["schema"], self.capabilities["driver_abi"])
+        _need(key in SITE_INTERFACE_BY_PROFILE_ABI, "ROUTE_SITE_INTERFACE_UNSUPPORTED")
+        return SITE_INTERFACE_BY_PROFILE_ABI[key]
 
     def summary(self) -> dict[str, Any]:
         return {

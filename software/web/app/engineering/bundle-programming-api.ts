@@ -112,6 +112,21 @@ export type ProgrammingPlan = {
 
 export type ProgrammingRunOutcome = "PASS" | "FAIL" | "OUTCOME_UNKNOWN" | "BLOCKED";
 
+export type TimeSyncObservation = {
+  ppu_id: string | null;
+  status: "SYNCED" | "CORRECTED" | "SKIPPED_BUSY" | "UNAVAILABLE"
+    | "UNTRUSTED_SOURCE" | "TIMEOUT" | "FAILED" | "UNSUPPORTED";
+  source: string | null;
+  service: string | null;
+  before_offset_ms: number | null;
+  after_offset_ms: number | null;
+  uncertainty_ms: number | null;
+  elapsed_ms: number;
+  adjustment_performed: boolean;
+  warning_code: string | null;
+  observed_at_utc: string;
+};
+
 export type ProgrammingStageEvent = {
   job_id: string; site_id: number; session_id: string; attempt: number;
   sequence: number; stage: SequenceOperation;
@@ -413,6 +428,8 @@ export type ProgrammingBatch = {
   execution_status: string;
   outcome: ProgrammingBatchOutcome | null;
   reason: string | null;
+  /** One best-effort pre-start observation for each target PPU alias. */
+  time_sync?: Record<string, TimeSyncObservation>;
   failure_domain: string | null;
   stop_requested: boolean;
   /**

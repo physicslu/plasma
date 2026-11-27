@@ -9,8 +9,6 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 
 const { d1, r2 } = hostingConfig;
 const isProductBuild = process.env.PLASMA_PRODUCT_BUILD === "1";
-const localGatewayProxyTarget =
-  process.env.PLASMA_GATEWAY_PROXY_URL ?? "http://127.0.0.1:18080";
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -59,7 +57,7 @@ export default defineConfig(async ({ command }) => {
   const define = { __PLASMA_BUILD_IDENTITY__: JSON.stringify(buildIdentity) };
   if (isProductBuild) {
     // Product packaging is a self-hosted Node runtime. Do not pull Wrangler,
-    // Cloudflare Worker bindings, or the integration-host proxy into this
+    // Cloudflare Worker bindings into this
     // build. next.config.ts enables Vinext standalone output for this mode.
     return {
       plugins: [vinext()],
@@ -88,15 +86,6 @@ export default defineConfig(async ({ command }) => {
         "plasma.open4th.com",
         "swpc.tail820e64.ts.net",
       ],
-      proxy: {
-        // PPU-local API calls still go to the Python Gateway. The target is a
-        // server-side integration-host setting, never a Browser-visible API
-        // base. Fleet and Manager namespaces stay owned by Vinext BFF routes.
-        "^/api/(?!fleet(?:/|$))(?!manager(?:/|$))": {
-          target: localGatewayProxyTarget,
-          changeOrigin: true,
-        },
-      },
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),

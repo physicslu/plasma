@@ -14,6 +14,12 @@ const retiredPaths = [
   "../app/fleet/production-prototype.css",
   "../app/fleet/pmod-theme.css",
   "../app/engineering/programming-workspace.tsx",
+  // U10: the Control Station is Manager-managed only.
+  "../app/engineering/programming-workspace-v2.tsx",
+  "../app/engineering/engineering-server-batch.ts",
+  "../app/server-batch-api.ts",
+  "../app/server-batch-snapshot-store.ts",
+  "../render",
   "../../../.github/workflows/pr99-format-cleanup.yml",
   "../../../.github/workflows/unified-pe-dashboard-verify.yml",
 ];
@@ -32,13 +38,13 @@ test("retired Production and Engineering Batch surfaces stay absent", async () =
   }
 });
 
-test("active routes point only at Factory Console v2 and Programming Workspace v2", async () => {
+test("active routes point only at Factory Console v2 and the Managed Programming Workspace", async () => {
   const fleetPage = await source("../app/fleet/page.tsx");
   const engineeringPage = await source("../app/engineering/page.tsx");
   const globalNav = await source("../app/global-nav.tsx");
 
   assert.match(fleetPage, /FactoryConsoleV2/);
-  assert.match(engineeringPage, /ProgrammingWorkspaceV2/);
-  assert.doesNotMatch(engineeringPage, /ProgrammingWorkspace(?!V2)/);
+  assert.match(engineeringPage, /<ManagedProgrammingWorkspace \/>/);
+  assert.doesNotMatch(engineeringPage, /ProgrammingWorkspaceV2|StandaloneProgrammingWorkspace|[^d]ProgrammingWorkspace\b/);
   assert.doesNotMatch(globalNav, /pmod-theme\.css/);
 });

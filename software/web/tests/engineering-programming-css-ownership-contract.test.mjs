@@ -60,7 +60,7 @@ test("Programming base owns chrome only and targeting field geometry has one own
 
 test("EMode Programming-specific controls have one scoped presentation owner", async () => {
   const [workspace, shell, v2] = await Promise.all([
-    source("../app/engineering/programming-workspace-v2.tsx"),
+    source("../app/engineering/managed-programming-workspace.tsx"),
     source("../app/engineering/engineering.css"),
     source("../app/engineering/programming-workspace-v2.css"),
   ]);
@@ -70,7 +70,7 @@ test("EMode Programming-specific controls have one scoped presentation owner", a
     "engineeringBoundaryNote",
     "engineeringOperationWarning",
     "workflowField",
-    "engineeringBatchSelectHead",
+    "engineeringBatchSelectCell",
     "engineeringResult",
   ]) {
     assert.match(workspace, new RegExp(liveClass), `workspace must still render ${liveClass}`);

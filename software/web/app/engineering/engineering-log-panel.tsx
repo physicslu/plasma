@@ -9,7 +9,6 @@ import {
   type OperatorLogCategory,
   type OperatorLogEntry,
 } from "../operator-ui/operator-log-panel";
-import { useWorkspaceSession } from "../workspace-session";
 import "./engineering-log-placement.css";
 
 export type EngineeringLogCategory = OperatorLogCategory;
@@ -59,7 +58,6 @@ type EngineeringLogPanelProps = {
 
 export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPanelProps) {
   const { t } = useI18n();
-  const { sessionAuditEntries, clearSessionAuditEntries } = useWorkspaceSession();
   const allLogs = useMemo<OperatorLogEntry[]>(() => {
     const localLogs = logs
       .filter(log => !log.text.includes("[SESSION] ACTIVE ·"))
@@ -69,22 +67,12 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
         level: log.error ? "error" as const : "info" as const,
         category: log.category,
       }));
-    const sessionLogs: OperatorLogEntry[] = sessionAuditEntries.map(entry => ({
-      id: -entry.id,
-      text: `${entry.time}  [NET] ${entry.message}`,
-      level: "info",
-      category: "NET",
-    }));
-    return [...localLogs, ...sessionLogs].sort((left, right) => {
+    return localLogs.sort((left, right) => {
       const timeOrder = right.text.slice(0, 8).localeCompare(left.text.slice(0, 8));
       return timeOrder || right.id - left.id;
     });
-  }, [logs, sessionAuditEntries]);
+  }, [logs]);
 
-  function clearLog() {
-    onClear();
-    clearSessionAuditEntries();
-  }
 
   return (
     <OperatorLogPanel
@@ -92,7 +80,7 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
       number={4}
       title={t("engineeringProgramming.jobLog")}
       clearLabel={t("engineeringProgramming.clear")}
-      onClear={clearLog}
+      onClear={onClear}
       downloadFilenamePrefix="plasma-engineering"
       filterAriaLabel="Engineering log filters"
       filterItemAriaLabelPrefix="Engineering log filter"

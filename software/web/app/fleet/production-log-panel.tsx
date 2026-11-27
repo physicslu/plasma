@@ -7,7 +7,6 @@ import {
   type OperatorLogCategory,
   type OperatorLogEntry,
 } from "../operator-ui/operator-log-panel";
-import { useWorkspaceSession } from "../workspace-session";
 import "./production-log-placement.css";
 
 export type ProductionLogEntry = {
@@ -57,7 +56,6 @@ function productionLogClassification(message: string): ProductionLogClassificati
 }
 
 export default function ProductionLogPanel({ logs, number, title, clearLabel, onClear }: ProductionLogPanelProps) {
-  const { sessionAuditEntries, clearSessionAuditEntries } = useWorkspaceSession();
   const allLogs = useMemo<OperatorLogEntry[]>(() => {
     const localLogs = logs.map(entry => {
       const classification = productionLogClassification(entry.text);
@@ -68,22 +66,12 @@ export default function ProductionLogPanel({ logs, number, title, clearLabel, on
         category: classification.category,
       };
     });
-    const sessionLogs: OperatorLogEntry[] = sessionAuditEntries.map(entry => ({
-      id: -entry.id,
-      text: `${entry.time}  [NET] ${entry.message}`,
-      level: "info",
-      category: "NET",
-    }));
-    return [...localLogs, ...sessionLogs].sort((left, right) => {
+    return localLogs.sort((left, right) => {
       const timeOrder = right.text.slice(0, 8).localeCompare(left.text.slice(0, 8));
       return timeOrder || right.id - left.id;
     });
-  }, [logs, sessionAuditEntries]);
+  }, [logs]);
 
-  function clearLog() {
-    onClear();
-    clearSessionAuditEntries();
-  }
 
   return (
     <OperatorLogPanel
@@ -91,7 +79,7 @@ export default function ProductionLogPanel({ logs, number, title, clearLabel, on
       number={number}
       title={title}
       clearLabel={clearLabel}
-      onClear={clearLog}
+      onClear={onClear}
       downloadFilenamePrefix="plasma-production"
       filterAriaLabel="Production log filters"
       filterItemAriaLabelPrefix="Production log filter"

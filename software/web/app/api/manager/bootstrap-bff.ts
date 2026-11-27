@@ -168,12 +168,7 @@ export async function relayManagerBootstrapRequest(
   }
 
   try {
-    if (!managerRoutingRequired()) {
-      return json(503, {
-        ok: false,
-        error: { code: "manager_not_enabled", message: "Manager mode is not enabled for this Control Station" },
-      });
-    }
+    managerRoutingRequired();
     const suffix = normalizedAction ? `/${normalizedAction}` : "";
     const target = `${managerApiBase()}/api/registry/${encodeURIComponent(normalizedAlias)}/bootstrap${suffix}`;
     let body: ArrayBuffer | undefined;
@@ -420,15 +415,7 @@ export async function relayManagerProgrammingRequest(
   }
 
   try {
-    if (!managerRoutingRequired()) {
-      return json(503, {
-        ok: false,
-        error: {
-          code: "manager_not_enabled",
-          message: "Manager mode is not enabled for this Control Station",
-        },
-      });
-    }
+    managerRoutingRequired();
     const query = programmingReadQuery(request, normalizedResource);
     const response = await fetch(`${managerApiBase()}/api/programming/${normalizedResource}${query}`, {
       method: request.method,

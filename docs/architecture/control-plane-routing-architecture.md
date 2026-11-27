@@ -166,24 +166,15 @@ When Manager routing is configured, the shared Workspace API base is the same-or
 
 Manager failure in Managed Mode is fail-closed. The Console must not silently switch to a stored direct Plasma Gateway Endpoint.
 
-### Standalone Mode
+### Standalone Console (retired, U10)
 
-A PPU remains autonomous:
-
-```text
-Local client / local PPU Console
-        |
-        v
-Plasma Gateway
-        |
-        v
-Plasma Server
-        |
-        v
-PS -> PL -> Site -> IC
-```
-
-Standalone Mode may explicitly use a direct Plasma Gateway API base. This is a distinct operating mode, not an automatic Managed Mode fallback.
+The Control Station has no standalone mode. The Browser never selects or
+calls a PPU Gateway directly, and the PPU runs no Batch: the former PPU
+`/api/batches` routes answer `410 PPU_BATCH_RETIRED`. Every Programming,
+including a single Programming of 1 Site × 1 Cycle, is a Manager-owned
+Batch (`/api/programming/batches`). PPU autonomy is unchanged: the Plasma
+Gateway and Plasma Server still start, run accepted Jobs and serve local
+maintenance without a live Manager, but they are not a Console target.
 
 ## Programming route
 

@@ -107,6 +107,8 @@ class ControllerWriteAdmissionMixin:
             return "site.job.submit"
         if normalized == "/api/resource-reservations":
             return "site.job.submit"
+        if normalized == "/api/pre-start-time-sync":
+            return "site.job.submit"
         if re.fullmatch(rf"/api/jobs/{_SEGMENT}/cancel", path):
             return "site.job.cancel"
         if normalized in {"/api/engineering/diagnostics/loopback",

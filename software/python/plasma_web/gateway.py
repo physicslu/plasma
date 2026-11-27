@@ -474,6 +474,20 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/api/pre-start-time-sync":
+            try:
+                body = self._body()
+                base._require_declared_keys(
+                    body, allowed={"owner_id", "token", "threshold_ms", "budget_ms"},
+                    required={"owner_id", "threshold_ms", "budget_ms"},
+                    label="Pre-Start Time Sync")
+                result = base._run(self.client_factory().pre_start_time_sync(
+                    body["owner_id"], body.get("token"),
+                    body["threshold_ms"], body["budget_ms"]))
+                self._json(HTTPStatus.OK, {"ok": True, "time_sync": result})
+            except Exception as exc:
+                self._error(exc)
+            return
         if parsed.path == "/api/resource-reservations":
             try:
                 body = self._body()

@@ -4,12 +4,11 @@ import test from "node:test";
 
 const source = await readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
 
-test("PMode derives Target IC and Synthetic Image admission from shared programming capabilities", () => {
-  assert.match(source, /resolveProgrammingCapabilities\(catalog\)/);
-  assert.match(source, /targetValid:\s*!programmingCapabilities\.target_device_required \|\| Boolean\(targetDevice\)/);
-  assert.match(source, /if \(!targetDevice && programmingCapabilities\.target_device_required\)/);
-  assert.match(source, /syntheticProgrammingImageAvailable = programmingCapabilities\.synthetic_programming_image/);
-  assert.match(source, /allowSyntheticMockImage:\s*syntheticProgrammingImageAvailable/);
+test("PMode admits Target IC through the Manager Programming Route, not a Browser capability resolver (U10)", () => {
+  assert.match(source, /const icpn = targetDevice\?\.icpn \?\? targetDevice\?\.identifier \?\? null;/);
+  assert.match(source, /if \(!icpn\) return blocked\("no-target", "NO TARGET", "Select a Target IC\."\);/);
+  assert.match(source, /const blocker = managedBatchBlocker\(managedTopology, managedRoutes\.routes, icpn,/);
+  assert.doesNotMatch(source, /resolveProgrammingCapabilities|syntheticProgrammingImageAvailable|allowSyntheticMockImage/);
   assert.doesNotMatch(source, /catalog\?\.provider === "mock"/);
 });
 

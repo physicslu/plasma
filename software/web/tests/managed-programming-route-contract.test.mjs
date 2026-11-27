@@ -9,15 +9,17 @@ const managerBff = await readFile(new URL("../app/api/manager/manager-bff.ts", i
 const managedRoute = await readFile(new URL("../app/api/manager/ppu/[...path]/route.ts", import.meta.url), "utf8");
 const managedConfig = await readFile(new URL("../app/api/manager/ppu/route.ts", import.meta.url), "utf8");
 const communicationHealth = await readFile(new URL("../app/fleet/communication-health.ts", import.meta.url), "utf8");
+const bootstrapBff = await readFile(new URL("../app/api/manager/bootstrap-bff.ts", import.meta.url), "utf8");
+const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const macConsoleLauncher = await readFile(new URL("../../../packaging/macos/run-console.sh", import.meta.url), "utf8");
 
-test("Control Station bootstrap makes BFF managed discovery authoritative over legacy localStorage", () => {
+test("Control Station routing is always the Manager PPU prefix and legacy Browser routing storage is wiped (U10)", () => {
   assert.match(workspace, /return `\$\{window\.location\.origin\}\/api\/manager\/ppu`/);
-  assert.match(workspace, /const discovery = await discoverManagedRouting\(\)/);
-  assert.match(workspace, /if \(discovery\?\.managed === true\)/);
-  assert.match(workspace, /nextMode = "managed"/);
-  assert.match(workspace, /window\.localStorage\.setItem\(API_MODE_STORAGE_KEY, nextMode\)/);
-  assert.doesNotMatch(workspace, /if \(storedMode === "standalone"\)/);
+  assert.doesNotMatch(workspace, /discoverManagedRouting|localStorage|API_MODE_STORAGE_KEY|storedMode|"standalone"/);
+  assert.match(layout, /window\.localStorage\.removeItem\(apiKey\)/);
+  assert.match(layout, /window\.localStorage\.removeItem\("plasma-api-mode"\)/);
+  assert.match(layout, /window\.sessionStorage\.removeItem\("plasma-production-active-batch-v1"\)/);
+  assert.match(layout, /window\.sessionStorage\.removeItem\("plasma-engineering-active-batch-v1"\)/);
 });
 
 test("Gateway transport isolates bootstrap reads until WorkspaceSession resolves routing", () => {
@@ -28,24 +30,25 @@ test("Gateway transport isolates bootstrap reads until WorkspaceSession resolves
   assert.match(gatewayTransport, /if \(isStateChanging\(requestMethod\(currentInput, init\)\)\) return routingUnresolvedResponse\(\)/);
   assert.match(gatewayTransport, /await gatewayRoutingReady/);
   assert.match(gatewayTransport, /const rebasedUrl = `\$\{resolvedGatewayApiBase\}\$\{directPath\}\$\{search\}`/);
-  assert.match(workspace, /markGatewayRoutingResolved\(saved, nextMode\);\s*setHydrated\(true\)/);
-  assert.match(workspace, /fetch\("\/api\/manager\/ppu"/);
+  assert.match(workspace, /const managed = managedApiBase\(\);\s*setApiBaseState\(managed\);\s*markGatewayRoutingResolved\(managed\);\s*setHydrated\(true\)/);
 });
 
 test("Managed routing remains authoritative after bootstrap and rebases stale direct Gateway paths", () => {
-  assert.match(gatewayTransport, /type GatewayRoutingMode = "managed" \| "standalone"/);
-  assert.match(gatewayTransport, /gatewayRoutingMode === "managed"/);
-  assert.match(gatewayTransport, /resolvedGatewayApiBase/);
-  assert.match(gatewayTransport, /currentInput = rebaseInput\(currentInput, directPath, url\.search\)/);
+  // U10: no routing mode; once resolved, every Gateway path is rebased.
+  assert.doesNotMatch(gatewayTransport, /GatewayRoutingMode|gatewayRoutingMode|"standalone"/);
+  assert.match(gatewayTransport, /\} else if \(resolvedGatewayApiBase\) \{\s*currentInput = rebaseInput\(currentInput, directPath, url\.search\);/);
+  assert.doesNotMatch(gatewayTransport, /"\/api\/batches"/);
   assert.doesNotMatch(gatewayTransport, /bearerToken|"Authorization"/);
 });
 
 test("Managed Control Station stays fail-closed and cannot switch to a direct Gateway", () => {
-  assert.match(workspace, /discovery === null && storedMode === "managed"/);
-  assert.match(workspace, /apiMode === "managed" && normalized !== managedBase/);
-  assert.match(workspace, /Managed Control Station routing is locked to the selected Manager PPU/);
-  assert.match(workspace, /apiMode,/);
-  assert.match(workspace, /managedPpuAlias,/);
+  // Unset or "managed" is managed; any other mode is a misconfiguration, never standalone.
+  assert.match(managerBff, /if \(mode && mode !== "managed"\) \{\s*throw new Error\("PLASMA_CONTROL_STATION_MODE must be managed when configured"\);/);
+  assert.match(managerBff, /export function managerRoutingRequired\(\): true/);
+  for (const source of [managerBff, managedConfig, bootstrapBff]) {
+    assert.doesNotMatch(source, /managed: false|manager_not_enabled/);
+  }
+  assert.doesNotMatch(workspace, /apiMode|setApiBase\b|managedPpuAlias|normalized !== managedBase/);
 });
 
 test("macOS Control Station declares managed routing intent independently from Browser storage", () => {
@@ -58,19 +61,13 @@ test("macOS Control Station declares managed routing intent independently from B
 });
 
 test("PMode and EMode keep one shared WorkspaceSession apiBase", () => {
-  assert.match(workspace, /const \[apiBase, setApiBaseState\] = useState\(DEFAULT_API_BASE\)/);
+  assert.match(workspace, /const \[apiBase, setApiBaseState\] = useState\(""\)/);
   assert.match(workspace, /apiBase,/);
-  assert.match(workspace, /ensureEngineeringSession/);
-  assert.match(workspace, /restartEngineeringSession/);
+  assert.doesNotMatch(workspace, /ensureEngineeringSession|restartEngineeringSession|programmingImage|pmodOperations/);
 });
 
-test("Programming APIs continue to use the shared apiBase for jobs, status, cache and binary Image upload", () => {
-  assert.match(plasmaApi, /fetch\(`\$\{apiBase\}\$\{path\}`/);
-  assert.match(plasmaApi, /\/api\/programming-assets\/check/);
-  assert.match(plasmaApi, /Content-Type": "application\/octet-stream"/);
-  assert.match(plasmaApi, /body: file/);
-  assert.match(plasmaApi, /body\.asset_sha256 = fingerprint\.asset_sha256/);
-  assert.match(plasmaApi, /"\/api\/jobs"/);
+test("plasma-api carries types only: the Browser has no direct Job, status or Programming Asset client (U10)", () => {
+  assert.doesNotMatch(plasmaApi, /fetch\(|"\/api\/jobs"|\/api\/programming-assets|application\/octet-stream/);
 });
 
 test("Managed PPU selection is runtime state and no longer requires Console restart", () => {

@@ -1,52 +1,27 @@
 import { expect, test } from "@playwright/test";
+import { mockManager } from "./managed-programming-helpers";
 
-const rawManagedProviderError = "Managed PPU returned a non-JSON response for a JSON API route";
+// U10: the Engineering session (and its raw provider error) is gone; EMode
+// Programming availability now comes from the Manager's Programming Routes.
+// The operator contract is kept: a Manager-side capability fault shows a
+// Programming-unavailable notice (with the Manager's exact reason) while the
+// Manager backend and the PPU stay ONLINE, and Start stays disabled.
 
-test("EMode keeps raw managed-provider detail out of the operator availability notice", async ({ page }) => {
-  await page.route("**/api/settings/gateway", async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        gateway_settings: {
-          revision: 1,
-          ppu_request_timeout_ms: 5_000,
-          ppu_retry_count: 0,
-          ppu_response_budget_ms: 5_000,
-        },
-      }),
-    });
-  });
-
-  await page.route("**/api/engineering/session", async route => {
-    await route.fulfill({
-      status: 502,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ok: false,
-        error: { message: rawManagedProviderError },
-      }),
-    });
-  });
-
-  await page.route("**/api/health/live", async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, gateway: "plasma-web" }),
-    });
-  });
+test("EMode reports Programming unavailable as a capability notice and keeps the backend and PPU ONLINE", async ({ page }) => {
+  await mockManager(page, { routesStatus: 502 });
 
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
 
-  const availability = page.locator(".engineeringBoundaryNote.warning");
-  await expect(availability).toBeVisible();
-  await expect(availability.locator("b")).toContainText(/燒錄功能目前不可用|Programming unavailable/i);
-  await expect(availability.locator(":scope > span")).toBeHidden();
+  const workspace = page.locator('[data-programming-backend="manager"]');
+  await expect(workspace.getByTestId("managed-backend")).toContainText("ONLINE");
   await expect(page.locator(".engineeringGateway")).toHaveClass(/online/);
 
-  // The diagnostic detail is still retained by the Engineering Job Log.
-  await expect(page.locator(".engineeringOperatorLog")).toContainText(rawManagedProviderError);
+  const availability = page.locator(".engineeringBoundaryNote.warning");
+  await expect(availability).toBeVisible();
+  await expect(availability.locator("b")).toContainText("ROUTES UNAVAILABLE");
+  await expect(page.getByRole("button", { name: /START PROGRAMMING/ })).toBeDisabled();
+
+  await expect(availability.locator(":scope > span")).toContainText("ROUTE_ROOT_UNAVAILABLE");
+  await expect(workspace.getByLabel("Selected Engineering PPU")).toContainText("PPU ONLINE");
 });

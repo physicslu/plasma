@@ -162,19 +162,22 @@ datasheet/programming-manual geometry sources, and the qualified programming
 group. Arbitrary reviewer prose cannot stand in for those references.
 
 The data-only applicability validator accepts the source-validated OpenOCD
-0.12.0 STM32F103 medium-density route and the independently source-locked
-low-density documentary cohort. The low-density route verifies the Provider,
-manufacturer source, exact applicability, Programming Profile, per-base Flash
-Geometry and operation scope from locked data files and durable Evidence IDs.
-It does not consult the Python exact-ICPN qualification list or require that
-the Profile already occur in the previous Active Revision. Other Provider/group
-combinations fail closed until their source-backed contracts can be validated
-by the Publisher. A reviewed packet cannot authorize an installed Runtime or a
-Job.
+0.12.0 STM32F103 medium-density route and source-locked qualification documents
+using the existing Profile schema. The locked route selects a unique
+qualification document by its applicability blob and qualification SHA-256,
+then verifies Provider, manufacturer Exact identity, Profile, per-base Flash
+Geometry, exact qualification row and operation scope against its source locks
+and durable Evidence IDs. It does not consult the Python exact-ICPN
+qualification list or require that the Profile already occur in the previous
+Active Revision. Missing, ambiguous or altered qualification authority fails
+closed. A reviewed packet cannot authorize an installed Runtime or a Job.
 The first data-only package route is bounded to STM32F103 medium-density
-VFQFPN36. Its packet must match the source-locked DS5319 Rev 20 Table 5 SWD
-pins (PA13/25 and PA14/28). This is a fresh applicability review for a package
-that the earlier non-LQFP qualification explicitly left outside its scope;
+VFQFPN36. Its packet must match the SHA-256 locked package-route authority,
+including the geometry source-lock key, and source-locked DS5319 Rev 20 Table 5
+SWD pins (PA13/25 and PA14/28). An HTTPS Exact identity must remain on the
+official ordering-source host. This is a
+fresh applicability review for a package that the earlier non-LQFP
+qualification explicitly left outside its scope;
 the earlier exclusion is not silently treated as support. Other package routes
 remain unqualified by this data-only validator.
 
@@ -221,6 +224,8 @@ Provider, FPGA or Job execution code. No PR #1147 candidate is published by this
 Milestone D implementation.
 
 **2026-11-23 Gate 1 implementation acceptance — Catalog publication decoupling:** Implement and prove an existing-Manager SQLite data-only L0–L2 promotion path where reviewed exact-ICPN evidence, Provider/Profile source locks and supported operation scope are validated from durable versioned Catalog publication authority, **not** a Python static exact-ICPN registry, a pre-existing exact Profile in the previous active revision, or a per-IC Python release. Reuse existing Stage/Publish/Rollback and Manager Selector routes; add only the smallest necessary source-backed Provider/Profile admission handling. Demonstrate the already merged PR #1147 12 Low-density Exact ICPNs as an isolated SQLite revision fixture (12 L1→L2, 77 L3 unchanged, three T4/T6 excluded, 5,885 total if source identity matches), with immutable Evidence IDs, negative/rollback/concurrency checks and no PPU/FPGA/DUT execution. Separate code/schema CI from future ordinary Catalog data-only releases. This is a Gate 1 target, not evidence that the decoupling or SWPC publication has occurred. No merge or deployment is authorized by this paragraph.
+
+**2026-11-23 Gate 1 follow-on — provider-neutral L0–L2 publication:** Replace the STM32F103 low-density Profile-ID dispatch and medium-density-specific fallback in the SQLite Publisher with a common, source-driven qualification verifier. The verifier must admit reviewed existing Provider/Profile implementations and versioned exact applicability from authenticated, immutable evidence without relying on static Python exact-part qualification registries, hard-coded per-vendor/family/part dispatch, or pre-existing Profile membership in the active snapshot. Reject unsupported Provider releases, altered source locks/geometry/operations, fabricated exact applicability, ambiguous package identity, forged L2/L3 or runtime authority. Preserve canonical Existing-First Stage/Validate/Publish/Rollback, Manager Selector and durable evidence, and separately enforce L3 physical authority. Demonstrate 12 STM32F103 low-density L1→L2 with 77 original L3 and three excluded T4/T6 preserved; demonstrate data-only future IC updates without Python edits, build, or PPU/FPGA deployment, using at least one synthetic or appropriately locked independent-provider negative case. Test relevant publication contracts/CI only; do not use unrelated Job Retry/Timeout failures as L2 qualification criteria. Development is an isolated Draft PR under Gate 1, with no merge or production SWPC/Z2/FPGA/DUT mutation until separately authorized.
 
 **Milestone E — Remove duplicated static coupling.**
 After parity and rollback evidence, retire dynamic per-IC Python registration, global count assertions and Catalog data-triggered product pipelines. Temporary legacy/SQLite parallel reading must exist only in the shadow-comparison phase and be removed when the canonical read path switches, consistent with Replace-by-Default. Keep versioned manufacturer/Provider evidence available for audits and repeatable snapshots.

@@ -48,12 +48,10 @@ export default defineConfig({
     timeout: 120_000,
     stdout: "ignore",
     stderr: "pipe",
-    // This suite mocks browser-visible Gateway calls with page.route(), so it
-    // deliberately exercises Standalone routing. Supplying a Manager alias here
-    // would select Managed Mode and move the downstream fetch into the server-side
-    // BFF, outside Playwright's browser interception boundary. Managed routing is
-    // covered by the explicit BFF/Manager contract tests and real cross-stack
-    // runtime acceptance; do not fake a healthy Manager in this suite.
+    // The Console is Manager-managed only (U10). Specs intercept the
+    // browser-visible same-origin Manager BFF paths (/api/manager/...) with
+    // page.route() (see managed-programming-helpers.ts mockManager); no
+    // healthy Manager is faked server-side and no direct Gateway is reached.
     env: {
       ...process.env,
       PLASMA_FLEET_UI_ENABLED: "1",

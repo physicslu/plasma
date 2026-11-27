@@ -7,11 +7,8 @@ const pmodCss = fs.readFileSync(new URL("../app/fleet/factory-console-v2.css", i
 const operatorPanel = fs.readFileSync(new URL("../app/operator-ui/operator-panel.tsx", import.meta.url), "utf8");
 const operatorCss = fs.readFileSync(new URL("../app/operator-ui/operator-panel.css", import.meta.url), "utf8");
 const batchSummaryCss = fs.readFileSync(new URL("../app/operator-ui/batch-summary.css", import.meta.url), "utf8");
-const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
-const serverBatchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
-const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-store.ts", import.meta.url), "utf8");
+const emode = fs.readFileSync(new URL("../app/engineering/managed-programming-workspace.tsx", import.meta.url), "utf8");
 const statistics = fs.readFileSync(new URL("../app/programming/batch-statistics.ts", import.meta.url), "utf8");
-const serverBatchRuntime = fs.readFileSync(new URL("../../python/plasma_web/batch_runtime.py", import.meta.url), "utf8");
 
 test("Production and Engineering share neutral operator summary primitives", () => {
   assert.match(pmod, /BatchSummary/);
@@ -47,10 +44,10 @@ test("Production KPI row separates equipment scope, planned IC quantity, and pro
   assert.match(batchSummaryCss, /grid-template-columns:\s*repeat\(var\(--batch-summary-columns, 7\), minmax\(0, 1fr\)\)/);
 });
 
-test("Production manufacturing KPIs use server Batch truth and exclude cancelled work from Yield", () => {
-  assert.match(snapshotStore, /latestSnapshot/);
-  assert.match(serverBatchApi, /publishServerBatchSnapshot/);
-  assert.equal((serverBatchApi.match(/return observeBatchSnapshot\(payload\.batch\);/g) ?? []).length, 4);
+test("Production manufacturing KPIs use Manager Batch truth and exclude cancelled work from Yield", () => {
+  // U10: the snapshot is the Manager Batch journal, never a PPU-local Batch store.
+  assert.match(pmod, /applyBatchSnapshot\(managedProductionSnapshot\(next, managedTopology\), catalog\)/);
+  assert.doesNotMatch(pmod, /server-batch-api|server-batch-snapshot-store|publishServerBatchSnapshot/);
   assert.match(statistics, /site\.pass_rounds \?\? site\.completed_rounds/);
   assert.match(statistics, /site\.final_failures/);
   const snapshot = statistics.slice(statistics.indexOf("export function snapshotStatistics"), statistics.indexOf("export function passRate"));
@@ -76,8 +73,8 @@ test("Production next-Batch membership is independently selectable at PPU and Si
 
 test("Production running Batch exposes only whole-Batch ABORT", () => {
   assert.match(pmod, /async function abortBatch/);
-  assert.match(pmod, /cancelServerBatch\(/);
-  assert.doesNotMatch(pmod, /cancelServerBatchPPU/);
+  assert.match(pmod, /await stopProgrammingBatch\(activeBatchId\)/);
+  assert.doesNotMatch(pmod, /cancelServerBatch/);
   assert.doesNotMatch(pmod, /Cancel PPU/);
   assert.match(pmod, /Membership is immutable after START/i);
   assert.match(pmod, /only whole-Batch ABORT/);
@@ -96,22 +93,8 @@ test("Production LED board remains the primary high-density runtime surface", ()
   assert.match(pmodCss, /factorySiteLed\[data-state="faulted"\]/);
 });
 
-test("Engineering v2 submits Batch policy once and the server runtime owns repeat, retry, and stop behavior", () => {
-  const runBatchStart = emode.indexOf("async function runBatch()");
-  const cancelBatchStart = emode.indexOf("async function cancelBatch()", runBatchStart);
-  assert.ok(runBatchStart >= 0 && cancelBatchStart > runBatchStart);
-  const runBatch = emode.slice(runBatchStart, cancelBatchStart);
-
-  assert.match(runBatch, /startEngineeringServerBatch\(apiBase/);
-  assert.match(runBatch, /repeat_count:\s*repeatValue/);
-  assert.match(runBatch, /site_retry_limit:\s*retryValue/);
-  assert.match(runBatch, /failed_site_stop_threshold:\s*thresholdValue/);
-  assert.doesNotMatch(runBatch, /for \(let round/);
-  assert.doesNotMatch(runBatch, /for \(let attempt/);
-  assert.doesNotMatch(runBatch, /startJob\(/);
-
-  assert.match(serverBatchRuntime, /for round_index in range\(1, batch\.policy\.repeat_count \+ 1\):/);
-  assert.match(serverBatchRuntime, /max_retries=batch\.policy\.site_retry_limit/);
-  assert.match(serverBatchRuntime, /threshold = batch\.policy\.failed_site_stop_threshold/);
-  assert.match(serverBatchRuntime, /batch\.stop_reason = "failed_site_threshold"/);
+test("Engineering submits Batch policy once and the Manager owns repeat, retry, and stop behavior", () => {
+  assert.match(emode, /const policy = \{ retryLimit, stopPolicy, repeat: repeatValue, replaceIc \};/);
+  assert.equal((emode.match(/runManagedBatch\(request, \{/g) ?? []).length, 1);
+  assert.doesNotMatch(emode, /for \(let round|for \(let attempt|startJob\(|startEngineeringServerBatch/);
 });

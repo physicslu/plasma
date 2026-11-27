@@ -63,8 +63,10 @@ export async function installTestDeviceCatalog(page: Page) {
   });
 }
 
-export async function chooseTestTarget(page: Page) {
-  const target = page.getByLabel("Target IC");
+export async function chooseTestTarget(page: Page, mode: "production" | "engineering" = "production") {
+  const target = mode === "production"
+    ? page.getByLabel("Target IC")
+    : sharedProgrammingJob(page, "engineering").getByPlaceholder("Search ICPN / IC identifier...");
   await target.fill(testTargetIc);
   await page.getByRole("option", { name: new RegExp(testTargetIc) }).click();
   await expect(target).toHaveValue(testTargetIc);

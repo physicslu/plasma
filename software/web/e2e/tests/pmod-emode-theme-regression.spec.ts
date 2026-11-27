@@ -1,4 +1,5 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { mockFleet, mockManager, type MockPpu } from "./managed-programming-helpers";
 import {
   expectProgrammingJobDesktopActionGeometry,
   programmingJob as sharedProgrammingJob,
@@ -7,98 +8,18 @@ import {
   programmingJobOperation,
   programmingJobPolicy,
 } from "./programming-job-test-helpers";
-import { commitProductionSites, factoryConsoleHeading, programmingJob } from "./production-console-helpers";
+import { chooseTestTarget, commitProductionSites, factoryConsoleHeading, programmingJob } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppu1Id = `${facilityId}-ppu-01`;
-const ppu2Id = `${facilityId}-ppu-02`;
 
-function catalog() {
-  return {
-    ok: true,
-    provider: "mock",
-    facility_count: 1,
-    ppu_count: 2,
-    site_count: 6,
-    programming_asset_scope: "connection-session-and-ppu",
-    facilities: [{
-      facility_id: facilityId,
-      display_name: "Mock Facility 01",
-      ppus: [
-        { ppu_id: ppu1Id, display_name: "Mock PPU 01", model: "MOCK-PPU", site_count: 2, provider: "mock" },
-        { ppu_id: ppu2Id, display_name: "Mock PPU 02", model: "MOCK-PPU", site_count: 4, provider: "mock" },
-      ],
-    }],
-  };
-}
-
-function targetStatus(ppuId: string) {
-  const siteCount = ppuId === ppu1Id ? 2 : 4;
-  return {
-    ok: true,
-    ppu: {
-      ppu_id: ppuId,
-      facility_id: facilityId,
-      model: "MOCK-PPU",
-      display_name: ppuId === ppu1Id ? "Mock PPU 01" : "Mock PPU 02",
-      site_count: siteCount,
-      enabled_site_count: siteCount,
-      capabilities: { max_supported_sites: siteCount, operations: ["erase", "program", "verify", "read"] },
-    },
-    sites: Array.from({ length: siteCount }, (_, index) => ({
-      site_id: index + 1,
-      enabled: true,
-      state: "idle",
-      current_job_id: null,
-      queued_jobs: 0,
-      interface: "mock",
-      target: "MOCK-IC",
-    })),
-  };
+function catalog(): MockPpu[] {
+  // Two Mock Manager PPUs of one Facility with 2 and 4 Sites (U10: managed only).
+  return mockFleet(1, [2, 4]);
 }
 
 async function installMockProvider(page: Page) {
-  await page.route("**/api/settings/gateway", async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        gateway_settings: {
-          revision: 1,
-          ppu_request_timeout_ms: 10_000,
-          ppu_retry_count: 3,
-          ppu_response_budget_ms: 47_000,
-        },
-      }),
-    });
-  });
-  await page.route("**/api/engineering/**", async (route: Route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (url.pathname === "/api/engineering/session" && request.method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, session: {
-          session_id: "0123456789abcdef0123456789abcdef",
-          programming_asset_cache_scope: "connection-session-and-ppu",
-          previous_session_cleared: false,
-        } }),
-      });
-      return;
-    }
-    if (url.pathname === "/api/engineering/targets" && request.method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
-      return;
-    }
-    const targetMatch = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/status$/.exec(url.pathname);
-    if (targetMatch && request.method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(targetStatus(decodeURIComponent(targetMatch[2]))) });
-      return;
-    }
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
-  });
+  await mockManager(page, { ppus: catalog() });
 }
 
 async function background(page: Page, selector: string) {
@@ -111,6 +32,8 @@ test("Pmod dark theme covers operator surfaces and keeps shared Programming Job 
   await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
   await commitProductionSites(page, facilityId, ppu1Id, [1]);
   await expect(page.locator(`[data-production-ppu="${ppu1Id}"]`)).toBeVisible();
+  // The managed Programming Job lists the Route's operations once a Target IC is chosen.
+  await chooseTestTarget(page);
 
   const job = programmingJob(page);
   expect(await programmingJobFieldOrder(job)).toEqual(["target", "image", "operations", "policy"]);
@@ -167,38 +90,40 @@ test("Pmod Facility packs different-width PPU cards without changing Site card d
   expect(new Set(siteSizes).size).toBe(1);
 });
 
-test("Emode Gateway URL, Connect, and EMode label retain readable Light and Dark theme colors", async ({ page }) => {
+// U10: the standalone Gateway URL input and Connect button are gone; the
+// managed header keeps the backend status and the EMode label, which must stay
+// readable in both themes.
+test("Emode managed backend status and EMode label retain readable Light and Dark theme colors", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/engineering");
   await page.locator(".engineeringWorkspace nav button").nth(2).click();
   const gateway = page.locator(".engineeringProgrammingV2Header .engineeringGateway");
   await expect(gateway).toBeVisible();
+  await expect(gateway.getByTestId("managed-backend")).toContainText("ONLINE");
+  await expect(gateway.locator("input")).toHaveCount(0);
+  await expect(gateway.getByRole("button")).toHaveCount(0);
 
   const readGatewayColors = () => gateway.evaluate(element => {
-    const input = element.querySelector("input")!;
-    const button = element.querySelector("button")!;
+    const status = element.querySelector("output")!;
     const label = element.querySelector("b")!;
     return {
-      input: getComputedStyle(input).color,
-      button: getComputedStyle(button).color,
+      status: getComputedStyle(status).color,
       label: getComputedStyle(label).color,
-      inputOpacity: getComputedStyle(input).opacity,
+      statusOpacity: getComputedStyle(status).opacity,
     };
   });
 
   expect(await readGatewayColors()).toMatchObject({
-    input: "rgb(17, 38, 49)",
-    button: "rgb(17, 38, 49)",
+    status: "rgb(17, 38, 49)",
     label: "rgb(17, 38, 49)",
-    inputOpacity: "1",
+    statusOpacity: "1",
   });
 
   await page.getByRole("group", { name: "Theme" }).getByRole("button", { name: "Dark", exact: true }).click();
   expect(await readGatewayColors()).toMatchObject({
-    input: "rgb(233, 243, 248)",
-    button: "rgb(233, 243, 248)",
+    status: "rgb(233, 243, 248)",
     label: "rgb(233, 243, 248)",
-    inputOpacity: "1",
+    statusOpacity: "1",
   });
 });
 
@@ -272,7 +197,9 @@ test("Emode v2 keeps workspace density while Programming Job follows the shared 
 
   await programmingJobOperation(job, "verify").check();
   await expect(programmingJobOperation(job, "verify")).toBeChecked();
-  await expect(page.getByLabel("SITE 1 Read Memory")).toBeVisible();
+  // READ is the qualified Site row's own action once the Target IC has a Route.
+  await chooseTestTarget(page, "engineering");
+  await expect(page.getByLabel("Read SITE 1 Flash")).toBeVisible();
 
   const passKpi = await page.locator('[data-kpi="pass"]').evaluate(element => {
     const style = getComputedStyle(element);

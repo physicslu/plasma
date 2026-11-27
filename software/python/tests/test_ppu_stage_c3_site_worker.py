@@ -30,6 +30,25 @@ F103 = {"icpn": "STM32F103C8T6", "target_config": "target/stm32f1x.cfg",
         "flash_base": 0x08000000, "flash_size": 0x10000, "erase_granularity": 1024}
 
 
+def test_status_socket_timeout_is_local_and_not_sent_to_strict_worker(monkeypatch, tmp_path):
+    class FakeSocket:
+        timeout = None
+        request = None
+        def __enter__(self): return self
+        def __exit__(self, *_args): return None
+        def settimeout(self, value): self.timeout = value
+        def connect(self, _path): pass
+        def sendall(self, data): self.request = json.loads(data)
+        def recv(self, _size): return b'{"ok":true,"result":{"sessions":[]}}\n'
+    fake = FakeSocket()
+    monkeypatch.setattr(worker.socket, "socket", lambda *_args, **_kwargs: fake)
+    result = worker.SiteWorkerClient(tmp_path / "control.sock", timeout_s=60).call(
+        "status", _socket_timeout_s=0.15)
+    assert result == {"sessions": []}
+    assert fake.timeout == 0.15
+    assert fake.request == {"protocol": worker.PROTOCOL, "op": "status"}
+
+
 def test_control_socket_streams_stage_events_before_final_reply(tmp_path, monkeypatch):
     class FakeCore:
         def handle(self, request, peer, role, event_sink):

@@ -5,12 +5,16 @@ export type ProgrammingJobField = "target" | "image" | "operations" | "policy";
 export type ProgrammingJobAction = "start" | "status" | "abort";
 export type ProgrammingJobOperation = "erase" | "program" | "verify" | "read";
 export type ProgrammingJobPolicy = "repeat" | "retry" | "stop";
+/** Optional managed Batch Policy controls next to Repeat / Retry / Stop. */
+export type ProgrammingJobPolicyControl = ProgrammingJobPolicy | "replace-ic" | "note";
 
 const expectedFields: ProgrammingJobField[] = ["target", "image", "operations", "policy"];
 const expectedActions: ProgrammingJobAction[] = ["start", "status", "abort"];
 const expectedOperationsByMode: Record<ProgrammingJobMode, ProgrammingJobOperation[]> = {
   engineering: ["erase", "program", "verify"],
-  production: ["erase", "program", "verify", "read"],
+  // Managed PMode offers the Route's E / P / V sequence; Read is EMode's
+  // per-Site action, never a Production Batch operation.
+  production: ["erase", "program", "verify"],
 };
 const expectedPolicies: ProgrammingJobPolicy[] = ["repeat", "retry", "stop"];
 
@@ -37,7 +41,7 @@ export function programmingJobOperation(panel: Locator, operation: ProgrammingJo
   return panel.locator(`[data-programming-job-operation="${operation}"]`);
 }
 
-export function programmingJobPolicy(panel: Locator, policy: ProgrammingJobPolicy) {
+export function programmingJobPolicy(panel: Locator, policy: ProgrammingJobPolicyControl) {
   return panel.locator(`[data-programming-job-policy="${policy}"]`);
 }
 
@@ -76,7 +80,13 @@ export async function expectProgrammingJobContract(panel: Locator) {
   expect(await programmingJobFieldOrder(panel)).toEqual(expectedFields);
   expect(await programmingJobActionOrder(panel)).toEqual(expectedActions);
   expect(await programmingJobOperationOrder(panel)).toEqual(expectedOperationsByMode[mode]);
-  expect(await programmingJobPolicyOrder(panel)).toEqual(expectedPolicies);
+  // Repeat / Retry / Stop keep their order; the managed Batch Policy adds the
+  // optional "Replace IC before next Cycle" toggle (after Repeat) and a note.
+  const policies = await programmingJobPolicyOrder(panel);
+  expect(policies.filter(policy => (expectedPolicies as string[]).includes(policy ?? ""))).toEqual(expectedPolicies);
+  expect(policies.filter(policy => !(expectedPolicies as string[]).includes(policy ?? ""))
+    .every(policy => policy === "replace-ic" || policy === "note")).toBe(true);
+  if (policies.includes("replace-ic")) expect(policies.indexOf("replace-ic")).toBe(policies.indexOf("repeat") + 1);
 
   await expect(programmingJobAction(panel, "start")).toHaveCount(1);
   await expect(programmingJobAction(panel, "status")).toHaveCount(1);

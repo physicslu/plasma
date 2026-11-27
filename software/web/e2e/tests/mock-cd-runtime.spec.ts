@@ -1,76 +1,30 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import {
+  batchRuns,
+  engineeringLog,
+  engineeringSiteRow,
+  harnessPpuState,
+  imagePattern,
+  managed,
+  observeManagedTraffic,
+  openEngineering,
+  selectEngineeringIc,
+  setEngineeringOperations,
+  setEngineeringSites,
+  setHarnessPpu,
+  settledManagerBatch,
+  type Operation,
+} from "./mock-cd-managed-helpers";
 
-type Operation = "erase" | "program" | "verify" | "read";
+// U10 Managed Lifecycle on the real Mock CD stack:
+// Console → BFF → Manager ProgrammingBatchCoordinator → real PPU Bootstrap /
+// Reservation / Job Binding → Mock PPU Runtime. No Plasma API is replaced.
 
-type StartRequest = {
-  siteId: number;
-  operation: Operation;
-};
-
-type BatchRequest = {
-  targets?: Array<{ facility_id?: string; ppu_id?: string; site_ids?: number[] }>;
-  operations?: Operation[];
-};
-
-const gatewayUrl = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
-const unreachableGatewayUrl = process.env.MOCK_CD_UNREACHABLE_GATEWAY_URL ?? "http://127.0.0.1:19899";
-const engineeringFacilityId = process.env.MOCK_CD_ENGINEERING_FACILITY_ID ?? "mock-facility-02";
-const engineeringPpuId = process.env.MOCK_CD_ENGINEERING_PPU_ID ?? "mock-facility-02-ppu-03";
-const engineeringPpuSites = Number(process.env.MOCK_CD_ENGINEERING_PPU_SITES ?? "6");
-const engineeringMainFlashBytes = 4 * 1024 * 1024;
-const imageAssetBytes = Buffer.from(Array.from({ length: 256 }, (_, index) => (index * 17 + 3) & 0xff));
-const operationLabels: Record<Operation, string> = {
-  erase: "擦除",
-  program: "燒錄",
-  verify: "驗證",
-  read: "讀取",
-};
-const perSiteOperationOrder: Operation[] = ["erase", "program", "verify", "read"];
-const batchOperationOrder: Operation[] = ["erase", "program", "verify"];
-
-const engineeringLog = (page: Page) => page.getByLabel("Engineering job log");
-const engineeringRow = (page: Page, siteId: number) => {
-  const label = `SITE-${String(siteId).padStart(2, "0")}`;
-  return page.locator(".channelTable tbody tr").filter({ hasText: label }).first();
-};
-
-async function openEngineeringProgramming(page: Page) {
-  await page.goto("/engineering");
-  await page.getByRole("button", { name: "Programming", exact: true }).click();
-
-  const facility = page.getByLabel("Engineering Facility", { exact: true });
-  const ppu = page.getByLabel("Engineering PPU", { exact: true });
-  await expect(facility.locator("option")).toHaveCount(8, { timeout: 15_000 });
-  await expect(page.locator(".topologyFoot")).toContainText("System Topology: 8 Facilities | 32 PPUs | 160 Sites");
-
-  await facility.selectOption(engineeringFacilityId);
-  await ppu.selectOption(engineeringPpuId);
-  await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText(engineeringPpuId);
-  await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText(`${engineeringPpuSites} Sites`);
-  await expect(page.locator(".channelTable tbody tr")).toHaveCount(engineeringPpuSites, { timeout: 15_000 });
-  await expect(page.getByText("SITE-00", { exact: true })).toHaveCount(0);
-}
-
-async function setEngineeringBatchSites(page: Page, siteIds: number[]) {
-  const desired = new Set(siteIds);
-  for (let siteId = 1; siteId <= engineeringPpuSites; siteId += 1) {
-    const checkbox = page.getByLabel(`Batch select SITE ${siteId}`);
-    const checked = await checkbox.isChecked();
-    if (desired.has(siteId) && !checked) await checkbox.check();
-    if (!desired.has(siteId) && checked) await checkbox.uncheck();
-  }
-}
-
-async function setEngineeringBatchOperations(page: Page, operations: Operation[]) {
-  const desired = new Set(operations);
-  for (const operation of batchOperationOrder) {
-    const checkbox = page.getByLabel(`Engineering batch ${operation}`);
-    const checked = await checkbox.isChecked();
-    if (desired.has(operation) && !checked) await checkbox.check();
-    if (!desired.has(operation) && checked) await checkbox.uncheck();
-  }
-}
+const imageAssetBytes = imagePattern(256, 17, 3);
+const imageFile = (name: string, buffer: Buffer = imageAssetBytes) =>
+  ({ name, mimeType: "application/octet-stream", buffer });
 
 test("Control Station root and retired /ppu route never expose the legacy Site Matrix", async ({ page }) => {
   await page.goto("/");
@@ -81,117 +35,173 @@ test("Control Station root and retired /ppu route never expose the legacy Site M
 
   await page.goto("/ppu");
   await expect(page).toHaveURL(/\/engineering$/);
-  await expect(page.getByRole("button", { name: "Programming", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(Programming|燒錄)$/ }).first()).toBeVisible();
   await expect(page.getByText("SITE MATRIX", { exact: true })).toHaveCount(0);
   await expect(page.getByText("PPU CONTROL", { exact: true })).toHaveCount(0);
 });
 
-test("Engineering Gateway reports offline and recovers without reviving direct PPU Console ownership", async ({ page }) => {
-  await openEngineeringProgramming(page);
+test("Manager-managed PPU goes offline and recovers without reviving direct PPU Console ownership", async ({ page, request }) => {
+  const alias = managed.ppuB;
+  const traffic = observeManagedTraffic(page);
+  const workspace = await openEngineering(page, alias);
+  // The managed Console owns no Gateway URL: the PPU is a Manager Registry entry.
+  await expect(page.getByLabel("Engineering Gateway URL")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Connect", exact: true })).toHaveCount(0);
+  const foot = workspace.getByLabel("Selected Engineering PPU");
+  await expect(foot).toContainText(`Manager Alias: ${alias}`);
+  await expect(foot).toContainText("PPU ONLINE", { timeout: 30_000 });
 
-  const gatewayInput = page.getByLabel("Engineering Gateway URL");
-  const gatewayForm = page.locator(".engineeringGateway");
-  await expect(gatewayForm).toHaveClass(/online/);
+  const job = await selectEngineeringIc(page);
+  await setEngineeringSites(workspace, [1], managed.ppuBSites);
+  await setEngineeringOperations(job, ["erase"]);
+  const start = job.getByRole("button", { name: /START PROGRAMMING/ });
+  await expect(start).toBeEnabled();
 
-  await gatewayInput.fill(unreachableGatewayUrl);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(gatewayForm).toHaveClass(/offline/, { timeout: 15_000 });
-  await expect(engineeringLog(page)).toContainText(unreachableGatewayUrl, { timeout: 15_000 });
+  try {
+    await setHarnessPpu(request, alias, "offline");
+    // The Manager Fleet observes the unreachable PPU; the Console fails closed.
+    await expect(foot).toContainText("PPU OFFLINE", { timeout: 45_000 });
+    await expect(workspace.getByTestId("managed-readiness")).toContainText("PPU OFFLINE");
+    await expect(start).toBeDisabled();
+    // The Manager Registry itself stays reachable; only the PPU is offline.
+    await expect(workspace.getByTestId("managed-backend")).toContainText("ONLINE");
+  } finally {
+    await setHarnessPpu(request, alias, "online");
+  }
 
-  await gatewayInput.fill(gatewayUrl);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(gatewayForm).toHaveClass(/online/, { timeout: 15_000 });
-  await expect(page.getByLabel("Engineering Facility", { exact: true }).locator("option")).toHaveCount(8, { timeout: 15_000 });
-
-  const malformed = "ftp://invalid-gateway.local";
-  await gatewayInput.fill(malformed);
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(engineeringLog(page)).toContainText(malformed);
-  await expect(gatewayForm).toHaveClass(/online/);
+  await expect(foot).toContainText("PPU ONLINE", { timeout: 45_000 });
+  expect((await harnessPpuState(request))[alias]?.state).toBe("online");
+  await expect(start).toBeEnabled({ timeout: 30_000 });
+  // Recovery alone never submits anything.
+  expect(traffic.batches).toEqual([]);
+  expect(traffic.legacy).toEqual([]);
 });
 
-test("EMode owns real per-Site E/P/V/R and Read download through the Python Engineering provider", async ({ page }) => {
-  const engineeringStarts: StartRequest[] = [];
-  page.on("request", request => {
-    const url = new URL(request.url());
-    const expectedPath = `/api/engineering/targets/${engineeringFacilityId}/${engineeringPpuId}/api/jobs`;
-    if (request.method() !== "POST" || url.pathname !== expectedPath) return;
-    const body = request.postDataJSON() as { site_id?: number; operation?: Operation };
-    if (typeof body.site_id === "number" && body.operation) {
-      engineeringStarts.push({ siteId: body.site_id, operation: body.operation });
-    }
-  });
+test("EMode owns real per-Site E/P/V/R and Read download through the Manager Managed Lifecycle", async ({ page, request }) => {
+  const traffic = observeManagedTraffic(page);
+  // No Save File Picker: the verified Read is offered as a Browser download.
+  await page.addInitScript(() => { (window as unknown as Record<string, unknown>).showSaveFilePicker = undefined; });
+  const workspace = await openEngineering(page, managed.ppuA);
+  const job = await selectEngineeringIc(page);
+  const siteId = managed.ppuASites;
+  await setEngineeringSites(workspace, [siteId], managed.ppuASites);
+  await job.getByLabel("Engineering Programming Image file").setInputFiles(imageFile("engineering-managed-runtime.bin"));
+  const start = job.getByRole("button", { name: /START PROGRAMMING/ });
+  const row = engineeringSiteRow(workspace, siteId);
+  const log = engineeringLog(workspace);
 
-  await openEngineeringProgramming(page);
-  await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
-    name: "engineering-provider-runtime.bin",
-    mimeType: "application/octet-stream",
-    buffer: imageAssetBytes,
-  });
-
-  const siteId = engineeringPpuSites;
-  const row = engineeringRow(page, siteId);
-  for (const operation of perSiteOperationOrder) {
-    await test.step(`${engineeringFacilityId}/${engineeringPpuId}/SITE-${siteId}: ${operation}`, async () => {
-      const before = engineeringStarts.length;
-      await page.getByLabel(operation === "read"
-        ? `SITE ${siteId} Read Memory`
-        : `SITE ${siteId} ${operationLabels[operation]}`).click();
-      await expect.poll(() => engineeringStarts.length, { timeout: 15_000 }).toBe(before + 1);
-      expect(engineeringStarts[before]).toEqual({ siteId, operation });
-      await expect(row.locator(".state")).toHaveText("SUCCESS", { timeout: 30_000 });
+  // Erase-only and Read Batches carry no Image, so they never activate a
+  // Resource Set (ADMISSION_RESOURCE_ACTIVATION_REQUIRES_IMAGE on a PPU with
+  // no Active Set). Program first so this test does not depend on spec order;
+  // then each of E / P / V runs as its own Batch on the Site.
+  const perSiteOperations: Operation[] = ["program", "erase", "program", "verify"];
+  for (const [index, operation] of perSiteOperations.entries()) {
+    await test.step(`${managed.ppuA}/SITE-${siteId}: ${operation} (#${index + 1})`, async () => {
+      const before = traffic.batches.length;
+      await setEngineeringOperations(job, [operation]);
+      await expect(start).toBeEnabled();
+      await start.click();
+      await expect.poll(() => traffic.batches.length, { timeout: 15_000 }).toBe(before + 1);
+      const sent = traffic.batches[before];
+      expect(sent.body.targets).toEqual([{ ppu_alias: managed.ppuA, site_ids: [siteId] }]);
+      expect(sent.body.operations).toEqual([operation]);
+      await expect.poll(() => sent.batchId, { timeout: 15_000 }).toMatch(/^[0-9a-f]{32}$/);
+      const batch = await settledManagerBatch(request, sent.batchId!);
+      expect(batch.outcome).toBe("PASS");
+      expect(batch.operations).toEqual([operation]);
+      const runs = await batchRuns(request, batch);
+      expect(runs).toHaveLength(1);
+      expect(runs[0].run.outcome).toBe("PASS");
+      expect(runs[0].run.site_id).toBe(siteId);
+      expect(runs[0].run.receipt?.operations).toEqual([operation]);
+      expect(runs[0].run.receipt?.observed_operations).toEqual([operation]);
+      await expect(row.locator(".engineeringResult")).toHaveText("PASS", { timeout: 30_000 });
+      await expect(log).toContainText(`[RESULT] PASS · Batch ${sent.batchId}`, { timeout: 30_000 });
     });
   }
 
-  const downloadLink = page.getByLabel(`Download SITE ${siteId} read file`);
-  await expect(downloadLink).toBeVisible();
-  const [download] = await Promise.all([
-    page.waitForEvent("download"),
-    downloadLink.click(),
-  ]);
-  expect(download.suggestedFilename()).toBe(`read_SITE${siteId}_main_flash.bin`);
-  const path = await download.path();
-  if (!path) throw new Error("Engineering Mock PPU Read did not produce a local file");
-  const bytes = await readFile(path);
-  expect(bytes.length).toBe(engineeringMainFlashBytes);
-  expect(bytes.subarray(0, imageAssetBytes.length).equals(imageAssetBytes)).toBe(true);
-  expect(bytes.subarray(imageAssetBytes.length).every(value => value === 0xff)).toBe(true);
+  await test.step(`${managed.ppuA}/SITE-${siteId}: read`, async () => {
+    const before = traffic.batches.length;
+    const readButton = workspace.getByRole("button", { name: `Read SITE ${siteId} Flash` });
+    await expect(readButton).toBeEnabled();
+    await readButton.click();
+    await expect(workspace.getByRole("status", { name: `SITE ${siteId} Read status` })).toHaveText("PASS", { timeout: 60_000 });
+    await expect.poll(() => traffic.batches.length).toBe(before + 1);
+    const sent = traffic.batches[before];
+    // Read is address / length over the Route's whole Flash: its own one-Site Batch.
+    expect(sent.body).toMatchObject({
+      icpn: managed.icpn,
+      targets: [{ ppu_alias: managed.ppuA, site_ids: [siteId] }],
+      operation: "read",
+      address: managed.flashBase,
+      length: managed.flashSize,
+    });
+    expect(sent.body).not.toHaveProperty("operations");
+    const batch = await settledManagerBatch(request, sent.batchId!);
+    expect(batch.outcome).toBe("PASS");
+    const [{ run }] = await batchRuns(request, batch);
+    const output = run.receipt?.read_output;
+    expect(output?.bytes).toBe(managed.flashSize);
+    expect(output?.filename).toBeTruthy();
+
+    const save = workspace.getByRole("link", { name: `Save SITE ${siteId} Read binary` });
+    await expect(save).toBeVisible();
+    const [download] = await Promise.all([page.waitForEvent("download"), save.click()]);
+    // The file name is the Manager's Read output naming, not a Console invention.
+    expect(download.suggestedFilename()).toBe(output!.filename);
+    const path = await download.path();
+    if (!path) throw new Error("Managed Mock PPU Read did not produce a local file");
+    const bytes = await readFile(path);
+    expect(bytes.length).toBe(managed.flashSize);
+    expect(createHash("sha256").update(bytes).digest("hex")).toBe(output!.sha256);
+    // Erase → Program → Verify left the Image at Flash Base and the rest erased.
+    expect(bytes.subarray(0, imageAssetBytes.length).equals(imageAssetBytes)).toBe(true);
+    expect(bytes.subarray(imageAssetBytes.length).every(value => value === 0xff)).toBe(true);
+  });
+  expect(traffic.legacy).toEqual([]);
 });
 
-test("EMode server-owned Batch carries selected Sites and operations", async ({ page }) => {
-  const batches: BatchRequest[] = [];
-  page.on("request", request => {
-    const url = new URL(request.url());
-    if (request.method() !== "POST" || url.pathname !== "/api/batches") return;
-    batches.push(request.postDataJSON() as BatchRequest);
-  });
-
-  await openEngineeringProgramming(page);
-  const selectedSites = engineeringPpuSites >= 3 ? [1, 3, engineeringPpuSites] : [1, engineeringPpuSites];
+test("EMode Manager Batch carries a non-contiguous Site subset × selected operations", async ({ page, request }) => {
+  const traffic = observeManagedTraffic(page);
+  const workspace = await openEngineering(page, managed.ppuA);
+  const job = await selectEngineeringIc(page);
+  const selectedSites = [1, 3, managed.ppuASites];
   const operations: Operation[] = ["erase", "program"];
-  await setEngineeringBatchSites(page, selectedSites);
-  await setEngineeringBatchOperations(page, operations);
-  await expect(page.getByLabel("Engineering batch read")).toHaveCount(0);
-  await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
-    name: "engineering-batch-runtime.bin",
-    mimeType: "application/octet-stream",
-    buffer: imageAssetBytes,
-  });
+  await setEngineeringSites(workspace, selectedSites, managed.ppuASites);
+  await setEngineeringOperations(job, operations);
+  // Read is a Site-row action, never a Programming Job operation.
+  await expect(job.locator('[data-programming-job-operation="read"]')).toHaveCount(0);
+  await job.getByLabel("Engineering Programming Image file").setInputFiles(imageFile("engineering-batch-runtime.bin"));
 
-  const start = page.getByRole("button", { name: /START PROGRAMMING/ });
+  const start = job.getByRole("button", { name: /START PROGRAMMING/ });
   await expect(start).toBeEnabled();
   await start.click();
-  await expect.poll(() => batches.length, { timeout: 15_000 }).toBe(1);
+  await expect.poll(() => traffic.batches.length, { timeout: 15_000 }).toBe(1);
 
-  expect(batches[0]?.targets).toEqual([{
-    facility_id: engineeringFacilityId,
-    ppu_id: engineeringPpuId,
-    site_ids: selectedSites,
-  }]);
-  expect(batches[0]?.operations).toEqual(operations);
+  const sent = traffic.batches[0];
+  expect(sent.body.targets).toEqual([{ ppu_alias: managed.ppuA, site_ids: selectedSites }]);
+  expect(sent.body.operations).toEqual(operations);
+  await expect.poll(() => sent.batchId, { timeout: 15_000 }).toMatch(/^[0-9a-f]{32}$/);
 
-  await expect(engineeringLog(page)).toContainText("[BATCH] SUCCESS", { timeout: 30_000 });
-  for (const siteId of selectedSites) {
-    await expect(engineeringRow(page, siteId).locator(".engineeringResult")).toHaveText("PASS", { timeout: 30_000 });
+  const batch = await settledManagerBatch(request, sent.batchId!);
+  expect(batch.outcome).toBe("PASS");
+  expect(batch.units.map(unit => [unit.ppu_alias, unit.site_id])).toEqual(
+    selectedSites.map(siteId => [managed.ppuA, siteId]));
+  const runs = await batchRuns(request, batch);
+  expect(runs.map(item => item.run.site_id).sort((a, b) => a - b)).toEqual(selectedSites);
+  for (const { run } of runs) {
+    expect(run.outcome).toBe("PASS");
+    expect(run.receipt?.operations).toEqual(operations);
+    expect(run.receipt?.observed_operations).toEqual(operations);
   }
+
+  const log = engineeringLog(workspace);
+  await expect(log).toContainText(`[RESULT] PASS · Batch ${sent.batchId}`, { timeout: 30_000 });
+  for (let siteId = 1; siteId <= managed.ppuASites; siteId += 1) {
+    const result = engineeringSiteRow(workspace, siteId).locator(".engineeringResult");
+    if (selectedSites.includes(siteId)) await expect(result).toHaveText("PASS", { timeout: 30_000 });
+    else await expect(result).not.toHaveText("PASS");
+  }
+  expect(traffic.batches).toHaveLength(1);
+  expect(traffic.legacy).toEqual([]);
 });

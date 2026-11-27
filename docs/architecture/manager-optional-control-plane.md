@@ -13,8 +13,8 @@ Canonical ownership is defined in [Control Plane Routing Architecture](control-p
 A Plasma PPU is a complete autonomous execution node. It must not require a live Manager connection to:
 
 - start its local Plasma Server and Plasma Gateway;
-- expose its explicit local/Standalone maintenance boundary;
-- continue an already accepted Job or Batch;
+- expose its explicit local maintenance boundary;
+- continue an already accepted Job (the PPU runs no Batch; Batches are Manager-owned, U10);
 - recover a Site;
 - perform local maintenance and diagnostics.
 
@@ -27,10 +27,10 @@ Plasma Manager -> PPU
 PPU autonomy does **not** mean that a centrally managed Console may bypass Manager.
 
 ```text
-Standalone Mode
-local client -> Plasma Gateway -> Plasma Server -> local execution
+Local maintenance (no Console)
+local tool -> Plasma Gateway -> Plasma Server -> local execution
 
-Managed Mode
+Control Console (the only Console mode, U10)
 Control Console -> BFF -> Manager -> selected Plasma Gateway -> Plasma Server -> local execution
 ```
 
@@ -70,24 +70,13 @@ Management Host
 
 The Management Host owns centralized visibility, managed routing, runtime PPU registry state, and cross-domain network commissioning orchestration. It does not execute FPGA/IC operations and does not receive Linux network-mutation privilege on the PPU.
 
-## Mode A: Standalone PPU
+## Mode A: Autonomous PPU (no Console)
 
-No Manager or central host is required for local PPU capability:
-
-```text
-Local client / local PPU Console
-        |
-        v
-Plasma Gateway
-        |
-        v
-Plasma Server
-        |
-        v
-SITE 1 .. SITE N
-```
-
-Standalone Mode is an explicit operating mode and local recovery boundary. It is not an automatic fallback from Managed Mode.
+No Manager or central host is required for local PPU capability (local
+Gateway, accepted Jobs, Site recovery, maintenance). The Control Console does
+not connect to a PPU directly: the standalone Console and the PPU-local Batch
+runtime were retired (U10). Programming from a Console always goes through
+the Manager.
 
 ## Mode B: Managed fleet
 
@@ -115,7 +104,7 @@ local execution
 
 PMode, EMode, Programming Asset/Image transfer and PS Loopback use the same Managed Mode routing ownership.
 
-A previously stored direct Plasma Gateway Endpoint is not the Managed Mode routing source of truth. When the Management Host is configured for Manager routing, the shared Workspace API base uses the same-origin Manager BFF path. An operator may select Standalone Mode explicitly when a direct local PPU workflow is intended.
+A previously stored direct Plasma Gateway Endpoint is not the Managed Mode routing source of truth. When the Management Host is configured for Manager routing, the shared Workspace API base uses the same-origin Manager BFF path.
 
 ## Browser-facing BFF boundary
 

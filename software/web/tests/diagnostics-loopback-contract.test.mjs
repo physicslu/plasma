@@ -70,9 +70,8 @@ test("Diagnostics Test Page shell is shared while loopback keeps domain controls
 });
 
 test("Manager BFF namespace stays in Vinext and receives alias binding", () => {
-  assert.ok(vite.includes('"^/api/(?!fleet(?:/|$))(?!manager(?:/|$))"'));
-  assert.match(vite, /process\.env\.PLASMA_GATEWAY_PROXY_URL \?\? "http:\/\/127\.0\.0\.1:18080"/);
-  assert.match(vite, /target: localGatewayProxyTarget/);
+  // U10: no dev proxy forwards /api/* to a PPU Gateway; every PPU call is a BFF relay.
+  assert.doesNotMatch(vite, /proxy:|PLASMA_GATEWAY_PROXY_URL|localGatewayProxyTarget/);
   assert.match(vite, /PLASMA_MANAGER_PPU_ALIAS:\s*process\.env\.PLASMA_MANAGER_PPU_ALIAS\s*\?\?\s*""/);
 });
 

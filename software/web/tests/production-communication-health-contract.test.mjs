@@ -16,7 +16,9 @@ test("PMode renders layered Gateway and PPU health instead of one Connected flag
 
 test("Gateway reachability is classified from HTTP response evidence", () => {
   assert.match(health, /error instanceof PlasmaApiError && error\.status !== undefined \? "online" : "unreachable"/);
-  assert.match(factory, /setGatewayHealth\(gatewayHealthFromSettled\(results\)\)/);
+  // U10: status comes from the Manager; a Manager answer is reachability evidence.
+  assert.match(factory, /\/\/ The Manager answered; an unobservable PPU is a PPU fault, not a Gateway fault\.\s*setGatewayHealth\("online"\);/);
+  assert.doesNotMatch(factory + health, /gatewayHealthFromSettled/);
   assert.match(factory, /setGatewayHealth\(gatewayHealthFromError\(error\)\)/);
 });
 
@@ -29,6 +31,6 @@ test("Programming provider absence does not downgrade a reachable PPU to offline
 });
 
 test("Production dispatch remains fail-closed when Programming provider is unavailable", () => {
-  assert.match(factory, /providerOnline: gatewayHealth === "online" && Boolean\(catalog && !providerError\)/);
+  assert.match(factory, /if \(!catalog\) return blocked\("programming-unavailable", "MANAGER OFFLINE", providerError \?\? "The Manager Registry is unavailable\."\);/);
   assert.match(readiness, /Provider availability is a Programming capability signal, not a PPU/);
 });

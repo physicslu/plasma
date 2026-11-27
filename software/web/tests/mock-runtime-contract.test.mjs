@@ -8,7 +8,6 @@ const panelSource = await readFile(new URL("../app/engineering/mock-runtime-sett
 const mockRuntimeCss = await readFile(new URL("../app/engineering/mock-runtime-settings.css", import.meta.url), "utf8");
 const sharedSettingsUi = await readFile(new URL("../app/operator-ui/settings-ui.tsx", import.meta.url), "utf8");
 const sharedSettingsCss = await readFile(new URL("../app/operator-ui/settings-ui.css", import.meta.url), "utf8");
-const batchSource = await readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 
 test("Mock runtime settings are server-owned and exposed under Engineering Settings", () => {
   assert.match(apiSource, /\/api\/mock\/runtime/);
@@ -54,8 +53,10 @@ test("Mock and Gateway test methods share one explicit numbering contract", () =
   assert.match(sharedSettingsCss, /list-style:\s*none/);
 });
 
-test("server Batch snapshots expose immutable Mock execution provenance", () => {
-  assert.match(batchSource, /mock_runtime\?: MockBatchRuntimeSnapshot/);
-  assert.match(apiSource, /resolved_seed: number/);
-  assert.match(apiSource, /revision: number/);
+test("Mock settings remain immutable for an accepted Batch", async () => {
+  // Moved from the retired engineering-server-batch ownership contract (U10):
+  // the Mock Profile is snapshotted by the runtime that accepts the Batch.
+  const mockRuntime = await readFile(new URL("../../../docs/architecture/mock-runtime-v1.1.md", import.meta.url), "utf8");
+  assert.match(mockRuntime, /One immutable Mock Profile snapshot/);
+  assert.match(mockRuntime, /Editing Mock Settings while a Batch is running cannot alter that Batch/);
 });

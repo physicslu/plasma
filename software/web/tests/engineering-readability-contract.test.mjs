@@ -70,7 +70,7 @@ test("Engineering numbering is metadata only and shared Operator Panel owns firs
     source(readabilityPath),
     source(refreshPath),
     source(panelCssPath),
-    source(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url)),
+    source(new URL("../app/engineering/managed-programming-workspace.tsx", import.meta.url)),
   ]);
 
   assert.match(programmingWorkspace, /<OperatorPanelHeader\s+number=\{1\}\s+title="SYSTEM SETUP & TARGETING"/);
