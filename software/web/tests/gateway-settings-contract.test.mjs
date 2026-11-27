@@ -12,7 +12,8 @@ const engineeringCss = await readFile(new URL("../app/engineering/engineering.cs
 const engineeringWorkspace = await readFile(new URL("../app/engineering/managed-programming-workspace.tsx", import.meta.url), "utf8");
 const batchStatistics = await readFile(new URL("../app/programming/batch-statistics.ts", import.meta.url), "utf8");
 const productionWorkspace = await readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
-const serverBatchRuntime = await readFile(new URL("../../python/plasma_web/batch_runtime.py", import.meta.url), "utf8");
+const gatewayModule = await readFile(new URL("../../python/plasma_web/gateway.py", import.meta.url), "utf8");
+const retiredBatchRuntime = new URL("../../python/plasma_web/batch_runtime.py", import.meta.url);
 
 test("EMode Settings owns the server-backed shared Plasma Gateway communication policy", () => {
   assert.match(engineeringPage, /active === "settings"/);
@@ -79,15 +80,13 @@ test("Shared Settings Guide renders explicit full-width-colon step numbers", () 
   assert.match(sharedSettingsCss, /list-style:\s*none/);
 });
 
-test("PPU Gateway Batch runtime freezes authoritative Gateway policy at START", () => {
-  // The Console no longer issues direct Jobs or PPU-local Batches (U10); the
-  // Gateway-side runtime keeps its own frozen communication policy.
+test("the PPU runs no Batch: Gateway policy is not frozen into a PPU-local Batch (U10)", async () => {
+  // The Console issues no direct Jobs or PPU-local Batches, and the PPU-local
+  // Batch runtime is retired: every Batch is Manager-owned.
   assert.doesNotMatch(engineeringWorkspace, /cachedGatewaySettings|getGatewayLiveness|withCommunicationRetry|gateway-settings-api/);
-  assert.match(serverBatchRuntime, /gateway_policy=self\.gateway_settings\.snapshot\(\)/);
-  assert.match(serverBatchRuntime, /retries = batch\.gateway_policy\.ppu_retry_count if retryable else 0/);
-  assert.match(serverBatchRuntime, /timeout=batch\.gateway_policy\.request_timeout_s/);
-  assert.match(serverBatchRuntime, /batch\.failed_ppus\.add\(ppu_key\)/);
-  assert.match(serverBatchRuntime, /_cancel_active_jobs\(batch, ppu_key=ppu_key\)/);
+  await assert.rejects(readFile(retiredBatchRuntime, "utf8"), { code: "ENOENT" });
+  assert.match(gatewayModule, /PPU_BATCH_RETIRED/);
+  assert.doesNotMatch(gatewayModule, /batch_runtime|BatchRuntimeManager/);
 });
 
 test("manufacturing Yield is undefined until an IC has a PASS or FAIL outcome", () => {
