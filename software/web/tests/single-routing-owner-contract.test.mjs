@@ -17,7 +17,7 @@ test("WorkspaceSession remains the authoritative browser routing owner", async (
 
   // U10: the routing target is always the same-origin Manager PPU prefix.
   assert.match(workspace, /return `\$\{window\.location\.origin\}\/api\/manager\/ppu`;/);
-  assert.match(workspace, /markGatewayRoutingResolved\(managed\);/);
+  assert.match(workspace, /markGatewayRoutingResolved\(managedApiBase\(\)\);/);
   assert.doesNotMatch(workspace, /localStorage|API_STORAGE_KEY|apiMode|setApiBase\b|"standalone"/);
   assert.match(devicesPage, /useWorkspaceSession\(\)/);
   // PR-C2: the Device Selector is Manager-owned and same-origin (Manager BFF);

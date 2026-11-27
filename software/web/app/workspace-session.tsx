@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
@@ -44,13 +45,16 @@ type WorkspaceSessionContextValue = {
 
 const WorkspaceSessionContext = createContext<WorkspaceSessionContextValue | null>(null);
 
+const subscribeNever = () => () => {};
+
 function managedApiBase(): string {
   return `${window.location.origin}/api/manager/ppu`;
 }
 
 export function WorkspaceSessionProvider({ children }: { children: ReactNode }) {
-  const [hydrated, setHydrated] = useState(false);
-  const [apiBase, setApiBaseState] = useState("");
+  // "" on the server and during hydration; the managed prefix on the client.
+  const hydrated = useSyncExternalStore(subscribeNever, () => true, () => false);
+  const apiBase = hydrated ? managedApiBase() : "";
 
   // Production deliberately keeps the three responsibility domains separate:
   // draft = transient tree edit state, Production Set = committed equipment scope,
@@ -66,10 +70,7 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     // The Console reaches a PPU only through the Plasma Manager (U10): every
     // Gateway path is rebased onto the same-origin managed prefix. There is
     // no Browser-chosen Gateway URL and no direct-Gateway fallback.
-    const managed = managedApiBase();
-    setApiBaseState(managed);
-    markGatewayRoutingResolved(managed);
-    setHydrated(true);
+    markGatewayRoutingResolved(managedApiBase());
   }, []);
 
   const value = useMemo<WorkspaceSessionContextValue>(() => ({
