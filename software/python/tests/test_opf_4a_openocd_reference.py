@@ -452,7 +452,7 @@ def test_real_worker_unproven_safe_off_seals_site_and_blocks_next_job():
         assert len(env["sim"].argvs) == children_before_denial
 
 
-def _runtime_execute(env, monkeypatch, *, pinned_profile=None):
+def _runtime_execute(env, monkeypatch, *, pinned_profile=None, fpga_identity_guard=None):
     """Real Runtime/Worker/ABI5; only socket and physical process edges replaced."""
     original_load = engine.load_engine
 
@@ -484,7 +484,7 @@ def _runtime_execute(env, monkeypatch, *, pinned_profile=None):
         active_asset_set=env["active_asset_set"],
         job_deadline_monotonic=time.monotonic() + 5,
         image_root=env["image_root"], job_binding=_binding(address=0x08000000, length=len(IMAGE)),
-        pinned_profile=pinned_profile))
+        pinned_profile=pinned_profile, fpga_identity_guard=fpga_identity_guard))
 
 
 def _prepared_profile(env):
@@ -509,6 +509,28 @@ def test_prepared_profile_is_reused_without_a_second_active_set_verification(mon
         result = _runtime_execute(env, monkeypatch, pinned_profile=prepared)
         assert result["result"] == "PASS" and result["safe_off"] is True
         assert bytes(env["sim"].memory[:len(IMAGE)]) == IMAGE
+
+
+def test_the_reservation_fpga_guard_sees_the_worker_identity_and_can_refuse_before_any_session(monkeypatch):
+    """U8: the Batch Reservation's FPGA pin is checked before any Site session."""
+    with installed_bundle(with_control_socket=False, with_fpga=False,
+                          platform_provider=True) as env:
+        seen = []
+        result = _runtime_execute(env, monkeypatch, fpga_identity_guard=seen.append)
+        assert result["result"] == "PASS" and len(seen) == 1
+        assert seen[0]["status"] == "IMAGE" and seen[0]["image_id"]
+
+
+def test_a_refused_reservation_fpga_identity_opens_no_site_session(monkeypatch):
+    with installed_bundle(with_control_socket=False, with_fpga=False,
+                          platform_provider=True) as env:
+        def refuse(_identity):
+            raise RuntimeError("reserved FPGA identity changed")
+
+        with pytest.raises(Exception, match="RESERVED_FPGA_IDENTITY_REFUSED"):
+            _runtime_execute(env, monkeypatch, fpga_identity_guard=refuse)
+        assert env["sim"].argvs == []
+        assert "open_job_session" not in env["worker_calls"]
 
 
 def test_a_prepared_profile_of_another_set_is_refused_before_any_session(monkeypatch):

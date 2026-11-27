@@ -591,6 +591,7 @@ async def execute_runtime_flash(
     attempt: int = 1,
     stage_event=None,
     pinned_profile: Mapping[str, Any] | None = None,
+    fpga_identity_guard=None,
 ) -> dict[str, Any]:
     """Production REST Flash cutover; no direct-C3 fallback.
 
@@ -651,6 +652,13 @@ async def execute_runtime_flash(
             and (fpga is None or identity["image_id"] == fpga["image_id"]))
         _need(identity_verified,
               "OPF_FPGA_IDENTITY_UNVERIFIED")
+        if fpga_identity_guard is not None:
+            # U8: under a Batch Reservation the loaded image must be the one
+            # the Reservation's first Job saw; checked before any Site session.
+            try:
+                fpga_identity_guard(dict(identity))
+            except Exception as exc:  # noqa: BLE001 - any refusal denies the Job
+                raise ReferenceDenied("RESERVED_FPGA_IDENTITY_REFUSED") from exc
         # Platform comes from the authenticated installed Worker adapter, not
         # from the Bundle's target declarations. Live C3 Root admission still
         # verifies PL/ABI, ownership and SAFE_OFF before hardware execution.
