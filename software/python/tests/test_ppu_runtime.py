@@ -24,6 +24,9 @@ def test_build_runtime_creates_server_gateway_helper_zipapp_without_catalog(tmp_
     assert result == output.resolve()
     app = output / "ppu" / "ppu.pyz"
     assert app.is_file()
+    import zipfile
+    with zipfile.ZipFile(app) as archive:
+        assert "plasma_server/time_sync.py" in archive.namelist()
     assert (output / "ppu" / "THIRD_PARTY_LICENSES" / "PyYAML.txt").is_file()
     # OPF S5 / PR-C1: no Catalog / IC Support data ships in the PPU runtime.
     assert not (output / "data").exists()
