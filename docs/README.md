@@ -56,6 +56,8 @@
 
 ## PPU architecture and runtime
 
+- **Plan** · `Gate 1` · `Draft PR #1508` · `Host-only` — [Programming Profile v2 / Provider-neutral Execution Plan](architecture/opf-programming-profile-v2-provider-neutral-gate1.md)：新增可編輯的 Profile v2 資料契約、Provider-neutral 執行計畫與 Mock Hardware Workflow；不改動 Bundle v3、Job Binding v1 或 Z2 實機燒錄路徑。真正 Runtime／Power Hardware／DUT 驗證均未實作。
+
 - **Current** · `PR #1343/#1348 Merged` · `S0–S5 partial` — [PLASMA Core Convergence and Deletion-First Roadmap](architecture/plasma-core-convergence-and-deletion-first-roadmap.md)：後續 OPF／Bundle／Runtime 收斂及舊程式刪除的共同基準；S0–S5 尚待個別 Gate 1，非 Runtime 或實機驗收。
 - **Reference** · `S5-A Gate 1` · `Host-only` — [OPF S5-A bounded source convergence and import-boundary regression](development/opf-s5a-source-convergence-gate1-20261108.md)：記錄可攜式 OPF 隔離匯入、故意注入相依的負向測試、退休 Compiler 防回流、既有路由與安全邊界；僅 Source-only，不是 S5 Final Closure 或實機驗收。
 - **Reference** · `S5-B Gate 1` · `Host-only` — [OPF S5-B final architecture convergence](development/opf-s5b-final-convergence-gate1-20261109.md)：PPU Gateway 相容 Device Selector 路由刪除後的 Consumer 稽核、刪除／保留清單、Import Graph、LOC 與 Runtime Footprint；僅 Host-only，HIL NOT_RUN。
