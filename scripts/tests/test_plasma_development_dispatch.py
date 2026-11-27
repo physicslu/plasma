@@ -1069,6 +1069,71 @@ class DevelopmentPath3Contracts(DevelopmentPath2Contracts):
                       (ROOT / "scripts/plasma_development_dispatch.py").read_text())
         self.assertIn('"GH_TOKEN", "GITHUB_TOKEN"',
                       (ROOT / "scripts/plasma_development_codex_sandbox.py").read_text())
+
+    def test_path3_publisher_stages_source_without_build_or_evidence(self):
+        job=WORKFLOW.read_text().split("  development-codex:",1)[1].split(
+            "\n  authorize:",1)[0]
+        publisher=job.split("Publish successful Path 3 edits to the exact authorized PR",1)[1]
+        add="git -C candidate add -A"
+        exclude="git -C candidate reset -q HEAD -- pl/build .plasma-path3-evidence"
+        self.assertIn(add+"\n",publisher)
+        self.assertIn(exclude+"\n",publisher)
+        self.assertLess(publisher.index(add),publisher.index(exclude))
+        self.assertNotIn("git -C candidate add -f",publisher)
+
+        def git(candidate,*args):
+            return subprocess.run(["git","-C",str(candidate),*args],
+                                  text=True,capture_output=True,check=True).stdout
+
+        with tempfile.TemporaryDirectory() as td:
+            candidate=Path(td)/"candidate"
+            candidate.mkdir()
+            git(candidate,"init","-q")
+            git(candidate,"config","user.name","Path 3 test")
+            git(candidate,"config","user.email","path3@example.invalid")
+            (candidate/"source-modified.txt").write_text("old\n")
+            (candidate/"source-deleted.txt").write_text("delete\n")
+            build=candidate/"pl/build"
+            build.mkdir(parents=True)
+            (build/"tracked.txt").write_text("old build\n")
+            evidence=candidate/".plasma-path3-evidence"
+            evidence.mkdir()
+            (evidence/"tracked.log").write_text("old evidence\n")
+            git(candidate,"add","-A")
+            git(candidate,"commit","-qm","baseline")
+            (candidate/".gitignore").write_text("pl/build/\n")
+            git(candidate,"add",".gitignore")
+            git(candidate,"commit","-qm","ignore build")
+
+            (candidate/"source-modified.txt").write_text("new\n")
+            (candidate/"source-deleted.txt").unlink()
+            (candidate/"source-added.txt").write_text("added\n")
+            (build/"tracked.txt").write_text("changed build\n")
+            (build/"nested").mkdir()
+            (build/"nested/ignored.bin").write_bytes(b"build output")
+            (evidence/"tracked.log").unlink()
+            (evidence/"new.log").write_text("private evidence\n")
+
+            stage=subprocess.run(["bash","-euo","pipefail","-c",
+                                  add+"\n"+exclude],cwd=td,
+                                 text=True,capture_output=True)
+            self.assertEqual(stage.returncode,0,stage.stderr)
+            self.assertEqual(git(candidate,"diff","--cached","--name-status").splitlines(),
+                             ["A\tsource-added.txt","D\tsource-deleted.txt",
+                              "M\tsource-modified.txt"])
+            git(candidate,"diff","--cached","--check")
+            self.assertEqual(git(candidate,"ls-files","pl/build/nested/ignored.bin"),"")
+
+            git(candidate,"reset","-q","--hard","HEAD")
+            (build/"nested").mkdir(exist_ok=True)
+            (build/"nested/ignored.bin").write_bytes(b"build output")
+            (evidence/"new.log").write_text("private evidence\n")
+            stage=subprocess.run(["bash","-euo","pipefail","-c",
+                                  add+"\n"+exclude],cwd=td,
+                                 text=True,capture_output=True)
+            self.assertEqual(stage.returncode,0,stage.stderr)
+            self.assertEqual(git(candidate,"diff","--cached","--name-only"),"")
+
     def test_development_path3_supports_vivado_and_full_source_edits(self):
         # Stub-only contract: no Vivado or physical device is invoked by CI.
         task={
