@@ -21,6 +21,7 @@ import plasma_development_dispatch as dev
 import plasma_host_observe as host_observe
 
 WORKFLOW=ROOT/".github/workflows/plasma-engineering-runtime-dispatch.yml"
+# Gate 1 seed: reproduce ignored pl/build staging failure (Run 45739613057) in an isolated Git fixture.
 REGISTRY=ROOT/"specs/engineering-dispatch/development-tasks-v1.json"
 HOST_BUILD_PROJECT = {
     "execution_path": "path2-cli", "capability": "vivado-host-build",
