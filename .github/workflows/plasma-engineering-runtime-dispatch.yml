@@ -767,7 +767,8 @@ jobs:
           print(ref)
           ' "$PINNED_SHA")"
           # Do not publish private Codex logs or generated Vivado outputs.
-          git -C candidate add -A -- . ':(exclude).plasma-path3-evidence' ':(exclude)pl/build'
+          git -C candidate add -A
+          git -C candidate reset -q HEAD -- pl/build .plasma-path3-evidence
           git -C candidate diff --cached --check
           if git -C candidate diff --cached --quiet; then
             echo PATH3_NO_SOURCE_CHANGES
