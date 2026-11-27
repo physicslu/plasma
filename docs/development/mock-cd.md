@@ -138,7 +138,7 @@ The acceptance scenarios are:
 
 6. **PMode multi-PPU Batch**
    - one Manager Batch over `ppu-a` + `ppu-b` with a shared Image (E/P/V) and one Erase-only Batch complete on both PPUs, each with its own Job / Binding;
-   - ABORT is whole-Batch STOP QUEUING: started Jobs complete PASS, queued Cycles are never submitted. Known intermittent pre-existing BFF bug: the stop relay (GET Batch, then POST stop to the HTTP/1.0 Manager) can lose the POST (503 `manager_unavailable`); the test stays strict.
+   - ABORT is whole-Batch STOP QUEUING: started Jobs complete PASS, queued Cycles are never submitted. The stop relay reads the Batch and then POSTs stop in one Worker request; the HTTP/1.0 Manager now declares `Connection: close` on every response, so the runtime never reuses a closed connection for the POST (previously an intermittent 503 `manager_unavailable`).
 
 7. **Mock runtime settings** are written through the Manager relay (the G13 Gateway refuses an unsigned direct write) and EMode System Configuration shows the applied revision.
 

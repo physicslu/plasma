@@ -38,23 +38,27 @@ def test_windows_control_station_launcher_is_explicitly_managed() -> None:
 
 
 def test_web_default_and_storage_migration_are_same_origin_owned() -> None:
+    session = _source("software/web/app/workspace-session.tsx")
     api = _source("software/web/app/plasma-api.ts")
     layout = _source("software/web/app/layout.tsx")
-    assert 'process.env.NEXT_PUBLIC_PLASMA_API_URL ?? ""' in api
-    assert 'if (!trimmed) return "";' in api
+    # U10: the Console is Manager-managed only; no Browser-owned API base.
+    assert "`${window.location.origin}/api/manager/ppu`" in session
+    assert "NEXT_PUBLIC_PLASMA_API_URL" not in api + session
     assert 'window.localStorage.getItem(versionKey) === "3"' in layout
     assert 'window.localStorage.removeItem(apiKey);' in layout
     assert "legacyApiBases" not in layout
 
 
-def test_swpc_local_gateway_and_mock_path_remain_available_behind_same_origin() -> None:
+def test_integration_host_console_is_manager_managed_without_a_gateway_proxy() -> None:
     vite = _source("software/web/vite.config.ts")
     deployment = _source("utilities/plasmactl/backends/plasmactl-integration")
-    assert 'process.env.PLASMA_GATEWAY_PROXY_URL ?? "http://127.0.0.1:18080"' in vite
-    assert "target: localGatewayProxyTarget" in vite
+    # U10: no same-origin Vite proxy to a PPU Gateway; the Manager is required.
+    assert "PLASMA_GATEWAY_PROXY_URL" not in vite
+    assert "proxy:" not in vite
     assert 'engineering_mock_args=" --engineering-mock --engineering-mock-root $engineering_mock_root"' in deployment
     assert 'default_public_api_url=""' in deployment
-    assert "current_config_version=6" in deployment
+    assert "current_config_version=7" in deployment
+    assert 'manager_enabled="${PLASMA_MANAGER_ENABLED:-1}"' in deployment
 
 
 def test_windows_installer_acceptance_proves_clean_install_managed_fail_closed() -> None:

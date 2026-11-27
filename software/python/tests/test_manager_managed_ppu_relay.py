@@ -258,6 +258,15 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
         self.assertEqual((observed["method"], observed["path"]), ("POST", "/api/jobs"))
         self.assertEqual(observed["idempotency_key"], "job-1")
 
+    def test_manager_declares_one_exchange_per_connection(self):
+        # HTTP/1.0 Manager: every response says Connection: close, so a pooling
+        # client (the Console BFF runtime) never reuses a closed connection for
+        # its next request (U10: intermittent "Network connection lost" on the
+        # BFF Batch stop relay, which reads the Batch and then POSTs stop).
+        status, headers, _ = self.relay("GET", "/api/status")
+        self.assertEqual(status, 200)
+        self.assertEqual({k.lower(): v for k, v in headers.items()}.get("connection"), "close")
+
     def test_managed_workspace_settings_routes_preserve_security_headers(self):
         for path in ("/api/settings/gateway", "/api/settings/ppu-network", "/api/mock/runtime"):
             status, _, data = self.relay("GET", path)

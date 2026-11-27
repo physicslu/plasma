@@ -156,14 +156,10 @@ test("real Production Mock submits one Manager Batch for two PPUs (Erase) and co
 });
 
 test("real Production Mock ABORT is whole-Batch STOP QUEUING: started Jobs complete normally, nothing new is submitted", async ({ page, request }) => {
-  // KNOWN PRE-EXISTING, INTERMITTENT APP BUG (BFF, unchanged by U10): the
-  // canonical Batch stop relay first GETs the Batch from the Manager
-  // (authorizedAliases → managerProgrammingRead) and then POSTs .../stop in the
-  // same Worker request. Against the HTTP/1.0 Manager that POST intermittently
-  // fails in the Vinext/workerd runtime with "Network connection lost"
-  // (retryable), the BFF answers 503 manager_unavailable, the Console logs
-  // "[BAT] ABORT ERROR" and the Batch runs every queued Cycle. This test stays
-  // strict (no test.fail): it is the product acceptance for STOP QUEUING.
+  // The canonical Batch stop relay GETs the Batch from the Manager and then
+  // POSTs .../stop in the same Worker request. The HTTP/1.0 Manager declares
+  // Connection: close on every response (U10 fix), so the POST no longer
+  // fails intermittently with "Network connection lost" (BFF 503). Strict.
   const traffic = observeManagedTraffic(page);
   const repeat = 50;
   const job = await openTwoPpuProductionSet(page, ["erase", "program", "verify"]);
