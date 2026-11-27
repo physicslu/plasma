@@ -904,3 +904,47 @@ def test_runtime_restart_quiesce_blocks_jobs_without_holding_a_connection(tmp_pa
             await control.close()
             await manager.shutdown()
     asyncio.run(scenario())
+
+
+# --- U8: the Batch Reservation pins one loaded FPGA identity -------------------------
+
+FPGA = {"status": "IMAGE", "image_id": "z2-independent-swd-v5-d0add58c",
+        "session_id": "fpga-931d", "boot_id": "4cef-boot", "firmware_sha256": "0d" * 32,
+        "journal_sha256": "ab" * 32}
+
+
+def test_the_first_reserved_job_pins_the_fpga_identity_and_later_jobs_match_it(tmp_path: Path) -> None:
+    manager, _identity, expected = _m3_manager(tmp_path)
+    manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)
+    manager._reservation["job_ids"].update({"job-1", "job-2"})
+    manager._guard_reserved_fpga_identity("job-1", dict(FPGA))
+    snap = manager.resource_reservation_snapshot()
+    assert snap["state"] == "ACTIVE" and snap["fpga_image_id"] == FPGA["image_id"]
+    # Same image; the Root journal digest alone (not part of the identity) may differ.
+    manager._guard_reserved_fpga_identity("job-2", {**FPGA, "journal_sha256": "cd" * 32})
+    assert manager.resource_reservation_snapshot()["state"] == "ACTIVE"
+
+
+@pytest.mark.parametrize("change", ["image_id", "session_id", "boot_id", "firmware_sha256"])
+def test_a_changed_fpga_image_under_a_reservation_isolates_the_ppu(tmp_path: Path, change) -> None:
+    manager, _identity, expected = _m3_manager(tmp_path)
+    manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)
+    manager._reservation["job_ids"].update({"job-1", "job-2"})
+    manager._guard_reserved_fpga_identity("job-1", dict(FPGA))
+    with pytest.raises(PlasmaError, match="reserved FPGA identity changed"):
+        manager._guard_reserved_fpga_identity("job-2", {**FPGA, change: "other"})
+    snap = manager.resource_reservation_snapshot()
+    assert snap["state"] == "RECOVERY_REQUIRED" and snap["reason"] == "RESERVED_FPGA_IDENTITY_CHANGED"
+    assert _m3_b3_refused(manager)
+
+
+def test_an_unverifiable_identity_never_pins_and_a_job_outside_the_reservation_is_untouched(tmp_path: Path) -> None:
+    manager, _identity, expected = _m3_manager(tmp_path)
+    manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)
+    manager._reservation["job_ids"].add("job-1")
+    with pytest.raises(PlasmaError, match="RESERVED_FPGA_IDENTITY_UNVERIFIABLE"):
+        manager._guard_reserved_fpga_identity("job-1", {**FPGA, "image_id": None})
+    assert "fpga_identity" not in manager._reservation
+    # Not this Reservation's Job (or no Reservation at all): nothing to pin.
+    manager._guard_reserved_fpga_identity("job-foreign", dict(FPGA))
+    assert "fpga_identity" not in manager._reservation

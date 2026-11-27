@@ -77,6 +77,9 @@ class RuntimeJobContext:
     active_asset_set: Mapping[str, Any] | None = None
     admitted_job_binding: Mapping[str, Any] | None = None
     trusted_provider: Any | None = None
+    #: U8: called with the Worker's observed FPGA identity before any Site
+    #: session; raises when it differs from the Batch Reservation's pin.
+    fpga_identity_guard: Any | None = None
 
     def __post_init__(self) -> None:
         if type(self.job_id) is not str or not self.job_id:

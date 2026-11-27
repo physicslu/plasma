@@ -73,6 +73,8 @@ class GenericImageRootTests(unittest.TestCase):
         self.port = FakePort(self.release)
         self.stack.enter_context(patch.object(stage, "STATE", self.folder / "state.json"))
         self.stack.enter_context(patch.object(stage, "CHILD", self.folder / "child.json"))
+        self.reservation = self.folder / "ppu-resource-reservation.json"
+        self.stack.enter_context(patch.object(stage, "RUNTIME_RESERVATION", self.reservation))
         self.stack.enter_context(patch.object(stage, "trusted_local"))
         self.stack.enter_context(patch.object(stage, "_state_file_trusted"))
         self.stack.enter_context(patch.object(stage.guard, "RootZ2TargetPort",
@@ -291,6 +293,35 @@ class GenericImageRootTests(unittest.TestCase):
             self.release.firmware_name, self.release.recovery_name])
         self.assertEqual(stage.read_state(self.release)["status"], "RECOVERY")
         self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+
+    def test_no_operator_pl_change_while_a_batch_holds_the_ppu(self):
+        """U11: download / test / restore refuse an ACTIVE Runtime Reservation."""
+        self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+        writes = list(self.port.writes)
+        self.reservation.write_text(json.dumps({"state": "ACTIVE", "owner_id": "batch-1"}))
+        for verb in ("download", "test", "restore"):
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "RUNTIME_RESOURCE_RESERVATION_ACTIVE"):
+                stage.run(verb)
+        self.assertEqual(self.port.writes, writes)
+        # A settled or isolated Reservation does not block operator recovery.
+        for state in ("RECOVERY_REQUIRED", "RELEASED"):
+            self.reservation.write_text(json.dumps({"state": state}))
+            self.assertEqual(stage.run("test")["result"], "IDENTITY_PASS")
+
+    def test_an_unreadable_runtime_reservation_fails_closed(self):
+        self.assertEqual(stage.run("download")["result"], "LOADED_AND_HELD")
+        for content in (b"not json", b"[]", b'{"state": 1}'):
+            self.reservation.write_bytes(content)
+            with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                        "RUNTIME_RESERVATION_UNREADABLE"):
+                stage.run("test")
+        # A link (e.g. to a device) is never followed.
+        self.reservation.unlink()
+        self.reservation.symlink_to("/dev/zero")
+        with self.assertRaisesRegex(stage.ImageDeploymentDenied,
+                                    "RUNTIME_RESERVATION_UNREADABLE"):
+            stage.run("test")
 
     def test_identity_requires_manual_download_first(self):
         for verb in ("test", "restore"):

@@ -156,6 +156,7 @@ class OpenOCDInterface(BaseInterface):
             stage_event=self.stage_event,
             attempt=self._context.attempt,
             pinned_profile=self._prepared_profile,
+            fpga_identity_guard=self._context.fpga_identity_guard,
         ))
 
     async def run_operations(

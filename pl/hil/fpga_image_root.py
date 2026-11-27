@@ -25,6 +25,10 @@ from pl.hil import fpga_image_admission as admission
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_FILE = guard.FIRMWARE / "plasma-image-manifest.json"
 STATE = Path("/var/lib/plasma-privileged/fpga-deployment-state.json")
+#: U11: the PPU Runtime's durable Batch Resource Reservation (installer state
+#: root /var/lib/plasma, Runtime output_root). Read only to REFUSE an operator
+#: PL change while a Batch holds the PPU; it never authorizes anything.
+RUNTIME_RESERVATION = Path("/var/lib/plasma/output/ppu-resource-reservation.json")
 # Never write mutable journal/state into the immutable privileged code root.
 # The state directory is a dedicated root-owned 0700 directory whose every
 # ancestor up to / is root-owned and not group/other writable. It must NOT
@@ -759,9 +763,44 @@ def _confirm_current(port, release: ImageManifest, record: dict | None,
          "MANIFEST_CHANGED_IN_FLIGHT")
     return record, report
 
+def refuse_while_runtime_reserved(path: Path | None = None) -> None:
+    """U11: no operator PL download / test / restore under an ACTIVE Batch Reservation.
+
+    The B3 FPGA load already needs the Runtime's asset quiesce lease, which a
+    held Reservation refuses; this closes the same window for the Root Entry.
+    Absent file: no Reservation. Unreadable or malformed: fail closed.
+    """
+    path = RUNTIME_RESERVATION if path is None else path
+    # The file lives under the Runtime account: never follow a link, read
+    # only a small regular file, and treat anything else as unreadable.
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return
+    except OSError:
+        need(False, "RUNTIME_RESERVATION_UNREADABLE")
+    try:
+        info = os.fstat(fd)
+        need(stat.S_ISREG(info.st_mode) and info.st_size <= 65536,
+             "RUNTIME_RESERVATION_UNREADABLE")
+        raw = os.read(fd, 65537)
+    except OSError:
+        need(False, "RUNTIME_RESERVATION_UNREADABLE")
+    finally:
+        os.close(fd)
+    try:
+        record = json.loads(raw)
+    except ValueError:
+        record = None
+    need(isinstance(record, dict) and type(record.get("state")) is str,
+         "RUNTIME_RESERVATION_UNREADABLE")
+    need(record["state"] != "ACTIVE", "RUNTIME_RESOURCE_RESERVATION_ACTIVE")
+
+
 def run(operation: str) -> dict:
     need(operation in ("download", "test", "restore"), "OPERATION_NOT_ALLOWLISTED")
     trusted_local()
+    refuse_while_runtime_reserved()
     release = read_image_manifest()
     port = guard.RootZ2TargetPort(release=release)
     with port.exclusive():

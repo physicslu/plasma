@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
+from functools import partial
 from typing import Any
 
 from plasma_core.config import PlasmaConfig, SiteConfig
@@ -79,6 +80,9 @@ class PPUExecutionLease:
 
 RESERVATION_FILE = "ppu-resource-reservation.json"
 RESERVATION_TTL_S = 90
+#: U8: the loaded-image identity a Batch Reservation pins (from the root Site
+#: Worker's Root journal view; the Runtime user cannot read the journal).
+FPGA_IDENTITY_KEYS = ("image_id", "session_id", "boot_id", "firmware_sha256")
 class SiteManager:
     """Own the Programming Sites local to exactly one physical PPU."""
 
@@ -432,6 +436,42 @@ class SiteManager:
                 raise PlasmaError(ErrorCode.PPU_BUSY,
                                   "PPU Resource Reservation could not be made durable") from None
 
+    def _guard_reserved_fpga_identity(self, job_id: str, identity: Any) -> None:
+        """U8: one loaded FPGA image for the whole Batch Reservation.
+
+        The Reservation's first Job pins the identity the root Site Worker
+        reports; every later Job of that Reservation must report the same one
+        before any Site session. A change (e.g. a Root image load between two
+        Jobs) isolates the PPU exactly like a changed Resource identity.
+        A Job outside a Reservation is not affected.
+        """
+        observed = ({key: identity.get(key) for key in FPGA_IDENTITY_KEYS}
+                    if isinstance(identity, dict) else None)
+        with self._execution_lock:
+            record = self._reservation_now()
+            if record is None or record["state"] != "ACTIVE" or job_id not in record["job_ids"]:
+                return
+            pinned = record.get("fpga_identity")
+            if pinned is None:
+                if observed is None or not all(type(v) is str and v for v in observed.values()):
+                    raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
+                                      "RESERVED_FPGA_IDENTITY_UNVERIFIABLE")
+                record["fpga_identity"] = observed
+                self._persist_reservation(record)
+                return
+            if observed == pinned:
+                return
+            self._reservation = self._recovery_record(
+                record, "RESERVED_FPGA_IDENTITY_CHANGED",
+                sorted(job for job in record["job_ids"] if not self._job_safe_off_proven(job)))
+            self._persist_reservation(self._reservation)
+            reservation = self._reservation
+        self.server_log.event("ERROR", "ppu_reserved_fpga_identity_changed",
+                              ppu_id=self.config.ppu.id, job_id=job_id,
+                              pinned_image_id=pinned.get("image_id"),
+                              observed_image_id=(observed or {}).get("image_id"))
+        raise self._reservation_busy("reserved FPGA identity changed", reservation)
+
     def _job_safe_off_proven(self, job_id: str) -> bool:
         """This PPU's own terminal Job result proves the Site is safe."""
         try:
@@ -506,6 +546,8 @@ class SiteManager:
             "state", "ppu_id", "owner_id", "epoch", "asset_set_sha256", "generation",
             "resource_set_sha256", "reason", "recovery_id", "reserved_epoch") if key in record}
         view["epoch"] = self._runtime_epoch
+        if isinstance(record.get("fpga_identity"), dict):
+            view["fpga_image_id"] = record["fpga_identity"].get("image_id")
         if record["state"] == "RECOVERY_REQUIRED":
             view["unproven_job_ids"] = list(record["unproven_job_ids"])
         elif record["state"] == "ACTIVE":
@@ -928,6 +970,8 @@ class SiteManager:
                                   "JOB_IMAGE_SOURCE_NOT_EXCLUSIVE")
             if binding_selected:
                 runtime.job_binding = self._admit_job_binding(request, pinned)
+                runtime.fpga_identity_guard = partial(
+                    self._guard_reserved_fpga_identity, request.job_id)
                 lap("job_binding")
             request = self.execution_routers[request.site_id].admit(
                 request, trusted_provider=trusted_provider)

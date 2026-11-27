@@ -40,6 +40,8 @@ class JobRuntime:
     # OFE-1B: PPU-verified Job Binding identity, echoed for the Manager receipt.
     job_binding: dict[str, Any] | None = None
     trusted_provider: Any | None = field(default=None, repr=False)
+    # U8: checks the loaded FPGA identity against the Batch Reservation's pin.
+    fpga_identity_guard: Any | None = field(default=None, repr=False)
     updated_at: str = ""
     # Observation only: monotonic creation time and enqueue admission timing.
     created_monotonic: float = field(default_factory=time.monotonic, repr=False)
