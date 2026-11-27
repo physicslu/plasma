@@ -925,7 +925,7 @@ def test_the_first_reserved_job_pins_the_fpga_identity_and_later_jobs_match_it(t
     assert manager.resource_reservation_snapshot()["state"] == "ACTIVE"
 
 
-@pytest.mark.parametrize("change", ["image_id", "session_id", "boot_id", "firmware_sha256"])
+@pytest.mark.parametrize("change", ["status", "image_id", "session_id", "boot_id", "firmware_sha256"])
 def test_a_changed_fpga_image_under_a_reservation_isolates_the_ppu(tmp_path: Path, change) -> None:
     manager, _identity, expected = _m3_manager(tmp_path)
     manager.resource_reservation("acquire", owner_id="batch-1", expected=expected)

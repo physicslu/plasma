@@ -80,9 +80,11 @@ class PPUExecutionLease:
 
 RESERVATION_FILE = "ppu-resource-reservation.json"
 RESERVATION_TTL_S = 90
-#: U8: the loaded-image identity a Batch Reservation pins (from the root Site
-#: Worker's Root journal view; the Runtime user cannot read the journal).
-FPGA_IDENTITY_KEYS = ("image_id", "session_id", "boot_id", "firmware_sha256")
+#: U8: a Batch Reservation pins the loaded-image identity the root Site Worker
+#: reports from the Root journal (status, image, session, boot and image digest
+#: fields); the Runtime user cannot read the journal. Only the journal file's
+#: own digest is left out: it is not part of the loaded image's identity.
+FPGA_IDENTITY_VOLATILE = frozenset({"journal_sha256"})
 class SiteManager:
     """Own the Programming Sites local to exactly one physical PPU."""
 
@@ -445,7 +447,8 @@ class SiteManager:
         Jobs) isolates the PPU exactly like a changed Resource identity.
         A Job outside a Reservation is not affected.
         """
-        observed = ({key: identity.get(key) for key in FPGA_IDENTITY_KEYS}
+        observed = ({key: value for key, value in identity.items()
+                     if key not in FPGA_IDENTITY_VOLATILE}
                     if isinstance(identity, dict) else None)
         with self._execution_lock:
             record = self._reservation_now()
@@ -453,7 +456,8 @@ class SiteManager:
                 return
             pinned = record.get("fpga_identity")
             if pinned is None:
-                if observed is None or not all(type(v) is str and v for v in observed.values()):
+                if (not observed or type(observed.get("image_id")) is not str
+                        or not all(type(v) is str and v for v in observed.values())):
                     raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED,
                                       "RESERVED_FPGA_IDENTITY_UNVERIFIABLE")
                 record["fpga_identity"] = observed
