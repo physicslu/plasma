@@ -562,6 +562,8 @@ jobs:
             candidate/pl/build/**/*.rpt
             candidate/pl/build/**/*.bit
             candidate/pl/build/**/*.hwh
+            candidate/pl/build/**/artifacts/system_wrapper.bin
+            candidate/pl/build/**/artifacts/plasma-image-manifest.json
           if-no-files-found: warn
           retention-days: 14
 

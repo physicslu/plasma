@@ -397,6 +397,7 @@ def run_generic(task: dict, *, workspace: Path, approval: dict,
             verified.get("report_sha256") == actual_reports and
             type(verified.get("map")) is dict,
             "BUILD_GENERIC_VERIFIER_MISMATCH")
+    verify_paired_image_outputs(build, verified, plan["source_sha"])
     receipt = {**verified, "status": "HOST_BUILD_EVIDENCE_READY_REVIEW_REQUIRED",
                "execution_path": "path2-cli", "execution_capability": "vivado-host-build",
                "project": task["project"], "source_sha": plan["source_sha"],
@@ -406,3 +407,34 @@ def run_generic(task: dict, *, workspace: Path, approval: dict,
     (evidence_dir / "plasma-path2-vivado-host-receipt.json").write_text(
         json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     return receipt
+
+
+def verify_paired_image_outputs(build: Path, verified: dict, source_sha: str) -> None:
+    """Bind optional project-produced BIN/Manifest bytes to the build receipt."""
+    fields = ("bin_sha256", "manifest_sha256", "manifest_path", "image_id")
+    if not any(field in verified for field in fields):
+        return
+    require(all(type(verified.get(field)) is str for field in fields),
+            "BUILD_PAIRED_IMAGE_RECEIPT_INCOMPLETE")
+    bin_path = build / "artifacts/system_wrapper.bin"
+    manifest_path = build / "artifacts/plasma-image-manifest.json"
+    require(verified["manifest_path"] == str(manifest_path) and
+            bin_path.is_file() and not bin_path.is_symlink() and
+            manifest_path.is_file() and not manifest_path.is_symlink() and
+            0 < bin_path.stat().st_size <= 16_000_000 and
+            0 < manifest_path.stat().st_size <= 8192,
+            "BUILD_PAIRED_IMAGE_FILES_MISSING_OR_UNSAFE")
+    require(hashlib.sha256(bin_path.read_bytes()).hexdigest() == verified["bin_sha256"] and
+            hashlib.sha256(manifest_path.read_bytes()).hexdigest() == verified["manifest_sha256"],
+            "BUILD_PAIRED_IMAGE_SHA_MISMATCH")
+    try:
+        manifest = json.loads(manifest_path.read_bytes())
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise BuildDenied("BUILD_PAIRED_IMAGE_MANIFEST_INVALID") from exc
+    require(type(manifest) is dict and
+            manifest.get("firmware_name") == bin_path.name and
+            manifest.get("firmware_sha256") == verified["bin_sha256"] and
+            manifest.get("image_id") == verified["image_id"] and
+            verified["image_id"].endswith(source_sha[:12]) and
+            verified.get("source_sha") == source_sha,
+            "BUILD_PAIRED_IMAGE_SOURCE_OR_MANIFEST_MISMATCH")
