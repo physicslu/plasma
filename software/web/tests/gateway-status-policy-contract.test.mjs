@@ -25,16 +25,13 @@ test("Gateway owns Engineering PPU status timeout and retry policy", () => {
   assert.match(communication, /PPU_RETRY_BACKOFF_CAP_MULTIPLIER = 4/);
 });
 
-test("Browser status timeout is only an outer watchdog derived from Gateway response budget", () => {
-  assert.match(settingsApi, /ppu_response_budget_ms/);
-  assert.match(settingsApi, /gatewayStatusObservationTimeoutMs/);
-  assert.match(settingsApi, /GATEWAY_STATUS_TRANSPORT_MARGIN_MS = 5_000/);
-  assert.match(settingsApi, /GATEWAY_SETTINGS_FALLBACK_TTL_MS = 5_000/);
-  assert.match(plasmaApi, /statusObservationTimeoutMs/);
-  assert.match(plasmaApi, /ensureGatewaySettings/);
-  assert.match(plasmaApi, /gatewayStatusObservationTimeoutMs/);
+test("Browser has no direct Gateway status watchdog: PMode status is the Manager Fleet observation (U10)", () => {
+  assert.match(settingsApi, /ppu_response_budget_ms\?: number/);
+  assert.doesNotMatch(settingsApi, /gatewayStatusObservationTimeoutMs|ensureGatewaySettings|cachedGatewaySettings/);
+  assert.doesNotMatch(plasmaApi, /statusObservationTimeoutMs|ensureGatewaySettings|getPPUStatus/);
 
   assert.doesNotMatch(pmodConsole, /PPU_STATUS_REQUEST_TIMEOUT_MS/);
   assert.doesNotMatch(pmodRecovery, /PPU_STATUS_REQUEST_TIMEOUT_MS/);
-  assert.match(pmodConsole, /getPPUStatus\(targetBase\)/);
+  assert.match(pmodConsole, /managedPpuStatus\(await loadManagedTopology\(\), alias\)/);
+  assert.doesNotMatch(pmodConsole, /getPPUStatus/);
 });

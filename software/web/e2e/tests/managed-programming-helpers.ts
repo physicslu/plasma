@@ -29,9 +29,27 @@ export type MockPpu = {
   siteInterface?: string;
   /** One PPU can report different interface families on separate Sites. */
   siteInterfaces?: Record<number, string>;
+  /** Physical Site count the PPU reports (default 8, a PYNQ-Z2 carrier). */
+  siteCount?: number;
 };
 
 export const Z2: MockPpu = { alias: "z2", ppuId: "z2-hil", facilityId: "lab", enabledSites: [2] };
+
+/**
+ * A multi-Facility Mock Manager fleet for layout specs: `facilities` Facilities
+ * (`mock-facility-01` …), each with one PPU per entry of `siteCounts`, aliased
+ * `<facility>-ppu-NN`, every physical Site enabled.
+ */
+export function mockFleet(facilities = 3, siteCounts: number[] = [2, 4, 6, 8]): MockPpu[] {
+  return Array.from({ length: facilities }, (_, facilityIndex) => {
+    const facilityId = `mock-facility-${String(facilityIndex + 1).padStart(2, "0")}`;
+    return siteCounts.map((siteCount, ppuIndex) => {
+      const alias = `${facilityId}-ppu-${String(ppuIndex + 1).padStart(2, "0")}`;
+      return { alias, ppuId: alias, facilityId, siteCount,
+        enabledSites: Array.from({ length: siteCount }, (_, index) => index + 1) };
+    });
+  }).flat();
+}
 
 export function route(operations = ["erase", "program", "verify", "read"]) {
   return {
@@ -68,7 +86,8 @@ const device = {
 function fleetView(ppu: MockPpu) {
   const enabled = ppu.enabledSites ?? [2];
   const reachable = (ppu.transport ?? "reachable") === "reachable";
-  const sites = Array.from({ length: 8 }, (_, index) => {
+  const siteCount = ppu.siteCount ?? 8;
+  const sites = Array.from({ length: siteCount }, (_, index) => {
     const siteId = index + 1;
     const on = enabled.includes(siteId);
     const busy = (ppu.busySites ?? []).includes(siteId);
@@ -85,8 +104,8 @@ function fleetView(ppu: MockPpu) {
     transport_state: ppu.transport ?? "reachable",
     execution_state: reachable ? ppu.execution ?? "ready" : "unknown",
     observation: { state: ppu.observation ?? "current", last_success_at: "2026-11-11T00:00:00+00:00", stale_age_s: 0 },
-    topology: { source: "current", site_count: 8, enabled_site_count: enabled.length, sites: reachable ? sites : [] },
-    current_capacity: { site_count: 8, enabled_site_count: enabled.length },
+    topology: { source: "current", site_count: siteCount, enabled_site_count: enabled.length, sites: reachable ? sites : [] },
+    current_capacity: { site_count: siteCount, enabled_site_count: enabled.length },
     identity_conflict: false,
     degraded: !reachable || (ppu.execution ?? "ready") !== "ready",
   };

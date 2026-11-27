@@ -5,14 +5,14 @@ import test from "node:test";
 test("PMode retries transient PPU status failures without requiring Production Set reselection", async () => {
   const consoleSource = await fs.readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
   const recoverySource = await fs.readFile(new URL("../app/fleet/ppu-status-recovery.ts", import.meta.url), "utf8");
-  const plasmaApi = await fs.readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
-  const gatewaySettingsApi = await fs.readFile(new URL("../app/gateway-settings-api.ts", import.meta.url), "utf8");
 
   assert.match(consoleSource, /runtimeRecoveryGenerationRef/);
   assert.match(consoleSource, /isRecoverablePPUStatusError/);
   assert.match(consoleSource, /ppuRetryDelayMs/);
   assert.doesNotMatch(consoleSource, /PPU_STATUS_REQUEST_TIMEOUT_MS/);
-  assert.match(consoleSource, /getPPUStatus\(targetBase\)/);
+  // U10: Site status is the Manager Fleet observation; there is no direct Gateway status read.
+  assert.match(consoleSource, /const readStatus = async \(alias: string\) => managedPpuStatus\(await loadManagedTopology\(\), alias\);/);
+  assert.doesNotMatch(consoleSource, /getPPUStatus/);
   assert.match(consoleSource, /STATUS ERROR .* RECONNECTING/);
   assert.match(consoleSource, /STATUS RESTORED/);
   assert.match(consoleSource, /runtimeRecoveryGenerationRef\.current \+= 1/);
@@ -21,9 +21,4 @@ test("PMode retries transient PPU status failures without requiring Production S
   assert.doesNotMatch(recoverySource, /PPU_STATUS_REQUEST_TIMEOUT_MS/);
   assert.match(recoverySource, /error instanceof PlasmaApiError && error\.transient/);
 
-  assert.match(plasmaApi, /ensureGatewaySettings/);
-  assert.match(plasmaApi, /statusObservationTimeoutMs/);
-  assert.match(plasmaApi, /gatewayStatusObservationTimeoutMs/);
-  assert.match(gatewaySettingsApi, /ppu_response_budget_ms/);
-  assert.match(gatewaySettingsApi, /GATEWAY_STATUS_TRANSPORT_MARGIN_MS = 5_000/);
 });

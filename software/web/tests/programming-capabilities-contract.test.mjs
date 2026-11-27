@@ -4,24 +4,24 @@ import test from "node:test";
 
 const capabilities = await readFile(new URL("../app/programming-capabilities.ts", import.meta.url), "utf8");
 const production = await readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
-const engineering = await readFile(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
+const factoryBackend = await readFile(new URL("../app/fleet/managed-factory-backend.ts", import.meta.url), "utf8");
+const engineering = await readFile(new URL("../app/engineering/managed-programming-workspace.tsx", import.meta.url), "utf8");
 
-test("Programming capability resolver uses an explicit fail-closed catalog contract", () => {
+test("Programming capability catalog keeps an explicit typed contract", () => {
   assert.match(capabilities, /synthetic_programming_image:\s*boolean/);
   assert.match(capabilities, /target_device_required:\s*boolean/);
   assert.match(capabilities, /ProgrammingCapabilityCatalog[\s\S]*programming_capabilities\?:\s*Partial<ProgrammingCapabilities>/);
-  assert.match(capabilities, /FAIL_CLOSED_CAPABILITIES[\s\S]*synthetic_programming_image:\s*false[\s\S]*target_device_required:\s*true/);
-  assert.match(capabilities, /typeof advertised\.synthetic_programming_image !== "boolean"/);
-  assert.match(capabilities, /typeof advertised\.target_device_required !== "boolean"/);
   assert.doesNotMatch(capabilities, /LEGACY_SHARED_MOCK_CAPABILITIES/);
   assert.doesNotMatch(capabilities, /provider\s*===?\s*["']mock["']/);
 });
 
-test("PMode and EMode consume the shared capability resolver instead of provider-name policy", () => {
-  assert.match(production, /resolveProgrammingCapabilities\(catalog\)/);
-  assert.match(engineering, /resolveProgrammingCapabilities\(catalog\)/);
-  assert.doesNotMatch(production, /\.provider === "mock"/);
-  assert.doesNotMatch(engineering, /\.provider === "mock"/);
-  assert.match(production, /syntheticProgrammingImageAvailable/);
-  assert.match(engineering, /syntheticProgrammingImageAvailable/);
+test("the managed Factory catalog is fail-closed: no synthetic Image, Target IC required (U10)", () => {
+  assert.match(factoryBackend, /export function managedFactoryCatalog\(topology: ManagedTopology\): ProgrammingCapabilityCatalog/);
+  assert.match(factoryBackend, /programming_capabilities: \{ synthetic_programming_image: false, target_device_required: true \}/);
+  // The standalone Browser capability resolver is retired with the standalone mode.
+  assert.doesNotMatch(capabilities, /resolveProgrammingCapabilities/);
+  for (const source of [production, engineering]) {
+    assert.doesNotMatch(source, /resolveProgrammingCapabilities|syntheticProgrammingImageAvailable/);
+    assert.doesNotMatch(source, /\.provider === "mock"/);
+  }
 });

@@ -1,47 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { mockManager } from "./managed-programming-helpers";
 import {
   programmingJob,
   programmingJobField,
   programmingJobFieldOrder,
 } from "./programming-job-test-helpers";
 
+// U10: Manager-managed only. An empty Mock Manager Registry / Fleet.
 async function installEmptyEngineeringCatalog(page: import("@playwright/test").Page) {
-  await page.route("**/api/engineering/**", async route => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (url.pathname === "/api/engineering/session" && request.method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          session: {
-            session_id: "0123456789abcdef0123456789abcdef",
-            programming_asset_cache_scope: "connection-session-and-ppu",
-            previous_session_cleared: false,
-          },
-        }),
-      });
-      return;
-    }
-    if (url.pathname === "/api/engineering/targets" && request.method() === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          provider: "mock",
-          facility_count: 0,
-          ppu_count: 0,
-          site_count: 0,
-          programming_asset_scope: "connection-session-and-ppu",
-          facilities: [],
-        }),
-      });
-      return;
-    }
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
-  });
+  await mockManager(page, { ppus: [] });
 }
 
 test("Pmod image controls precede EPVR and Pmod Emode share persistent Light Dark preference", async ({ page }) => {

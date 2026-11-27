@@ -12,14 +12,14 @@ const sharedComponent = fs.readFileSync(new URL("../app/operator-ui/programming-
 const sharedCss = fs.readFileSync(new URL("../app/operator-ui/programming-job-controls.css", import.meta.url), "utf8");
 const pmod = fs.readFileSync(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
 const pmodCss = fs.readFileSync(new URL("../app/fleet/factory-console-v2.css", import.meta.url), "utf8");
-const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
+const emode = fs.readFileSync(new URL("../app/engineering/managed-programming-workspace.tsx", import.meta.url), "utf8");
 const emodeSession = fs.readFileSync(new URL("../app/workspace-session.tsx", import.meta.url), "utf8");
 const emodeCss = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.css", import.meta.url), "utf8");
 const emodeBase = fs.readFileSync(new URL("../app/engineering/programming-workspace-base.css", import.meta.url), "utf8");
 const emodeDensity = fs.readFileSync(new URL("../app/engineering/engineering-density.css", import.meta.url), "utf8");
 const emodeRefresh = fs.readFileSync(new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url), "utf8");
 const directApi = fs.readFileSync(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
-const batchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
+const batchApi = fs.readFileSync(new URL("../app/engineering/bundle-programming-api.ts", import.meta.url), "utf8");
 const sharedDriver = fs.readFileSync(new URL("../e2e/tests/programming-job-test-helpers.ts", import.meta.url), "utf8");
 const productionRuntime = fs.readFileSync(new URL("../e2e/tests/production-multi-ppu-runtime.spec.ts", import.meta.url), "utf8");
 const engineeringRuntime = fs.readFileSync(new URL("../e2e/tests/engineering-programming-asset-cache-runtime.spec.ts", import.meta.url), "utf8");
@@ -58,7 +58,8 @@ test("PMode and EMode runtime tests consume one Programming Job test driver", ()
   assert.match(sharedDriver, /expectedFields:[^\n]*\["target", "image", "operations", "policy"\]/);
   assert.match(sharedDriver, /expectedActions:[^\n]*\["start", "status", "abort"\]/);
   assert.match(sharedDriver, /engineering:\s*\["erase", "program", "verify"\]/);
-  assert.match(sharedDriver, /production:\s*\["erase", "program", "verify", "read"\]/);
+  // U10: managed PMode offers the Route's E / P / V sequence; Read is never a Production Batch operation.
+  assert.match(sharedDriver, /production:\s*\["erase", "program", "verify"\]/);
   assert.match(sharedDriver, /expectedPolicies:[^\n]*\["repeat", "retry", "stop"\]/);
   assert.match(sharedDriver, /export async function expectProgrammingJobContract/);
   assert.match(sharedDriver, /export function programmingJobOperation/);

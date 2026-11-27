@@ -1,92 +1,11 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
-import { expandProductionTree } from "./production-console-helpers";
+import { expect, test, type Page } from "@playwright/test";
+import { mockFleet, mockManager } from "./managed-programming-helpers";
+import { chooseTestTarget, expandProductionTree } from "./production-console-helpers";
 
-const siteCounts = [2, 4, 6, 8] as const;
-
-function catalog() {
-  return {
-    ok: true,
-    provider: "mock",
-    facility_count: 3,
-    ppu_count: 12,
-    site_count: 60,
-    programming_asset_scope: "connection-session-and-ppu",
-    facilities: Array.from({ length: 3 }, (_, facilityIndex) => {
-      const facilityNumber = facilityIndex + 1;
-      const facilityId = `mock-facility-${String(facilityNumber).padStart(2, "0")}`;
-      return {
-        facility_id: facilityId,
-        display_name: `Mock Facility ${String(facilityNumber).padStart(2, "0")}`,
-        ppus: siteCounts.map((siteCount, ppuIndex) => ({
-          ppu_id: `${facilityId}-ppu-${String(ppuIndex + 1).padStart(2, "0")}`,
-          display_name: `Mock PPU ${String(ppuIndex + 1).padStart(2, "0")}`,
-          model: "MOCK-PPU",
-          site_count: siteCount,
-          provider: "mock",
-        })),
-      };
-    }),
-  };
-}
-
-function statusFor(facilityId: string, ppuId: string) {
-  const ppuNumber = Number(ppuId.slice(-2));
-  const siteCount = siteCounts[ppuNumber - 1] ?? 2;
-  return {
-    ok: true,
-    ppu: {
-      ppu_id: ppuId,
-      facility_id: facilityId,
-      model: "MOCK-PPU",
-      display_name: `Mock PPU ${String(ppuNumber).padStart(2, "0")}`,
-      site_count: siteCount,
-      enabled_site_count: siteCount,
-      capabilities: { max_supported_sites: siteCount, operations: ["erase", "program", "verify", "read"] },
-    },
-    sites: Array.from({ length: siteCount }, (_, index) => ({
-      site_id: index + 1,
-      enabled: true,
-      state: "idle",
-      current_job_id: null,
-      queued_jobs: 0,
-      interface: "mock",
-      target: "MOCK-IC",
-    })),
-  };
-}
-
+// U10: Manager-managed only. Three Facilities × four PPUs (2/4/6/8 Sites)
+// from the Mock Manager Registry / Fleet; the device catalog is this spec's own.
 async function installDashboardMock(page: Page) {
-  await page.route("**/api/engineering/**", async (route: Route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (url.pathname === "/api/engineering/session" && request.method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          session: {
-            session_id: "11111111111111111111111111111111",
-            programming_asset_cache_scope: "connection-session-and-ppu",
-            previous_session_cleared: false,
-          },
-        }),
-      });
-      return;
-    }
-    if (url.pathname === "/api/engineering/targets") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
-      return;
-    }
-    const parts = url.pathname.split("/").filter(Boolean);
-    const facilityId = parts[3];
-    const ppuId = parts[4];
-    if (request.method() === "GET" && parts.slice(5).join("/") === "api/status") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(statusFor(facilityId, ppuId)) });
-      return;
-    }
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
-  });
+  await mockManager(page, { ppus: mockFleet() });
 
   await page.route("**/api/manager/devices/search**", async route => {
     const query = new URL(route.request().url()).searchParams.get("q") ?? "";
@@ -215,8 +134,8 @@ test("Production Factory Console v2 keeps tree selection, LED status and separat
   }));
   expect(new Set(dimensions.map(value => value.join("x"))).size).toBe(1);
 
-  const ppuMaster = live.getByRole("checkbox", { name: "Batch select Mock PPU 01", exact: true });
-  const site2 = live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02", exact: true });
+  const ppuMaster = live.getByRole("checkbox", { name: "Batch select mock-facility-01-ppu-01 · PPU ID mock-facility-01-ppu-01", exact: true });
+  const site2 = live.getByRole("checkbox", { name: "Batch select mock-facility-01-ppu-01 · PPU ID mock-facility-01-ppu-01 SITE-02", exact: true });
   await expect(ppuMaster).toBeChecked();
   await site2.uncheck();
   await expect(site2).not.toBeChecked();
@@ -245,8 +164,14 @@ test("Engineering Programming remains the status-first single-PPU workspace", as
   await expect(page.getByRole("region", { name: "Engineering Programming Job" })).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .liveSiteStatus")).toBeVisible();
   await expect(page.getByLabel("Engineering Site selection").locator("tbody tr")).toHaveCount(2);
-  await expect(page.getByLabel("Select all Engineering batch Sites")).toBeChecked();
-  await expect(page.getByLabel("Site Retry Limit")).toHaveValue("3");
+  // Managed EMode: no Site is offered before a Target IC is chosen; then the
+  // Route-qualified Sites become selectable for the next Batch.
+  await expect(page.getByLabel("Select SITE 1 for programming")).toBeDisabled();
+  await chooseTestTarget(page, "engineering");
+  await expect(page.getByLabel("Select SITE 1 for programming")).toBeEnabled();
+  await expect(page.getByLabel("Select SITE 2 for programming")).toBeEnabled();
+  // The managed EMode Batch never retries unless the engineer asks for it.
+  await expect(page.getByLabel("Site Retry Limit")).toHaveValue("0");
 });
 
 test("PMode and EMode Batch Summary share identical PASS FAIL computed styles", async ({ page }) => {
