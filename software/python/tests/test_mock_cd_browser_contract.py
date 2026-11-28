@@ -29,12 +29,15 @@ def test_browser_stack_reuses_canonical_mock_cd_harness() -> None:
     # Manager Programming Engine come from the canonical harness.
     assert "cd.start_managed_ppus(" in source
     assert "cd.start_manager(" in source
-    assert "cd.enroll_mock_ppus(" in source
+    assert "cd.wait_enrolled(" in source
     assert '"state": "ready"' in source
     # Read downloads are served from the Job output directory the Runtime writes.
+    # Built-in Mock PPU: the product launcher provisions and starts each PPU.
     harness = (ROOT / "scripts" / "mock-cd.py").read_text(encoding="utf-8")
-    assert '"output": root / f"{item[\'ppu_id\']}-output"' in harness
-    assert '"--output-root", str(paths["output"])' in harness
+    assert '"plasma_server.mock_ppu", "serve"' in harness
+    launcher = (ROOT / "software/python/plasma_server/mock_ppu.py").read_text(encoding="utf-8")
+    assert '"output": root / f"{self.device_id}-output"' in launcher
+    assert '"--output-root", str(paths["output"])' in launcher
     # start_manager still validates the two-PPU Fleet before anything else.
     assert "validate_manager_fleet(manager_fleet)" in harness
 

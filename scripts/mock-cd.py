@@ -349,6 +349,11 @@ def start_managed_ppus(work: Path, processes: list[tuple[str, subprocess.Popen[s
     for name, spec in specs.items():
         processes.append((f"{name}-ppu", start_process(f"{name}-ppu", serve_command(spec),
                                                        cwd=PYTHON_DIR)))
+        # One at a time, so the Registry (and every Console list) keeps the
+        # PPUS order instead of whichever launcher registered first.
+        wait_json(f"http://127.0.0.1:{MANAGER_PORT}/api/registry",
+                  lambda value, alias=name: any(p.get("alias") == alias for p in value.get("ppus") or []),
+                  label=f"{name} registered", timeout_s=60.0)
     for item in PPUS:
         wait_json(
             f"{gateway_url(item)}/api/health/ready",

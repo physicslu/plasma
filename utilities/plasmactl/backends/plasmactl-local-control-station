@@ -745,7 +745,10 @@ install_profile() {
 
 backup_file_if_present() {
   local source="$1" target="$2"
-  [[ -f "$source" ]] && cp -a "$source" "$target"
+  # Absent is normal (e.g. no Mock PPU unit before the first upgrade).
+  if [[ -f "$source" ]]; then
+    cp -a "$source" "$target"
+  fi
 }
 
 run_deployment_preflight() {
