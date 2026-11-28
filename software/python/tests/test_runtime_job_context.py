@@ -19,6 +19,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 import pytest
+from .test_mock_programming_operations import reserved_request
 
 from plasma_core.config import PlasmaConfig, ServerConfig, SiteConfig
 from plasma_core.enums import JobState, Operation
@@ -232,7 +233,7 @@ def test_a_binding_hook_failure_resolves_the_job_and_releases_the_lease(tmp_path
         await manager.start()
         try:
             assert not manager.execution_lease_snapshot()["busy"]
-            result = await manager.submit(JobRequest(site_id=1, operation=Operation.ERASE))
+            result = await manager.submit(reserved_request(manager, JobRequest(site_id=1, operation=Operation.ERASE)))
             # Never a false success.
             assert result.state is not JobState.SUCCESS
             assert result.state is JobState.ERROR
@@ -243,7 +244,7 @@ def test_a_binding_hook_failure_resolves_the_job_and_releases_the_lease(tmp_path
             assert not manager.execution_lease_snapshot()["busy"]
             assert manager.execution_lease_snapshot()["active_job_count"] == 0
             # The Site is still usable: the failure took the Job down, not the PPU.
-            again = await manager.submit(JobRequest(site_id=1, operation=Operation.ERASE))
+            again = await manager.submit(reserved_request(manager, JobRequest(site_id=1, operation=Operation.ERASE)))
             assert again.state is JobState.SUCCESS
             assert not manager.execution_lease_snapshot()["busy"]
         finally:

@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from .test_mock_programming_operations import reserved_request
 
 from plasma_core.config import PlasmaConfig, ServerConfig, SiteConfig
 from plasma_core.enums import Operation
@@ -137,8 +138,8 @@ def test_site_manager_rejects_legacy_route_before_queue_or_lease(tmp_path: Path)
         await manager.start()
         try:
             with pytest.raises(PlasmaError, match="JOB_BINDING_NOT_QUALIFIED"):
-                manager.enqueue(JobRequest(site_id=2, operation=Operation.PROGRAMMING,
-                                           target="STM32F103C8T6", image=b"TEST", metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}}))
+                manager.enqueue(reserved_request(manager, JobRequest(site_id=2, operation=Operation.PROGRAMMING,
+                                           target="STM32F103C8T6", image=b"TEST", metadata={"job_binding": {"operation": "programming", "operations": ["erase", "program", "verify"]}})))
             assert manager.registry.all() == []
             assert not manager.execution_lease_snapshot()["busy"]
         finally:
@@ -155,7 +156,7 @@ def test_mock_job_reuses_existing_site_worker(tmp_path: Path):
         manager = SiteManager(config)
         await manager.start()
         try:
-            result = await manager.submit(JobRequest(site_id=1, operation=Operation.ERASE))
+            result = await manager.submit(reserved_request(manager, JobRequest(site_id=1, operation=Operation.ERASE)))
             assert result.success
         finally:
             await manager.shutdown()

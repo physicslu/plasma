@@ -295,6 +295,8 @@ def test_firmware_a_then_b_reuse_same_active_resources_on_c3():
                 resource = stack_resource()
                 calls = []
                 active = install_resolver(stack, resource, calls=calls)
+                await stack.reserved({})  # the Batch Reservation verifies once
+                calls.clear()
                 # Same Active Set + same Resources, two different Images.
                 for firmware in (FW_A, FW_B):
                     body = job_body(resource, firmware)
@@ -326,9 +328,14 @@ def test_firmware_a_then_b_reuse_same_active_resources_on_c3():
 
 def _denied(stack, body, expect):
     async def go():
-        status, received = await stack.api("POST", "/api/jobs", body)
+        reserved = await stack.reserved(body, required=False)
+        status, received = await stack.api("POST", "/api/jobs", reserved)
         assert status != 202, received
-        assert expect in json.dumps(received), received
+        # U7: where the PPU cannot even grant a Reservation (no verifiable
+        # Active Set, quiesced), the Job is refused before its Binding is read.
+        unreserved = "resource_reservation_token" not in reserved
+        assert expect in json.dumps(received) or (
+            unreserved and "Reservation required" in json.dumps(received)), received
         assert stack.sim.argvs == []
     return go()
 

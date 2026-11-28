@@ -18,7 +18,7 @@ from plasma_interfaces.mock import MockInterface
 from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
 
-from tests.helpers import make_config
+from tests.helpers import make_config, reserved_client
 
 
 class ShutdownFailureMock(MockInterface):
@@ -122,7 +122,7 @@ class ExecutionContractServerTests(unittest.IsolatedAsyncioTestCase):
         manager = SiteManager(config, interface_factory=interface_factory)
         self.server = PlasmaServer(config, manager)
         await self.server.start()
-        return PlasmaClient(*self.server.address, response_timeout_s=3.0)
+        return reserved_client(manager, *self.server.address, response_timeout_s=3.0)
 
     async def test_mock_server_drops_inline_image_from_job_registry(self) -> None:
         client = await self.start_server()

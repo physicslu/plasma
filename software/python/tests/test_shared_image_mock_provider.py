@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 
 from plasma_core.enums import Operation
-from plasma_core.models import LOCAL_MOCK_BLOB_SCHEME, JobRequest
+from plasma_core.errors import PlasmaError
+from plasma_core.models import JobRequest
 from plasma_web.shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
@@ -28,7 +29,7 @@ class SharedImageMockProviderTests(unittest.IsolatedAsyncioTestCase):
         self.provider.close()
         self.temporary.cleanup()
 
-    async def test_program_job_enters_mock_server_as_shared_reference(self) -> None:
+    async def test_program_job_is_refused_by_the_mock_ppu_without_a_reservation(self) -> None:
         image = b"shared-provider-image" * 128
         digest = hashlib.sha256(image).hexdigest()
         self.provider.cache_asset(
@@ -47,23 +48,19 @@ class SharedImageMockProviderTests(unittest.IsolatedAsyncioTestCase):
             job_id="shared-provider-program",
             timeout_s=10.0,
         )
-        accepted = await self.provider.start_job(
-            self.facility_id,
-            self.ppu_id,
-            request,
-            session_id=self.session_id,
-            asset_sha256=digest,
-        )
-        self.assertTrue(accepted["ok"])
-
+        # U7: the Mock PPU refuses a Programming Job outside an ACTIVE
+        # Resource Reservation; nothing is registered or queued.
+        with self.assertRaisesRegex(PlasmaError, "Reservation required"):
+            await self.provider.start_job(
+                self.facility_id,
+                self.ppu_id,
+                request,
+                session_id=self.session_id,
+                asset_sha256=digest,
+            )
         server = self.provider._servers[(self.facility_id, self.ppu_id)]
-        runtime = server.manager.registry.get(request.job_id)
-        self.assertEqual(runtime.request.image, b"")
-        self.assertIsNotNone(runtime.request.image_ref)
-        assert runtime.request.image_ref is not None
-        self.assertEqual(runtime.request.image_ref.scheme, LOCAL_MOCK_BLOB_SCHEME)
-        self.assertEqual(runtime.request.image_ref.sha256, digest)
-        self.assertEqual(runtime.request.image_ref.size_bytes, len(image))
+        self.assertEqual(server.manager.registry.all(), [])
+        self.assertFalse(server.manager.execution_lease_snapshot()["busy"])
 
 
 if __name__ == "__main__":

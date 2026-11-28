@@ -11,6 +11,7 @@ from pathlib import Path
 
 from plasma_core.assets import ProgrammingAsset
 from plasma_core.enums import Operation
+from plasma_core.errors import PlasmaError
 from plasma_core.models import JobRequest
 from plasma_web.gateway import PlasmaWebHandler
 from plasma_web.mock_synthetic_image import build_synthetic_mock_asset
@@ -117,25 +118,26 @@ class MockSyntheticRuntimeTests(unittest.TestCase):
                 thread.join()
             PlasmaWebHandler.engineering_provider = previous_provider
 
-    def test_direct_mock_job_can_use_synthetic_image_without_asset_sha(self) -> None:
+    def test_direct_mock_job_with_a_synthetic_image_is_refused_without_a_reservation(self) -> None:
+        # U7: a Mock PPU admits a Programming Job only under its ACTIVE
+        # Resource Reservation, exactly like a physical PPU; no Mock bypass.
         request = JobRequest(
             site_id=1,
             operation=Operation.PROGRAM,
             client_id="synthetic-test",
         )
-        accepted = __import__("asyncio").run(
-            self.provider.start_job(
-                "mock-facility-01",
-                "mock-facility-01-ppu-01",
-                request,
-                session_id=self.session_id,
-                asset_sha256=None,
+        with self.assertRaisesRegex(PlasmaError, "Reservation required"):
+            __import__("asyncio").run(
+                self.provider.start_job(
+                    "mock-facility-01",
+                    "mock-facility-01-ppu-01",
+                    request,
+                    session_id=self.session_id,
+                    asset_sha256=None,
+                )
             )
-        )
-        self.assertTrue(accepted["ok"])
-        self.assertTrue(accepted["job"]["job_id"])
 
-    def test_gateway_accepts_image_less_program_only_for_shared_image_mock_provider(self) -> None:
+    def test_gateway_engineering_mock_job_is_refused_without_a_reservation(self) -> None:
         status, payload = self.request_gateway_job(
             self.provider,
             {
@@ -144,9 +146,8 @@ class MockSyntheticRuntimeTests(unittest.TestCase):
                 "session_id": self.session_id,
             },
         )
-        self.assertEqual(status, 202)
-        self.assertTrue(payload["ok"])
-        self.assertEqual(payload["job"]["operation"], "program")
+        self.assertEqual(status, 409)
+        self.assertIn("Reservation required", payload["error"]["message"])
 
     def test_gateway_keeps_non_synthetic_provider_fail_closed(self) -> None:
         status, payload = self.request_gateway_job(

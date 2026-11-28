@@ -44,3 +44,19 @@ def make_config(
     )
     config.validate()
     return config
+
+
+def reserved_client(manager: Any, *args: Any, owner: str = "test-batch", **kwargs: Any):
+    """U7: a protocol client that sends every Job the way the Manager does,
+    under ``manager``'s ACTIVE Resource Reservation (acquired on first use)."""
+    from plasma_client.client import PlasmaClient
+    from tests.test_mock_programming_operations import reserved_request
+
+    class ReservedClient(PlasmaClient):
+        async def submit(self, request):
+            return await super().submit(reserved_request(manager, request, owner))
+
+        async def start(self, request):
+            return await super().start(reserved_request(manager, request, owner))
+
+    return ReservedClient(*args, **kwargs)

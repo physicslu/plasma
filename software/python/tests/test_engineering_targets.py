@@ -193,26 +193,24 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
                         list(range(1, ppu["site_count"] + 1)),
                     )
 
-    async def test_job_is_executed_by_selected_ppu_using_cached_image_asset(self) -> None:
+    async def test_direct_engineering_job_is_refused_by_the_mock_ppu_without_a_reservation(self) -> None:
+        # U7: the retired standalone Engineering Job path can no longer
+        # program: its Jobs carry no Resource Reservation, and Mock and
+        # physical PPUs share one admission contract.
         facility_id = "mock-facility-02"
         ppu_id = "mock-facility-02-ppu-03"
         image = b"\x11\x22\x33\x44" * 64
         session_id, asset_sha256 = self.cache_image_asset(facility_id, ppu_id, image)
-        accepted = await self.provider.start_job(
-            facility_id,
-            ppu_id,
-            JobRequest(site_id=6, operation=Operation.PROGRAM),
-            session_id=session_id,
-            asset_sha256=asset_sha256,
-        )
-        job = await self.wait_terminal(facility_id, ppu_id, accepted["job"]["job_id"])
-        self.assertEqual(job["site_id"], 6)
-        self.assertEqual(job["operation"], "program")
-        self.assertEqual(job["state"], "success")
+        with self.assertRaisesRegex(PlasmaError, "Reservation required"):
+            await self.provider.start_job(
+                facility_id,
+                ppu_id,
+                JobRequest(site_id=6, operation=Operation.PROGRAM),
+                session_id=session_id,
+                asset_sha256=asset_sha256,
+            )
         selected = await self.provider.status(facility_id, ppu_id)
-        self.assertEqual(selected["sites"][5]["latest_job"]["job_id"], job["job_id"])
-        other = await self.provider.status("mock-facility-02", "mock-facility-02-ppu-02")
-        self.assertTrue(all(site["latest_job"] is None for site in other["sites"]))
+        self.assertTrue(all(site["latest_job"] is None for site in selected["sites"]))
 
     async def test_non_image_asset_cannot_drive_program_job(self) -> None:
         facility_id = "mock-facility-01"
@@ -239,121 +237,6 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
                 asset_sha256=asset_sha256,
             )
         self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
-
-    async def test_size_aware_program_has_real_cancellation_window(self) -> None:
-        facility_id = "mock-facility-01"
-        ppu_id = "mock-facility-01-ppu-01"
-        image = bytes((index % 251 for index in range(100 * 1024)))
-        session_id, asset_sha256 = self.cache_image_asset(facility_id, ppu_id, image, "100k.bin")
-        accepted = await self.provider.start_job(
-            facility_id,
-            ppu_id,
-            JobRequest(site_id=1, operation=Operation.PROGRAM),
-            session_id=session_id,
-            asset_sha256=asset_sha256,
-        )
-        job_id = accepted["job"]["job_id"]
-        await asyncio.sleep(0.2)
-        cancellation = await self.provider.cancel_job(facility_id, ppu_id, job_id)
-        self.assertTrue(cancellation["accepted"])
-        job = await self.wait_terminal(facility_id, ppu_id, job_id)
-        self.assertEqual(job["state"], "cancelled")
-        self.assertTrue(job["cancel_requested"])
-
-    async def test_two_sites_can_reuse_one_normalized_image(self) -> None:
-        facility_id = "mock-facility-03"
-        ppu_id = "mock-facility-03-ppu-02"
-        image = b"shared" * 128
-        session_id, asset_sha256 = self.cache_image_asset(facility_id, ppu_id, image, "shared.bin")
-        accepted = await asyncio.gather(
-            self.provider.start_job(
-                facility_id, ppu_id, JobRequest(site_id=1, operation=Operation.PROGRAM),
-                session_id=session_id, asset_sha256=asset_sha256,
-            ),
-            self.provider.start_job(
-                facility_id, ppu_id, JobRequest(site_id=2, operation=Operation.PROGRAM),
-                session_id=session_id, asset_sha256=asset_sha256,
-            ),
-        )
-        jobs = await asyncio.gather(*(
-            self.wait_terminal(facility_id, ppu_id, item["job"]["job_id"])
-            for item in accepted
-        ))
-        self.assertEqual([job["state"] for job in jobs], ["success", "success"])
-
-    async def test_ppu_rejects_different_active_images_across_sessions(self) -> None:
-        facility_id = "mock-facility-03"
-        ppu_id = "mock-facility-03-ppu-04"
-        image_a = b"A" * 1024
-        image_b = b"B" * 1024
-        sha_a = hashlib.sha256(image_a).hexdigest()
-        sha_b = hashlib.sha256(image_b).hexdigest()
-
-        session_a = self.provider.begin_session()["session"]["session_id"]
-        self.provider.cache_asset(session_a, facility_id, ppu_id, "A.bin", "image", "binary", sha_a, image_a)
-        first = await self.provider.start_job(
-            facility_id, ppu_id, JobRequest(site_id=1, operation=Operation.PROGRAM),
-            session_id=session_a, asset_sha256=sha_a,
-        )
-
-        session_same = self.provider.begin_session()["session"]["session_id"]
-        self.provider.cache_asset(session_same, facility_id, ppu_id, "A-again.bin", "image", "binary", sha_a, image_a)
-        second = await self.provider.start_job(
-            facility_id, ppu_id, JobRequest(site_id=2, operation=Operation.PROGRAM),
-            session_id=session_same, asset_sha256=sha_a,
-        )
-
-        session_b = self.provider.begin_session()["session"]["session_id"]
-        self.provider.cache_asset(session_b, facility_id, ppu_id, "B.bin", "image", "binary", sha_b, image_b)
-        with self.assertRaises(PlasmaError) as blocked:
-            await self.provider.start_job(
-                facility_id, ppu_id, JobRequest(site_id=3, operation=Operation.PROGRAM),
-                session_id=session_b, asset_sha256=sha_b,
-            )
-        self.assertEqual(blocked.exception.code, ErrorCode.SITE_BUSY)
-        self.assertTrue(blocked.exception.recoverable)
-
-        for accepted in (first, second):
-            await self.provider.cancel_job(facility_id, ppu_id, accepted["job"]["job_id"])
-        await asyncio.gather(*(
-            self.wait_terminal(facility_id, ppu_id, accepted["job"]["job_id"])
-            for accepted in (first, second)
-        ))
-
-        third = None
-        for _ in range(100):
-            try:
-                third = await self.provider.start_job(
-                    facility_id, ppu_id, JobRequest(site_id=3, operation=Operation.PROGRAM),
-                    session_id=session_b, asset_sha256=sha_b,
-                )
-                break
-            except PlasmaError as exc:
-                if exc.code is not ErrorCode.SITE_BUSY:
-                    raise
-                await asyncio.sleep(0.02)
-        self.assertIsNotNone(third, "PPU Image lease was not released after terminal Jobs")
-        assert third is not None
-        await self.provider.cancel_job(facility_id, ppu_id, third["job"]["job_id"])
-        await self.wait_terminal(facility_id, ppu_id, third["job"]["job_id"])
-
-    async def test_read_result_can_be_retrieved_from_selected_mock_ppu(self) -> None:
-        facility_id = "mock-facility-03"
-        ppu_id = "mock-facility-03-ppu-01"
-        accepted = await self.provider.start_job(
-            facility_id,
-            ppu_id,
-            JobRequest(
-                site_id=1,
-                operation=Operation.READ,
-                map_data={"sections": [{"name": "flash", "address": 0, "length": 16}]},
-            ),
-        )
-        job = await self.wait_terminal(facility_id, ppu_id, accepted["job"]["job_id"])
-        self.assertEqual(job["state"], "success")
-        output_file = Path(job["result"]["output_files"][0]).name
-        data = self.provider.read_output_file(facility_id, ppu_id, job["job_id"], output_file)
-        self.assertEqual(len(data), 16)
 
 
 if __name__ == "__main__":

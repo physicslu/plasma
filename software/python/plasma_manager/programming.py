@@ -1820,11 +1820,13 @@ class BundleProgrammingWorkflow:
             **({"operation": plan.operation} if plan.operations is None
                else {"operations": plan.operations}),
         }
-        if plan.payload.get("execution_owner_id") is not None:
-            payload["execution_owner_id"] = plan.payload["execution_owner_id"]
-            session = self._batch_session(run.alias, plan.payload["execution_owner_id"])
-            if session is not None:
-                payload["resource_reservation_token"] = session["reservation"]["token"]
+        # U7: the PPU admits a Programming Job only under the Batch's ACTIVE
+        # Resource Reservation; without one nothing is sent (BLOCKED, not UNKNOWN).
+        session = self._batch_session(run.alias, plan.payload.get("execution_owner_id"))
+        if session is None:
+            raise _StepFailure("RESOURCE_RESERVATION_MISSING", outcome="BLOCKED")
+        payload["execution_owner_id"] = plan.payload["execution_owner_id"]
+        payload["resource_reservation_token"] = session["reservation"]["token"]
         if plan.image is not None:
             payload["image_asset"] = plan.image_asset
             payload["asset_base64"] = base64.b64encode(plan.image).decode("ascii")

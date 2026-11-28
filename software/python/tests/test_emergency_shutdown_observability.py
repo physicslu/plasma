@@ -12,7 +12,7 @@ from plasma_interfaces.mock import MockInterface
 from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
 
-from tests.helpers import make_config
+from tests.helpers import make_config, reserved_client
 
 
 class EmergencyShutdownFailureMock(MockInterface):
@@ -50,7 +50,7 @@ class EmergencyShutdownObservabilityTests(unittest.IsolatedAsyncioTestCase):
         manager.workers[1].output = StateWriteFailureOutput(config.server.output_root)
         self.server = PlasmaServer(config, manager)
         await self.server.start()
-        return PlasmaClient(*self.server.address, response_timeout_s=3.0)
+        return reserved_client(manager, *self.server.address, response_timeout_s=3.0)
 
     async def test_emergency_safe_shutdown_failure_is_authoritative_job_error(self) -> None:
         client = await self.start_server(lambda _site: EmergencyShutdownFailureMock())
