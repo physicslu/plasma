@@ -1,4 +1,15 @@
-import { expect, test, type Page, type Request } from "@playwright/test";
+import { createHash } from "node:crypto";
+import { expect, test, type Page } from "@playwright/test";
+import {
+  batchRuns,
+  imagePattern,
+  managed,
+  BATCHES_PATH,
+  managerBatch,
+  observeManagedTraffic,
+  settledManagerBatch,
+  type Operation,
+} from "./mock-cd-managed-helpers";
 import {
   expectProgrammingJobContract,
   programmingJob,
@@ -7,238 +18,209 @@ import {
   programmingJobStatusValue,
 } from "./programming-job-test-helpers";
 
-const facilityId = process.env.MOCK_CD_PRODUCTION_FACILITY_ID ?? "mock-facility-01";
-const ppuOne = process.env.MOCK_CD_PRODUCTION_PPU_ONE ?? `${facilityId}-ppu-01`;
-const ppuTwo = process.env.MOCK_CD_PRODUCTION_PPU_TWO ?? `${facilityId}-ppu-02`;
-const gateway = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
-const targetIc = "STM32F103C8T6";
-const browserJobPath = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/jobs$/;
+// U10 PMode on the real Mock CD stack: ONE Manager Batch over two Mock PPUs
+// (ppu-a + ppu-b). Console → BFF → Manager ProgrammingBatchCoordinator → each
+// PPU's real Bootstrap / Reservation / Job Binding → Mock PPU Runtime.
+//
+// Serial: an Image-less (Erase-only) Batch never activates a Resource Set, so
+// the shared-Image test runs first and makes both PPUs' Resource Sets Active.
+test.describe.configure({ mode: "serial" });
 
-type RuntimeOperationSettings = {
-  error_rate_per_mille: number;
-  base_time_ms: number;
-  throughput_bytes_per_second: number;
-  jitter_ms: number;
-};
+const ppus = [managed.ppuA, managed.ppuB];
+const sharedImage = imagePattern(4096, 0, 0xa5);
+const sharedImageSha = createHash("sha256").update(sharedImage).digest("hex");
 
-type RuntimeSettings = {
-  enabled: boolean;
-  default_image_size_bytes: number;
-  operations: Record<"erase" | "program" | "verify" | "read", RuntimeOperationSettings>;
-  seed: { mode: "auto" | "fixed"; fixed_seed: number | null };
-};
-
-function editableRuntime(settings: RuntimeSettings) {
-  return {
-    enabled: settings.enabled,
-    default_image_size_bytes: settings.default_image_size_bytes,
-    operations: settings.operations,
-    seed: settings.seed,
-  };
+function ppuCard(page: Page, alias: string) {
+  return page.locator(`[data-production-ppu="${alias}"]`);
 }
 
-function ppuCard(page: Page, ppuId: string) {
-  return page.locator(`[data-production-ppu="${ppuId}"]`);
+function siteCard(page: Page, alias: string, siteId = 1) {
+  return ppuCard(page, alias).locator(`[data-production-site="${siteId}"]`);
 }
 
-function siteCard(page: Page, ppuId: string, siteId = 1) {
-  return ppuCard(page, ppuId).locator(`[data-production-site="${siteId}"]`);
-}
-
-function fpsCheckbox(page: Page, ppuId: string, siteId = 1) {
+function fpsCheckbox(page: Page, alias: string, siteId = 1) {
   return page.getByRole("checkbox", {
-    name: `Production Set ${facilityId} ${ppuId} SITE-${String(siteId).padStart(2, "0")}`,
+    name: `Production Set ${managed.facilityId} ${alias} SITE-${String(siteId).padStart(2, "0")}`,
   });
 }
 
-async function chooseTarget(page: Page) {
-  const target = page.getByLabel("Target IC");
-  await target.fill(targetIc);
-  await expect(page.getByRole("listbox", { name: "Target IC search results" })).toBeVisible();
-  await page.getByRole("option", { name: new RegExp(`^${targetIc}(?:\\s|$)`) }).click();
-}
-
-async function openTwoPpuProductionSet(page: Page) {
+async function openTwoPpuProductionSet(page: Page, operations: Operation[]) {
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
+  await expect(page.locator('main[data-programming-backend="manager"]')).toBeVisible();
+  await expect(page.locator(".productionTreeFacility").first()).toBeVisible({ timeout: 30_000 });
+  await page.evaluate(() => document.querySelectorAll("details").forEach(item => { item.open = true; }));
+  await expect(page.locator(".productionTreePpu")).toHaveCount(2);
 
-  const facility = page.locator(".productionTreeFacility").first();
-  if (!await facility.evaluate((element: HTMLDetailsElement) => element.open)) {
-    await facility.locator(":scope > summary").click();
+  for (const alias of ppus) {
+    await expect(fpsCheckbox(page, alias)).toBeVisible();
+    await fpsCheckbox(page, alias).check();
   }
-  const ppus = facility.locator(".productionTreePpu");
-  await expect(ppus).toHaveCount(4);
-  for (const index of [0, 1]) {
-    const ppu = ppus.nth(index);
-    if (!await ppu.evaluate((element: HTMLDetailsElement) => element.open)) {
-      await ppu.locator(":scope > summary").click();
-    }
-  }
-
-  await expect(fpsCheckbox(page, ppuOne)).toBeVisible();
-  await expect(fpsCheckbox(page, ppuTwo)).toBeVisible();
-
-  await fpsCheckbox(page, ppuOne).check();
-  await fpsCheckbox(page, ppuTwo).check();
   await page.getByRole("button", { name: "SET PRODUCTION SITES", exact: true }).click();
-
-  const first = ppuCard(page, ppuOne);
-  const second = ppuCard(page, ppuTwo);
-  await expect(first).toBeVisible();
-  await expect(second).toBeVisible();
+  for (const alias of ppus) await expect(ppuCard(page, alias)).toBeVisible();
   await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("2");
 
-  await chooseTarget(page);
   const job = programmingJob(page, "production");
+  await job.getByLabel("Target IC").fill(managed.icpn);
+  await page.getByRole("option", { name: new RegExp(`^${managed.icpn}(?:\\s|$)`) }).first().click();
+  // The Route of the chosen IC supplies the E / P / V operations.
   await expectProgrammingJobContract(job);
-  await programmingJobOperation(job, "erase").check();
-  return { first, second, job };
+  for (const name of ["erase", "program", "verify"] as const) {
+    const box = programmingJobOperation(job, name);
+    if (operations.includes(name)) await box.check();
+    else await box.uncheck();
+  }
+  if (operations.includes("program") || operations.includes("verify")) {
+    await page.getByLabel("Production Programming Image file").setInputFiles({
+      name: "production-shared-asset.bin",
+      mimeType: "application/octet-stream",
+      buffer: sharedImage,
+    });
+  }
+  return job;
 }
 
-function observeBrowserOwnership(page: Page) {
-  const batchBodies: Array<Record<string, unknown>> = [];
-  const batchPpuCancels: string[] = [];
-  let browserJobPosts = 0;
-  let wholeBatchCancels = 0;
-  page.on("request", (request: Request) => {
-    if (request.method() !== "POST") return;
-    const url = new URL(request.url());
-    if (url.pathname === "/api/batches") {
-      batchBodies.push(request.postDataJSON() as Record<string, unknown>);
-      return;
-    }
-    if (browserJobPath.test(url.pathname)) {
-      browserJobPosts += 1;
-      return;
-    }
-    if (/^\/api\/batches\/[^/]+\/cancel$/.test(url.pathname)) {
-      wholeBatchCancels += 1;
-      return;
-    }
-    const ppuCancel = /^\/api\/batches\/[^/]+\/targets\/([^/]+)\/([^/]+)\/cancel$/.exec(url.pathname);
-    if (ppuCancel) batchPpuCancels.push(decodeURIComponent(ppuCancel[2]));
-  });
-  return {
-    batchBodies,
-    batchPpuCancels,
-    browserJobPosts: () => browserJobPosts,
-    wholeBatchCancels: () => wholeBatchCancels,
-  };
-}
-
-test("real Production Mock submits one server Batch for two PPUs and completes both", async ({ page }) => {
-  const ownership = observeBrowserOwnership(page);
-  const { first, second, job } = await openTwoPpuProductionSet(page);
-
+test("real Production Mock shares one Programming Image across two PPUs for Erase Program Verify in ONE Manager Batch", async ({ page, request }) => {
+  const traffic = observeManagedTraffic(page);
+  const job = await openTwoPpuProductionSet(page, ["erase", "program", "verify"]);
   await programmingJobAction(job, "start").click();
 
-  await expect.poll(() => ownership.batchBodies.length, { timeout: 5_000 }).toBe(1);
-  const body = ownership.batchBodies[0] as {
-    targets?: Array<{ ppu_id?: string }>;
-    execution_policy?: Record<string, unknown>;
-  };
-  expect(body.targets?.map(target => target.ppu_id)).toEqual([ppuOne, ppuTwo]);
-  expect(body.execution_policy).toEqual({
-    repeat_count: 1,
-    site_retry_limit: 3,
-    failed_site_stop_threshold: null,
-  });
-  expect(ownership.browserJobPosts()).toBe(0);
+  await expect.poll(() => traffic.batches.length, { timeout: 15_000 }).toBe(1);
+  const sent = traffic.batches[0];
+  expect(sent.body.targets).toEqual(ppus.map(alias => ({ ppu_alias: alias, site_ids: [1] })));
+  expect(sent.body.operations).toEqual(["erase", "program", "verify"]);
+  expect(sent.body.repeat).toBe(1);
+  // The Image is carried once, for both PPUs.
+  expect(Buffer.from(String(sent.body.image_base64), "base64").equals(sharedImage)).toBe(true);
+  expect(sent.body).not.toHaveProperty("bundle_base64");
 
-  await expect.poll(async () => first.locator('[data-production-site="1"]').getAttribute("data-site-state"), { timeout: 5_000 }).toMatch(/^(running|success)$/);
-  await expect.poll(async () => second.locator('[data-production-site="1"]').getAttribute("data-site-state"), { timeout: 5_000 }).toMatch(/^(running|success)$/);
-
-  await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
-  await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
+  await expect(siteCard(page, managed.ppuA)).toHaveAttribute("data-site-state", "success", { timeout: 60_000 });
+  await expect(siteCard(page, managed.ppuB)).toHaveAttribute("data-site-state", "success", { timeout: 60_000 });
   await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("2");
   await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");
-  expect(ownership.browserJobPosts()).toBe(0);
+  await expect(page.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
+
+  // Manager evidence: one Batch, one Job per PPU with its own Binding, same Image.
+  await expect.poll(() => sent.batchId).toMatch(/^[0-9a-f]{32}$/);
+  const batch = await settledManagerBatch(request, sent.batchId!);
+  expect(batch.outcome).toBe("PASS");
+  expect(batch.units.map(unit => unit.ppu_alias)).toEqual(ppus);
+  const runs = await batchRuns(request, batch);
+  expect(runs.map(item => item.unit.ppu_alias)).toEqual(ppus);
+  expect(new Set(runs.map(item => item.attempt.job_id)).size).toBe(2);
+  expect(new Set(runs.map(item => item.attempt.job_binding_sha256)).size).toBe(2);
+  for (const { run } of runs) {
+    expect(run.outcome).toBe("PASS");
+    expect(run.receipt?.expected_image_sha256).toBe(sharedImageSha);
+    expect(run.receipt?.observed_operations).toEqual(["erase", "program", "verify"]);
+  }
+  for (const alias of ppus) {
+    const activation = batch.resource_activation?.[alias];
+    if (activation) expect(activation.result).toBe("PASS");
+  }
+  expect(traffic.legacy).toEqual([]);
 });
 
-test("real Production Mock shares one Programming Asset across two PPUs for Erase Program Verify", async ({ page }) => {
-  const ownership = observeBrowserOwnership(page);
-  const { job } = await openTwoPpuProductionSet(page);
-
-  await page.getByLabel("Production Programming Image file").setInputFiles({
-    name: "production-shared-asset.bin",
-    mimeType: "application/octet-stream",
-    buffer: Buffer.alloc(4096, 0xa5),
-  });
-  await programmingJobOperation(job, "program").check();
-  await programmingJobOperation(job, "verify").check();
+test("real Production Mock submits one Manager Batch for two PPUs (Erase) and completes both", async ({ page, request }) => {
+  const traffic = observeManagedTraffic(page);
+  const job = await openTwoPpuProductionSet(page, ["erase"]);
   await programmingJobAction(job, "start").click();
 
-  await expect.poll(() => ownership.batchBodies.length, { timeout: 5_000 }).toBe(1);
-  const body = ownership.batchBodies[0] as {
-    targets?: Array<{ ppu_id?: string }>;
-    operations?: string[];
-    asset?: {
-      asset_name?: string;
-      asset_size?: number;
-      asset_sha256?: string;
-      asset_base64?: string;
-    };
-  };
-  expect(body.targets?.map(target => target.ppu_id)).toEqual([ppuOne, ppuTwo]);
-  expect(body.operations).toEqual(["erase", "program", "verify"]);
-  expect(body.asset?.asset_name).toBe("production-shared-asset.bin");
-  expect(body.asset?.asset_size).toBe(4096);
-  expect(body.asset?.asset_sha256).toMatch(/^[0-9a-f]{64}$/);
-  expect(body.asset?.asset_base64).toBeTruthy();
-  expect(ownership.browserJobPosts()).toBe(0);
+  await expect.poll(() => traffic.batches.length, { timeout: 15_000 }).toBe(1);
+  const sent = traffic.batches[0];
+  expect(sent.body.targets).toEqual(ppus.map(alias => ({ ppu_alias: alias, site_ids: [1] })));
+  expect(sent.body.operations).toEqual(["erase"]);
+  // Erase only: no Image, the Route's whole Flash range.
+  expect(sent.body).not.toHaveProperty("image_base64");
+  expect(sent.body).toMatchObject({ address: managed.flashBase, length: managed.flashSize });
 
-  await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 30_000 });
-  await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 30_000 });
+  for (const alias of ppus) {
+    await expect.poll(async () => siteCard(page, alias).getAttribute("data-site-state"), { timeout: 15_000 })
+      .toMatch(/^(running|success)$/);
+  }
+  await expect(siteCard(page, managed.ppuA)).toHaveAttribute("data-site-state", "success", { timeout: 60_000 });
+  await expect(siteCard(page, managed.ppuB)).toHaveAttribute("data-site-state", "success", { timeout: 60_000 });
   await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("2");
-  await expect(page.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
-  expect(ownership.browserJobPosts()).toBe(0);
+  await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");
+
+  await expect.poll(() => sent.batchId).toMatch(/^[0-9a-f]{32}$/);
+  const batch = await settledManagerBatch(request, sent.batchId!);
+  expect(batch.outcome).toBe("PASS");
+  // Both PPUs were already Active: an Erase-only Batch never runs B1/B2/B3.
+  expect(batch.resource_activation ?? {}).toEqual({});
+  const runs = await batchRuns(request, batch);
+  expect(runs.map(item => [item.unit.ppu_alias, item.run.outcome])).toEqual(ppus.map(alias => [alias, "PASS"]));
+  expect(traffic.legacy).toEqual([]);
 });
 
-test("real Production Mock exposes only whole-Batch ABORT for multi-PPU runtime", async ({ page, request }) => {
-  const runtimeResponse = await request.get(`${gateway}/api/mock/runtime`);
-  expect(runtimeResponse.ok()).toBeTruthy();
-  const runtimePayload = await runtimeResponse.json();
-  const original = runtimePayload.mock_runtime as RuntimeSettings;
-  const slowed = {
-    ...editableRuntime(original),
-    operations: {
-      ...original.operations,
-      erase: {
-        ...original.operations.erase,
-        error_rate_per_mille: 0,
-        // Keep the real-stack cancellation window independent of busy-runner
-        // browser/actionability latency; the already-terminal ABORT race has
-        // its own dedicated mode-guard regression coverage.
-        base_time_ms: 3000,
-        jitter_ms: 0,
-      },
-    },
-  };
+test("real Production Mock ABORT is whole-Batch STOP QUEUING: started Jobs complete normally, nothing new is submitted", async ({ page, request }) => {
+  // The canonical Batch stop relay GETs the Batch from the Manager and then
+  // POSTs .../stop in the same Worker request. The HTTP/1.0 Manager declares
+  // Connection: close on every response (U10 fix), so the POST no longer
+  // fails intermittently with "Network connection lost" (BFF 503). Strict.
+  const traffic = observeManagedTraffic(page);
+  const repeat = 50;
+  const job = await openTwoPpuProductionSet(page, ["erase", "program", "verify"]);
+  // Same-IC Debug: every Cycle continues by itself, so queued work exists to stop.
+  await job.getByLabel("Repeat Count").fill(String(repeat));
+  await job.getByLabel("Replace IC before next Cycle").uncheck();
+  await programmingJobAction(job, "start").click();
 
-  const updateResponse = await request.post(`${gateway}/api/mock/runtime`, { data: slowed });
-  expect(updateResponse.ok()).toBeTruthy();
-
+  await expect.poll(() => traffic.batches.length, { timeout: 15_000 }).toBe(1);
+  const sent = traffic.batches[0];
+  expect(sent.body.repeat).toBe(repeat);
+  expect(sent.body.replace_ic_before_next_cycle).toBe(false);
+  await expect.poll(() => sent.batchId, { timeout: 15_000 }).toMatch(/^[0-9a-f]{32}$/);
   try {
-    const ownership = observeBrowserOwnership(page);
-    const { job } = await openTwoPpuProductionSet(page);
+    // Wait until both PPU lanes are running in the Console.
+    for (const alias of ppus) {
+      await expect(siteCard(page, alias)).toHaveAttribute("data-site-state", "running", { timeout: 30_000 });
+    }
 
-    await programmingJobAction(job, "start").click();
-    await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
-    await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
-
+    // Only the whole-Batch stop exists; no per-PPU cancel.
     await expect(page.getByRole("button", { name: "Cancel PPU", exact: true })).toHaveCount(0);
-    await programmingJobAction(job, "abort").click();
-    await expect.poll(() => ownership.wholeBatchCancels(), { timeout: 5_000 }).toBe(1);
-    await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
-    await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
-    await expect(programmingJobStatusValue(job)).toHaveText("CANCELLED");
+    const [stopResponse] = await Promise.all([
+      page.waitForResponse(response => response.request().method() === "POST"
+        && new URL(response.url()).pathname === `${BATCHES_PATH}/${sent.batchId}/stop`),
+      programmingJobAction(job, "abort").click(),
+    ]);
+    expect(traffic.stops).toEqual([sent.batchId]);
+    // The Manager accepted STOP QUEUING (the known bug fails here with 503).
+    expect(stopResponse.status(), await stopResponse.text()).toBe(200);
+    await expect(page.getByLabel("Production batch log")).not.toContainText("ABORT ERROR");
 
-    expect(ownership.batchPpuCancels).toEqual([]);
-    expect(ownership.browserJobPosts()).toBe(0);
+    const batch = await settledManagerBatch(request, sent.batchId!, 90_000);
+    expect(batch.stop_requested).toBe(true);
+    expect(batch.outcome).not.toBe("PASS");
+    expect(String((batch as unknown as { reason: string }).reason)).toMatch(/^STOP_REQUESTED/);
+    const cycles = (batch as unknown as {
+      cycles: { planned: number; settled: number; pass: number; fail: number; remaining: number };
+    }).cycles;
+    expect(cycles.planned).toBe(repeat * ppus.length);
+    // Every Job that had been started finished normally (PASS), none was cancelled.
+    expect(cycles.settled).toBeGreaterThanOrEqual(ppus.length);
+    expect(cycles.pass).toBe(cycles.settled);
+    expect(cycles.fail).toBe(0);
+    for (const unit of batch.units) {
+      for (const attempt of unit.attempts) expect(attempt.outcome).toBe("PASS");
+    }
+    // Queued Cycles were never submitted, and nothing is submitted after the stop.
+    expect(cycles.remaining).toBeGreaterThan(0);
+    expect(cycles.settled).toBeLessThan(cycles.planned);
+    const settledAttempts = batch.counts.attempts;
+    await page.waitForTimeout(2_000);
+    expect((await managerBatch(request, sent.batchId!)).counts.attempts).toBe(settledAttempts);
+
+    await expect(programmingJobStatusValue(job)).not.toHaveText(/RUNNING|STOPPING/, { timeout: 30_000 });
+    for (const alias of ppus) {
+      await expect(siteCard(page, alias)).not.toHaveAttribute("data-site-state", /running|faulted|error/, { timeout: 30_000 });
+    }
+    expect(traffic.batches).toHaveLength(1);
+    expect(traffic.legacy).toEqual([]);
   } finally {
-    const restoreResponse = await request.post(`${gateway}/api/mock/runtime`, { data: editableRuntime(original) });
-    expect(restoreResponse.ok()).toBeTruthy();
+    // Never leave a Batch running for the next spec, whatever failed above.
+    await settledManagerBatch(request, sent.batchId!, 120_000);
   }
 });

@@ -7,7 +7,7 @@ async function source(path) {
 }
 
 test("Engineering Programming owns its base stylesheet directly", async () => {
-  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const workspace = await source("../app/engineering/managed-programming-workspace.tsx");
 
   assert.match(workspace, /import "\.\/programming-workspace-base\.css";/);
   assert.doesNotMatch(workspace, /\.\.\/fleet\/programming\//);

@@ -85,6 +85,9 @@ class MockInterface(BaseInterface):
     # Set by the closing step of a programming Job, cleared when a Job starts.
     site_safe: bool = field(default=False, init=False)
     safe_off_count: int = field(default=0, init=False)
+    # Receipt of the last bound Read, the same shape a C-3 Read publishes
+    # (range, bytes, SHA256, SAFE_OFF). Derived from the Mock Flash contents.
+    operation_evidence: dict[str, Any] | None = field(default=None, init=False)
     _context: RuntimeJobContext | None = field(default=None, init=False, repr=False)
     _active_job_id: str | None = field(default=None, init=False, repr=False)
     _active_attempt: int = field(default=0, init=False, repr=False)
@@ -291,6 +294,7 @@ class MockInterface(BaseInterface):
             self._active_job_id = request.job_id
             self._active_attempt = 1
         self.site_safe = False
+        self.operation_evidence = None
 
         raw = request.metadata.get("mock_runtime")
         if raw is None:
@@ -641,13 +645,43 @@ class MockInterface(BaseInterface):
         length: int,
         progress: ProgressCallback | None = None,
     ) -> bytes:
-        self._validate_range(address, length)
+        self.operation_evidence = None
+        binding = self._context.admitted_job_binding if self._context is not None else None
+        if binding is None:
+            # Unbound Engineering Mock Read: unchanged legacy behaviour.
+            self._validate_range(address, length)
+            await self._before("read", progress, length)
+            assert self.image_store is not None
+            return self.flash_state.read(self.image_store, address, length)
+        # A bound Read reads exactly its Job Binding range, like a C-3 Read.
+        job_range = self._binding(Operation.READ)["range"]
+        if address != job_range["address"] or length != job_range["length"]:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT,
+                              "mock read range is not the Job Binding range")
+        offset = self._offset(address, length)
         await self._before("read", progress, length)
         assert self.image_store is not None
-        return self.flash_state.read(self.image_store, address, length)
+        data = self.flash_state.read(self.image_store, offset, length)
+        if not self._close_site():
+            raise PlasmaError(
+                ErrorCode.INTERFACE_FAILURE,
+                "mock closing step did not leave the Site safe",
+                context={"operation": Operation.READ.value, "safe_off": False},
+            )
+        # Every field is observed from what was actually read back.
+        self.operation_evidence = {
+            "result": "PASS",
+            "read_address": address,
+            "read_length": length,
+            "bytes_read": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "safe_off": True,
+        }
+        return data
 
     async def safe_shutdown(self) -> None:
         # The Runtime context never outlives the Job it was bound for.
         self._context = None
+        self.operation_evidence = None
         self.shutdown_count += 1
         await asyncio.sleep(0)

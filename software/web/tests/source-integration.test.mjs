@@ -32,54 +32,44 @@ function createLocalStorage(initial = {}) {
   };
 }
 
-function runBrowserApiMigration(script, initial) {
+function runBrowserApiMigration(script, initial, initialSession = {}) {
   const localStorage = createLocalStorage(initial);
+  const sessionStorage = createLocalStorage(initialSession);
   runInNewContext(script, {
     URL,
-    window: { localStorage },
+    window: { localStorage, sessionStorage },
   });
-  return localStorage.snapshot();
+  return { local: localStorage.snapshot(), session: sessionStorage.snapshot() };
 }
 
-test("uses canonical Web REST APIs and Site identity", async () => {
+test("uses canonical Web REST types and Site identity", async () => {
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
   assert.match(api, /export type PPUSnapshot/);
   assert.match(api, /export type SiteSnapshot/);
-  assert.match(api, /export async function getPPUStatus/);
-  assert.match(api, /payload\.ppu/);
-  assert.match(api, /payload\.sites/);
-  assert.match(api, /siteId: number/);
-  assert.match(api, /site_id: options\.siteId/);
-  assert.match(api, /\/api\/status/);
-  assert.match(api, /\/api\/jobs/);
-  assert.match(api, /\/api\/programming-assets/);
-  assert.match(api, /await fetch/);
+  assert.match(api, /site_id: number/);
+  // U10: plasma-api is a type module; the Browser has no direct Gateway client.
+  assert.doesNotMatch(api, /fetch\(|\/api\/status|\/api\/jobs|\/api\/programming-assets/);
   assert.doesNotMatch(api, /channel_id/);
   assert.doesNotMatch(api, /payload\.programmer|payload\.channels/);
   assert.doesNotMatch(api, /LegacyChannel|LegacyProgrammer/);
 });
 
-test("EMode Programming owns single-PPU engineering operations after legacy console retirement", async () => {
-  const page = await readFile(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
+test("EMode Programming owns single-PPU engineering operations through the Manager after legacy console retirement", async () => {
+  const page = await readFile(new URL("../app/engineering/managed-programming-workspace.tsx", import.meta.url), "utf8");
+  const api = await readFile(new URL("../app/engineering/bundle-programming-api.ts", import.meta.url), "utf8");
 
-  assert.match(page, /getEngineeringTargets/);
-  assert.match(page, /getPPUStatus/);
-  assert.match(page, /startJob/);
-  assert.match(page, /cancelJob/);
-  assert.match(page, /operationOrder: Operation\[] = \["erase", "program", "verify"\]/);
-  assert.match(page, /aria-label=\{`SITE \$\{site\.id\} Read Memory`\}/);
-  assert.match(page, /runSingleSite\(site\.id, operation\)/);
-  assert.match(page, /readDownloadUrl\(targetApiBase, site\.jobId, site\.outputFile\)/);
-  assert.match(page, /startEngineeringServerBatch/);
-  assert.match(page, /abortEngineeringServerBatch/);
-  assert.match(page, /executionPolicy:/);
-  assert.match(page, /site_retry_limit:/);
+  assert.match(api, /export const SEQUENCE_OPERATIONS = \["erase", "program", "verify"\] as const;/);
+  assert.match(page, /aria-label=\{`Read SITE \$\{site\.site_id\} Flash`\}/);
+  assert.match(page, /await runManagedRead\(\{ alias, siteId: id, icpn, address, length \}/);
+  assert.equal((page.match(/runManagedBatch\(request, \{/g) ?? []).length, 1);
+  assert.match(page, /await stopProgrammingBatch\(/);
+  assert.doesNotMatch(page, /getEngineeringTargets|getPPUStatus|startJob|cancelJob|startEngineeringServerBatch|abortEngineeringServerBatch/);
   assert.doesNotMatch(page, /BatchLifecycle/);
-  assert.doesNotMatch(page, /new BatchLifecycle/);
 });
 
 test("uses same-origin as the default Browser route with no fixed remote Gateway", async () => {
+  const workspace = await readFile(new URL("../app/workspace-session.tsx", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
   // Deployment API defaults are owned by the integration backend; the top-level
   // plasmactl script is now only the deployment-profile router.
@@ -88,20 +78,18 @@ test("uses same-origin as the default Browser route with no fixed remote Gateway
     "utf8",
   );
 
-  const webDefault = api.match(
-    /process\.env\.NEXT_PUBLIC_PLASMA_API_URL\s*\?\?\s*"([^"]*)"/,
-  )?.[1];
   const deploymentDefault = plasmactlIntegration.match(
     /default_public_api_url="([^"]*)"/,
   )?.[1];
 
-  assert.equal(webDefault, "");
   assert.equal(deploymentDefault, "");
-  assert.match(api, /if \(!trimmed\) return ""/);
-  assert.doesNotMatch(api, /process\.env\.NEXT_PUBLIC_PLASMA_API_URL\s*\?\?\s*"https?:\/\//);
+  // U10: the Browser route is always the same-origin Manager PPU prefix; no
+  // build-time Gateway URL exists.
+  assert.match(workspace, /return `\$\{window\.location\.origin\}\/api\/manager\/ppu`;/);
+  assert.doesNotMatch(workspace + api, /NEXT_PUBLIC_PLASMA_API_URL/);
 });
 
-test("browser API storage v3 clears pre-v3 direct endpoints while preserving only post-migration explicit standalone input", async () => {
+test("browser API storage v3 clears direct endpoints and wipes retired standalone routing and Batch keys", async () => {
   const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
   const migration = extractTemplateLiteral(layout, "apiBaseStorageMigration");
 
@@ -115,14 +103,23 @@ test("browser API storage v3 clears pre-v3 direct endpoints while preserving onl
       "plasma-api-base": priorValue,
       "plasma-api-base-version": "2",
     });
-    assert.equal(migrated["plasma-api-base"], undefined);
-    assert.equal(migrated["plasma-api-base-version"], "3");
+    assert.equal(migrated.local["plasma-api-base"], undefined);
+    assert.equal(migrated.local["plasma-api-base-version"], "3");
   }
 
+  // U10: even after v3, the retired standalone mode and PPU-local Batch handles are wiped.
   const alreadyMigrated = runBrowserApiMigration(migration, {
-    "plasma-api-base": "https://engineering-standalone.example.invalid",
     "plasma-api-base-version": "3",
+    "plasma-api-mode": "standalone",
+  }, {
+    "plasma-production-active-batch-v1": "batch-p",
+    "plasma-engineering-active-batch-v1": "batch-e",
+    "plasma-managed-production-batch-v1": "manager-batch",
   });
-  assert.equal(alreadyMigrated["plasma-api-base"], "https://engineering-standalone.example.invalid");
-  assert.equal(alreadyMigrated["plasma-api-base-version"], "3");
+  assert.equal(alreadyMigrated.local["plasma-api-mode"], undefined);
+  assert.equal(alreadyMigrated.local["plasma-api-base-version"], "3");
+  assert.equal(alreadyMigrated.session["plasma-production-active-batch-v1"], undefined);
+  assert.equal(alreadyMigrated.session["plasma-engineering-active-batch-v1"], undefined);
+  // The Manager Batch observation key is not a retired standalone handle.
+  assert.equal(alreadyMigrated.session["plasma-managed-production-batch-v1"], "manager-batch");
 });

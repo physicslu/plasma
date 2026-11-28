@@ -11,7 +11,7 @@ import PpuOverviewPage from "./ppu-overview-page";
 import PpuRegistrationPage from "./ppu-registration-page";
 import PpuRuntimeDeploymentPage from "./ppu-runtime-deployment-page";
 import PpuSitesPage from "./ppu-sites-page";
-import ProgrammingWorkspaceV2 from "./programming-workspace-v2";
+import ManagedProgrammingWorkspace from "./managed-programming-workspace";
 import "./engineering.css";
 import "./engineering-density.css";
 import "./engineering-workspace-refresh.css";
@@ -305,7 +305,7 @@ export default function EngineeringPage() {
 
           <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : diagnosticsSurfaceActive ? "diagnosticsActive" : settingsSurfaceActive ? "settingsActive" : ppuSurfaceActive ? "ppuSitesActive" : ""}`}>
             {active === "programming" ? (
-              <ProgrammingWorkspaceV2 />
+              <ManagedProgrammingWorkspace />
             ) : active === "ppu-sites" && ppuSection === "platform" ? (
               <PpuRuntimeDeploymentPage />
             ) : active === "ppu-sites" && ppuSection === "registration" ? (

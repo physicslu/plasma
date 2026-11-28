@@ -11,8 +11,8 @@ const read = path => readFile(new URL(path, root), "utf8");
 
 const core = await read("app/programming/managed-programming.ts");
 const emode = await read("app/engineering/managed-programming-workspace.tsx");
+const page = await read("app/engineering/page.tsx");
 const pmode = await read("app/fleet/factory-console-v2.tsx");
-const router = await read("app/engineering/programming-workspace-v2.tsx");
 const api = await read("app/engineering/bundle-programming-api.ts");
 const bff = await read("app/api/manager/bootstrap-bff.ts");
 const panel = await read("app/operator-ui/programming-job-panel.tsx");
@@ -29,8 +29,10 @@ test("both managed modes show one warning per PPU for a failed Batch time sync",
 });
 
 test("formal Console routes EMode Programming to the Manager backend, never the Mock runtime", () => {
-  assert.match(router, /apiMode === "managed" \? <ManagedProgrammingWorkspace \/> : <StandaloneProgrammingWorkspace \/>/);
-  assert.match(router, /if \(!hydrated\) return null;/);
+  // U10: the Console is Manager-managed only; there is no standalone router.
+  assert.match(page, /import ManagedProgrammingWorkspace from "\.\/managed-programming-workspace";/);
+  assert.match(page, /active === "programming" \? \(\s*<ManagedProgrammingWorkspace \/>/);
+  assert.doesNotMatch(page, /StandaloneProgrammingWorkspace|programming-workspace-v2"|apiMode/);
 });
 
 test("managed Programming has no direct PPU Gateway client, Job router or Batch runtime", () => {
@@ -266,8 +268,9 @@ const factory = await read("app/fleet/factory-console-v2.tsx");
 const factoryBackend = await read("app/fleet/managed-factory-backend.ts");
 
 test("PMode discovers Manager Registry/Fleet and requires live Site interface admission", () => {
-  assert.match(factory, /const managed = apiMode === "managed";/);
-  assert.match(factory, /nextCatalog = managedFactoryCatalog\(topology\);/);
+  // U10: PMode is Manager-managed only; there is no apiMode branch.
+  assert.doesNotMatch(factory, /apiMode|const managed = /);
+  assert.match(factory, /const nextCatalog: EngineeringTargetCatalog = managedFactoryCatalog\(restoredTopology\);/);
   assert.match(factoryBackend, /siteCapability\(site, routes, icpn\)/);
   assert.match(factory, /const blocker = managedBatchBlocker\(managedTopology, managedRoutes\.routes, icpn,/);
   assert.doesNotMatch(factoryBackend, /site_count[^\n]*programmable|siteCount[^\n]*programmable/);
@@ -297,7 +300,7 @@ test("PR-D Manager controls Retry/Stop and the Browser restores durable Batch by
   assert.doesNotMatch(factory, /for \(const site of waiting\)/);
   assert.match(factory, /retryValue: siteRetryLimit/);
   assert.match(factory, /await stopProgrammingBatch\(activeBatchId\)/);
-  assert.match(factory, /managed \? readManagedBatch\(\)/);
+  assert.match(factory, /let managedId = readManagedBatch\(\);/);
   assert.match(factory, /getStartReconciliation\(pendingStart\)/);
   assert.match(factory, /await getProgrammingBatch\(batchId\)/);
   assert.match(factory, /writeManagedStart\(startId\)/);
@@ -309,7 +312,7 @@ test("PR-D Manager controls Retry/Stop and the Browser restores durable Batch by
 
 test("PMode retains Factory UI and no Mock is presented as HIL acceptance", () => {
   assert.match(factory, /useState<ProgrammingSource>\("image"\)/);
-  assert.match(factory, /source=\{managed \? \{ value: programmingSource/);
+  assert.match(factory, /source=\{\{ value: programmingSource, disabled: batchRunning, onChange: changeProgrammingSource \}\}/);
   assert.match(factory, /repeatDisabled: batchRunning,/);
   assert.match(factoryBackend, /readyLabel: "MANAGER BATCH READY"/);
   assert.doesNotMatch(factory, /data-testid="managed-production-mode"/);
@@ -700,4 +703,13 @@ test("Console surfaces use the one SAFE_OFF label; READY stays the PPU Site capa
   // Site READY is the PPU's own idle Site + Profile, never a Batch or SAFE_OFF guess.
   assert.match(core, /if \(site\.current_job_id \|\| site\.state !== "idle"\) \{/);
   assert.match(core, /return \{ programmable: true, label: "READY", reason: "" \};/);
+});
+
+test("a Programming Image is bound only when Program or Verify is selected", () => {
+  // Moved from the retired server-batch-api contract (U10): the managed
+  // request carries a file only for P/V; Erase-only sends no Image.
+  assert.match(api, /export function operationsTakeImage\(operations: readonly string\[\]\): boolean \{\s*return operations\.includes\("program"\) \|\| operations\.includes\("verify"\);/);
+  assert.match(emode, /const needsImage = operations != null && operationsTakeImage\(operations\);/);
+  assert.match(factory, /const managedNeedsFile = managedChosen != null && operationsTakeImage\(managedChosen\);/);
+  assert.match(core, /operations: readonly \["erase"\]; operation\?: undefined; file: null;/);
 });

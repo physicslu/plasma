@@ -22,13 +22,6 @@ export type MockRuntimeSettings = {
   };
 };
 
-export type MockBatchRuntimeSnapshot = {
-  profile: Omit<MockRuntimeSettings, "seed">;
-  seed_mode: "auto" | "fixed";
-  resolved_seed: number;
-  batch_id: string;
-};
-
 type MockRuntimePayload = {
   ok: boolean;
   mock_runtime: MockRuntimeSettings;

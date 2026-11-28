@@ -9,9 +9,10 @@ test("Web JobState contract includes infrastructure error", () => {
   assert.match(source, /\|\s*"error"/);
 });
 
-test("infrastructure error is terminal for execution activity tracking", () => {
-  const terminalSet = source.match(/const terminalJobStates = new Set<JobState>\(\[([\s\S]*?)\]\);/);
-  assert.ok(terminalSet, "terminal JobState set must remain explicit");
+test("infrastructure error is terminal for Manager Batch activity tracking", () => {
+  const batchSnapshot = fs.readFileSync(path.resolve("app/batch-snapshot.ts"), "utf8");
+  const terminalSet = batchSnapshot.match(/export const terminalServerBatchStates = new Set<ServerBatchState>\(\[([\s\S]*?)\]\);/);
+  assert.ok(terminalSet, "terminal Batch state set must remain explicit");
   assert.match(terminalSet[1], /"error"/);
 });
 
@@ -21,11 +22,7 @@ test("Job snapshots expose retry provenance for future Batch policy", () => {
   assert.match(source, /failure_source\?: string \| null/);
 });
 
-test("browser direct jobs carry a page-instance execution owner", () => {
-  assert.match(source, /let directBrowserExecutionOwnerId: string \| null = null/);
-  assert.match(source, /directBrowserExecutionOwnerId = window\.crypto\.randomUUID\(\)/);
-  assert.match(
-    source,
-    /execution_owner_id: options\.executionOwnerId \?\? browserExecutionOwnerId\(\)/,
-  );
+test("plasma-api is a type module: the Browser issues no direct PPU Job (U10)", () => {
+  assert.doesNotMatch(source, /fetch\(|export (async )?function|directBrowserExecutionOwnerId|execution_owner_id/);
+  assert.match(source, /export class PlasmaApiError extends Error/);
 });

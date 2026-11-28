@@ -40,7 +40,6 @@ const catalogs: Record<Locale, Catalog> = {
     "engineeringProgramming.title": "Single PPU Programming",
     "engineeringProgramming.subtitle": "Facility → PPU → Site；E/P/V/R 全部由 Python Engineering PPU Provider 執行。",
     "engineeringProgramming.gateway": "Plasma Gateway",
-    "engineeringProgramming.connect": "連線",
     "engineeringProgramming.providerOffline": "PPU Provider 離線",
     "engineeringProgramming.serverSource": "SERVER SOURCE OF TRUTH",
     "engineeringProgramming.serverSourceNote": "前端不建立 Mock topology；所有 target identity 由 Python Provider 回報。",
@@ -59,7 +58,6 @@ const catalogs: Record<Locale, Catalog> = {
     "engineeringProgramming.execute": "執行",
     "engineeringProgramming.cancel": "取消",
     "engineeringProgramming.cancelling": "取消中",
-    "engineeringProgramming.imageAssetTooLarge": "Programming Image Asset 超過 16 MiB 限制。",
     "engineeringProgramming.targetInterface": "目標 / 介面",
     "engineeringProgramming.operation": "操作",
     "engineeringProgramming.state": "狀態",
@@ -70,7 +68,6 @@ const catalogs: Record<Locale, Catalog> = {
     "engineeringProgramming.noPpu": "未選 PPU",
     "engineeringProgramming.jobLog": "ENGINEERING JOB LOG",
     "engineeringProgramming.clear": "清除",
-    "operation.erase": "擦除", "operation.program": "燒錄", "operation.verify": "驗證", "operation.read": "讀取",
   },
   "en-US": {
     "nav.entry": "Demo",
@@ -105,7 +102,6 @@ const catalogs: Record<Locale, Catalog> = {
     "engineeringProgramming.title": "Single PPU Programming",
     "engineeringProgramming.subtitle": "Facility → PPU → Site; E/P/V/R is executed by the Python Engineering PPU Provider.",
     "engineeringProgramming.gateway": "Plasma Gateway",
-    "engineeringProgramming.connect": "Connect",
     "engineeringProgramming.providerOffline": "PPU Provider offline",
     "engineeringProgramming.serverSource": "SERVER SOURCE OF TRUTH",
     "engineeringProgramming.serverSourceNote": "The browser does not create Mock topology; all target identities are reported by the Python Provider.",
@@ -124,7 +120,6 @@ const catalogs: Record<Locale, Catalog> = {
     "engineeringProgramming.execute": "Execute",
     "engineeringProgramming.cancel": "Cancel",
     "engineeringProgramming.cancelling": "Cancelling",
-    "engineeringProgramming.imageAssetTooLarge": "Programming Image Asset exceeds the 16 MiB limit.",
     "engineeringProgramming.targetInterface": "Target / Interface",
     "engineeringProgramming.operation": "Operation",
     "engineeringProgramming.state": "State",
@@ -135,7 +130,6 @@ const catalogs: Record<Locale, Catalog> = {
     "engineeringProgramming.noPpu": "No PPU",
     "engineeringProgramming.jobLog": "ENGINEERING JOB LOG",
     "engineeringProgramming.clear": "Clear",
-    "operation.erase": "Erase", "operation.program": "Program", "operation.verify": "Verify", "operation.read": "Read",
   },
 };
 

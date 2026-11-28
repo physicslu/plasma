@@ -11,7 +11,7 @@ test("PMode and EMode consume one neutral ICPickerField primitive through Progra
     source("../app/devices/ic-picker-field.tsx"),
     source("../app/operator-ui/programming-job-panel.tsx"),
     source("../app/fleet/factory-console-v2.tsx"),
-    source("../app/engineering/programming-workspace-v2.tsx"),
+    source("../app/engineering/managed-programming-workspace.tsx"),
   ]);
 
   assert.match(picker, /import "\.\/ic-picker-field\.css"/);

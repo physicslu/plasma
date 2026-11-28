@@ -64,7 +64,7 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   const sharedPanel = await fs.readFile(new URL("../app/operator-ui/operator-panel.tsx", import.meta.url), "utf8");
   const sharedPanelCss = await fs.readFile(new URL("../app/operator-ui/operator-panel.css", import.meta.url), "utf8");
   const sharedJob = await fs.readFile(new URL("../app/operator-ui/programming-job-panel.tsx", import.meta.url), "utf8");
-  const batchApi = await fs.readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
+  const batchSnapshotTypes = await fs.readFile(new URL("../app/batch-snapshot.ts", import.meta.url), "utf8");
 
   assert.match(route, /factory-console-v2/);
   assert.match(source, /PRODUCTION SITE SELECTION/);
@@ -89,7 +89,7 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(workspace, /draft = transient tree edit state/);
   assert.match(workspace, /Production Set = committed equipment scope/);
   assert.match(workspace, /Batch Selection = operator intent/);
-  assert.match(workspace, /Server Batch Runtime remains server-owned/);
+  assert.match(workspace, /Every Batch is Manager-owned/);
 
   assert.match(source, /applyProductionSet/);
   assert.match(source, /setProductionSet\(snapshot\)/);
@@ -116,26 +116,22 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(sharedJob, /ICPickerField/);
   assert.match(source, /<ProgrammingJobPanel[\s\S]*mode="production"/);
   assert.match(source, /targetDevice=\{targetDevice\}/);
-  assert.match(source, /resolveProgrammingCapabilities\(catalog\)/);
-  assert.match(source, /if \(!targetDevice && programmingCapabilities\.target_device_required\)/);
-  assert.match(source, /targetValid:\s*!programmingCapabilities\.target_device_required \|\| Boolean\(targetDevice\)/);
-  assert.match(source, /targetDevice:\s*targetDevice \? \{ vendor: targetDevice\.vendor, identifier: targetDevice\.identifier \} : null/);
-  assert.match(source, /allowSyntheticMockImage:\s*syntheticProgrammingImageAvailable/);
+  // U10: the Manager Route admits a Target IC; there is no standalone capability resolver.
+  assert.match(source, /const icpn = targetDevice\?\.icpn \?\? targetDevice\?\.identifier \?\? null;/);
+  assert.match(source, /if \(!icpn\) return blocked\("no-target", "NO TARGET", "Select a Target IC\."\);/);
+  assert.doesNotMatch(source, /resolveProgrammingCapabilities|allowSyntheticMockImage/);
   assert.doesNotMatch(source, /catalog\?\.provider === "mock"/);
   assert.match(sharedJob, /<OperatorPanelToggle/);
   assert.match(sharedPanel, /aria-expanded=\{expanded\}/);
 
-  assert.match(source, /createServerBatch/);
-  assert.match(source, /getServerBatch/);
-  assert.match(source, /cancelServerBatch/);
-  assert.doesNotMatch(source, /cancelServerBatchPPU/);
+  assert.doesNotMatch(source, /createServerBatch|getServerBatch|cancelServerBatch/);
   assert.doesNotMatch(source, /Cancel PPU/);
   assert.match(source, /only whole-Batch ABORT is allowed/);
   assert.match(source, /batchSelectionLocked/);
 
   const abortFunction = source.slice(source.indexOf("async function abortBatch"), source.indexOf("function stateText"));
-  assert.match(abortFunction, /cancelServerBatch\(/);
-  assert.doesNotMatch(abortFunction, /ppu_id|site_id|cancelServerBatchPPU/);
+  assert.match(abortFunction, /await stopProgrammingBatch\(activeBatchId\)/);
+  assert.doesNotMatch(abortFunction, /ppu_id|site_id/);
 
   const statistics = await fs.readFile(new URL("../app/programming/batch-statistics.ts", import.meta.url), "utf8");
   assert.match(source, /snapshotStatistics\(\{\s*sites: batchSnapshot\.sites,/);
@@ -162,8 +158,9 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(css, /background:\s*#22c55e/); // PASS green.
   assert.match(css, /background:\s*#ef4444/); // FAIL red.
 
-  assert.match(batchApi, /"\/api\/batches"/);
-  assert.match(batchApi, /terminalServerBatchStates/);
+  // U10: Batch snapshots are Manager-owned; the PPU-local /api/batches client is retired.
+  assert.match(batchSnapshotTypes, /export const terminalServerBatchStates/);
+  assert.doesNotMatch(source + batchSnapshotTypes, /\/api\/batches/);
 
   const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
   assert.equal(api.status, 404);
@@ -187,9 +184,8 @@ test("fleet BFF source keeps Manager loopback-only and latest-job summaries brow
   assert.match(contract, /progress_percent/);
   assert.doesNotMatch(contract, /output_files/);
   assert.doesNotMatch(contract, /firmware/);
-  assert.match(vite, /\^\/api\/\(\?!fleet/);
-  assert.match(vite, /PLASMA_GATEWAY_PROXY_URL\s*\?\?\s*"http:\/\/127\.0\.0\.1:18080"/);
-  assert.match(vite, /target: localGatewayProxyTarget/);
+  // U10: the Gateway dev proxy is gone; Fleet and Manager stay Vinext BFF routes.
+  assert.doesNotMatch(vite, /proxy:|PLASMA_GATEWAY_PROXY_URL|localGatewayProxyTarget/);
   assert.match(vite, /PLASMA_FLEET_UI_ENABLED:\s*process\.env\.PLASMA_FLEET_UI_ENABLED\s*\?\?\s*"0"/);
   assert.match(vite, /PLASMA_CONTROL_STATION_MODE:\s*process\.env\.PLASMA_CONTROL_STATION_MODE\s*\?\?\s*""/);
   assert.match(vite, /PLASMA_MANAGER_API_URL:\s*process\.env\.PLASMA_MANAGER_API_URL/);

@@ -28,10 +28,14 @@ function json(status: number, payload: object): Response {
   });
 }
 
-export function managerRoutingRequired(): boolean {
+/**
+ * The Control Station is Manager-managed only (U10): there is no standalone
+ * direct-Gateway mode. `PLASMA_CONTROL_STATION_MODE` may be unset or
+ * "managed"; any other value is a misconfiguration.
+ */
+export function managerRoutingRequired(): true {
   const mode = (process.env.PLASMA_CONTROL_STATION_MODE ?? "").trim();
-  if (!mode) return false;
-  if (mode !== "managed") {
+  if (mode && mode !== "managed") {
     throw new Error("PLASMA_CONTROL_STATION_MODE must be managed when configured");
   }
   return true;
@@ -199,12 +203,7 @@ async function relayManagerRequest(
 ): Promise<Response> {
   let managerBase: string;
   try {
-    if (requireManagedMode && !managerRoutingRequired()) {
-      return json(503, {
-        ok: false,
-        error: { code: "manager_not_enabled", message: "Manager mode is not enabled for this Control Station" },
-      });
-    }
+    if (requireManagedMode) managerRoutingRequired();
     managerBase = managerApiBase();
   } catch {
     return json(503, {

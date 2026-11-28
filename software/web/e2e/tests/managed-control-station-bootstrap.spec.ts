@@ -1,25 +1,23 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+// U10: the Console is Manager-managed only. Every Gateway path is rebased onto
+// the same-origin `/api/manager/ppu` prefix; there is no standalone mode, no
+// Browser-chosen Gateway URL and no routing discovery round-trip. These specs
+// keep the regression guard that stale standalone Browser storage from an older
+// Console (`plasma-api-mode` / `plasma-api-base`) is ignored and that no request
+// ever reaches a direct Gateway.
 
 const staleDirectGateway = "https://swpc.tail820e64.ts.net:8443";
 const defaultRemoteGateway = "https://legacy-gateway.invalid";
 
-async function seedLegacyStandaloneRouting(page: import("@playwright/test").Page) {
+async function seedLegacyStandaloneRouting(page: Page) {
   await page.addInitScript(({ directGateway }) => {
     window.localStorage.setItem("plasma-api-mode", "standalone");
     window.localStorage.setItem("plasma-api-base", directGateway);
   }, { directGateway: staleDirectGateway });
 }
 
-async function expectManagedBrowserRouting(page: import("@playwright/test").Page) {
-  await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("plasma-api-mode")))
-    .toBe("managed");
-  await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("plasma-api-base")))
-    .toMatch(/\/api\/manager\/ppu$/);
-  await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("plasma-api-base")))
-    .not.toBe(staleDirectGateway);
-}
-
-function observeGatewayRouting(page: import("@playwright/test").Page) {
+function observeGatewayRouting(page: Page) {
   const leakedGatewayRequests: string[] = [];
   const managedStatusRequests: string[] = [];
   page.on("request", request => {
@@ -32,29 +30,7 @@ function observeGatewayRouting(page: import("@playwright/test").Page) {
   return { leakedGatewayRequests, managedStatusRequests };
 }
 
-test("Managed Control Station overrides stale standalone Browser routing", async ({ page }) => {
-  await seedLegacyStandaloneRouting(page);
-  await page.route("**/api/manager/ppu", async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, managed: true, configured: true, ppu_alias: "swpc" }),
-    });
-  });
-
-  await page.goto("/");
-  await expectManagedBrowserRouting(page);
-});
-
-test("Gateway reads stay inside the Browser until Managed routing discovery resolves", async ({ page }) => {
-  await seedLegacyStandaloneRouting(page);
-  const { leakedGatewayRequests, managedStatusRequests } = observeGatewayRouting(page);
-
-  let releaseDiscovery!: () => void;
-  const discoveryReleased = new Promise<void>(resolve => { releaseDiscovery = resolve; });
-  let observeDiscovery!: () => void;
-  const discoveryObserved = new Promise<void>(resolve => { observeDiscovery = resolve; });
-
+async function routeManagedStatus(page: Page) {
   await page.route("**/api/manager/ppu/api/status", async route => {
     await route.fulfill({
       status: 200,
@@ -62,84 +38,59 @@ test("Gateway reads stay inside the Browser until Managed routing discovery reso
       body: JSON.stringify({ ok: true, sites: [] }),
     });
   });
-  await page.route("**/api/manager/ppu", async route => {
-    observeDiscovery();
-    await discoveryReleased;
-    await route.fulfill({
+}
+
+async function openConsole(page: Page) {
+  await page.goto("/");
+  // Hydrated: the root providers (Gateway transport, workspace session) are mounted.
+  await expect(page.getByRole("group", { name: "Language" })).toHaveAttribute("aria-busy", "false");
+}
+
+/** A Gateway read aimed at any absolute Gateway URL lands on the managed prefix. */
+async function gatewayRead(page: Page, gateway: string) {
+  return await page.evaluate(async target => {
+    const response = await fetch(`${target}/api/status`, { cache: "no-store" });
+    return { status: response.status, ok: response.ok, url: response.url };
+  }, gateway);
+}
+
+test("stale standalone Browser routing storage is ignored: Gateway reads go through the Manager", async ({ page }) => {
+  await seedLegacyStandaloneRouting(page);
+  const { leakedGatewayRequests, managedStatusRequests } = observeGatewayRouting(page);
+  await routeManagedStatus(page);
+
+  await openConsole(page);
+  for (const gateway of [staleDirectGateway, defaultRemoteGateway]) {
+    expect(await gatewayRead(page, gateway)).toEqual({
       status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, managed: true, configured: true, ppu_alias: "swpc" }),
+      ok: true,
+      url: expect.stringMatching(/^http:\/\/127\.0\.0\.1:4173\/api\/manager\/ppu\/api\/status$/),
     });
-  });
-
-  const navigation = page.goto("/");
-  await discoveryObserved;
-
-  await page.evaluate(({ gateways }) => {
-    const scope = window as typeof window & {
-      __plasmaBootstrapReads?: Promise<Array<{ status: number; ok: boolean }>>;
-    };
-    scope.__plasmaBootstrapReads = Promise.all(gateways.map(async gateway => {
-      const response = await fetch(`${gateway}/api/status`, { cache: "no-store" });
-      return { status: response.status, ok: response.ok };
-    }));
-  }, { gateways: [staleDirectGateway, defaultRemoteGateway] });
-
-  await page.waitForTimeout(50);
-  expect(leakedGatewayRequests).toEqual([]);
-
-  releaseDiscovery();
-  await navigation;
-  const reads = await page.evaluate(async () => {
-    const scope = window as typeof window & {
-      __plasmaBootstrapReads?: Promise<Array<{ status: number; ok: boolean }>>;
-    };
-    return await scope.__plasmaBootstrapReads;
-  });
-
-  expect(reads).toEqual([
-    { status: 200, ok: true },
-    { status: 200, ok: true },
-  ]);
-  await expectManagedBrowserRouting(page);
+  }
   expect(leakedGatewayRequests).toEqual([]);
   expect(managedStatusRequests.length).toBeGreaterThanOrEqual(2);
+  // The stale keys are retired at load: never honoured, never re-published.
+  expect(await page.evaluate(() => [
+    window.localStorage.getItem("plasma-api-mode"),
+    window.localStorage.getItem("plasma-api-base"),
+  ])).toEqual([null, null]);
 });
 
 test("Managed routing stays exclusive during steady-state Browser traffic", async ({ page }) => {
   await seedLegacyStandaloneRouting(page);
   const { leakedGatewayRequests, managedStatusRequests } = observeGatewayRouting(page);
+  await routeManagedStatus(page);
 
-  await page.route("**/api/manager/ppu/api/status", async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, sites: [] }),
-    });
-  });
-  await page.route("**/api/manager/ppu", async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, managed: true, configured: true, ppu_alias: "swpc" }),
-    });
-  });
-
-  await page.goto("/");
-  await expectManagedBrowserRouting(page);
-
-  const statusCountAfterBootstrap = managedStatusRequests.length;
+  await openConsole(page);
+  const statusCountAfterLoad = managedStatusRequests.length;
   const directAttempts: Array<{ status: number; ok: boolean; url: string }> = [];
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    directAttempts.push(await page.evaluate(async directGateway => {
-      const response = await fetch(`${directGateway}/api/status`, { cache: "no-store" });
-      return { status: response.status, ok: response.ok, url: response.url };
-    }, staleDirectGateway));
+    directAttempts.push(await gatewayRead(page, staleDirectGateway));
     await page.waitForTimeout(250);
   }
 
   expect(leakedGatewayRequests).toEqual([]);
-  expect(managedStatusRequests.length).toBeGreaterThanOrEqual(statusCountAfterBootstrap + 2);
+  expect(managedStatusRequests.length).toBeGreaterThanOrEqual(statusCountAfterLoad + 2);
   for (const directAttempt of directAttempts) {
     expect(directAttempt).toEqual({
       status: 200,
@@ -151,6 +102,7 @@ test("Managed routing stays exclusive during steady-state Browser traffic", asyn
 
 test("Managed Control Station remains fail-closed when the BFF routing config is incomplete", async ({ page }) => {
   await seedLegacyStandaloneRouting(page);
+  const { leakedGatewayRequests } = observeGatewayRouting(page);
   await page.route("**/api/manager/ppu", async route => {
     await route.fulfill({
       status: 503,
@@ -163,7 +115,20 @@ test("Managed Control Station remains fail-closed when the BFF routing config is
       }),
     });
   });
+  await page.route("**/api/manager/ppu/api/status", async route => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: false, error: { code: "manager_bff_misconfigured", message: "Managed PPU routing is not configured" } }),
+    });
+  });
 
-  await page.goto("/");
-  await expectManagedBrowserRouting(page);
+  await openConsole(page);
+  // Never a fallback to the stale direct Gateway: the read fails at the Manager.
+  expect(await gatewayRead(page, staleDirectGateway)).toEqual({
+    status: 503,
+    ok: false,
+    url: expect.stringContaining("/api/manager/ppu/api/status"),
+  });
+  expect(leakedGatewayRequests).toEqual([]);
 });

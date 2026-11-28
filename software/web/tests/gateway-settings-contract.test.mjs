@@ -9,10 +9,9 @@ const sharedSettingsCss = await readFile(new URL("../app/operator-ui/settings-ui
 const sharedSurfaceCss = await readFile(new URL("../app/operator-ui/operator-surface-primitives.css", import.meta.url), "utf8");
 const engineeringPage = await readFile(new URL("../app/engineering/page.tsx", import.meta.url), "utf8");
 const engineeringCss = await readFile(new URL("../app/engineering/engineering.css", import.meta.url), "utf8");
-const engineeringWorkspace = await readFile(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
+const engineeringWorkspace = await readFile(new URL("../app/engineering/managed-programming-workspace.tsx", import.meta.url), "utf8");
+const batchStatistics = await readFile(new URL("../app/programming/batch-statistics.ts", import.meta.url), "utf8");
 const productionWorkspace = await readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
-const plasmaApi = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
-const serverBatchApi = await readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const serverBatchRuntime = await readFile(new URL("../../python/plasma_web/batch_runtime.py", import.meta.url), "utf8");
 
 test("EMode Settings owns the server-backed shared Plasma Gateway communication policy", () => {
@@ -22,8 +21,8 @@ test("EMode Settings owns the server-backed shared Plasma Gateway communication 
   assert.match(engineeringPage, /<span className="engineeringNavLabel">Plasma Gateway<\/span>/);
   assert.match(engineeringPage, /<GatewaySettingsPanel \/>/);
   assert.match(settingsApi, /\/api\/settings\/gateway/);
-  assert.match(settingsApi, /ppu_request_timeout_ms: 10_000/);
-  assert.match(settingsApi, /ppu_retry_count: 3/);
+  assert.match(settingsApi, /ppu_request_timeout_ms: number/);
+  assert.match(settingsApi, /ppu_retry_count: number/);
   assert.match(settingsPanel, /PPU Request Timeout seconds/);
   assert.match(settingsPanel, /PPU Retry Count/);
   assert.match(settingsPanel, /PLASMA GATEWAY COMMUNICATION CONFIGURATION/);
@@ -31,7 +30,6 @@ test("EMode Settings owns the server-backed shared Plasma Gateway communication 
   assert.match(settingsPanel, /Plasma Gateway Settings/);
   assert.match(settingsPanel, /<SettingsGrid columns=\{3\}>/);
   assert.doesNotMatch(settingsPanel, /<SettingsTabs/);
-  assert.match(serverBatchApi, /gateway_settings\?: GatewaySettings/);
 });
 
 test("Plasma Gateway settings retain compatibility-sensitive internal identifiers", () => {
@@ -40,14 +38,6 @@ test("Plasma Gateway settings retain compatibility-sensitive internal identifier
   assert.match(engineeringPage, /selectSettingsSection\("gateway"\)/);
   assert.match(settingsPanel, /getGatewaySettings/);
   assert.match(settingsPanel, /updateGatewaySettings/);
-});
-
-test("Plasma Gateway user-facing connection errors use canonical terminology", () => {
-  assert.match(plasmaApi, /Plasma Gateway Endpoint 必須使用 http:\/\/ 或 https:\/\//);
-  assert.match(plasmaApi, /Plasma Gateway communication policy unavailable/);
-  assert.match(plasmaApi, /Plasma Gateway request timed out/);
-  assert.match(plasmaApi, /Plasma Gateway connection failed/);
-  assert.doesNotMatch(plasmaApi, /Plasma Web REST Gateway/);
 });
 
 test("Plasma Gateway uses the shared Engineering Settings UI primitives without a redundant local tab shell", () => {
@@ -89,17 +79,10 @@ test("Shared Settings Guide renders explicit full-width-colon step numbers", () 
   assert.match(sharedSettingsCss, /list-style:\s*none/);
 });
 
-test("Engineering direct Jobs use client Gateway policy while server Batch freezes authoritative Gateway policy", () => {
-  assert.match(engineeringWorkspace, /configuredGatewayPolicy\.current = cachedGatewaySettings\(apiBase\)/);
-  assert.match(engineeringWorkspace, /requestTimeoutMs:\s*configuredGatewayPolicy\.current\.ppu_request_timeout_ms/);
-  assert.match(engineeringWorkspace, /const policy = configuredGatewayPolicy\.current/);
-  assert.match(engineeringWorkspace, /withCommunicationRetry/);
-  assert.match(engineeringWorkspace, /getGatewayLiveness/);
-  assert.match(engineeringWorkspace, /GatewayUnavailableError/);
-  assert.match(engineeringWorkspace, /Server Batch Runtime freezes its own authoritative Gateway policy at START/);
-  assert.match(plasmaApi, /inFlightJobSnapshots/);
-  assert.match(plasmaApi, /readonly transient = false/);
-
+test("PPU Gateway Batch runtime freezes authoritative Gateway policy at START", () => {
+  // The Console no longer issues direct Jobs or PPU-local Batches (U10); the
+  // Gateway-side runtime keeps its own frozen communication policy.
+  assert.doesNotMatch(engineeringWorkspace, /cachedGatewaySettings|getGatewayLiveness|withCommunicationRetry|gateway-settings-api/);
   assert.match(serverBatchRuntime, /gateway_policy=self\.gateway_settings\.snapshot\(\)/);
   assert.match(serverBatchRuntime, /retries = batch\.gateway_policy\.ppu_retry_count if retryable else 0/);
   assert.match(serverBatchRuntime, /timeout=batch\.gateway_policy\.request_timeout_s/);
@@ -108,8 +91,9 @@ test("Engineering direct Jobs use client Gateway policy while server Batch freez
 });
 
 test("manufacturing Yield is undefined until an IC has a PASS or FAIL outcome", () => {
-  assert.match(engineeringWorkspace, /const yieldLabel = completedIc > 0/);
-  assert.match(engineeringWorkspace, /:\s*"—"/);
+  // EMode and PMode share Batch Statistics v1: YIELD is N/A until a Cycle settles.
+  assert.match(batchStatistics, /return settled > 0 \? `\$\{\(\(pass \/ settled\) \* 100\)\.toFixed\(1\)\}%` : "N\/A";/);
+  assert.match(engineeringWorkspace, /const kpis = statisticsKpis\(statistics, formatElapsed\(elapsed\)\);/);
   // PMode (Batch Statistics v1): N/A without a settled Cycle, never 100%.
   assert.match(productionWorkspace, /statisticsKpis\(statistics,/);
   assert.match(productionWorkspace, /communicationState === "reconnecting"/);

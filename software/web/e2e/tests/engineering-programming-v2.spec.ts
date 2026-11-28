@@ -1,4 +1,5 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { FIRMWARE, Z2, legacyRequests, mockManager } from "./managed-programming-helpers";
 import {
   expectProgrammingJobContract,
   programmingJob,
@@ -7,267 +8,30 @@ import {
   programmingJobPolicy,
 } from "./programming-job-test-helpers";
 
-const facilityId = "mock-facility-01";
-const ppuId = "mock-facility-01-ppu-01";
+// U10: Manager-managed only (EMode = ManagedProgrammingWorkspace). The
+// approved EMode workflow, collapse controls, Target IC binding, the per-Site
+// READ and the "only checked Sites" Batch snapshot are kept; every Job is a
+// Manager Batch. Mock Manager / Mock PPU at the Browser boundary.
 
-type BatchTarget = { facility_id: string; ppu_id: string; site_ids: number[] };
-type BatchExecutionPolicy = {
-  repeat_count: number;
-  site_retry_limit: number;
-  failed_site_stop_threshold: number | null;
-};
+const PPU = { ...Z2, enabledSites: [1, 2], siteCount: 2 };
 
-function catalog() {
-  return {
-    ok: true,
-    provider: "mock",
-    facility_count: 3,
-    ppu_count: 12,
-    site_count: 60,
-    programming_asset_scope: "connection-session-and-ppu",
-    facilities: [{
-      facility_id: facilityId,
-      display_name: "Mock Facility 01",
-      ppus: [{
-        ppu_id: ppuId,
-        display_name: "Mock PPU 01",
-        model: "MOCK-PPU",
-        site_count: 2,
-        provider: "mock",
-      }],
-    }],
-  };
+async function openProgramming(page: Page) {
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+  await expect(page.getByTestId("managed-backend")).toContainText("ONLINE");
 }
 
-function ppuStatus() {
-  return {
-    ok: true,
-    ppu: {
-      ppu_id: ppuId,
-      facility_id: facilityId,
-      model: "MOCK-PPU",
-      display_name: "Mock PPU 01",
-      site_count: 2,
-      enabled_site_count: 2,
-      capabilities: { max_supported_sites: 2, operations: ["erase", "program", "verify", "read"] },
-    },
-    sites: [1, 2].map(siteId => ({
-      site_id: siteId,
-      enabled: true,
-      state: "idle",
-      current_job_id: null,
-      queued_jobs: 0,
-      interface: "mock",
-      target: "MOCK-IC",
-    })),
-  };
+async function chooseTarget(page: Page) {
+  const job = programmingJob(page, "engineering");
+  const target = job.getByPlaceholder("Search ICPN / IC identifier...");
+  await target.fill("STM32F103C8T6");
+  await expect(page.getByRole("listbox", { name: "Target IC search results" })).toBeVisible();
+  await page.getByRole("option", { name: /STM32F103C8T6/ }).click();
+  await expect(target).toHaveValue("STM32F103C8T6");
 }
 
-function completedBatch(body: Record<string, unknown>) {
-  const targets = body.targets as BatchTarget[];
-  const operations = body.operations as string[];
-  const executionPolicy = body.execution_policy as BatchExecutionPolicy;
-  const now = "2026-08-26T08:00:00Z";
-  const sites = targets.flatMap(target => target.site_ids.map(siteId => ({
-    facility_id: target.facility_id,
-    ppu_id: target.ppu_id,
-    site_id: siteId,
-    key: `${target.facility_id}/${target.ppu_id}/${siteId}`,
-    state: "success",
-    current_round: executionPolicy.repeat_count,
-    completed_rounds: executionPolicy.repeat_count,
-    current_operation: null,
-    current_job_id: null,
-    progress_percent: 100,
-    total_attempts: executionPolicy.repeat_count * operations.length,
-    retry_count: 0,
-    final_failures: 0,
-    faulted_round: null,
-    faulted_operation: null,
-    last_failure_source: null,
-    communication_state: "connected",
-    communication_attempt: 0,
-    error: null,
-    operation_statistics: {},
-  })));
-  return {
-    batch_id: "engineering-v2-batch-0001",
-    state: "success",
-    created_at: now,
-    started_at: now,
-    finished_at: now,
-    operations,
-    execution_policy: executionPolicy,
-    target_device: body.target_device ?? null,
-    asset: null,
-    read: body.read ?? { offset: 0, length: 256 },
-    cancel_requested: false,
-    stop_reason: null,
-    error: null,
-    faulted_site_count: 0,
-    site_counts: {
-      ready: 0,
-      running: 0,
-      success: sites.length,
-      faulted: 0,
-      error: 0,
-      stopped: 0,
-      cancelled: 0,
-    },
-    operation_statistics: {},
-    sites,
-  };
-}
-
-async function installApi(
-  page: Page,
-  submissions: Array<Record<string, unknown>>,
-  batchSubmissions: Array<Record<string, unknown>> = [],
-) {
-  await page.route("**/api/batches**", async (route: Route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (url.pathname === "/api/batches" && request.method() === "POST") {
-      const body = request.postDataJSON() as Record<string, unknown>;
-      batchSubmissions.push(body);
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: completedBatch(body) }),
-      });
-      return;
-    }
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: `unhandled ${url.pathname}` } }) });
-  });
-
-  await page.route("**/api/engineering/**", async (route: Route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    const path = url.pathname;
-
-    if (path === "/api/engineering/session" && request.method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          session: {
-            session_id: "engineering-programming-v2-session-0001",
-            programming_asset_cache_scope: "connection-session-and-ppu",
-            previous_session_cleared: false,
-          },
-        }),
-      });
-      return;
-    }
-    if (path === "/api/engineering/targets" && request.method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
-      return;
-    }
-    if (path === `/api/engineering/targets/${facilityId}/${ppuId}/api/status` && request.method() === "GET" && !url.searchParams.has("job")) {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(ppuStatus()) });
-      return;
-    }
-    if (path === `/api/engineering/targets/${facilityId}/${ppuId}/api/jobs` && request.method() === "POST") {
-      const body = request.postDataJSON() as Record<string, unknown>;
-      submissions.push(body);
-      const siteId = Number(body.site_id);
-      const operation = String(body.operation);
-      await route.fulfill({
-        status: 202,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          job: {
-            job_id: `engineering-v2-${operation}-${siteId}`,
-            site_id: siteId,
-            operation,
-            state: "queued",
-            cancel_requested: false,
-            stage: null,
-            stage_state: null,
-            stage_progress_percent: 0,
-            progress_percent: 0,
-            bytes_done: null,
-            bytes_total: null,
-          },
-        }),
-      });
-      return;
-    }
-    if (path === `/api/engineering/targets/${facilityId}/${ppuId}/api/status` && request.method() === "GET" && url.searchParams.has("job")) {
-      const jobId = url.searchParams.get("job") ?? "";
-      const parts = jobId.split("-");
-      const siteId = Number(parts.at(-1));
-      const operation = parts.at(-2) ?? "erase";
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          job: {
-            job_id: jobId,
-            site_id: siteId,
-            operation,
-            state: "success",
-            cancel_requested: false,
-            stage: operation,
-            stage_state: "done",
-            stage_progress_percent: 100,
-            progress_percent: 100,
-            bytes_done: null,
-            bytes_total: null,
-            result: { state: "success", output_files: [] },
-          },
-        }),
-      });
-      return;
-    }
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: `unhandled ${path}` } }) });
-  });
-
-  await page.route("**/api/manager/devices/search**", async route => {
-    const query = new URL(route.request().url()).searchParams.get("q") ?? "";
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        rest_contract_version: "3",
-        query,
-        catalog_size: 7657,
-        count: 1,
-        results: [{
-          vendor: "STMicroelectronics",
-          family: "STM32F1",
-          subfamily: null,
-          plasma_series: "STM32",
-          identifier: "STM32F103C8T6",
-          identifier_kind: "manufacturer_part_number",
-          icpn: "STM32F103C8T6",
-          package: null,
-          cpu_architectures: ["ARM Cortex-M3"],
-          backend: {
-            type: "openocd",
-            distribution: "upstream-openocd",
-            target_config: "tcl/target/stm32f1x.cfg",
-            mapping_status: "mapping_candidate",
-          },
-          physical_validation: {
-            engineering_status: "not_verified",
-            ppu_status: "no_evidence",
-            socket_status: "no_evidence",
-          },
-          catalog_origin: "e2e",
-        }],
-      }),
-    });
-  });
-}
-
-test("Engineering Programming renders the approved workflow and binds Target IC to a direct PPU job", async ({ page }) => {
-  const submissions: Array<Record<string, unknown>> = [];
-  await installApi(page, submissions);
+test("Engineering Programming renders the approved workflow and binds the Target IC to the Manager Batch", async ({ page }) => {
+  const counters = await mockManager(page, { ppus: [PPU] });
   await page.setViewportSize({ width: 1536, height: 1000 });
   await page.goto("/engineering");
 
@@ -284,14 +48,10 @@ test("Engineering Programming renders the approved workflow and binds Target IC 
   await expect(page.locator(".liveSiteStatus .operatorPanelTitle")).toHaveText(/^3\.\s*LIVE SITE STATUS/);
   await expect(page.locator(".engineeringProgrammingV2 .recentEvents")).toHaveCount(0);
   await expect(page.getByText("RECENT EVENTS", { exact: true })).toHaveCount(0);
-  await expect(programmingJobPolicy(job, "retry")).toHaveValue("3");
+  await expect(programmingJobPolicy(job, "retry")).toHaveValue("0");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
-  await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
-  await expect(page.getByLabel("Batch select SITE 2")).toBeChecked();
   await expect(page.getByLabel("Engineering batch read")).toHaveCount(0);
-  await expect(page.getByLabel("SITE 1 Read Memory")).toBeVisible();
-  await expect(page.getByLabel("SITE 2 Read Memory")).toBeVisible();
-  await expect(page.getByText("OPERATIONS (E/P/V)", { exact: true })).toBeVisible();
+  await expect(job.locator('[data-programming-job-field="operations"] > strong')).toHaveText("2-3. Operations");
 
   const layout = await page.locator(".engineeringProgrammingV2").evaluate(root => {
     const box = (selector: string) => root.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
@@ -317,12 +77,12 @@ test("Engineering Programming renders the approved workflow and binds Target IC 
   await expect(page.getByLabel("Engineering Facility")).toBeVisible();
 
   await page.getByRole("button", { name: "Collapse Engineering Programming Job" }).click();
-  await expect(page.getByLabel("Target IC")).toBeHidden();
+  await expect(job.getByPlaceholder("Search ICPN / IC identifier...")).toBeHidden();
   await expect(programmingJobAction(job, "start")).toBeVisible();
   await expect(programmingJobAction(job, "status")).toBeVisible();
   await expect(programmingJobAction(job, "abort")).toBeVisible();
   await page.getByRole("button", { name: "Expand Engineering Programming Job" }).click();
-  await expect(page.getByLabel("Target IC")).toBeVisible();
+  await expect(job.getByPlaceholder("Search ICPN / IC identifier...")).toBeVisible();
 
   const sidebarWidth = await page.locator(".engineeringSidebar").evaluate(element => element.getBoundingClientRect().width);
   await page.getByRole("button", { name: "Collapse Engineering menu" }).click();
@@ -330,84 +90,86 @@ test("Engineering Programming renders the approved workflow and binds Target IC 
   expect(collapsedWidth).toBeLessThan(sidebarWidth);
   await page.getByRole("button", { name: "Expand Engineering menu" }).click();
 
-  const target = job.getByLabel("Target IC");
-  await target.fill("STM32F103C8T6");
-  await expect(page.getByRole("listbox", { name: "Target IC search results" })).toBeVisible();
-  await page.getByRole("option", { name: /STM32F103C8T6/ }).click();
-  await expect(target).toHaveValue("STM32F103C8T6");
+  await chooseTarget(page);
+  // READ is each qualified Site row's own action.
+  await expect(page.getByLabel("Read SITE 1 Flash")).toBeVisible();
+  await expect(page.getByLabel("Read SITE 2 Flash")).toBeVisible();
 
-  await page.getByLabel("SITE 1 擦除").click();
-  await expect.poll(() => submissions.length).toBe(1);
-  expect(submissions[0].site_id).toBe(1);
-  expect(submissions[0].operation).toBe("erase");
-  expect(submissions[0].target_device).toEqual({
-    vendor: "STMicroelectronics",
-    identifier: "STM32F103C8T6",
+  await page.getByLabel("Select SITE 1 for programming").check();
+  await programmingJobOperation(job, "program").uncheck();
+  await programmingJobOperation(job, "verify").uncheck();
+  await programmingJobAction(job, "start").click();
+  await expect.poll(() => counters.batches.length).toBe(1);
+  expect(counters.batches[0].body).toMatchObject({
+    icpn: "STM32F103C8T6",
+    targets: [{ ppu_alias: "z2", site_ids: [1] }],
+    operations: ["erase"],
   });
+  expect(legacyRequests(counters)).toEqual([]);
 
   const siteOne = page.locator(".channelTable tbody tr").filter({ hasText: "SITE-01" });
-  await expect(siteOne.locator(".state")).toContainText("SUCCESS");
-  await expect(siteOne.locator(".engineeringResult")).toHaveText("PASS");
+  await expect(siteOne.locator(".engineeringResult")).toHaveText("PASS", { timeout: 20_000 });
 });
 
-test("Read Memory starts an independent single-Site Job without submitting a Batch", async ({ page }) => {
-  const submissions: Array<Record<string, unknown>> = [];
-  const batchSubmissions: Array<Record<string, unknown>> = [];
-  await installApi(page, submissions, batchSubmissions);
-  await page.goto("/engineering");
-  await page.getByRole("button", { name: "Programming", exact: true }).click();
+test("Read Memory starts an independent single-Site READ Batch, never a programming Batch", async ({ page }) => {
+  // No Save File Picker: the verified READ is offered as a Browser download.
+  await page.addInitScript(() => { (window as unknown as Record<string, unknown>).showSaveFilePicker = undefined; });
+  const counters = await mockManager(page, { ppus: [PPU] });
+  await openProgramming(page);
+  await chooseTarget(page);
 
-  await page.getByLabel("SITE 1 Read Memory").click();
-  await expect.poll(() => submissions.length).toBe(1);
-  expect(submissions[0].site_id).toBe(1);
-  expect(submissions[0].operation).toBe("read");
-  expect(batchSubmissions).toHaveLength(0);
+  await page.getByLabel("Read SITE 1 Flash").click();
+  await expect(page.getByLabel("SITE 1 Read status")).toHaveText("PASS", { timeout: 20_000 });
+  expect(counters.batches).toHaveLength(1);
+  expect(counters.batches[0].body).toMatchObject({ operation: "read", targets: [{ ppu_alias: "z2", site_ids: [1] }] });
+  expect(counters.batches[0].body).not.toHaveProperty("operations");
+  expect(legacyRequests(counters)).toEqual([]);
 });
 
-test("unselected Sites stay visible and START PROGRAMMING snapshots only checked Sites into one server Batch", async ({ page }) => {
-  const directSubmissions: Array<Record<string, unknown>> = [];
-  const batchSubmissions: Array<Record<string, unknown>> = [];
-  await installApi(page, directSubmissions, batchSubmissions);
-  await page.goto("/engineering");
-  await page.getByRole("button", { name: "Programming", exact: true }).click();
+test("unselected Sites stay visible and START PROGRAMMING snapshots only checked Sites into one Manager Batch", async ({ page }) => {
+  const counters = await mockManager(page, { ppus: [PPU] });
+  await openProgramming(page);
+  await chooseTarget(page);
 
   const job = programmingJob(page, "engineering");
   await expectProgrammingJobContract(job);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
-  await page.getByLabel("Batch select SITE 2").uncheck();
+  await page.getByLabel("Select SITE 1 for programming").check();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
-  await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
-  await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
+  await expect(page.getByLabel("Select SITE 1 for programming")).toBeChecked();
+  await expect(page.getByLabel("Select SITE 2 for programming")).not.toBeChecked();
 
-  await programmingJobOperation(job, "erase").check();
-  await programmingJobOperation(job, "read").waitFor({ state: "detached" });
+  await page.getByLabel("Engineering Programming Image file").setInputFiles({ name: "app.bin", mimeType: "application/octet-stream", buffer: FIRMWARE });
+  // Two Cycles back to back on the same IC (Same-IC Debug): no operator IC
+  // replacement pause between them, so the KPIs count Cycles.
+  await programmingJobPolicy(job, "replace-ic").uncheck();
   await programmingJobPolicy(job, "repeat").fill("2");
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary.getByText("BATCH SUMMARY", { exact: true })).toBeVisible();
   await expect(summary.locator('[data-kpi="sites"] b')).toHaveText("1");
-  await expect(summary.locator('[data-kpi="total-ic"] b')).toHaveText("2");
-  await expect(summary.locator('[data-kpi="yield"] b')).toHaveText("—");
+  await expect(summary.locator('[data-kpi="total-cycles"] b')).toHaveText("2");
+  await expect(summary.locator('[data-kpi="cycle-pass-rate"] b')).toHaveText("N/A");
   await expect(summary.locator('[data-kpi="batch-time"] b')).toHaveText("00:00:00");
+  // The Mock Manager runs one Cycle per Site: run the snapshot with Repeat 1.
+  await programmingJobPolicy(job, "repeat").fill("1");
+  await expect(summary.locator('[data-kpi="total-cycles"] b')).toHaveText("1");
   await expect(programmingJobAction(job, "start")).toBeEnabled();
   await programmingJobAction(job, "start").click();
 
-  await expect.poll(() => batchSubmissions.length).toBe(1);
-  expect(directSubmissions).toHaveLength(0);
-  expect(batchSubmissions[0].targets).toEqual([{
-    facility_id: facilityId,
-    ppu_id: ppuId,
-    site_ids: [1],
-  }]);
-  expect(batchSubmissions[0].operations).toEqual(["erase"]);
-  expect(batchSubmissions[0].execution_policy).toEqual({
-    repeat_count: 2,
-    site_retry_limit: 3,
-    failed_site_stop_threshold: null,
+  await expect.poll(() => counters.batches.length).toBe(1);
+  expect(counters.batches[0].body).toMatchObject({
+    targets: [{ ppu_alias: "z2", site_ids: [1] }],
+    operations: ["erase", "program", "verify"],
+    repeat: 1,
+    replace_ic_before_next_cycle: false,
+    retry_limit: 0,
   });
-  await expect(summary.locator('[data-kpi="pass"] b')).toHaveText("2");
+  await expect(summary.locator('[data-kpi="pass"] b')).toHaveText("1", { timeout: 20_000 });
   await expect(summary.locator('[data-kpi="fail"] b')).toHaveText("0");
-  await expect(summary.locator('[data-kpi="processed-ic"] b')).toHaveText("2");
-  await expect(summary.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
+  // After the run the Summary follows the Manager Batch record (the Mock
+  // Manager does not echo the Same-IC flag), so either KPI family may show.
+  await expect(summary.locator('[data-kpi="settled-cycles"] b, [data-kpi="processed-ic"] b')).toHaveText("1");
+  await expect(summary.locator('[data-kpi="cycle-pass-rate"] b, [data-kpi="yield"] b')).toHaveText("100.0%");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
-  await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
+  await expect(page.getByLabel("Select SITE 2 for programming")).not.toBeChecked();
 });

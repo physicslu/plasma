@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-const gateway = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
+// U10: the Mock PPU Gateways enforce G13 (every write is bound to the PPU
+// controller), so an unsigned direct POST to a Gateway is refused. The
+// settings go through the same-origin BFF → Manager relay, which signs it for
+// the Console's managed PPU, exactly like the Console's own settings panel.
+const mockRuntime = "/api/manager/ppu/api/mock/runtime";
+const gatewayUrl = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
 
 type RuntimeOperation = {
   error_rate_per_mille: number;
@@ -27,11 +32,16 @@ function editable(settings: RuntimeSettings) {
   };
 }
 
-test("real Gateway persists Mock settings and Engineering UI shows the applied revision", async ({ page, request }) => {
-  const initialResponse = await request.get(`${gateway}/api/mock/runtime`);
+test("Mock settings applied through the Manager relay persist and EMode System Configuration shows the applied revision", async ({ page, request }) => {
+  const initialResponse = await request.get(mockRuntime);
   expect(initialResponse.ok()).toBeTruthy();
   const initialPayload = await initialResponse.json();
   const original = initialPayload.mock_runtime as RuntimeSettings;
+  // The Gateway refuses an unsigned direct write (G13); nothing changes.
+  const direct = await request.post(`${gatewayUrl}/api/mock/runtime`, { data: editable(original) });
+  expect(direct.status()).toBe(401);
+  const unchanged = await (await request.get(mockRuntime)).json();
+  expect((unchanged.mock_runtime as RuntimeSettings).revision).toBe(original.revision);
 
   try {
     const changed = {
@@ -46,7 +56,7 @@ test("real Gateway persists Mock settings and Engineering UI shows the applied r
         },
       },
     };
-    const updateResponse = await request.post(`${gateway}/api/mock/runtime`, { data: changed });
+    const updateResponse = await request.post(mockRuntime, { data: changed });
     expect(updateResponse.ok()).toBeTruthy();
     const updatePayload = await updateResponse.json();
     const applied = updatePayload.mock_runtime as RuntimeSettings;
@@ -61,7 +71,7 @@ test("real Gateway persists Mock settings and Engineering UI shows the applied r
     await expect(page.getByRole("region", { name: "Applied Configuration" })).toContainText("fixed · 4242");
     await expect(page.getByRole("region", { name: "Applied Configuration" })).toContainText("4096 KiB");
   } finally {
-    const restoreResponse = await request.post(`${gateway}/api/mock/runtime`, { data: editable(original) });
+    const restoreResponse = await request.post(mockRuntime, { data: editable(original) });
     expect(restoreResponse.ok()).toBeTruthy();
   }
 });

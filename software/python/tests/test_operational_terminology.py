@@ -19,11 +19,15 @@ def test_plasmactl_generates_canonical_systemd_descriptions(tmp_path: Path) -> N
             "XDG_CONFIG_HOME": str(tmp_path / "xdg"),
             "PLASMA_PYTHON": sys.executable,
             "PLASMA_NPM": "/usr/bin/true",
+            # The Manager is required (U10); its BFF URL is stubbed below.
+            "PLASMA_MANAGER_PPU_ALIAS": "ppu-a",
         }
     )
 
     subprocess.run(
-        ["bash", "-c", 'source "$1"; write_units', "_", str(PLASMACTL_INTEGRATION)],
+        ["bash", "-c",
+         'source "$1"; manager_bff_url() { printf "http://127.0.0.1:19180\\n"; }; write_units',
+         "_", str(PLASMACTL_INTEGRATION)],
         check=True,
         env=env,
     )

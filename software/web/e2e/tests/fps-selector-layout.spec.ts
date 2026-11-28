@@ -1,65 +1,11 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { mockFleet, mockManager } from "./managed-programming-helpers";
 import { expandProductionTree, factoryConsoleHeading } from "./production-console-helpers";
 
-function catalog() {
-  const siteCounts = [2, 4, 6, 8];
-  const facilities = Array.from({ length: 3 }, (_, facilityIndex) => {
-    const number = facilityIndex + 1;
-    const facilityId = `mock-facility-${String(number).padStart(2, "0")}`;
-    return {
-      facility_id: facilityId,
-      display_name: `Mock Facility ${String(number).padStart(2, "0")}`,
-      ppus: siteCounts.map((siteCount, ppuIndex) => ({
-        ppu_id: `${facilityId}-ppu-${String(ppuIndex + 1).padStart(2, "0")}`,
-        display_name: `Mock PPU ${String(ppuIndex + 1).padStart(2, "0")}`,
-        model: "MOCK-PPU",
-        site_count: siteCount,
-        provider: "mock",
-      })),
-    };
-  });
-
-  return {
-    ok: true,
-    provider: "mock",
-    facility_count: facilities.length,
-    ppu_count: facilities.reduce((count, facility) => count + facility.ppus.length, 0),
-    site_count: facilities.reduce(
-      (count, facility) => count + facility.ppus.reduce((ppuCount, ppu) => ppuCount + ppu.site_count, 0),
-      0,
-    ),
-    facilities,
-  };
-}
-
+// U10: the Console is Manager-managed only. Three Facilities × four PPUs
+// (2/4/6/8 Sites) come from the Mock Manager Registry / Fleet.
 async function installProductionCatalog(page: Page) {
-  await page.route("**/api/engineering/**", async (route: Route) => {
-    const request = route.request();
-    const path = new URL(request.url()).pathname;
-
-    if (path === "/api/engineering/session" && request.method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          session: {
-            session_id: "fps-selector-layout-session-00000000",
-            previous_session_cleared: false,
-            programming_asset_cache_scope: "connection-session-and-ppu",
-          },
-        }),
-      });
-      return;
-    }
-
-    if (path === "/api/engineering/targets" && request.method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
-      return;
-    }
-
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
-  });
+  await mockManager(page, { ppus: mockFleet() });
 }
 
 async function openProduction(page: Page, viewport: { width: number; height: number }) {
