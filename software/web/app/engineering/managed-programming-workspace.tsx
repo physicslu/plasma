@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { beginBatchExecutionActivity } from "../batch-execution-activity";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { useI18n } from "../i18n";
+import { useJobSetting } from "../workspace-session";
 import { BatchSummary } from "../operator-ui/batch-summary";
 import { OperatorPanelHeader } from "../operator-ui/operator-panel";
 import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
@@ -219,29 +221,29 @@ export default function ManagedProgrammingWorkspace() {
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [topology, setTopology] = useState<ManagedTopology | null>(null);
   const [topologyError, setTopologyError] = useState<string | null>(null);
-  const [selectedAlias, setSelectedAlias] = useState<string | null>(null);
+  const [selectedAlias, setSelectedAlias] = useJobSetting<string | null>("emode.alias", null);
   const [routesByAlias, setRoutesByAlias] = useState<Record<string, RoutesState>>({});
   const [platform, setPlatform] = useState<{ alias: string; availability: ManagedAvailability } | null>(null);
 
-  const [targetDevice, setTargetDevice] = useState<DeviceSearchResult | null>(null);
-  const [source, setSource] = useState<ProgrammingSource>("image");
-  const [file, setFile] = useState<File | null>(null);
+  const [targetDevice, setTargetDevice] = useJobSetting<DeviceSearchResult | null>("emode.targetDevice", null);
+  const [source, setSource] = useJobSetting<ProgrammingSource>("emode.source", "image");
+  const [file, setFile] = useJobSetting<File | null>("emode.file", null);
   // EMode covers many Sites of ONE PPU: the Manager runs them as one Batch in
   // concurrent per-Site lanes (bounded by the PPU job limit) and judges each
   // Site on its own.
-  const [chosenSiteIds, setChosenSiteIds] = useState<number[]>([]);
-  const [checkedOperations, setCheckedOperations] = useState(ALL_OPERATIONS);
+  const [chosenSiteIds, setChosenSiteIds] = useJobSetting<number[]>("emode.siteIds", []);
+  const [checkedOperations, setCheckedOperations] = useJobSetting("emode.operations", ALL_OPERATIONS);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [locked, setLocked] = useState<LockedInput | null>(null);
   const [run, setRun] = useState<ProgrammingRun | null>(null);
   // Batch Policy: Manager-owned Repeat (Cycles per Site), Retry and Stop Policy.
-  const [repeatCount, setRepeatCount] = useState("1");
-  const [replaceIc, setReplaceIc] = useState(true);
+  const [repeatCount, setRepeatCount] = useJobSetting("emode.repeatCount", "1");
+  const [replaceIc, setReplaceIc] = useJobSetting("emode.replaceIc", true);
   // Manual Repeat: Sites the operator marked "IC replaced", per pause.
   const [replacedMarks, setReplacedMarks] = useState<ReadonlySet<string>>(new Set());
-  const [retryLimit, setRetryLimit] = useState(0);
-  const [stopPolicy, setStopPolicy] = useState<StopPolicy>({ kind: "never" });
+  const [retryLimit, setRetryLimit] = useJobSetting("emode.retryLimit", 0);
+  const [stopPolicy, setStopPolicy] = useJobSetting<StopPolicy>("emode.stopPolicy", { kind: "never" });
   const [batch, setBatch] = useState<ProgrammingBatch | null>(null);
   const [stopping, setStopping] = useState(false);
   const [runContext, setRunContext] = useState<RunContext | null>(null);
@@ -345,7 +347,7 @@ export default function ManagedProgrammingWorkspace() {
       stopped = true;
       if (timer) clearTimeout(timer);
     };
-  }, [appendLog]);
+  }, [appendLog, setSelectedAlias]);
 
   // Programming Routes and Platform admission of the selected PPU (reads only).
   useEffect(() => {
@@ -381,6 +383,9 @@ export default function ManagedProgrammingWorkspace() {
   const reading = readPhase !== "idle";
   // One Site, one Job: a Batch run and a READ Job lock each other out.
   const active = phase !== "idle" || reading;
+  // The global mode-switch guard: an EMode Batch or READ holds the same
+  // execution lease as a PMode Batch until its Manager answer is terminal.
+  useEffect(() => (active ? beginBatchExecutionActivity() : undefined), [active]);
 
   const capabilities = useMemo(
     () => new Map((ppu?.sites ?? []).map(site => [site.site_id, siteCapability(site, routes, icpn)] as const)),

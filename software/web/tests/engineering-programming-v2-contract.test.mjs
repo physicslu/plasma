@@ -140,7 +140,7 @@ test("Engineering retains explicit Retry while the former Production single-PPU 
   const retiredProductionRoute = await source("../app/fleet/programming/page.tsx");
 
   assert.match(workspace, /retryAriaLabel: "Site Retry Limit"/);
-  assert.match(workspace, /const \[retryLimit, setRetryLimit\] = useState\(0\);/);
+  assert.match(workspace, /const \[retryLimit, setRetryLimit\] = useJobSetting\("emode\.retryLimit", 0\);/);
   assert.match(retiredProductionRoute, /redirect\("\/fleet"\)/);
 });
 

@@ -176,6 +176,7 @@ jobs:
                   "managed_ppu_offline_recovery": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "emode_managed_per_site_erase_program_verify_read_download": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "emode_managed_batch_noncontiguous_sites_x_operations": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "emode_managed_batch_every_site_of_one_ppu": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "emode_1mib_image_once_per_batch_resource_set_activated_once_reused": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "pmode_multi_ppu_batch_shared_image_epv": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "pmode_multi_ppu_batch_erase": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",

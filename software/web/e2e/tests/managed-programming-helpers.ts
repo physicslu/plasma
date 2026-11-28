@@ -194,6 +194,8 @@ export async function mockManager(page: Page, options: {
   batchError?: { code: string; message: string };
   /** true: the Manager admits the Batch but the answer never arrives (HTTP 504). */
   batchLost?: boolean;
+  /** true: the Manager applies STOP QUEUING but its answer is lost (BFF 503). */
+  stopLost?: boolean;
   /** Fault injection on the reconciliation answer: an HTTP status, or an edited view. */
   reconcile?: (view: Record<string, unknown>) => Record<string, unknown> | number;
   /** HTTP status of the Batch start ID issue (default 200). */
@@ -685,6 +687,10 @@ export async function mockManager(page: Page, options: {
     counters.stops.push(JSON.stringify(r.request().postDataJSON()));
     const batch = batches.get(batchId)!;
     if (!batch.outcome) batch.stopRequested = true;
+    if (options.stopLost) {
+      await r.fulfill(json({ ok: false, error: { code: "manager_unavailable", message: "Network connection lost" } }, 503));
+      return;
+    }
     await r.fulfill(json({ ok: true, batch: batchRecord(batchId) }));
   });
 

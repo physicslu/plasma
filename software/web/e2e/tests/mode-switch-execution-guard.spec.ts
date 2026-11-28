@@ -22,9 +22,9 @@ import {
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
 
-async function installExecutionApi(page: Page) {
+async function installExecutionApi(page: Page, options: { stopLost?: boolean } = {}) {
   const run: RunScript = { runningPolls: 100_000 };
-  const counters = await mockManager(page, { ppus: mockFleet(1, [2]), script: () => run });
+  const counters = await mockManager(page, { ppus: mockFleet(1, [2]), script: () => run, ...options });
   let failPolls = 0;
   // Manager Batch journal outage: the next N reads answer 503, then the Mock Manager resumes.
   await page.route(/\/api\/manager\/programming\/batches\/[0-9a-f]{32}$/, async route => {
@@ -102,6 +102,20 @@ test("Pmod Manager Batch locks Emode through running and stopping until terminal
   expect(cancels(api.counters)).toEqual([]);
 });
 
+test("a lost STOP QUEUING answer is reconciled from the Manager Batch, never resent", async ({ page }) => {
+  const api = await installExecutionApi(page, { stopLost: true });
+  const job = await startProductionBatch(page);
+
+  await programmingJobAction(job, "abort").click();
+  await expect(programmingJobStatusValue(job)).toHaveText(/STOPPING|CANCELLING/);
+  await expect(page.getByLabel("Production batch log")).not.toContainText("ABORT ERROR");
+  await expectModeLocked(page, "工程模式");
+  api.finishJobs();
+  await expectModeUnlocked(page, "工程模式");
+  expect(api.counters.stops).toHaveLength(1);
+  expect(cancels(api.counters)).toEqual([]);
+});
+
 test("successful Pmod Batch releases its execution lease and restores Engineering mode", async ({ page }) => {
   const api = await installExecutionApi(page);
   const job = await startProductionBatch(page);
@@ -149,15 +163,9 @@ test("restoring an already successful Batch after reload holds no stale executio
   expect(api.counters.batches).toHaveLength(1);
 });
 
-// KNOWN APP BUG (U10, reported, not fixed here): the managed EMode workspace
-// (ManagedProgrammingWorkspace) never takes the global Batch execution lease
-// (beginBatchExecutionActivity), so a running EMode Manager Batch / READ does
-// not lock the PMode navigation. The tests below state the required contract
-// and are expected to fail until the app is fixed; then drop `test.fail`.
-const EMODE_LEASE_BUG = "managed EMode Batch does not take the global mode-switch execution lease";
-
+// A running EMode Manager Batch or READ holds the same global execution lease
+// as a PMode Batch, so PMode navigation stays locked until a terminal answer.
 test("Emode single-Site READ still locks Pmod until terminal", async ({ page }) => {
-  test.fail(true, EMODE_LEASE_BUG);
   const api = await installExecutionApi(page);
   await page.addInitScript(() => { (window as unknown as Record<string, unknown>).showSaveFilePicker = undefined; });
   await page.goto("/engineering");
@@ -173,7 +181,6 @@ test("Emode single-Site READ still locks Pmod until terminal", async ({ page }) 
 });
 
 test("Emode Manager Batch keeps Pmod locked while it runs and releases it at the terminal answer", async ({ page }) => {
-  test.fail(true, EMODE_LEASE_BUG);
   const api = await installExecutionApi(page);
   await startEngineeringBatch(page);
 
@@ -182,6 +189,20 @@ test("Emode Manager Batch keeps Pmod locked while it runs and releases it at the
   api.finishJobs();
   await expect(page.getByRole("region", { name: "Engineering Batch Summary" }).locator('[data-kpi="pass"] b')).toHaveText("1", { timeout: 15_000 });
   await expectModeUnlocked(page, "量產模式");
+  expect(cancels(api.counters)).toEqual([]);
+});
+
+test("Emode STOP QUEUING with a lost answer reads stop_requested from the Manager and keeps the running Job", async ({ page }) => {
+  const api = await installExecutionApi(page, { stopLost: true });
+  const job = await startEngineeringBatch(page);
+
+  await expectModeLocked(page, "量產模式");
+  await programmingJobAction(job, "abort").click();
+  await expect(programmingJobAction(job, "abort")).toHaveText(/STOP REQUESTED/);
+  await expect(page.getByLabel("Engineering job log")).toContainText("[STOP QUEUING]");
+  api.finishJobs();
+  await expectModeUnlocked(page, "量產模式");
+  expect(api.counters.stops).toHaveLength(1);
   expect(cancels(api.counters)).toEqual([]);
 });
 
@@ -199,7 +220,6 @@ test("Emode Manager FAIL terminates the Batch with its exact reason and no Brows
 });
 
 test("Emode Manager Batch observation outage stays fail-closed until the Manager answers again", async ({ page }) => {
-  test.fail(true, EMODE_LEASE_BUG);
   const api = await installExecutionApi(page);
   await startEngineeringBatch(page);
 
