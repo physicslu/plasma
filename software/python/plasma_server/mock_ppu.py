@@ -85,6 +85,9 @@ class MockPPUSpec:
     server_port: int = DEFAULT_SERVER_PORT
     ppu_id: str | None = None
     gateway_args: tuple[str, ...] = field(default=())
+    #: Where the Runtime control and G13 admission sockets live (AF_UNIX
+    #: paths are short): the systemd RuntimeDirectory, else the device root.
+    socket_dir: Path | None = None
 
     @property
     def device_id(self) -> str:
@@ -100,14 +103,15 @@ class MockPPUSpec:
 
     def paths(self) -> dict[str, Path]:
         root = self.root
+        sockets = self.socket_dir or root
         paths = {
             "root": root,
             "config": root / "ppu.yaml",
             "product": root / "product",
             "state": root / "state",
-            "runtime_dir": root / "rt",
-            "runtime_socket": root / "rt" / "control.sock",
-            "admission_socket": root / "adm.sock",
+            "runtime_dir": sockets / "rt",
+            "runtime_socket": sockets / "rt" / "control.sock",
+            "admission_socket": sockets / "adm.sock",
             "machine_id": root / "machine-id",
             "package_target": root / "ppu-package-target.json",
             "install_policy": root / "ppu-bundle-install-policy.json",
@@ -168,7 +172,7 @@ def provision(spec: MockPPUSpec) -> dict[str, Path]:
     paths = spec.paths()
     paths["root"].mkdir(mode=0o700, parents=True, exist_ok=True)
     paths["root"].chmod(0o700)
-    paths["runtime_dir"].mkdir(mode=0o700, exist_ok=True)
+    paths["runtime_dir"].mkdir(mode=0o700, parents=True, exist_ok=True)
     paths["runtime_dir"].chmod(0o700)
     paths["config"].write_text(yaml.safe_dump(runtime_config(spec), sort_keys=False),
                                encoding="utf-8")
@@ -489,6 +493,8 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--manager-url", default=None,
                      help="register and enroll with this Manager (omit: no registration)")
     run.add_argument("--register-timeout-s", type=float, default=None)
+    run.add_argument("--socket-dir", type=Path, default=None,
+                     help="private directory for the AF_UNIX sockets (default: --root)")
     run.add_argument("--log-dir", type=Path, default=None)
     run.add_argument("--gateway-arg", action="append", default=[],
                      help="extra Gateway argument (repeatable)")
@@ -506,7 +512,8 @@ def main(argv: list[str] | None = None) -> int:
         root=args.root.resolve(), control_plane=args.control_plane.resolve(),
         alias=args.alias, sites=args.sites, host=args.host,
         gateway_port=args.gateway_port, server_port=args.server_port,
-        ppu_id=args.ppu_id, gateway_args=tuple(args.gateway_arg))
+        ppu_id=args.ppu_id, gateway_args=tuple(args.gateway_arg),
+        socket_dir=None if args.socket_dir is None else args.socket_dir.resolve())
     return serve(spec, args.manager_url, log_dir=args.log_dir,
                  register_timeout_s=args.register_timeout_s)
 

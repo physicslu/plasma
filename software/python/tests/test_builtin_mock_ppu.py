@@ -95,6 +95,11 @@ def test_unix_socket_path_limit_is_enforced(tmp_path: Path) -> None:
     spec = mock_ppu.MockPPUSpec(root=tmp_path / ("x" * 120), control_plane=SCRIPTS)
     with pytest.raises(mock_ppu.MockPPUError, match="too long"):
         spec.paths()
+    # A long device root is fine once the sockets live in a short runtime dir.
+    short = mock_ppu.MockPPUSpec(root=tmp_path / ("x" * 120), control_plane=SCRIPTS,
+                                 socket_dir=Path("/run/user/1000/plasma-mock-ppu"))
+    assert short.paths()["admission_socket"] == Path("/run/user/1000/plasma-mock-ppu/adm.sock")
+    assert short.paths()["machine_id"].parent == tmp_path / ("x" * 120)
 
 
 def test_bootstrap_cli_defaults_stay_the_z2_layout() -> None:
@@ -343,10 +348,12 @@ def test_default_install_writes_and_enables_the_mock_ppu_unit(tmp_path: Path) ->
     text = unit.read_text()
     assert text.startswith("# Managed by Plasma local-control-station profile\n")
     assert (f"ExecStart={tmp_path}/current/venv/bin/python -m plasma_server.mock_ppu serve "
-            f"--root {tmp_path}/state/mock-ppu --control-plane {tmp_path}/current/ppu-control-plane "
+            f"--root {tmp_path}/state/mock-ppu --socket-dir %t/plasma-mock-ppu "
+            f"--control-plane {tmp_path}/current/ppu-control-plane "
             "--alias mock-ppu-01 --sites 8 --manager-url http://127.0.0.1:18280") in text
     assert "After=plasma-local-manager.service" in text and "Restart=on-failure" in text
     assert "KillMode=mixed" in text
+    assert "RuntimeDirectory=plasma-mock-ppu\nRuntimeDirectoryMode=0700" in text
     assert "SYSTEMCTL --user enable plasma-mock-ppu.service" in events
 
 

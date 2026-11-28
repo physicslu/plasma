@@ -493,7 +493,10 @@ Wants=plasma-local-manager.service
 Type=simple
 WorkingDirectory=$state_dir
 Environment=PYTHONUNBUFFERED=1
-ExecStart=$current_link/venv/bin/python -m plasma_server.mock_ppu serve --root $mock_ppu_root --control-plane $current_link/$release_control_plane_dir --alias $mock_ppu_alias --sites $mock_ppu_sites --manager-url http://$manager_host:$manager_port
+# AF_UNIX sockets (Runtime control, G13 admission) in the private runtime dir.
+RuntimeDirectory=plasma-mock-ppu
+RuntimeDirectoryMode=0700
+ExecStart=$current_link/venv/bin/python -m plasma_server.mock_ppu serve --root $mock_ppu_root --socket-dir %t/plasma-mock-ppu --control-plane $current_link/$release_control_plane_dir --alias $mock_ppu_alias --sites $mock_ppu_sites --manager-url http://$manager_host:$manager_port
 KillMode=mixed
 TimeoutStopSec=20
 Restart=on-failure
@@ -522,7 +525,7 @@ verify_mock_ppu() {
     return 0
   fi
   systemctl --user is-active --quiet plasma-mock-ppu.service || die "plasma-mock-ppu.service is not active"
-  grep -Fq "plasma_server.mock_ppu serve --root $mock_ppu_root --control-plane $current_link/$release_control_plane_dir" "$mock_ppu_unit" || \
+  grep -Fq "plasma_server.mock_ppu serve --root $mock_ppu_root --socket-dir %t/plasma-mock-ppu --control-plane $current_link/$release_control_plane_dir" "$mock_ppu_unit" || \
     die "Mock PPU unit does not run the release launcher"
   local attempt
   for attempt in {1..60}; do

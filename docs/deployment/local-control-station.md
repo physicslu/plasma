@@ -32,6 +32,7 @@ Owner Product Decision 2026-11-28, Gate 1 D1-D7. The profile installs
 plasma-mock-ppu.service
   -> <current>/venv/bin/python -m plasma_server.mock_ppu serve
        --root ~/.local/state/plasma/local-control-station/mock-ppu
+       --socket-dir %t/plasma-mock-ppu   (RuntimeDirectory, 0700: AF_UNIX sockets)
        --control-plane <current>/ppu-control-plane
        --alias mock-ppu-01 --sites 8 --manager-url http://127.0.0.1:18280
      ├── plasma_server.runtime_server   (8 Mock Sites, Virtual Flash)
