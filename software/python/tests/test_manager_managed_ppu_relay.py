@@ -98,7 +98,7 @@ class FakeManagedPPUGatewayHandler(BaseHTTPRequestHandler):
             status = HTTPStatus.OK
         else:
             payload = {"ok": True, "path": self.path, "size": len(body)}
-            status = HTTPStatus.CREATED if "programming-assets" in self.path else HTTPStatus.OK
+            status = HTTPStatus.OK
         data = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -185,7 +185,7 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
         body = b"{}"
         status, _, data = self.relay(
             "POST",
-            "/api/engineering/session",
+            "/api/mock/runtime",
             body=body,
             headers={
                 "Content-Type": "application/json",
@@ -233,6 +233,7 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
             "/api/engineering/targets/fac-a/ppu-01/api/jobs/job-7/cancel",
             "/api/engineering/targets/fac-a/ppu-01/api/programming-assets",
             "/api/engineering/targets/fac-a/ppu-01/api/programming-assets/check",
+            "/api/engineering/session",
         ):
             with self.subTest(path=path):
                 status, _, data = self.relay(

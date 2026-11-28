@@ -148,10 +148,6 @@ server {
         limit_except POST { deny all; }
         proxy_pass $gateway_root;
     }
-    location = /api/engineering/session {
-        limit_except POST { deny all; }
-        proxy_pass $gateway_root;
-    }
 
     location = /api/jobs {
         limit_except POST { deny all; }
@@ -170,28 +166,14 @@ server {
         limit_except GET { deny all; }
         proxy_pass $gateway_root;
     }
-    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/programming-assets/check$ {
-        limit_except POST { deny all; }
-        proxy_pass $gateway_root;
-    }
-    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/programming-assets$ {
-        limit_except POST { deny all; }
-        proxy_pass $gateway_root;
-    }
-    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/jobs$ {
-        limit_except POST { deny all; }
-        proxy_pass $gateway_root;
-    }
-    location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/jobs/[^/]+/cancel$ {
-        limit_except POST { deny all; }
-        proxy_pass $gateway_root;
-    }
     location ~ ^/api/engineering/targets/[^/]+/[^/]+/api/jobs/[^/]+/files/[^/]+$ {
         limit_except GET { deny all; }
         proxy_pass $gateway_root;
     }
 
     # Deliberately excluded from this Programming ingress:
+    # - Engineering session, Programming Asset upload and Job/cancel writes
+    #   (retired: Programming is a Manager Batch with a Reservation, U7)
     # - /api/settings/ppu-network/activation*
     # - POST /api/settings/ppu-network
     # - POST /api/settings/gateway

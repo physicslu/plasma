@@ -150,69 +150,13 @@ pem
 
 Only `asset_type=image` + `asset_format=binary` has an implemented normalizer today. Unsupported type/format combinations fail closed rather than pretending to be programmable Images.
 
-## Engineering Programming Asset routes
+## Engineering Programming Asset routes (retired)
 
-For a selected Engineering target base:
-
-```text
-/api/engineering/targets/{facility_id}/{ppu_id}
-```
-
-REST v3 defines:
-
-```text
-POST .../api/programming-assets/check
-POST .../api/programming-assets?session_id=...&name=...&type=...&format=...&sha256=...
-```
-
-The check request contains metadata/fingerprint only:
-
-```json
-{
-  "session_id": "...",
-  "asset_name": "target.bin",
-  "asset_type": "image",
-  "asset_format": "binary",
-  "asset_size": 102400,
-  "asset_sha256": "...64 lowercase hex characters..."
-}
-```
-
-Canonical response:
-
-```json
-{
-  "ok": true,
-  "rest_contract_version": "3",
-  "programming_asset": {
-    "cache_hit": true,
-    "asset_name": "target.bin",
-    "asset_type": "image",
-    "asset_format": "binary",
-    "asset_size": 102400,
-    "asset_sha256": "..."
-  }
-}
-```
-
-Binary/materialized Asset upload uses `application/octet-stream`. The endpoint's `type` and `format` query parameters describe semantics and serialization explicitly.
+The Engineering session, Programming Asset cache (`.../api/programming-assets/check`, `.../api/programming-assets`) and Engineering Job write routes (`.../api/jobs`, `.../api/jobs/{job_id}/cancel`, `POST /api/engineering/session`) are retired. They existed only to feed the standalone Engineering Job path, which U7 made unreachable: every Programming Job needs an ACTIVE Resource Reservation, held only by the Manager-owned Batch. The Gateway answers `404` for these paths, G13 controller admission leaves them unclassified, and neither the Manager relay nor the managed ingress forwards them. Programming starts at the Manager `POST /api/programming/batches`.
 
 ## Job submission
 
-Engineering Program/Verify references a session-cached Asset:
-
-```json
-{
-  "site_id": 1,
-  "operation": "program",
-  "session_id": "...",
-  "asset_sha256": "..."
-}
-```
-
-The Provider resolves that Asset, normalizes it into an execution Image, and sends the normalized Image over Plasma Protocol v3.3. Engineering Job submission does not resend cached Asset bytes.
-
-Standalone/local inline Program/Verify may submit one materialized Asset directly:
+Inline Program/Verify submits one materialized Asset directly:
 
 ```json
 {
@@ -244,9 +188,9 @@ A direct REST Job may declare an execution-owner token:
 
 The current Web `startJob()` client automatically supplies one random page-instance token and reuses it for direct Jobs issued from that loaded Browser page. This lets an existing direct multi-Site workflow express one logical execution owner while another Browser page or PC receives a different owner. A page reload creates a new token; it does not inherit ownership from Jobs that may still be active.
 
-For Engineering routes the Gateway currently maps an explicit token to `execution_owner_kind=engineering_session`; for the standalone REST path it maps to `rest_client`. These names are execution-source labels only. The token is a concurrency label and is **not** an authenticated security identity or authorization credential.
+The Gateway maps an explicit token to `execution_owner_kind=rest_client`. This name is an execution-source label only. The token is a concurrency label and is **not** an authenticated security identity or authorization credential.
 
-If a raw REST Job omits `execution_owner_id`, the fixed Gateway process labels (`plasma-web`, `plasma-web-engineering`) are not trusted as client identity. The PPU fails closed by treating each such Job as a separate `rest_job` owner. Server-side PMode/EMode Batch execution uses immutable `batch_id` as its shared owner and does not depend on the Browser page token.
+If a raw REST Job omits `execution_owner_id`, the fixed Gateway process label (`plasma-web`) is not trusted as client identity. The PPU fails closed by treating each such Job as a separate `rest_job` owner. Server-side PMode/EMode Batch execution uses immutable `batch_id` as its shared owner and does not depend on the Browser page token.
 
 ## PPU execution ownership conflict
 
@@ -282,18 +226,9 @@ GET /api/engineering/targets
   supported_asset_types
   supported_asset_formats
   implemented_normalizers
-
-POST /api/engineering/session
-  session.programming_asset_cache_scope
 ```
 
-Current cache scope is:
-
-```text
-(connection session, facility_id, ppu_id)
-```
-
-A session/PPU may cache multiple Assets simultaneously. This is required for future workflows that combine an Image, Option data, credentials, Serial Number and calibration inputs.
+These catalog fields describe the Asset model only; the session Programming Asset cache they once scoped is retired with the Engineering Job path.
 
 ## Concurrency authority
 

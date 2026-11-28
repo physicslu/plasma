@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from plasma_client.client import PlasmaClient
 from plasma_core.assets import ProgrammingAssetFormat, ProgrammingAssetType
 from plasma_core.config import PlasmaConfig, load_config
-from plasma_core.enums import JobState, Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import JobRequest
 
 from .engineering_targets import MockEngineeringPPUProvider, MockPPUSpec
 
@@ -164,48 +161,9 @@ class ConfiguredMockEngineeringPPUProvider(MockEngineeringPPUProvider):
 
     async def _shutdown_servers_and_watchers(self) -> None:
         # Gateway shutdown must not stop or mutate the independently owned Server.
-        with self._asset_lock:
-            self._ppu_image_leases.clear()
         self._ports.clear()
         self._output_roots.clear()
         await asyncio.sleep(0)
-
-    async def _watch_image_job(self, key: tuple[str, str], job_id: str) -> None:
-        try:
-            timeout_s = max(1.0, self.job_timeout_s(*key)) + 15.0
-            deadline = asyncio.get_running_loop().time() + timeout_s
-            while asyncio.get_running_loop().time() < deadline:
-                try:
-                    snapshot = await self._client(*key).status(job_id=job_id)
-                    job = snapshot.get("job") if isinstance(snapshot, dict) else None
-                    if isinstance(job, dict):
-                        try:
-                            if JobState(str(job.get("state"))).terminal:
-                                return
-                        except ValueError:
-                            pass
-                except PlasmaError:
-                    # Do not fail-open the PPU-wide Image lease while the local
-                    # Server may still own the accepted Job.
-                    pass
-                await asyncio.sleep(0.05)
-        finally:
-            self._release_ppu_image(key, job_id)
-
-    def _site_config(self, site_id: int) -> Any:
-        config = self._current_config()
-        for site in config.sites:
-            if site.id == site_id:
-                return site
-        raise PlasmaError(
-            ErrorCode.INVALID_ARGUMENT,
-            f"unknown configured Engineering Site: {site_id}",
-        )
-
-    def job_timeout_s(self, facility_id: str, ppu_id: str) -> float:
-        self._key(facility_id, ppu_id)
-        config = self._current_config()
-        return max((float(site.operation_timeout_s) for site in config.sites), default=30.0)
 
     def catalog(self) -> dict[str, Any]:
         config = self._current_config()
@@ -254,84 +212,3 @@ class ConfiguredMockEngineeringPPUProvider(MockEngineeringPPUProvider):
             },
             "facilities": [facility],
         }
-
-    def _resolve_main_flash_read(self, request: JobRequest) -> JobRequest:
-        if request.operation is not Operation.READ:
-            return request
-        site = self._site_config(request.site_id)
-        flash_size = self._mock_flash_size(site)
-        return replace(
-            request,
-            map_data={
-                "scope": "main_flash",
-                "sections": [
-                    {
-                        "name": "main_flash",
-                        "address": 0,
-                        "length": flash_size,
-                    }
-                ],
-            },
-            metadata={
-                **request.metadata,
-                "read_scope": "main_flash",
-                "read_size_bytes": flash_size,
-            },
-        )
-
-    async def start_job(
-        self,
-        facility_id: str,
-        ppu_id: str,
-        request: JobRequest,
-        *,
-        session_id: str | None = None,
-        asset_sha256: str | None = None,
-    ) -> dict[str, Any]:
-        request = self._resolve_main_flash_read(request)
-        lease_key: tuple[str, str] | None = None
-        if request.operation in {Operation.PROGRAM, Operation.VERIFY}:
-            if request.image:
-                raise PlasmaError(
-                    ErrorCode.INVALID_ARGUMENT,
-                    "Engineering program/verify must use a session-cached Programming Asset",
-                )
-            if not session_id or not asset_sha256:
-                raise PlasmaError(
-                    ErrorCode.INVALID_ARGUMENT,
-                    "configured Engineering program/verify requires session_id and asset_sha256",
-                )
-            asset = self._cached_asset(session_id, facility_id, ppu_id, asset_sha256)
-            image = asset.normalize_image()
-            lease_key = self._key(facility_id, ppu_id)
-            self._reserve_ppu_image(lease_key, image.sha256, request.job_id)
-            request = replace(
-                request,
-                image=image.data,
-                metadata={
-                    **request.metadata,
-                    "image_name": image.name,
-                    "source_asset_name": asset.name,
-                    "source_asset_sha256": asset.sha256,
-                    "source_asset_type": asset.asset_type.value,
-                    "source_asset_format": asset.asset_format.value,
-                    "source_asset_origin": "user",
-                },
-            )
-        elif session_id is not None or asset_sha256 is not None:
-            raise PlasmaError(
-                ErrorCode.INVALID_ARGUMENT,
-                "session Programming Asset reference is only valid for program or verify",
-            )
-
-        site = self._site_config(request.site_id)
-        request = replace(request, timeout_s=float(site.operation_timeout_s))
-        try:
-            accepted = await self._client(facility_id, ppu_id).start(request)
-        except Exception:
-            if lease_key is not None:
-                self._release_ppu_image(lease_key, request.job_id)
-            raise
-        if lease_key is not None:
-            self._schedule_image_watch(lease_key, request.job_id)
-        return accepted

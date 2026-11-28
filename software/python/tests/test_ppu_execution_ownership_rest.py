@@ -10,31 +10,20 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_web.gateway import PlasmaWebHandler
 
 
-class OwnershipProvider:
+class OwnershipClient:
+    """Stand-in PPU client behind the Gateway's direct /api/jobs route."""
+
     last_request = None
     reject = False
 
-    def job_timeout_s(self, facility_id, ppu_id):
-        return 30.0
-
-    async def start_job(
-        self,
-        facility_id,
-        ppu_id,
-        request,
-        *,
-        session_id=None,
-        asset_sha256=None,
-    ):
-        OwnershipProvider.last_request = request
-        if OwnershipProvider.reject:
+    async def start(self, request):
+        OwnershipClient.last_request = request
+        if OwnershipClient.reject:
             raise PlasmaError(
                 ErrorCode.PPU_BUSY,
                 "PPU is owned by another active execution",
                 recoverable=True,
                 context={
-                    "facility_id": facility_id,
-                    "ppu_id": ppu_id,
                     "active_owner_kind": "batch",
                     "active_owner_id": "batch-a",
                     "requested_owner_kind": request.metadata.get("execution_owner_kind"),
@@ -55,9 +44,8 @@ class OwnershipProvider:
 class PPUExecutionOwnershipRestTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.previous_provider = PlasmaWebHandler.engineering_provider
-        cls.provider = OwnershipProvider()
-        PlasmaWebHandler.engineering_provider = cls.provider
+        cls.previous_factory = PlasmaWebHandler.client_factory
+        PlasmaWebHandler.client_factory = staticmethod(OwnershipClient)
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -67,20 +55,15 @@ class PPUExecutionOwnershipRestTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join()
-        PlasmaWebHandler.engineering_provider = cls.previous_provider
+        PlasmaWebHandler.client_factory = cls.previous_factory
 
     def setUp(self):
-        OwnershipProvider.last_request = None
-        OwnershipProvider.reject = False
+        OwnershipClient.last_request = None
+        OwnershipClient.reject = False
 
-    def post_job(self, body):
+    def post_job(self, body, path="/api/jobs"):
         conn = HTTPConnection("127.0.0.1", self.server.server_port)
-        conn.request(
-            "POST",
-            "/api/engineering/targets/factory-a/ppu-01/api/jobs",
-            json.dumps(body).encode(),
-            {"Content-Type": "application/json"},
-        )
+        conn.request("POST", path, json.dumps(body).encode(), {"Content-Type": "application/json"})
         response = conn.getresponse()
         payload = json.loads(response.read())
         status = response.status
@@ -92,23 +75,23 @@ class PPUExecutionOwnershipRestTests(unittest.TestCase):
             {
                 "site_id": 1,
                 "operation": "erase",
-                "execution_owner_id": "engineering-session-a",
+                "execution_owner_id": "client-a",
             }
         )
         self.assertEqual(status, 202)
         self.assertEqual(payload["job"]["site_id"], 1)
-        request = OwnershipProvider.last_request
+        request = OwnershipClient.last_request
         self.assertIsNotNone(request)
-        self.assertEqual(request.metadata["execution_owner_kind"], "engineering_session")
-        self.assertEqual(request.metadata["execution_owner_id"], "engineering-session-a")
+        self.assertEqual(request.metadata["execution_owner_kind"], "rest_client")
+        self.assertEqual(request.metadata["execution_owner_id"], "client-a")
 
     def test_ppu_busy_is_http_409_with_structured_conflict_context(self):
-        OwnershipProvider.reject = True
+        OwnershipClient.reject = True
         status, payload = self.post_job(
             {
                 "site_id": 1,
                 "operation": "erase",
-                "execution_owner_id": "engineering-session-b",
+                "execution_owner_id": "client-b",
             }
         )
         self.assertEqual(status, 409)
@@ -118,7 +101,7 @@ class PPUExecutionOwnershipRestTests(unittest.TestCase):
         self.assertEqual(error["error_type"], "PPU_BUSY")
         self.assertTrue(error["recoverable"])
         self.assertEqual(error["context"]["active_owner_id"], "batch-a")
-        self.assertEqual(error["context"]["requested_owner_id"], "engineering-session-b")
+        self.assertEqual(error["context"]["requested_owner_id"], "client-b")
 
     def test_invalid_explicit_rest_owner_fails_before_provider_submission(self):
         status, payload = self.post_job(
@@ -130,7 +113,7 @@ class PPUExecutionOwnershipRestTests(unittest.TestCase):
         )
         self.assertEqual(status, 400)
         self.assertIn("execution_owner_id", payload["error"]["message"])
-        self.assertIsNone(OwnershipProvider.last_request)
+        self.assertIsNone(OwnershipClient.last_request)
 
 
 if __name__ == "__main__":

@@ -391,7 +391,6 @@ Catalog/session:
 
 ```text
 GET  /api/engineering/targets
-POST /api/engineering/session
 ```
 
 Selected PPU base:
@@ -400,19 +399,15 @@ Selected PPU base:
 /api/engineering/targets/{facility_id}/{ppu_id}
 ```
 
-Programming Asset and PPU operations:
+Read-only PPU operations:
 
 ```text
-POST .../api/programming-assets/check
-POST .../api/programming-assets?session_id=...&name=...&type=...&format=...&sha256=...
 GET  .../api/status
 GET  .../api/status?job={job_id}
-POST .../api/jobs
-POST .../api/jobs/{job_id}/cancel
 GET  .../api/jobs/{job_id}/files/{filename}
 ```
 
-Engineering Program/Verify Job bodies reference `session_id + asset_sha256`; they do not carry source Asset bytes again.
+The Engineering session, Programming Asset cache and Job/cancel write routes are retired (U7): Programming runs only as a Manager Batch holding an ACTIVE Resource Reservation.
 
 Canonical Read intent is `main_flash`; concrete address/length are provider-resolved execution details. Legacy offset/length request fields may remain temporarily for compatibility, but they are not operator semantics and the canonical Mock Provider does not use them to narrow Read.
 
