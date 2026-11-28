@@ -564,7 +564,7 @@ export default function FactoryConsoleV2() {
     terminalBatchRef.current = snapshot.batch_id;
     pollGenerationRef.current += 1;
     const stats = snapshotStatistics({
-      sites: snapshot.sites, repeat: snapshot.execution_policy.repeat_count,
+      mock: snapshot.mock, sites: snapshot.sites, repeat: snapshot.execution_policy.repeat_count,
       replaceIc: snapshot.execution_policy.replace_ic_before_next_cycle !== false,
     });
     const terminal = `[BAT] TERMINAL · ${snapshot.state.toUpperCase()} · PASS ${stats.passCycles} · FAIL ${stats.failCycles} · ERROR ${snapshot.site_counts.error ?? 0} · CANCELLED ${snapshot.site_counts.cancelled ?? 0} · STOPPED ${snapshot.site_counts.stopped ?? 0} · Job Attempts ${stats.jobAttempts ?? "—"} · Retry ${stats.retryAttempts ?? "—"}`;
@@ -1067,6 +1067,7 @@ export default function FactoryConsoleV2() {
   // Site: its Cycles are never IC output, so it shows no YIELD.
   const statistics: BatchStatistics = batchSnapshot
     ? snapshotStatistics({
+      mock: batchSnapshot.mock,
       sites: batchSnapshot.sites,
       repeat: batchSnapshot.execution_policy.repeat_count,
       replaceIc: batchSnapshot.execution_policy.replace_ic_before_next_cycle !== false,

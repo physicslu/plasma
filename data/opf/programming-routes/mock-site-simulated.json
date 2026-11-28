@@ -1,0 +1,50 @@
+{
+  "image_package": {
+    "kind": "mock-programming-asset"
+  },
+  "profile": {
+    "capabilities": {
+      "driver_abi": "mock-simulated:1",
+      "fpga_package": null,
+      "max_image_bytes": 1048576,
+      "operations": [
+        "erase",
+        "program",
+        "verify",
+        "read"
+      ],
+      "provider_package": "mock-platform-provider",
+      "schema": "plasma.ppu.provider-capabilities.v2",
+      "target": "STM32F103C8T6",
+      "transport": "fpga"
+    },
+    "flash_profile": {
+      "erase_granularity": 1024,
+      "flash_base": 134217728,
+      "flash_size": 1048576,
+      "icpn": "STM32F103C8T6",
+      "schema": "plasma.ppu.openocd-flash-profile.v1",
+      "target_config": "target/mock-simulated.cfg"
+    },
+    "id": "mock-programming-profile",
+    "version": "1.0.0"
+  },
+  "provider": {
+    "id": "mock-platform-provider",
+    "options": {
+      "options": {
+        "properties": {},
+        "type": "object"
+      },
+      "schema": "plasma.ppu.provider-options.v1"
+    },
+    "version": "1.0.0"
+  },
+  "route_id": "mock-site-simulated",
+  "schema": "plasma.opf.programming-route.v1",
+  "target": {
+    "board": "mock-site",
+    "fpga_part": "none",
+    "platform": "mock"
+  }
+}

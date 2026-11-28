@@ -64,7 +64,7 @@ from plasma_opf.site_safety import (  # noqa: F401 - re-exported for Receipt rea
 )
 from plasma_opf import bundle_v3
 from .shared_control import SharedControlError, shared_boundary, shared_control_reason
-from .bootstrap import BootstrapManagerError
+from .bootstrap import PPU_CLASS_MOCK, PPU_CLASS_UNKNOWN, BootstrapManagerError
 from .client import PPUHTTPError, PPUTransportError
 
 ROUTES_ENV = "PLASMA_PROGRAMMING_ROUTES_ROOT"
@@ -245,8 +245,10 @@ class BatchPreparation:
     only: a restarted Manager never inherits it.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, mock: bool = False) -> None:
         self.lock = threading.Lock()
+        #: A Mock Batch resolves only Mock Routes; any other Batch never does.
+        self.mock = mock
         self.prepared: _Prepared | None = None
         #: How many times this Batch actually prepared (tests / evidence).
         self.preparations = 0
@@ -567,6 +569,14 @@ class BundleProgrammingWorkflow:
             raise ProgrammingError(409, "ppu_not_enabled",
                                    "PPU must complete Validate & Enable before programming")
         return record
+
+    def ppu_class(self, alias: str) -> str:
+        """Mock / physical / unknown, as the enrolled device proved it (M2)."""
+        credentials = getattr(self.coordinator, "credentials", None)
+        if credentials is None:
+            return PPU_CLASS_UNKNOWN
+        with shared_boundary("PROGRAMMING_CLASS_READ"):
+            return credentials.ppu_class(alias)
 
     def _routes_dir(self) -> Path:
         root = self.routes_root if self.routes_root is not None else default_routes_root()
@@ -967,8 +977,15 @@ class BundleProgrammingWorkflow:
         return None if verdict is None else verdict[1]
 
     # --------------------------------------------------------------------- API
-    def list_routes(self) -> dict[str, Any]:
-        return {"ok": True, "routes": [r.summary() for r in self.routes()]}
+    def routes_for(self, *, mock: bool) -> tuple[bundle_v3.ProgrammingRoute, ...]:
+        """The Routes a Mock (or a non-Mock) Batch may resolve. A Mock Route
+        never serves a Physical PPU and a Physical Route never a Mock PPU."""
+        return tuple(route for route in self.routes()
+                     if (route.target.get("platform") == PPU_CLASS_MOCK) == mock)
+
+    def list_routes(self, alias: str | None = None) -> dict[str, Any]:
+        mock = alias is not None and self.ppu_class(alias) == PPU_CLASS_MOCK
+        return {"ok": True, "routes": [r.summary() for r in self.routes_for(mock=mock)]}
 
     def _ppu_resources(self, alias: str, site: int) -> tuple[str, dict[str, Any]]:
         """PPU id + the Resource identity the PPU derived from its Active Set."""
@@ -1140,7 +1157,7 @@ class BundleProgrammingWorkflow:
         """
         self._parse_request({**dict(body), "site_id": 1})
 
-    def prepare(self, body: Mapping[str, Any]) -> _Prepared:
+    def prepare(self, body: Mapping[str, Any], *, mock: bool = False) -> _Prepared:
         """The Batch-once part of a plan. Touches no PPU and authorizes nothing."""
         if not isinstance(body, Mapping):
             raise ProgrammingError(400, "invalid_request", "plan body must be an object")
@@ -1149,7 +1166,7 @@ class BundleProgrammingWorkflow:
         # next Cycle prepare again, never reuse what it did not resolve.
         fingerprint = self._routes_fingerprint()
         return self._prepare_parsed(spec, self._parse_request({**spec, "site_id": 1}),
-                                    fingerprint)
+                                    fingerprint, mock=mock)
 
     def _prepared_for(self, preparation: BatchPreparation,
                       body: Mapping[str, Any]) -> _Prepared:
@@ -1160,15 +1177,15 @@ class BundleProgrammingWorkflow:
             prepared = preparation.prepared
             if (prepared is None or prepared.spec != spec
                     or prepared.routes_fingerprint != fingerprint):
-                prepared = self.prepare(body)
+                prepared = self.prepare(body, mock=preparation.mock)
                 preparation.prepared = prepared
                 preparation.preparations += 1
             return prepared
 
     def _prepare_parsed(self, spec: dict[str, Any], parsed: dict[str, Any],
-                        fingerprint: str | None) -> _Prepared:
+                        fingerprint: str | None, *, mock: bool = False) -> _Prepared:
         icpn, operations = parsed["icpn"], parsed["operations"]
-        routes = self.routes()
+        routes = self.routes_for(mock=mock)
         required = operations or [parsed["operation"]]
         if not bundle_v3.resolve_routes(routes, icpn=icpn.strip()):
             raise ProgrammingError(422, "programming_route_not_found",

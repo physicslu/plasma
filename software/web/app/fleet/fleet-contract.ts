@@ -53,7 +53,15 @@ export type FleetPPUView = {
   };
   identity_conflict: boolean;
   degraded: boolean;
+  /** Enrollment-proven PPU class (Manager, M2); never inferred from the alias. */
+  ppu_class: PpuClass;
 };
+
+export type PpuClass = "mock" | "physical" | "unknown";
+
+export function ppuClass(value: unknown): PpuClass {
+  return value === "mock" || value === "physical" ? value : "unknown";
+}
 
 export type FleetWebPayload = {
   ok: true;
@@ -70,6 +78,8 @@ export type FleetWebPayload = {
     reported_sites: number;
     enabled_sites: number;
     identity_conflicts: number;
+    mock_ppus: number;
+    physical_ppus: number;
   };
   manager: {
     cache_age_s: number | null;
@@ -213,6 +223,7 @@ function ppuView(value: unknown): FleetPPUView {
     },
     identity_conflict: boolean(item.identity_conflict),
     degraded: array(item.errors).length > 0 || item.execution_ready !== true,
+    ppu_class: ppuClass(item.ppu_class),
   };
 }
 
@@ -242,6 +253,8 @@ export function sanitizeManagerFleet(value: unknown): FleetWebPayload {
       reported_sites: number(summary.reported_sites),
       enabled_sites: number(summary.enabled_sites),
       identity_conflicts: number(summary.identity_conflicts),
+      mock_ppus: ppus.filter(ppu => ppu.ppu_class === "mock").length,
+      physical_ppus: ppus.filter(ppu => ppu.ppu_class === "physical").length,
     },
     manager: {
       cache_age_s: typeof cache.age_s === "number" ? cache.age_s : null,

@@ -183,6 +183,28 @@ def _device_id_from_status(payload: Mapping[str, Any]) -> str:
         raise BootstrapManagerError(str(exc)) from exc
 
 
+#: PPU classification (built-in Mock PPU, M2). Decided only by the PPU's own
+#: owner-provisioned package target, read from a MACed (credential-proven)
+#: Bootstrap status - never from a client request, alias or display label.
+PPU_CLASS_MOCK = "mock"
+PPU_CLASS_PHYSICAL = "physical"
+PPU_CLASS_UNKNOWN = "unknown"
+_KNOWN_PPU_CLASSES = frozenset({PPU_CLASS_MOCK, PPU_CLASS_PHYSICAL})
+
+
+def ppu_class_from_status(payload: Mapping[str, Any]) -> str:
+    """Mock / Physical from an AUTHENTICATED Bootstrap status, else unknown.
+
+    A Bootstrap that does not report its trusted target (absent, or an older
+    release) is ``unknown``: never assumed to be Mock.
+    """
+    target = payload.get("target") if isinstance(payload, Mapping) else None
+    platform = target.get("platform") if isinstance(target, Mapping) else None
+    if type(platform) is not str or not platform:
+        return PPU_CLASS_UNKNOWN
+    return PPU_CLASS_MOCK if platform == "mock" else PPU_CLASS_PHYSICAL
+
+
 class BootstrapCredentialStore:
     """Manager-owned device secrets, separate from public registry state."""
 
@@ -190,8 +212,12 @@ class BootstrapCredentialStore:
         self.path = path.resolve() if path is not None else None
         self._lock = RLock()
         self._credentials: dict[str, BootstrapCredential] = {}
+        # Learned from the enrolled device's MACed status; kept beside (not in)
+        # the credential records so an older Manager still loads this file.
+        self._classes: dict[str, str] = {}
         if self.path is not None and self.path.exists():
             self._credentials = self._load(self.path)
+            self._classes = self._load_classes(self.path, self._credentials)
             self.migrate_in_place()
 
     @staticmethod
@@ -235,6 +261,7 @@ class BootstrapCredentialStore:
             previous = dict(self._credentials)
             if type(generation) is not int or generation < 1:
                 raise BootstrapCredentialError("controller generation is invalid")
+            previous_classes = dict(self._classes)
             self._credentials[normalized] = BootstrapCredential(
                 normalized,
                 validated_device,
@@ -243,10 +270,47 @@ class BootstrapCredentialStore:
                 generation,
                 controller_id,
             )
+            # A new enrollment proves its class again (status right after claim).
+            self._classes.pop(normalized, None)
             try:
                 self._persist_locked()
             except Exception:
                 self._credentials = previous
+                self._classes = previous_classes
+                raise
+
+    def ppu_class(self, alias: str) -> str:
+        normalized = normalize_registry_alias(alias)
+        with self._lock:
+            if normalized not in self._credentials:
+                return PPU_CLASS_UNKNOWN
+            return self._classes.get(normalized, PPU_CLASS_UNKNOWN)
+
+    def record_class(self, alias: str, observed: str) -> None:
+        """Bind the class proven by the enrolled device's MACed status.
+
+        First proof is recorded; a later contradicting proof is refused: a
+        Mock and a Physical PPU are never the same enrolled device.
+        """
+        normalized = normalize_registry_alias(alias)
+        if observed not in _KNOWN_PPU_CLASSES:
+            return
+        with self._lock:
+            if normalized not in self._credentials:
+                return
+            current = self._classes.get(normalized)
+            if current == observed:
+                return
+            if current is not None:
+                raise BootstrapCredentialError(
+                    f"PPU class changed from {current} to {observed}; explicit re-enrollment is required")
+            if self.path is None:
+                return
+            self._classes[normalized] = observed
+            try:
+                self._persist_locked()
+            except Exception:
+                self._classes.pop(normalized, None)
                 raise
 
     def remove(self, alias: str) -> None:
@@ -257,11 +321,14 @@ class BootstrapCredentialStore:
             if normalized not in self._credentials:
                 return
             previous = dict(self._credentials)
+            previous_classes = dict(self._classes)
             del self._credentials[normalized]
+            self._classes.pop(normalized, None)
             try:
                 self._persist_locked()
             except Exception:
                 self._credentials = previous
+                self._classes = previous_classes
                 raise
 
     def public_state(self, alias: str) -> dict[str, object]:
@@ -275,6 +342,7 @@ class BootstrapCredentialStore:
             "updated_at": credential.updated_at if credential is not None else None,
             "controller_generation": credential.generation if credential is not None else None,
             "controller_id": credential.controller_id if credential is not None else None,
+            "ppu_class": self.ppu_class(normalized),
         }
 
     def _persist_locked(self) -> None:
@@ -293,6 +361,10 @@ class BootstrapCredentialStore:
                 for alias, credential in sorted(self._credentials.items())
             },
         }
+        classes = {alias: value for alias, value in sorted(self._classes.items())
+                   if alias in self._credentials}
+        if classes:
+            payload["ppu_classes"] = classes
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary: Path | None = None
         try:
@@ -354,6 +426,18 @@ class BootstrapCredentialStore:
             result[normalized] = BootstrapCredential(
                 normalized, device_id, token, updated_at, generation, controller_id)
         return result
+
+    @staticmethod
+    def _load_classes(path: Path, credentials: Mapping[str, BootstrapCredential]) -> dict[str, str]:
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8")).get("ppu_classes", {})
+        except (OSError, ValueError, AttributeError) as exc:
+            raise BootstrapCredentialError(f"cannot load Bootstrap credentials: {path}") from exc
+        if not isinstance(raw, dict) or any(
+                alias not in credentials or value not in _KNOWN_PPU_CLASSES
+                for alias, value in raw.items()):
+            raise BootstrapCredentialError("Bootstrap PPU classification is invalid")
+        return dict(raw)
 
     def migrate_in_place(self) -> bool:
         """Rewrite a v1 file as v2 (same secrets, generation 1); idempotent."""
@@ -624,6 +708,8 @@ class ManagerBootstrapCoordinator:
             raise BootstrapCredentialError(
                 "registered alias now resolves to a different Bootstrap device_id; explicit re-pairing is required"
             )
+        with shared_boundary("CREDENTIAL_CLASS", local_refusals=(BootstrapCredentialError,)):
+            self.credentials.record_class(normalized, ppu_class_from_status(payload))
         return normalized, record, client, payload, device_id, token
 
     def status(self, alias: str) -> dict[str, Any]:

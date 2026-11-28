@@ -90,6 +90,8 @@ export type ManagedPpu = {
   sites: FleetSiteView[];
   /** Registry + Fleet level availability (Platform and Routes are judged separately). */
   availability: ManagedAvailability;
+  /** Enrollment-proven class from the Manager Fleet (built-in Mock PPU, M2). */
+  ppuClass: "mock" | "physical" | "unknown";
 };
 
 export type ManagedFacility = {
@@ -151,6 +153,7 @@ export function buildManagedTopology(
       online: view?.transport_state === "reachable" && view.observation.state === "current",
       siteCount: view?.topology.site_count ?? 0,
       sites: view?.topology.sites ?? [],
+      ppuClass: view?.ppu_class ?? "unknown",
       availability: fleet ? fleetAvailability(view)
         : blocked("manager-unavailable", "FLEET UNAVAILABLE", "The Manager Fleet observation is unavailable."),
     });
@@ -815,6 +818,7 @@ export function managedBatchStatistics(batch: ProgrammingBatch): BatchStatistics
     tally.fail += site.fail;
   }
   return batchStatistics({
+    mock: batch.ppu_class === "mock",
     sites: batch.units.length,
     repeat: batch.policy.repeat,
     replaceIc: batch.policy.replace_ic_before_next_cycle ?? true,

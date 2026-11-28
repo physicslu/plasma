@@ -89,6 +89,8 @@ export type AwaitingContinueSite = {
 };
 
 export type ServerBatchSnapshot = {
+  /** Built-in Mock PPU Batch: simulated, never production statistics. */
+  mock?: boolean;
   /** Manual Repeat: Sites waiting for the operator's Continue. */
   awaiting_continue?: AwaitingContinueSite[];
   batch_id: string;

@@ -18,6 +18,11 @@ export type StatisticsMode = "REPLACE_IC" | "SAME_IC_DEBUG";
 
 export type BatchStatistics = {
   mode: StatisticsMode;
+  /**
+   * Built-in Mock PPU Batch: simulated Cycles on Virtual Flash. Labelled MOCK
+   * everywhere and never a production quantity, PASS/FAIL or YIELD (D4).
+   */
+  mock: boolean;
   sites: number;
   repeat: number;
   /** Declared by the mode (see above); never a physical identification. */
@@ -54,6 +59,7 @@ export function unitCycleTally(
 }
 
 export function batchStatistics(input: {
+  mock?: boolean;
   sites: number;
   repeat: number;
   replaceIc: boolean;
@@ -68,7 +74,7 @@ export function batchStatistics(input: {
   const tally = input.tally ?? { settled: 0, pass: 0, fail: 0 };
   const mode: StatisticsMode = input.replaceIc ? "REPLACE_IC" : "SAME_IC_DEBUG";
   return {
-    mode, sites, repeat,
+    mode, mock: input.mock === true, sites, repeat,
     physicalIc: mode === "REPLACE_IC" ? planned : sites,
     plannedCycles: planned,
     settledCycles: tally.settled,
@@ -86,6 +92,7 @@ export function batchStatistics(input: {
  * Standalone runtime): the same definitions, summed per Site.
  */
 export function snapshotStatistics(input: {
+  mock?: boolean;
   sites: readonly {
     completed_rounds: number; pass_rounds?: number; final_failures: number;
     total_attempts: number; retry_count: number;
@@ -106,7 +113,7 @@ export function snapshotStatistics(input: {
     if (pass + fail >= input.repeat) completed += 1;
   }
   return batchStatistics({
-    sites: input.sites.length, repeat: input.repeat, replaceIc: input.replaceIc,
+    mock: input.mock, sites: input.sites.length, repeat: input.repeat, replaceIc: input.replaceIc,
     tally, jobAttempts: attempts, retryAttempts: retries, sitesCompleted: completed,
   });
 }
@@ -131,6 +138,20 @@ export type StatisticsKpi = {
  */
 export function statisticsKpis(
   stats: BatchStatistics, batchTime: string, sitesKey = "sites",
+): StatisticsKpi[] {
+  const kpis = productionKpis(stats, batchTime, sitesKey);
+  if (!stats.mock) return kpis;
+  // D4: a Mock Batch keeps its numbers but never under production names, so
+  // no MOCK count can be read (or copied) as IC output, PASS IC or YIELD.
+  return [
+    { key: "source", label: "SOURCE", value: "MOCK", tone: "info" },
+    ...kpis.map(kpi => kpi.key === sitesKey || kpi.key === "batch-time"
+      ? kpi : { ...kpi, key: `mock-${kpi.key}`, label: `MOCK ${kpi.label}` }),
+  ];
+}
+
+function productionKpis(
+  stats: BatchStatistics, batchTime: string, sitesKey: string,
 ): StatisticsKpi[] {
   const sites = { key: sitesKey, label: "SITES", value: stats.sites };
   const time = { key: "batch-time", label: "BATCH TIME", value: batchTime };
@@ -160,6 +181,7 @@ export function statisticsKpis(
 /** The Batch Summary meta line: attempts and progress, in both modes. */
 export function statisticsMeta(stats: BatchStatistics): string {
   const parts = [
+    ...(stats.mock ? ["MOCK PPU · not production"] : []),
     `${stats.sites} Site${stats.sites === 1 ? "" : "s"}`,
     stats.mode === "REPLACE_IC" ? "Replace IC each Cycle" : "Same-IC Debug",
     `Cycles ${stats.settledCycles}/${stats.plannedCycles} settled · ${stats.remainingCycles} remaining`,
@@ -176,7 +198,8 @@ export function statisticsLogLine(stats: BatchStatistics): string {
   const ic = stats.mode === "REPLACE_IC"
     ? `IC ${stats.physicalIc} (operator-replaced, not identified) · YIELD ${rate}`
     : `Physical IC ${stats.physicalIc} (same IC per Site) · Cycle PASS rate ${rate} · no YIELD`;
-  return `[STATISTICS] ${stats.mode === "REPLACE_IC" ? "Replace IC" : "Same-IC Debug"} · Sites ${stats.sites}`
+  return `[STATISTICS] ${stats.mock ? "MOCK (simulated, not production) · " : ""}${
+    stats.mode === "REPLACE_IC" ? "Replace IC" : "Same-IC Debug"} · Sites ${stats.sites}`
     + `${stats.sitesCompleted != null ? ` (completed ${stats.sitesCompleted})` : ""}`
     + ` · Cycles PASS ${stats.passCycles} · FAIL ${stats.failCycles} · settled ${stats.settledCycles}/${stats.plannedCycles}`
     + ` · remaining ${stats.remainingCycles} · Job Attempts ${stats.jobAttempts ?? "—"} · Retry ${stats.retryAttempts ?? "—"}`

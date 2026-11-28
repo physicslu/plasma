@@ -12,6 +12,9 @@ from .bootstrap import (
     BootstrapCredentialError,
     BootstrapCredentialStore,
     BootstrapManagerError,
+    PPU_CLASS_MOCK,
+    PPU_CLASS_PHYSICAL,
+    PPU_CLASS_UNKNOWN,
     ControllerReplacedError,
     ManagerBootstrapCoordinator,
 )
@@ -434,7 +437,7 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
 
     def _bootstrap_get(self, alias: str, action: str) -> None:
         if action == "programming/routes":
-            self._programming_call(lambda: (HTTPStatus.OK, self._programming().list_routes()))
+            self._programming_call(lambda: (HTTPStatus.OK, self._programming().list_routes(alias)))
             return
         run_match = PROGRAMMING_RUN_RE.fullmatch(action)
         if run_match is not None:
@@ -777,7 +780,28 @@ class BootstrapPlasmaManagerHandler(base_server.PlasmaManagerHandler):
             alias, action = bootstrap
             self._bootstrap_get(alias, action)
             return
+        if parsed.path == "/api/fleet":
+            self._json(HTTPStatus.OK, self._classified_fleet(self._poller().snapshot()))
+            return
         super().do_GET()
+
+    def _classified_fleet(self, snapshot: dict) -> dict:
+        """Fleet with each PPU's enrollment-proven class (built-in Mock PPU,
+        M2): Mock PPUs are labelled and counted apart, never by their alias."""
+        try:
+            credentials = self._bootstrap().credentials
+        except BootstrapManagerError:
+            credentials = None
+        ppus = [dict(item) for item in snapshot.get("ppus") or [] if isinstance(item, dict)]
+        for item in ppus:
+            alias = item.get("alias")
+            item["ppu_class"] = (credentials.ppu_class(alias)
+                                 if credentials is not None and isinstance(alias, str)
+                                 else PPU_CLASS_UNKNOWN)
+        summary = dict(snapshot.get("summary") or {})
+        summary["mock_ppus"] = sum(item["ppu_class"] == PPU_CLASS_MOCK for item in ppus)
+        summary["physical_ppus"] = sum(item["ppu_class"] == PPU_CLASS_PHYSICAL for item in ppus)
+        return {**snapshot, "summary": summary, "ppus": ppus}
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
