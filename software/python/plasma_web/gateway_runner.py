@@ -37,11 +37,6 @@ def serve_handler(
     handler_class.engineering_provider = engineering_provider
     handler_class.gateway_settings = settings
     handler_class.ppu_network_settings = network_settings
-    handler_class.batch_runtime = canonical_gateway._build_batch_runtime(
-        engineering_provider,
-        settings=settings,
-        output_root=output_root,
-    )
     handler_class.allowed_origins = frozenset(cors_origins)
     handler_class.output_root = output_root.resolve()
     handler_class.static_root = static_root.resolve() if static_root is not None else None
@@ -54,7 +49,3 @@ def serve_handler(
         pass
     finally:
         server.server_close()
-        runtime = handler_class.batch_runtime
-        handler_class.batch_runtime = None
-        if runtime is not None:
-            runtime.close()

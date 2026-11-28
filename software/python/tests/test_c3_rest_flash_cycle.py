@@ -493,7 +493,6 @@ class Stack:
             Gateway.client_factory = staticmethod(lambda: PlasmaClient(host, port))
         Gateway.output_root = root / "output"
         Gateway.engineering_provider = None
-        Gateway.batch_runtime = None
         Gateway.static_root = None
         self.gateway = Gateway
         if self.in_process:

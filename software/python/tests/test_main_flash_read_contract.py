@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from plasma_core.enums import Operation
 from plasma_core.models import JobRequest
-from plasma_web.mock_batch_runtime import MockAwareBatchRuntimeManager
 from plasma_web.shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
@@ -41,16 +40,3 @@ def test_non_read_request_keeps_existing_memory_map() -> None:
     request = JobRequest(site_id=1, operation=Operation.ERASE, map_data={"sentinel": True})
 
     assert provider._resolve_main_flash_read(request) is request
-
-
-def test_mock_batch_snapshot_exposes_scope_not_operator_range() -> None:
-    source = {
-        "batch_id": "batch-test",
-        "operations": ["read"],
-        "read": {"offset": 0, "length": 256},
-    }
-
-    normalized = MockAwareBatchRuntimeManager._mock_payload(source, None)
-
-    assert normalized["read"] == {"scope": "main_flash"}
-    assert source["read"] == {"offset": 0, "length": 256}
