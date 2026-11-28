@@ -33,4 +33,4 @@ Post state: Active gen 25, Reservation NONE, PPU idle, no OpenOCD process, no ad
 
 ## Not committed
 
-Manager submission journals, the 64 KiB Read binary (its SHA256 is recorded above and in `h2-batch.json`), SSH helper scripts and the downloaded kit stay in the SWPC evidence root `/storage/projects/plasma-evidence/u7-deploy-hil-20261128`.
+Manager submission journals, the 64 KiB Read binary (its SHA256 is recorded above and in `h2-batch.json`), SSH helper scripts and the downloaded kit stay in the SWPC evidence root `<swpc-evidence-root>/u7-deploy-hil-20261128`.
