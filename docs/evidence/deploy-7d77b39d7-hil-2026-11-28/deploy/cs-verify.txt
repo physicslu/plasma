@@ -1,0 +1,7 @@
+[plasmactl local-control-station] Manager healthy: http://127.0.0.1:18280/api/health/live
+[plasmactl local-control-station] Manager Device Selector healthy: http://127.0.0.1:18280/api/devices/search?q=STM32F103&limit=1
+[plasmactl local-control-station] Control Station Console healthy: http://127.0.0.1:18190/
+[plasmactl local-control-station] PASS: local Control Station Console + Manager are healthy on loopback
+[plasmactl local-control-station] qualification boundary: Control Station runtime only; PPU/PS/PL/Site/IC readiness is separate
+[plasmactl local-control-station] target PPU probe: ONLINE (z2 -> http://192.168.2.99:18080)
+[plasmactl local-control-station] target PPU managed-control probe: READY (z2 -> http://192.168.2.99:18080)

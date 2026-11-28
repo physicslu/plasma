@@ -1,14 +1,9 @@
 from __future__ import annotations
 
-import asyncio
-import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
-from plasma_core.enums import JobState, Operation
-from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import JobRequest
 from plasma_web.engineering_targets import MockEngineeringPPUProvider
 
 
@@ -24,36 +19,6 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
     def tearDownClass(cls) -> None:
         cls.provider.close()
         cls.temporary.cleanup()
-
-    async def wait_terminal(self, facility_id: str, ppu_id: str, job_id: str) -> dict:
-        for _ in range(1000):
-            payload = await self.provider.status(facility_id, ppu_id, job_id=job_id)
-            job = payload["job"]
-            if JobState(job["state"]).terminal:
-                return job
-            await asyncio.sleep(0.01)
-        self.fail(f"job did not become terminal: {job_id}")
-
-    def cache_image_asset(
-        self,
-        facility_id: str,
-        ppu_id: str,
-        image: bytes,
-        name: str = "test.bin",
-    ) -> tuple[str, str]:
-        session_id = self.provider.begin_session()["session"]["session_id"]
-        sha256 = hashlib.sha256(image).hexdigest()
-        self.provider.cache_asset(
-            session_id,
-            facility_id,
-            ppu_id,
-            name,
-            "image",
-            "binary",
-            sha256,
-            image,
-        )
-        return session_id, sha256
 
     def test_catalog_is_eight_facilities_four_ppus_each_and_one_hundred_sixty_sites(self) -> None:
         catalog = self.provider.catalog()
@@ -91,94 +56,6 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertAlmostEqual(erase_s, 3.0)
 
-    def test_session_can_cache_multiple_assets_and_reconnect_clears_session(self) -> None:
-        facility_id = "mock-facility-02"
-        ppu_id = "mock-facility-02-ppu-03"
-        other_ppu_id = "mock-facility-02-ppu-04"
-        image_a = b"A" * 4096
-        image_b = b"B" * 4096
-        sha_a = hashlib.sha256(image_a).hexdigest()
-        sha_b = hashlib.sha256(image_b).hexdigest()
-
-        first_session = self.provider.begin_session()["session"]["session_id"]
-        miss = self.provider.asset_cache_status(
-            first_session, facility_id, ppu_id, "A.bin", "image", "binary", len(image_a), sha_a
-        )
-        self.assertFalse(miss["programming_asset"]["cache_hit"])
-
-        uploaded = self.provider.cache_asset(
-            first_session, facility_id, ppu_id, "A.bin", "image", "binary", sha_a, image_a
-        )
-        self.assertTrue(uploaded["programming_asset"]["uploaded"])
-        hit = self.provider.asset_cache_status(
-            first_session, facility_id, ppu_id, "A.bin", "image", "binary", len(image_a), sha_a
-        )
-        self.assertTrue(hit["programming_asset"]["cache_hit"])
-
-        other_ppu_miss = self.provider.asset_cache_status(
-            first_session, facility_id, other_ppu_id, "A.bin", "image", "binary", len(image_a), sha_a
-        )
-        self.assertFalse(other_ppu_miss["programming_asset"]["cache_hit"])
-
-        self.provider.cache_asset(
-            first_session, facility_id, ppu_id, "B.bin", "image", "binary", sha_b, image_b
-        )
-        old_asset_still_present = self.provider.asset_cache_status(
-            first_session, facility_id, ppu_id, "A.bin", "image", "binary", len(image_a), sha_a
-        )
-        new_asset_present = self.provider.asset_cache_status(
-            first_session, facility_id, ppu_id, "B.bin", "image", "binary", len(image_b), sha_b
-        )
-        self.assertTrue(old_asset_still_present["programming_asset"]["cache_hit"])
-        self.assertTrue(new_asset_present["programming_asset"]["cache_hit"])
-
-        serial = b"SN-000001"
-        serial_sha = hashlib.sha256(serial).hexdigest()
-        self.provider.cache_asset(
-            first_session,
-            facility_id,
-            ppu_id,
-            "serial.txt",
-            "serial_number",
-            "text",
-            serial_sha,
-            serial,
-        )
-        serial_hit = self.provider.asset_cache_status(
-            first_session,
-            facility_id,
-            ppu_id,
-            "serial.txt",
-            "serial_number",
-            "text",
-            len(serial),
-            serial_sha,
-        )
-        self.assertTrue(serial_hit["programming_asset"]["cache_hit"])
-
-        second_session_payload = self.provider.begin_session(first_session)["session"]
-        self.assertTrue(second_session_payload["previous_session_cleared"])
-        second_session = second_session_payload["session_id"]
-        reconnect_miss = self.provider.asset_cache_status(
-            second_session, facility_id, ppu_id, "B.bin", "image", "binary", len(image_b), sha_b
-        )
-        self.assertFalse(reconnect_miss["programming_asset"]["cache_hit"])
-        with self.assertRaises(PlasmaError):
-            self.provider.asset_cache_status(
-                first_session, facility_id, ppu_id, "B.bin", "image", "binary", len(image_b), sha_b
-            )
-
-    def test_upload_rejects_fingerprint_mismatch(self) -> None:
-        facility_id = "mock-facility-01"
-        ppu_id = "mock-facility-01-ppu-01"
-        session_id = self.provider.begin_session()["session"]["session_id"]
-        data = b"payload"
-        wrong_sha = hashlib.sha256(b"other").hexdigest()
-        with self.assertRaises(PlasmaError):
-            self.provider.cache_asset(
-                session_id, facility_id, ppu_id, "bad.bin", "image", "binary", wrong_sha, data
-            )
-
     async def test_each_mock_ppu_reports_its_own_canonical_topology(self) -> None:
         catalog = self.provider.catalog()
         for facility in catalog["facilities"]:
@@ -193,50 +70,6 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
                         list(range(1, ppu["site_count"] + 1)),
                     )
 
-    async def test_direct_engineering_job_is_refused_by_the_mock_ppu_without_a_reservation(self) -> None:
-        # U7: the retired standalone Engineering Job path can no longer
-        # program: its Jobs carry no Resource Reservation, and Mock and
-        # physical PPUs share one admission contract.
-        facility_id = "mock-facility-02"
-        ppu_id = "mock-facility-02-ppu-03"
-        image = b"\x11\x22\x33\x44" * 64
-        session_id, asset_sha256 = self.cache_image_asset(facility_id, ppu_id, image)
-        with self.assertRaisesRegex(PlasmaError, "Reservation required"):
-            await self.provider.start_job(
-                facility_id,
-                ppu_id,
-                JobRequest(site_id=6, operation=Operation.PROGRAM),
-                session_id=session_id,
-                asset_sha256=asset_sha256,
-            )
-        selected = await self.provider.status(facility_id, ppu_id)
-        self.assertTrue(all(site["latest_job"] is None for site in selected["sites"]))
-
-    async def test_non_image_asset_cannot_drive_program_job(self) -> None:
-        facility_id = "mock-facility-01"
-        ppu_id = "mock-facility-01-ppu-01"
-        session_id = self.provider.begin_session()["session"]["session_id"]
-        serial = b"SN-000002"
-        asset_sha256 = hashlib.sha256(serial).hexdigest()
-        self.provider.cache_asset(
-            session_id,
-            facility_id,
-            ppu_id,
-            "serial.txt",
-            "serial_number",
-            "text",
-            asset_sha256,
-            serial,
-        )
-        with self.assertRaises(PlasmaError) as caught:
-            await self.provider.start_job(
-                facility_id,
-                ppu_id,
-                JobRequest(site_id=1, operation=Operation.PROGRAM),
-                session_id=session_id,
-                asset_sha256=asset_sha256,
-            )
-        self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
 
 
 if __name__ == "__main__":

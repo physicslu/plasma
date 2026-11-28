@@ -112,10 +112,7 @@ class ControllerWriteAdmissionMixin:
         if re.fullmatch(rf"/api/jobs/{_SEGMENT}/cancel", path):
             return "site.job.cancel"
         if normalized in {"/api/engineering/diagnostics/loopback",
-                          "/api/engineering/diagnostics/openocd-control-plane",
-                          "/api/engineering/session"}:
-            return "engineering.write"
-        if self._engineering_target(path) is not None:  # type: ignore[attr-defined]
+                          "/api/engineering/diagnostics/openocd-control-plane"}:
             return "engineering.write"
         return None
 

@@ -327,7 +327,6 @@ def test_every_manager_forwarded_post_route_is_classified():
         r"^/api/engineering/diagnostics/loopback$": "/api/engineering/diagnostics/loopback",
         r"^/api/engineering/diagnostics/openocd-control-plane$":
             "/api/engineering/diagnostics/openocd-control-plane",
-        r"^/api/engineering/session$": "/api/engineering/session",
         r"^/api/jobs$": "/api/jobs",
     }
     expected = {
@@ -339,7 +338,8 @@ def test_every_manager_forwarded_post_route_is_classified():
         "/api/jobs/job-1/cancel": "site.job.cancel",
         "/api/settings/ppu-network/activation": "ppu.settings.write",
         "/api/settings/ppu-network/activation/act-1/commit": "ppu.settings.write",
-        "/api/engineering/targets/f/p/api/jobs": "engineering.write",
+        "/api/engineering/session": None,         # retired with the Engineering Job path (U7)
+        "/api/engineering/targets/f/p/api/jobs": None,
         "/api/batches": None,                     # not implemented by the PPU Gateway: refused
         "/api/anything-else": None,
     }

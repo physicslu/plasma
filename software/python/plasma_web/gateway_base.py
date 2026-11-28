@@ -544,7 +544,6 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         *,
         client_id: str,
         default_timeout_s: float = 30.0,
-        allow_inline_asset: bool = True,
     ) -> JobRequest:
         _require_declared_keys(
             body,
@@ -564,7 +563,6 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 "job_binding",
                 "image_asset",
                 "operations",
-                "session_id",
                 "target",
                 "provider",
                 "profile",
@@ -574,7 +572,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         )
         if "operations" in body:
             # Formal model: one programming Job with an ordered operations list.
-            if "operation" in body or "job_binding" not in body or not allow_inline_asset:
+            if "operation" in body or "job_binding" not in body:
                 raise ValueError(
                     "an operations list is one programming Job with a Job Binding and no "
                     "separate operation")
@@ -590,8 +588,6 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             raise ValueError("target must be a non-empty exact ICPN string")
 
         if "job_binding" in body or "image_asset" in body:
-            if not allow_inline_asset:
-                raise ValueError("Job Binding requests require the PPU Gateway inline-asset API")
             return self._job_image_request(body, operation, client_id=client_id,
                                            default_timeout_s=default_timeout_s)
 
@@ -600,28 +596,16 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         if operation is Operation.READ:
             allowed_fields = common_fields | {"offset", "length"}
         elif operation in image_operations:
-            if allow_inline_asset:
-                allowed_fields = common_fields | {
-                    "asset_name",
-                    "asset_type",
-                    "asset_format",
-                    "asset_size",
-                    "asset_sha256",
-                    "asset_base64",
-                }
-                required_fields = {
-                    "site_id",
-                    "operation",
-                    "asset_name",
-                    "asset_type",
-                    "asset_format",
-                    "asset_size",
-                    "asset_sha256",
-                    "asset_base64",
-                }
-            else:
-                allowed_fields = common_fields | {"session_id", "asset_sha256"}
-                required_fields = {"site_id", "operation", "session_id", "asset_sha256"}
+            asset_fields = {
+                "asset_name",
+                "asset_type",
+                "asset_format",
+                "asset_size",
+                "asset_sha256",
+                "asset_base64",
+            }
+            allowed_fields = common_fields | asset_fields
+            required_fields = {"site_id", "operation"} | asset_fields
             _require_declared_keys(
                 body,
                 allowed=allowed_fields,
@@ -649,7 +633,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             if not all(isinstance(body.get(key), str) and body[key] for key in ("provider", "profile")):
                 raise ValueError("provider and profile must both be non-empty strings")
             metadata.update(provider=body["provider"], profile=body["profile"])
-        if operation in image_operations and allow_inline_asset:
+        if operation in image_operations:
             asset = self._inline_asset(body)
             normalized = asset.normalize_image()
             image = normalized.data
@@ -719,139 +703,6 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     )
                     return
                 self._json(HTTPStatus.OK, _with_rest_version(payload))
-                return
-
-            if parsed.path == "/api/engineering/session":
-                if self.engineering_provider is None:
-                    self._engineering_unavailable()
-                    return
-                body = self._body()
-                _require_declared_keys(
-                    body,
-                    allowed={"previous_session_id"},
-                    label="Engineering session request",
-                )
-                previous = body.get("previous_session_id")
-                if previous is not None and not isinstance(previous, str):
-                    raise ValueError("previous_session_id must be a string")
-                self._json(
-                    HTTPStatus.CREATED,
-                    _with_rest_version(self.engineering_provider.begin_session(previous)),
-                )
-                return
-
-            engineering = self._engineering_target(parsed.path)
-            if engineering is not None:
-                if self.engineering_provider is None:
-                    self._engineering_unavailable()
-                    return
-                facility_id, ppu_id, tail = engineering
-                if tail == ["api", "programming-assets", "check"]:
-                    body = self._body()
-                    required = {
-                        "session_id",
-                        "asset_name",
-                        "asset_type",
-                        "asset_format",
-                        "asset_size",
-                        "asset_sha256",
-                    }
-                    _require_declared_keys(
-                        body,
-                        allowed=required,
-                        required=required,
-                        label="Programming Asset check",
-                    )
-                    self._json(
-                        HTTPStatus.OK,
-                        _with_rest_version(
-                            self.engineering_provider.asset_cache_status(
-                                str(body["session_id"]),
-                                facility_id,
-                                ppu_id,
-                                str(body["asset_name"]),
-                                str(body["asset_type"]),
-                                str(body["asset_format"]),
-                                body["asset_size"],
-                                str(body["asset_sha256"]),
-                            )
-                        ),
-                    )
-                    return
-                if tail == ["api", "programming-assets"]:
-                    query = parse_qs(parsed.query, keep_blank_values=True)
-                    allowed_query = {"session_id", "name", "type", "format", "sha256"}
-                    _require_declared_keys(
-                        query,
-                        allowed=allowed_query,
-                        required=allowed_query,
-                        label="Programming Asset upload query",
-                    )
-                    session_id = _query_value(query, "session_id", required=True)
-                    asset_name = _query_value(query, "name", required=True)
-                    asset_type = _query_value(query, "type", required=True)
-                    asset_format = _query_value(query, "format", required=True)
-                    asset_sha256 = _query_value(query, "sha256", required=True)
-                    assert None not in (session_id, asset_name, asset_type, asset_format, asset_sha256)
-                    self._json(
-                        HTTPStatus.CREATED,
-                        _with_rest_version(
-                            self.engineering_provider.cache_asset(
-                                session_id,
-                                facility_id,
-                                ppu_id,
-                                asset_name,
-                                asset_type,
-                                asset_format,
-                                asset_sha256,
-                                self._raw_body(),
-                            )
-                        ),
-                    )
-                    return
-                if len(tail) == 4 and tail[:2] == ["api", "jobs"] and tail[3] == "cancel":
-                    self._json(
-                        HTTPStatus.OK,
-                        _run(self.engineering_provider.cancel_job(facility_id, ppu_id, tail[2])),
-                    )
-                    return
-                if tail == ["api", "jobs"]:
-                    body = self._body()
-                    request = self._job_request(
-                        body,
-                        client_id="plasma-web-engineering",
-                        default_timeout_s=self.engineering_provider.job_timeout_s(facility_id, ppu_id),
-                        allow_inline_asset=False,
-                    )
-                    operation = request.operation
-                    session_id = (
-                        body["session_id"]
-                        if operation in {Operation.PROGRAM, Operation.VERIFY}
-                        else None
-                    )
-                    asset_sha256 = (
-                        body["asset_sha256"]
-                        if operation in {Operation.PROGRAM, Operation.VERIFY}
-                        else None
-                    )
-                    if session_id is not None and not isinstance(session_id, str):
-                        raise ValueError("session_id must be a string")
-                    if asset_sha256 is not None and not isinstance(asset_sha256, str):
-                        raise ValueError("asset_sha256 must be a string")
-                    self._json(
-                        HTTPStatus.ACCEPTED,
-                        _run(
-                            self.engineering_provider.start_job(
-                                facility_id,
-                                ppu_id,
-                                request,
-                                session_id=session_id,
-                                asset_sha256=asset_sha256,
-                            )
-                        ),
-                    )
-                    return
-                self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
                 return
 
             if parsed.path.startswith("/api/jobs/") and parsed.path.endswith("/cancel"):

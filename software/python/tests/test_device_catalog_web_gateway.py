@@ -13,7 +13,7 @@ from urllib.parse import quote
 from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
 from plasma_web.device_catalog import get_default_device_catalog, default_catalog_manifest_path
 from plasma_manager.server import PlasmaManagerHandler, PlasmaManagerHTTPServer
-from plasma_web.gateway import PlasmaWebHandler, _parse_target_device
+from plasma_web.gateway import _validated_target_claim
 from plasma_web.programming_qualification import get_default_programming_qualification_registry
 
 
@@ -526,15 +526,12 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(len(rows), 1015)
         for row in rows:
             with self.subTest(icpn=row.identifier):
-                selected = _parse_target_device(
-                    {"vendor": "Microchip", "identifier": row.identifier},
-                    label="Engineering target_device")
-                self.assertEqual(selected.icpn, row.identifier)
-                self.assertEqual(selected.identifier_kind, "unverified_exact_target_claim")
-        unknown = _parse_target_device(
-            {"vendor": "Microchip", "identifier": "ATSAML10E16A-MZTVAO"},
-            label="Batch target_device")
-        self.assertEqual(unknown.icpn, "ATSAML10E16A-MZTVAO")
+                # The Job `target` is an exact-target CLAIM, accepted
+                # without any Catalog lookup.
+                self.assertEqual(
+                    _validated_target_claim(row.identifier, label="target"), row.identifier)
+        self.assertEqual(
+            _validated_target_claim("ATSAML10E16A-MZTVAO", label="target"), "ATSAML10E16A-MZTVAO")
 
     def test_microchip_official_saml1x_route_is_l1_visible_but_never_executable(self) -> None:
         catalog = get_default_device_catalog()
@@ -956,43 +953,6 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=STM32&limit=30&offset=-1")
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"]["error_type"], "INVALID_DEVICE_SEARCH")
-
-    def test_engineering_job_target_device_preserves_unverified_icpn_claim(self) -> None:
-        record = get_default_device_catalog().search("STM32F407VGT6", limit=1)[0]
-        handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
-        request = handler._job_request(
-            {
-                "site_id": 1,
-                "operation": "erase",
-                "target_device": {"vendor": record.vendor, "identifier": record.identifier},
-            },
-            client_id="plasma-web-engineering",
-            allow_inline_asset=False,
-        )
-        self.assertEqual(request.target, "STM32F407VGT6")
-        self.assertEqual(request.metadata["target_device"]["vendor"], record.vendor)
-        self.assertEqual(request.metadata["target_device"]["identifier"], record.identifier)
-        self.assertEqual(request.metadata["target_device"]["identifier_kind"], "unverified_exact_target_claim")
-        self.assertEqual(request.metadata["target_device"]["icpn"], "STM32F407VGT6")
-
-    def test_engineering_job_target_device_does_not_depend_on_catalog_admission(self) -> None:
-        # A syntactically valid selected Target is a Job request claim; Runtime
-        # Provider remains the only programming capability authority.
-        handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
-        request = handler._job_request(
-            {
-                "site_id": 1,
-                "operation": "erase",
-                "target_device": {"vendor": "Analog Devices", "identifier": "ADUC7019BCPZ62I"},
-            },
-            client_id="plasma-web-engineering",
-            allow_inline_asset=False,
-        )
-        self.assertEqual(request.target, "ADUC7019BCPZ62I")
-        self.assertEqual(
-            request.metadata["target_device"]["identifier_kind"],
-            "unverified_exact_target_claim",
-        )
 
 
 if __name__ == "__main__":
