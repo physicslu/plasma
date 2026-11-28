@@ -13,10 +13,35 @@ from plasma_web.openocd_software_qualification import (
     get_default_openocd_software_qualification_registry,
 )
 
+XL_EXACT = frozenset({
+    "STM32F103RFT6", "STM32F103RFT6TR", "STM32F103RGT6", "STM32F103RGT6TR",
+    "STM32F103RGT7", "STM32F103VFT6", "STM32F103VFT6TR", "STM32F103VFT7",
+    "STM32F103VGT6", "STM32F103VGT6TR", "STM32F103VGT7", "STM32F103VGT7TR",
+    "STM32F103ZFH6", "STM32F103ZFH6TR", "STM32F103ZFT6", "STM32F103ZGH6",
+    "STM32F103ZGH6TR", "STM32F103ZGH7", "STM32F103ZGT6", "STM32F103ZGT6TR",
+})
+
 
 EVIDENCE_FILES = (
     "release/openocd.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json",
+    "release/openocd-qualification/stm32f103-xl-target-config-source-lock-v1.json",
+    "data/ic-support/target/stm32f103xl.cfg",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-v11.json",
+    "release/openocd-qualification/openocd-0.12.0-stm32f103-xl-20-v1.json",
+    "release/openocd-qualification/stm32f103-xl-manufacturer-documentary-lock-v1.json",
+    "release/openocd-qualification/catalog-stm32f103-xl-lqfp64-route-v1.json",
+    "release/openocd-qualification/catalog-stm32f103-xl-lqfp100-route-v1.json",
+    "release/openocd-qualification/catalog-stm32f103-xl-lqfp144-route-v1.json",
+    "release/openocd-qualification/catalog-stm32f103-xl-lfbga144-route-v1.json",
+    "data/ic-support/profiles/programming/stm32f1-xl-density-flash-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103rf-768k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103rg-1024k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103vf-768k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103vg-1024k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103zf-768k-v0.json",
+    "data/ic-support/profiles/memory-geometry/stm32f103zg-1024k-v0.json",
+    "docs/architecture/stm32f103-high-xl-l2-data-only-gap-audit-20261127.md",
     "release/openocd-qualification/openocd-0.12.0-stm32f103-v8.json",
     "release/openocd-qualification/openocd-0.12.0-stm32f103-v9.json",
     "release/openocd-qualification/stm32f103-medium-nonlqfp-exact-12-applicability-v1.json",
@@ -163,7 +188,7 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             "STM32F103VBH6",
             "STM32F103VBH7",
         )
-        expected = tuple(sorted((*expected, *extra, *LOW_DENSITY_EXACT)))
+        expected = tuple(sorted((*expected, *extra, *LOW_DENSITY_EXACT, *XL_EXACT)))
         self.assertEqual(
             self.registry.supported_exact_icpns("STMicroelectronics"),
             expected,
@@ -305,9 +330,9 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
             self.registry.state_for("STMicroelectronics", "STM32F103V8T7"),
             "UNKNOWN",
         )
-        # XL-density remains a separate programming transaction and must stay UNKNOWN.
+        # A plausible XL order code outside the exact 20 remains UNKNOWN.
         self.assertEqual(
-            self.registry.state_for("STMicroelectronics", "STM32F103RFT6"),
+            self.registry.state_for("STMicroelectronics", "STM32F103RFT7"),
             "UNKNOWN",
         )
         # Ordering syntax must not synthesize exact commercial identities.
@@ -412,21 +437,21 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
     def test_default_registry_is_available_in_full_source_tree(self):
         registry = get_default_openocd_software_qualification_registry()
         self.assertIsNotNone(registry)
-        self.assertEqual(registry.summary["supported_exact_icpns"], 89)
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 89)
+        self.assertEqual(registry.summary["supported_exact_icpns"], 109)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 109)
         self.assertEqual(
             registry.summary["unreviewed_default_unknown_exact_icpns"],
-            registry.summary["catalog_exact_icpns"] - 89,
+            registry.summary["catalog_exact_icpns"] - 109,
         )
         self.assertEqual(
             registry.summary["qualification_id"],
-            "adr0002-phase2-openocd-012-stm32f103-v10",
+            "adr0002-phase2-openocd-012-stm32f103-v11",
         )
         self.assertEqual(
             registry.summary["selector_visibility_rule"],
             "CATALOG_LEVEL_2_PROGRAMMABLE",
         )
-        self.assertEqual(len(registry.reviewed_exact_keys), 89)
+        self.assertEqual(len(registry.reviewed_exact_keys), 109)
 
     def test_new_exact_non_lqfp_medium_cohort_is_bounded(self):
         expected = {
@@ -468,6 +493,17 @@ class OpenOCDSoftwareQualificationV1Tests(unittest.TestCase):
                 self.assertFalse(result["reviewed"])
                 self.assertIsNone(result["programming"])
                 self.assertEqual(result["operations"], {})
+
+    def test_xl_target_config_source_lock_fails_closed(self):
+        self.assertIsNotNone(ROOT)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            copy_evidence_tree(root)
+            cfg = root / "data/ic-support/target/stm32f103xl.cfg"
+            cfg.write_bytes(cfg.read_bytes() + b"# drift\n")
+            with self.assertRaisesRegex(DeviceCatalogIntegrityError,
+                                        "XL target configuration source lock drift"):
+                OpenOCDSoftwareQualificationRegistry(self.catalog, root)
 
     def test_non_lqfp_applicability_integrity_fails_closed(self):
         self.assertIsNotNone(ROOT)

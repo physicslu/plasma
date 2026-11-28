@@ -916,6 +916,123 @@ def make_abi5(tmp_path, *, admit_ok=True, log=b"", rc=0, hang=False, hang_once=F
     return a, calls, journal
 
 
+@pytest.mark.parametrize("flash_kib", [768, 1024])
+def test_xl_flash_preamble_guards_raw_capacity_before_probing_both_banks(tmp_path, flash_kib):
+    a, _, _ = make_abi5(tmp_path)
+    config = a.scripts_root / "target" / "stm32f103xl.cfg"
+    config.write_text("# fake two-bank config\n")
+    profile = worker.FlashProfile("STM32F103RFT6", "target/stm32f1x.cfg",
+                                  0x08000000, flash_kib * 1024, 2048)
+    bound = worker.FlashRange(profile, "read", 0x08080000, 2048)
+    argv = a._operation_argv(1, bound, [])
+    assert [argv[i + 1] for i, part in enumerate(argv[:-1]) if part == "-f"] == [
+        "target/stm32f1x.cfg", "target/stm32f103xl.cfg"]
+    commands = [argv[i + 1] for i, part in enumerate(argv[:-1]) if part == "-c"]
+    assert commands[commands.index("poll off") + 1:commands.index("flash probe 1") + 1] == [
+        f"plasma_flash_capacity_guard {flash_kib}", "flash probe 0", "flash probe 1"]
+
+
+def test_xl_missing_bank_extension_denied_before_openocd_session(tmp_path):
+    a, calls, _ = make_abi5(tmp_path)
+    profile = worker.FlashProfile("STM32F103RFT6", "target/stm32f1x.cfg",
+                                  0x08000000, 768 * 1024, 2048)
+    bound = worker.FlashRange(profile, "read", 0x08080000, 2048)
+    with pytest.raises(worker.TransportDenied, match="TARGET_CONFIG_NOT_FOUND"):
+        a._operation_argv(1, bound, [])
+    assert calls["popen"] == []
+
+
+@pytest.mark.parametrize("size, start, length, expected", [
+    (768, 0x0807F800, 0x1000, [(0x0807F800, 0x800), (0x08080000, 0x800)]),
+    (768, 0x08000000, 0xC0000, [(0x08000000, 0x7F800), (0x0807F800, 0x800),
+                                 (0x08080000, 0x3F800), (0x080BF800, 0x800)]),
+    (1024, 0x08080000, 0x80000, [(0x08080000, 0x7F800), (0x080FF800, 0x800)]),
+])
+def test_xl_erase_segments_never_issue_whole_bank_erase(size, start, length, expected):
+    profile = worker.FlashProfile("STM32F103RFT6", "target/stm32f1x.cfg",
+                                  0x08000000, size * 1024, 2048)
+    assert abi5.Abi5OpenocdAdapter._erase_segments(profile, start, length) == expected
+    assert sum(n for _, n in expected) == length
+
+
+def test_xl_erase_rejects_unaligned_range_before_hardware():
+    profile = worker.FlashProfile("STM32F103RFT6", "target/stm32f1x.cfg",
+                                  0x08000000, 768 * 1024, 2048)
+    with pytest.raises(worker.TransportDenied, match="FLASH_RANGE_INVALID"):
+        abi5.Abi5OpenocdAdapter._erase_segments(profile, 0x08080001, 0x800)
+
+
+def test_xl_cross_bank_erase_program_verify_keeps_one_session_and_receipt(tmp_path):
+    payload = b"XL" * 2048
+    log = (GOOD + b"erased address 0x0807f800 (length 2048)\n"
+           + b"erased address 0x08080000 (length 2048)\n"
+           + b"wrote 4096 bytes from file normalized-image.bin\n")
+    a, calls, _ = make_abi5(tmp_path, log=log, flash_readback=payload)
+    (a.scripts_root / "target/stm32f103xl.cfg").write_text("# fake extension\n")
+    profile = worker.FlashProfile("STM32F103RFT6", "target/stm32f1x.cfg",
+                                  0x08000000, 768 * 1024, 2048)
+    image = worker.FlashImage(profile, payload, hashlib.sha256(payload).hexdigest(),
+                              0x0807F800)
+    result = a._run_operations(1, ("erase", "program", "verify"),
+                               deadline=time.monotonic() + 5, cancel=threading.Event(),
+                               image=image, flash_range=None)
+    assert result["result"] == "PASS"
+    assert result["steps"]["erase"] == {"erase_address": 0x0807F800,
+                                         "erase_length": 4096}
+    assert result["steps"]["verify"]["bytes_verified"] == 4096
+    assert len(calls["popen"]) == 1
+
+
+def test_xl_capacity_mismatch_is_reported_as_admission_failure(tmp_path):
+    a, calls, _ = make_abi5(tmp_path,
+                             log=GOOD + b"Error: PLASMA_FLASH_CAPACITY_MISMATCH\n", rc=1)
+    (a.scripts_root / "target/stm32f103xl.cfg").write_text("# fake extension\n")
+    profile = worker.FlashProfile("STM32F103RFT6", "target/stm32f1x.cfg",
+                                  0x08000000, 768 * 1024, 2048)
+    bound = worker.FlashRange(profile, "read", 0x08080000, 2048)
+    result = a._run_operations(1, ("read",), deadline=time.monotonic() + 5,
+                               cancel=threading.Event(), image=None, flash_range=bound)
+    assert result["result"] == "FAIL"
+    assert result["code"] == "FLASH_CAPACITY_ADMISSION_FAILED"
+    assert result["safe_off"] is True
+    assert len(calls["popen"]) == 1
+
+
+@pytest.mark.parametrize("expected,actual,device,read_error,ok", [
+    (768, 768, 0x430, False, True),
+    (1024, 1024, 0x430, False, True),
+    (768, 1024, 0x430, False, False),
+    (1024, 0xFFFF, 0x430, False, False),
+    (768, 768, 0x414, False, False),
+    (768, 768, 0x430, True, False),
+    (896, 896, 0x430, False, False),
+])
+def test_xl_tcl_capacity_guard_fails_closed(tmp_path, expected, actual, device, read_error, ok):
+    cfg = ROOT / "data/ic-support/target/stm32f103xl.cfg"
+    tcl = f"""
+rename source builtin_source
+proc source {{_}} {{}}
+proc find {{name}} {{return $name}}
+proc flash {{args}} {{}}
+set _CHIPNAME stm32f1x
+set _TARGETNAME stm32f1x.cpu
+builtin_source {{{cfg}}}
+proc read_memory {{address width count}} {{
+    if {{$address == 0xE0042000}} {{return {{{device}}}}}
+    if {{{int(read_error)}}} {{error READ_FAILED}}
+    return {{{actual}}}
+}}
+plasma_flash_capacity_guard {expected}
+"""
+    # tclsh accepts an interactive script on stdin; catch makes the result explicit.
+    wrapped = tcl.replace(f"plasma_flash_capacity_guard {expected}\n",
+                          f"if {{[catch {{plasma_flash_capacity_guard {expected}}} err]}} "
+                          "{puts stderr $err; exit 1}\n")
+    result = subprocess.run(["tclsh"], input=wrapped, text=True, capture_output=True,
+                            check=False)
+    assert (result.returncode == 0) is ok, result.stderr
+
+
 GOOD = b"Info : SWD DPIDR 0x1ba01477\nPLASMA_DPREG0=0x1ba01477\nSAFE_OFF_MODE_OFF_VERIFIED\n"
 
 # Every Adapter receipt reports the safe release it observed, never a literal:

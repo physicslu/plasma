@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "status": "REVIEWED_DOCUMENTARY_EVIDENCE",
+  "manufacturer": "STMicroelectronics",
+  "datasheet": {
+    "document": "DocID16554 Rev 4",
+    "url": "https://www.st.com/resource/en/datasheet/stm32f103vg.pdf",
+    "original_bytes_attested": false,
+    "sha256": null,
+    "byte_length": null,
+    "reviewed_facts": [
+      "F=768 KiB",
+      "G=1024 KiB",
+      "LQFP64/100/144",
+      "SWD PA13/PA14"
+    ]
+  },
+  "programming_manual": {
+    "document": "PM0068 Rev 2",
+    "url": "https://www.st.com/resource/en/programming_manual/pm0068-stm32f10xxx-xldensity-flash-programming-stmicroelectronics.pdf",
+    "original_bytes_attested": false,
+    "sha256": null,
+    "byte_length": null,
+    "reviewed_facts": [
+      "Bank 1 fixed 512 KiB",
+      "Bank 2 up to 512 KiB at 0x08080000",
+      "2 KiB pages",
+      "Bank 2 control base 0x40022040"
+    ]
+  },
+  "documentary_review": {
+    "path": "docs/architecture/stm32f103-high-xl-l2-data-only-gap-audit-20261127.md",
+    "git_blob_sha1": "33ac361e5d5adea5f8a959217f482c3bbeb17ed7"
+  },
+  "not_authorized": [
+    "installed_runtime",
+    "hardware_programming",
+    "job_batch_execution"
+  ]
+}

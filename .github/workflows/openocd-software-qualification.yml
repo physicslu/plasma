@@ -7,6 +7,9 @@ on:
     paths:
       - "release/openocd.json"
       - "release/openocd-qualification/**"
+      - "data/ic-support/target/stm32f103xl.cfg"
+      - "data/ic-support/profiles/programming/stm32f1-xl-density-flash-v0.json"
+      - "data/ic-support/profiles/memory-geometry/stm32f103*"
       - "software/python/plasma_web/openocd_software_qualification.py"
       - "software/python/plasma_web/programming_qualification.py"
       - "software/python/tests/test_openocd_software_qualification_v1.py"
@@ -45,6 +48,9 @@ on:
     paths:
       - "release/openocd.json"
       - "release/openocd-qualification/**"
+      - "data/ic-support/target/stm32f103xl.cfg"
+      - "data/ic-support/profiles/programming/stm32f1-xl-density-flash-v0.json"
+      - "data/ic-support/profiles/memory-geometry/stm32f103*"
       - "software/python/plasma_web/openocd_software_qualification.py"
       - "software/python/plasma_web/programming_qualification.py"
       - "software/python/tests/test_openocd_software_qualification_v1.py"

@@ -28,6 +28,7 @@ on:
       - "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.lock.json"
       - "data/ic-support/bindings/stm32f103c-pilot-v0.json"
       - "scripts/build-openocd-runtime.sh"
+      - "data/ic-support/target/stm32f103xl.cfg"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
@@ -79,6 +80,7 @@ on:
       - "data/ic-support/manufacturer-baseline/stm32f103c8t6-manufacturer-only-v1.lock.json"
       - "data/ic-support/bindings/stm32f103c-pilot-v0.json"
       - "scripts/build-openocd-runtime.sh"
+      - "data/ic-support/target/stm32f103xl.cfg"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
@@ -248,7 +250,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/openocd-${{ matrix.architecture }}
-          key: openocd-${{ env.OPENOCD_CACHE_SCHEMA }}-${{ runner.os }}-${{ matrix.architecture }}-ubuntu22.04-${{ env.OPENOCD_TOOLCHAIN_EPOCH }}-${{ hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py') }}
+          key: openocd-${{ env.OPENOCD_CACHE_SCHEMA }}-${{ runner.os }}-${{ matrix.architecture }}-ubuntu22.04-${{ env.OPENOCD_TOOLCHAIN_EPOCH }}-${{ hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py', 'data/ic-support/target/stm32f103xl.cfg') }}
 
       - name: Set up QEMU for ARMv7 build and runtime smoke
         if: matrix.architecture == 'armv7l'
@@ -332,6 +334,14 @@ jobs:
           ldd "$PLASMA_TEST_OPENOCD" | tee "$RUNNER_TEMP/openocd-rpc-real-ldd.txt"
           ! grep -q "not found" "$RUNNER_TEMP/openocd-rpc-real-ldd.txt"
           grep -q "libgpiod.so.2" "$RUNNER_TEMP/openocd-rpc-real-ldd.txt"
+          "$PLASMA_TEST_OPENOCD" --version 2>&1 | grep -q 'Open On-Chip Debugger 0.12.0'
+          cmp data/ic-support/target/stm32f103xl.cfg \
+            "$PLASMA_TEST_OPENOCD_SCRIPTS/target/stm32f103xl.cfg"
+          banks="$("$PLASMA_TEST_OPENOCD" -s "$PLASMA_TEST_OPENOCD_SCRIPTS" \
+            -c 'adapter driver dummy' -f target/stm32f1x.cfg \
+            -f target/stm32f103xl.cfg -c 'flash banks' -c shutdown 2>&1)"
+          grep -q '#0 .*0x08000000' <<< "$banks"
+          grep -q '#1 .*0x08080000' <<< "$banks"
           python -m pytest -q software/python/tests/test_openocd_rpc_worker_real.py
       - name: Install and execute on fresh matching Ubuntu 22.04 userspace
         shell: bash
@@ -413,7 +423,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/openocd-${{ matrix.architecture }}
-          key: openocd-${{ env.OPENOCD_CACHE_SCHEMA }}-${{ runner.os }}-${{ matrix.architecture }}-ubuntu22.04-${{ env.OPENOCD_TOOLCHAIN_EPOCH }}-${{ hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py') }}
+          key: openocd-${{ env.OPENOCD_CACHE_SCHEMA }}-${{ runner.os }}-${{ matrix.architecture }}-ubuntu22.04-${{ env.OPENOCD_TOOLCHAIN_EPOCH }}-${{ hashFiles('release/openocd.json', 'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py', 'data/ic-support/target/stm32f103xl.cfg') }}
 
       - name: Upload qualified OpenOCD runtime candidate
         uses: actions/upload-artifact@v4

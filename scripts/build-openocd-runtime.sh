@@ -67,11 +67,9 @@ docker run --rm \
     git fetch --depth 1 origin "$OPENOCD_SOURCE_COMMIT"
     git checkout --detach FETCH_HEAD
     test "$(git rev-parse HEAD)" = "$OPENOCD_SOURCE_COMMIT"
-    git submodule update --init --depth 1 \
-      jimtcl \
-      src/jtag/drivers/libjaylink
+    git submodule update --init --depth 1 jimtcl
 
-    ./bootstrap
+    ./bootstrap nosubmodule
     ./configure \
       --prefix="$prefix" \
       --disable-werror \
@@ -79,10 +77,13 @@ docker run --rm \
       --enable-dummy \
       --enable-remote-bitbang \
       --enable-linuxgpiod \
+      --disable-internal-libjaylink \
       --disable-jlink
     make -j2
     make install
     strip --strip-unneeded "$prefix/bin/openocd"
+    install -m 0644 /repo/data/ic-support/target/stm32f103xl.cfg \
+      "$prefix/share/openocd/scripts/target/stm32f103xl.cfg"
 
     "$prefix/bin/openocd" --version
     test -d "$prefix/share/openocd/scripts/target"

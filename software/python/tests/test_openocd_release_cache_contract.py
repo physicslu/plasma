@@ -17,7 +17,7 @@ CACHE_KEY = (
     "${{ matrix.architecture }}-ubuntu22.04-"
     "${{ env.OPENOCD_TOOLCHAIN_EPOCH }}-"
     "${{ hashFiles('release/openocd.json', "
-    "'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py') }}"
+    "'scripts/build-openocd-runtime.sh', 'scripts/openocd-runtime.py', 'data/ic-support/target/stm32f103xl.cfg') }}"
 )
 
 

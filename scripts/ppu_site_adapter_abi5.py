@@ -296,14 +296,28 @@ class Abi5OpenocdAdapter:
                         actions: list[str]) -> list[str]:
         """The qualified programming preamble and ending around exactly the
         given actions; no caller-supplied Tcl."""
+        capacity_kib = bound.profile.flash_size // 1024
+        xl_capacity_guard = (
+            ["-c", f"plasma_flash_capacity_guard {capacity_kib}", "-c", "flash probe 1"]
+            if bound.profile.flash_size > 512 * 1024 else []
+        )
+        xl_config = []
+        if xl_capacity_guard:
+            extension = (self.scripts_root / "target/stm32f103xl.cfg").resolve()
+            if self.scripts_root.resolve() not in extension.parents or not extension.is_file():
+                raise TransportDenied("TARGET_CONFIG_NOT_FOUND")
+            xl_config = ["-f", "target/stm32f103xl.cfg"]
         return [
             *self._base_argv(site),
             "-f", self._target_config(bound),
+            *xl_config,
             "-c", f"adapter speed {self._clock_khz(bound.profile)}",
             "-c", "init",
             "-c", "reset halt",
             "-c", "poll off",
+            *xl_capacity_guard[:2],
             "-c", "flash probe 0",
+            *xl_capacity_guard[2:],
             *[part for action in actions for part in ("-c", action)],
             "-c", "reset run",
             "-c", "shutdown",
@@ -313,6 +327,28 @@ class Abi5OpenocdAdapter:
     def _commands(argv: list[str], pattern: re.Pattern[str]) -> list[tuple[str, ...]]:
         commands = [argv[i + 1] for i, part in enumerate(argv[:-1]) if part == "-c"]
         return [m.groups() for m in map(pattern.match, commands) if m]
+
+    @staticmethod
+    def _erase_segments(profile: FlashProfile, address: int, length: int) -> list[tuple[int, int]]:
+        """Keep a two-bank XL erase page based, including whole-bank ranges."""
+        if profile.flash_size <= 512 * 1024:
+            return [(address, length)]
+        if ((address - profile.flash_base) % profile.erase_granularity
+                or length % profile.erase_granularity):
+            raise TransportDenied("FLASH_RANGE_INVALID")
+        start, end = address, address + length
+        bank_2 = profile.flash_base + 512 * 1024
+        points = [start] + ([bank_2] if start < bank_2 < end else []) + [end]
+        result: list[tuple[int, int]] = []
+        for first, last in zip(points, points[1:]):
+            bank_start = profile.flash_base if first < bank_2 else bank_2
+            bank_end = bank_2 if first < bank_2 else profile.flash_base + profile.flash_size
+            if first == bank_start and last == bank_end:
+                split = last - profile.erase_granularity
+                result.extend(((first, split - first), (split, last - split)))
+            else:
+                result.append((first, last - first))
+        return result
 
     def _run_operations(self, site: int, operations: tuple[str, ...], *, deadline: float,
                         cancel: threading.Event, image: FlashImage | None,
@@ -369,8 +405,12 @@ class Abi5OpenocdAdapter:
                 if not final:
                     actions.append(f"echo PLASMA_STAGE_COMPLETED_{stage}")
             if "erase" in operations:
-                action("erase", f"flash erase_address 0x{erase_address:08x} 0x{erase_length:08x}",
-                       final=operations[-1] == "erase")
+                erase_segments = self._erase_segments(bound.profile, erase_address, erase_length)
+                actions.append("echo PLASMA_STAGE_STARTED_erase")
+                actions.extend(f"flash erase_address 0x{start:08x} 0x{size:08x}"
+                               for start, size in erase_segments)
+                if operations[-1] != "erase":
+                    actions.append("echo PLASMA_STAGE_COMPLETED_erase")
             if "program" in operations:
                 staged.write_bytes(image.payload)
                 staged.chmod(0o600)
@@ -398,19 +438,25 @@ class Abi5OpenocdAdapter:
 
             erased, wrote = ERASED.findall(log), WROTE.findall(log)
             if rc != 0:
+                if bound.profile.flash_size > 512 * 1024 and any(
+                    marker in log for marker in (
+                        "PLASMA_FLASH_CAPACITY_UNSUPPORTED",
+                        "PLASMA_FLASH_DEVICE_ID_MISMATCH",
+                        "PLASMA_FLASH_CAPACITY_MISMATCH",
+                    )
+                ):
+                    return failed("FLASH_CAPACITY_ADMISSION_FAILED", rc)
                 # OpenOCD stops at the first failing command.
-                step = ("erase" if "erase" in operations and not erased
+                step = ("erase" if "erase" in operations and len(erased) < len(erase_segments)
                         else "program" if "program" in operations and not wrote
                         else operations[-1])
                 return failed(f"OPENOCD_{step.upper()}_FAILED", rc, failed_step=step)
             steps: dict[str, dict[str, Any]] = {}
             if "erase" in operations:
                 commanded = self._commands(argv, _ERASE_CMD)
-                if (len(commanded) != 1 or len(erased) != 1
-                        or (int(commanded[0][0], 16), int(commanded[0][1], 16))
-                        != (erase_address, erase_length)
-                        or (int(erased[0][0], 16), int(erased[0][1]))
-                        != (erase_address, erase_length)):
+                expected_segments = erase_segments
+                if ([(int(a, 16), int(n, 16)) for a, n in commanded] != expected_segments
+                        or [(int(a, 16), int(n)) for a, n in erased] != expected_segments):
                     return failed("ERASE_RANGE_NOT_OBSERVED", rc, failed_step="erase")
                 steps["erase"] = {"erase_address": erase_address, "erase_length": erase_length}
             if "program" in operations:

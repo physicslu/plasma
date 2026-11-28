@@ -99,12 +99,12 @@ class ProgrammingQualificationRegistryTests(unittest.TestCase):
 
     def test_default_registry_preserves_st_77_and_adds_12_l2_without_downgrading_l3(self):
         registry = get_default_programming_qualification_registry()
-        self.assertEqual(registry.summary["reviewed_exact_icpns"], 90)
-        self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 89)
+        self.assertEqual(registry.summary["reviewed_exact_icpns"], 110)
+        self.assertEqual(registry.summary["catalog_level_2_programmable_exact_icpns"], 109)
         self.assertEqual(registry.summary["catalog_level_3_verified_exact_icpns"], 77)
         self.assertEqual(registry.summary["catalog_level_3_direct_hil_exact_icpns"], 1)
         self.assertEqual(registry.summary["catalog_level_3_family_ready_exact_icpns"], 76)
-        self.assertEqual(registry.summary["catalog_level_counts"], {"0": 204, "1": 5592, "2": 12, "3": 77})
+        self.assertEqual(registry.summary["catalog_level_counts"], {"0": 204, "1": 5572, "2": 32, "3": 77})
 
         blue_pill = registry.describe("STMicroelectronics", "STM32F103C8T6")
         self.assertEqual(blue_pill["catalog_level"], 3)

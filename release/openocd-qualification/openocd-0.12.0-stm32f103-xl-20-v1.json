@@ -1,0 +1,750 @@
+{
+  "schema_version": 1,
+  "qualification_id": "adr0002-phase2-openocd-012-stm32f103-xl-20-v1",
+  "status": "reviewed_source_only",
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1",
+  "provider": {
+    "provider_id": "openocd-upstream",
+    "version": "0.12.0",
+    "source_commit": "9ea7f3d647c8ecf6b0f1424002dfc3f4504a162c",
+    "runtime_id": "0.12.0-9ea7f3d647c8",
+    "target_config": "tcl/target/stm32f1x.cfg",
+    "flash_driver": "stm32f1x",
+    "flash_driver_source_path": "src/flash/nor/stm32f1x.c"
+  },
+  "target_extension_source_lock": {
+    "path": "release/openocd-qualification/stm32f103-xl-target-config-source-lock-v1.json",
+    "git_blob_sha1": "ad460d6e5888ec39fc8785ebb6d78a9d9e36b2dc"
+  },
+  "manufacturer_source_lock": {
+    "path": "release/openocd-qualification/stm32f103-xl-manufacturer-documentary-lock-v1.json",
+    "git_blob_sha1": "93a89ad6c2a52e4d4246b8c923dad96c01b57d8b"
+  },
+  "catalog_source_lock": {
+    "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+    "git_blob_sha1": "c3219788d61591a63aae8cd8df3d25ef15d5c8f3"
+  },
+  "ordering_source_lock": {
+    "path": "data/device-catalog/research/stm32f1-ordering-authority-v2.4.json",
+    "git_blob_sha1": "0c4b4b1d2e727726d0431ef89d687a6b6d2e98cf"
+  },
+  "programming_profile": {
+    "path": "data/ic-support/profiles/programming/stm32f1-xl-density-flash-v0.json",
+    "git_blob_sha1": "d30eb05ac9dab0f441bc0336095ad3a70e3b4865"
+  },
+  "manufacturer_programming_group": {
+    "group_id": "st-stm32f103-xl-programming-v1",
+    "manufacturer": "STMicroelectronics",
+    "family": "STM32F1",
+    "series": "STM32F103",
+    "density_class": "xl",
+    "silicon_identity": {
+      "openocd_device_id": "0x430",
+      "openocd_class": "STM32F10x XL-density",
+      "identity_assumption": "genuine STMicroelectronics silicon corresponding to the selected exact commercial ICPN",
+      "revision_policy": "The exact order code does not encode silicon revision; software qualification is bounded to the OpenOCD high-density device-ID class and exact Production identity."
+    },
+    "debug_transport": [
+      "SWD",
+      "JTAG"
+    ],
+    "programming_electrical": {
+      "vdd_programming_v": {
+        "min": 2,
+        "max": 3.6
+      },
+      "external_vpp_required": false
+    },
+    "shared_flash_geometry": {
+      "main_flash_start": "0x08000000",
+      "erase_unit": "page",
+      "erase_unit_bytes": 2048,
+      "program_unit": "halfword",
+      "program_unit_bytes": 2
+    },
+    "manufacturer_evidence": {
+      "source_lock": {
+        "st_ds16554_documentary_review": "42ed7861df4d2d17832bfa59c9368f19513c62cefe25ae202be6e80f65756bb4",
+        "st_pm0068_documentary_review": "42ed7861df4d2d17832bfa59c9368f19513c62cefe25ae202be6e80f65756bb4"
+      },
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "programming_profile_path": "data/ic-support/profiles/programming/stm32f1-xl-density-flash-v0.json",
+      "direct_applicability_id": "st-stm32f103-xl-exact-20-v1",
+      "source_lock_path": "release/openocd-qualification/stm32f103-xl-manufacturer-documentary-lock-v1.json"
+    },
+    "operation_qualification": {
+      "probe": {
+        "state": "SUPPORTED",
+        "openocd_basis": [
+          "pinned stm32f1x 0x430 dual-bank probe, erase/write, and read/verify framework"
+        ],
+        "manufacturer_basis": [
+          "DocID16554 Rev 4 exact F/G ordering and package",
+          "PM0068 Rev 2 dual-bank page programming"
+        ],
+        "differential_basis": [
+          "raw capacity and 0x430 device ID admitted before both bank probes"
+        ],
+        "scope": "two-bank Main Flash range with raw capacity admission"
+      },
+      "erase": {
+        "state": "SUPPORTED",
+        "scope": "two-bank Main Flash range with raw capacity admission",
+        "openocd_basis": [
+          "pinned stm32f1x 0x430 dual-bank probe, erase/write, and read/verify framework"
+        ],
+        "manufacturer_basis": [
+          "DocID16554 Rev 4 exact F/G ordering and package",
+          "PM0068 Rev 2 dual-bank page programming"
+        ],
+        "differential_basis": [
+          "raw capacity and 0x430 device ID admitted before both bank probes"
+        ]
+      },
+      "program": {
+        "state": "SUPPORTED",
+        "scope": "two-bank Main Flash range with raw capacity admission",
+        "implicit_erase": false,
+        "openocd_basis": [
+          "pinned stm32f1x 0x430 dual-bank probe, erase/write, and read/verify framework"
+        ],
+        "manufacturer_basis": [
+          "DocID16554 Rev 4 exact F/G ordering and package",
+          "PM0068 Rev 2 dual-bank page programming"
+        ],
+        "differential_basis": [
+          "raw capacity and 0x430 device ID admitted before both bank probes"
+        ]
+      },
+      "read": {
+        "state": "SUPPORTED",
+        "scope": "two-bank Main Flash range with raw capacity admission",
+        "openocd_basis": [
+          "pinned stm32f1x 0x430 dual-bank probe, erase/write, and read/verify framework"
+        ],
+        "manufacturer_basis": [
+          "DocID16554 Rev 4 exact F/G ordering and package",
+          "PM0068 Rev 2 dual-bank page programming"
+        ],
+        "differential_basis": [
+          "raw capacity and 0x430 device ID admitted before both bank probes"
+        ]
+      },
+      "verify": {
+        "state": "SUPPORTED",
+        "scope": "two-bank Main Flash range with raw capacity admission",
+        "openocd_basis": [
+          "pinned stm32f1x 0x430 dual-bank probe, erase/write, and read/verify framework"
+        ],
+        "manufacturer_basis": [
+          "DocID16554 Rev 4 exact F/G ordering and package",
+          "PM0068 Rev 2 dual-bank page programming"
+        ],
+        "differential_basis": [
+          "raw capacity and 0x430 device ID admitted before both bank probes"
+        ]
+      }
+    },
+    "blocked_operations": [
+      "OPTION_PROGRAM",
+      "OPTION_ERASE",
+      "RDP_ENABLE",
+      "RDP_DISABLE",
+      "WRITE_PROTECTION_CHANGE"
+    ],
+    "backend_constraints": [
+      "raw 16-bit Flash capacity register and device ID must match the selected exact profile before probing either bank",
+      "both banks must probe before erase, program, read or verify",
+      "no implicit erase",
+      "full-bank/mass erase and option/security mutation excluded"
+    ]
+  },
+  "records": [
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RFT6",
+      "base_device": "STM32F103RF",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rf-768k-v0",
+      "main_flash_size_bytes": 786432,
+      "page_count": 384,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103rf-768k-v0.json",
+        "git_blob_sha1": "228672a2943ff67a5a55d5bf866ad6744530b7af"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp64-route-v1.json",
+        "git_blob_sha1": "68502921317640d58bf7cc354316ae5bbc932967"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RFT6TR",
+      "base_device": "STM32F103RF",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rf-768k-v0",
+      "main_flash_size_bytes": 786432,
+      "page_count": 384,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103rf-768k-v0.json",
+        "git_blob_sha1": "228672a2943ff67a5a55d5bf866ad6744530b7af"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp64-route-v1.json",
+        "git_blob_sha1": "68502921317640d58bf7cc354316ae5bbc932967"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RGT6",
+      "base_device": "STM32F103RG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103rg-1024k-v0.json",
+        "git_blob_sha1": "70307cdf1859b9f279535bd3c664d96865d02987"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp64-route-v1.json",
+        "git_blob_sha1": "68502921317640d58bf7cc354316ae5bbc932967"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RGT6TR",
+      "base_device": "STM32F103RG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103rg-1024k-v0.json",
+        "git_blob_sha1": "70307cdf1859b9f279535bd3c664d96865d02987"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp64-route-v1.json",
+        "git_blob_sha1": "68502921317640d58bf7cc354316ae5bbc932967"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103RGT7",
+      "base_device": "STM32F103RG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103rg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103rg-1024k-v0.json",
+        "git_blob_sha1": "70307cdf1859b9f279535bd3c664d96865d02987"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp64-route-v1.json",
+        "git_blob_sha1": "68502921317640d58bf7cc354316ae5bbc932967"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VFT6",
+      "base_device": "STM32F103VF",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vf-768k-v0",
+      "main_flash_size_bytes": 786432,
+      "page_count": 384,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103vf-768k-v0.json",
+        "git_blob_sha1": "9da3c65f151e28528a1c76f908a26d0bd94c3519"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp100-route-v1.json",
+        "git_blob_sha1": "07ea13035ab7a1db89cbec35a1514ce60c3fb4d3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VFT6TR",
+      "base_device": "STM32F103VF",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vf-768k-v0",
+      "main_flash_size_bytes": 786432,
+      "page_count": 384,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103vf-768k-v0.json",
+        "git_blob_sha1": "9da3c65f151e28528a1c76f908a26d0bd94c3519"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp100-route-v1.json",
+        "git_blob_sha1": "07ea13035ab7a1db89cbec35a1514ce60c3fb4d3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VFT7",
+      "base_device": "STM32F103VF",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vf-768k-v0",
+      "main_flash_size_bytes": 786432,
+      "page_count": 384,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103vf-768k-v0.json",
+        "git_blob_sha1": "9da3c65f151e28528a1c76f908a26d0bd94c3519"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp100-route-v1.json",
+        "git_blob_sha1": "07ea13035ab7a1db89cbec35a1514ce60c3fb4d3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VGT6",
+      "base_device": "STM32F103VG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103vg-1024k-v0.json",
+        "git_blob_sha1": "be66e1c186e24887b1833929b1894bb004a3ff3a"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp100-route-v1.json",
+        "git_blob_sha1": "07ea13035ab7a1db89cbec35a1514ce60c3fb4d3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VGT6TR",
+      "base_device": "STM32F103VG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103vg-1024k-v0.json",
+        "git_blob_sha1": "be66e1c186e24887b1833929b1894bb004a3ff3a"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp100-route-v1.json",
+        "git_blob_sha1": "07ea13035ab7a1db89cbec35a1514ce60c3fb4d3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VGT7",
+      "base_device": "STM32F103VG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103vg-1024k-v0.json",
+        "git_blob_sha1": "be66e1c186e24887b1833929b1894bb004a3ff3a"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp100-route-v1.json",
+        "git_blob_sha1": "07ea13035ab7a1db89cbec35a1514ce60c3fb4d3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103VGT7TR",
+      "base_device": "STM32F103VG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103vg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103vg-1024k-v0.json",
+        "git_blob_sha1": "be66e1c186e24887b1833929b1894bb004a3ff3a"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp100-route-v1.json",
+        "git_blob_sha1": "07ea13035ab7a1db89cbec35a1514ce60c3fb4d3"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZFH6",
+      "base_device": "STM32F103ZF",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zf-768k-v0",
+      "main_flash_size_bytes": 786432,
+      "page_count": 384,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103zf-768k-v0.json",
+        "git_blob_sha1": "2b9c745f77f0213fc62fc11bb94daba30179d8f4"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lfbga144-route-v1.json",
+        "git_blob_sha1": "15d09a60f97c98d3a6e9614966c160c29dbd6a1d"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZFH6TR",
+      "base_device": "STM32F103ZF",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zf-768k-v0",
+      "main_flash_size_bytes": 786432,
+      "page_count": 384,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103zf-768k-v0.json",
+        "git_blob_sha1": "2b9c745f77f0213fc62fc11bb94daba30179d8f4"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lfbga144-route-v1.json",
+        "git_blob_sha1": "15d09a60f97c98d3a6e9614966c160c29dbd6a1d"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZFT6",
+      "base_device": "STM32F103ZF",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zf-768k-v0",
+      "main_flash_size_bytes": 786432,
+      "page_count": 384,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103zf-768k-v0.json",
+        "git_blob_sha1": "2b9c745f77f0213fc62fc11bb94daba30179d8f4"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp144-route-v1.json",
+        "git_blob_sha1": "74c801268f49cd6d6949e6e78aee0623e2645016"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZGH6",
+      "base_device": "STM32F103ZG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103zg-1024k-v0.json",
+        "git_blob_sha1": "4b20e787b27b519076ed0300fce324d23934e6a6"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lfbga144-route-v1.json",
+        "git_blob_sha1": "15d09a60f97c98d3a6e9614966c160c29dbd6a1d"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZGH6TR",
+      "base_device": "STM32F103ZG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103zg-1024k-v0.json",
+        "git_blob_sha1": "4b20e787b27b519076ed0300fce324d23934e6a6"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lfbga144-route-v1.json",
+        "git_blob_sha1": "15d09a60f97c98d3a6e9614966c160c29dbd6a1d"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZGH7",
+      "base_device": "STM32F103ZG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103zg-1024k-v0.json",
+        "git_blob_sha1": "4b20e787b27b519076ed0300fce324d23934e6a6"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lfbga144-route-v1.json",
+        "git_blob_sha1": "15d09a60f97c98d3a6e9614966c160c29dbd6a1d"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZGT6",
+      "base_device": "STM32F103ZG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103zg-1024k-v0.json",
+        "git_blob_sha1": "4b20e787b27b519076ed0300fce324d23934e6a6"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp144-route-v1.json",
+        "git_blob_sha1": "74c801268f49cd6d6949e6e78aee0623e2645016"
+      }
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "icpn": "STM32F103ZGT6TR",
+      "base_device": "STM32F103ZG",
+      "software_state": "SUPPORTED",
+      "programming_profile_id": "stm32f1-xl-density-flash-v0",
+      "memory_geometry_profile_id": "stm32f103zg-1024k-v0",
+      "main_flash_size_bytes": 1048576,
+      "page_count": 512,
+      "operations": [
+        "probe",
+        "erase",
+        "program",
+        "read",
+        "verify"
+      ],
+      "qualification_basis": {
+        "kind": "manufacturer_applicability",
+        "applicability_id": "st-stm32f103-xl-exact-20-v1"
+      },
+      "geometry": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103zg-1024k-v0.json",
+        "git_blob_sha1": "4b20e787b27b519076ed0300fce324d23934e6a6"
+      },
+      "package_route": {
+        "path": "release/openocd-qualification/catalog-stm32f103-xl-lqfp144-route-v1.json",
+        "git_blob_sha1": "74c801268f49cd6d6949e6e78aee0623e2645016"
+      }
+    }
+  ],
+  "reviewed_exact_icpn_count": 20,
+  "non_claims": {
+    "installed_runtime_attested": false,
+    "physical_programming_qualified": false,
+    "execution_authorized": false
+  }
+}

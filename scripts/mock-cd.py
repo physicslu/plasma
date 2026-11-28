@@ -157,7 +157,8 @@ def write_manager_config(path: Path, work: Path) -> None:
         "manager": {
             "host": "127.0.0.1",
             "port": MANAGER_PORT,
-            "request_timeout_s": 1.0,
+            # Eight concurrent Mock Sites can briefly saturate the CI host.
+            "request_timeout_s": 5.0,
             "poll_interval_s": 0.2,
             "observation_db_path": str((work / "manager-observations.sqlite3").resolve()),
             # Persisted registry: configured PPUs are commissioned, and the

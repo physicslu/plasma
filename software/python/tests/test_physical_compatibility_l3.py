@@ -222,7 +222,7 @@ def test_l3_exact_family_allowlist_77_once_and_separate_hil_from_inference():
     registry = get_default_programming_qualification_registry()
     families = get_default_family_ready_registry()
     assert len(families.exact_keys) == 76
-    assert registry.summary["catalog_level_counts"] == {"0": 204, "1": 5592, "2": 12, "3": 77}
+    assert registry.summary["catalog_level_counts"] == {"0": 204, "1": 5572, "2": 32, "3": 77}
 
     blue_pill = registry.describe("STMicroelectronics", "STM32F103C8T6")
     assert blue_pill["ppu_readiness_source"] == "DIRECT_HIL"

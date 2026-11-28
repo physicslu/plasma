@@ -41,7 +41,7 @@ class STM32F103LowDensityCandidateGate1Test(unittest.TestCase):
 
     def test_existing_77_plus_exact_12_and_no_exclusions(self):
         registry = get_default_openocd_software_qualification_registry()
-        self.assertEqual(len(registry.supported_exact_icpns("STMicroelectronics")), 89)
+        self.assertEqual(len(registry.supported_exact_icpns("STMicroelectronics")), 109)
         for row in self.original["app"]["records"]:
             self.assertEqual(registry.state_for("STMicroelectronics", row["icpn"]), "SUPPORTED")
         for icpn in EXCLUDED:
