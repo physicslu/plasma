@@ -1827,7 +1827,8 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                 # classify this PPU (Mock vs Physical) from it; null if absent.
                 try:
                     payload["target"] = _trusted_package_target(self.owner.bootstrap_paths)
-                except BootstrapServiceError:
+                except (BootstrapServiceError, OSError, ValueError):
+                    # Unreadable or invalid: unclassified (never Mock), status still served.
                     payload["target"] = None
                 self._json(HTTPStatus.OK, payload)
             except BootstrapServiceError as exc:
