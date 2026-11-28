@@ -16,6 +16,7 @@ the PPU control-plane scripts (``--control-plane``).
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import signal
@@ -111,6 +112,7 @@ class MockPPUSpec:
             "package_target": root / "ppu-package-target.json",
             "install_policy": root / "ppu-bundle-install-policy.json",
             "ticket": root / "enrollment-ticket",
+            "lock": root / "launcher.lock",
             "output": root / f"{self.device_id}-output",
         }
         for key in ("runtime_socket", "admission_socket"):
@@ -345,12 +347,29 @@ def register_with_manager(spec: MockPPUSpec, manager_url: str) -> str:
 # -- process supervision -----------------------------------------------------
 
 class Stack:
-    """The three Mock PPU processes, started in dependency order."""
+    """The three Mock PPU processes, started in dependency order.
+
+    One launcher owns a device root at a time (an exclusive lock held for its
+    whole life), so a second start can never re-provision, unlink the sockets
+    of, or double-register a running Mock PPU.
+    """
 
     def __init__(self, spec: MockPPUSpec, *, log_dir: Path | None = None) -> None:
         self.spec = spec
         self.log_dir = log_dir
         self.processes: list[tuple[str, subprocess.Popen[bytes]]] = []
+        self._lock_fd: int | None = None
+
+    def _acquire_root(self) -> None:
+        root = self.spec.root
+        root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(self.spec.paths()["lock"], os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(fd)
+            raise MockPPUError(f"another launcher already runs this Mock PPU ({root})") from None
+        self._lock_fd = fd
 
     def _spawn(self, name: str, command: list[str]) -> None:
         output: Any = None
@@ -372,6 +391,7 @@ class Stack:
             raise MockPPUError(f"Mock PPU process exited: {dead}")
 
     def start(self, *, timeout_s: float = 60.0) -> None:
+        self._acquire_root()
         paths = provision(self.spec)
         self._spawn("runtime", runtime_command(self.spec))
         # The Runtime control socket exists before the Bootstrap starts, so
@@ -403,6 +423,9 @@ class Stack:
                     pass
                 process.wait()
         self.processes.clear()
+        if self._lock_fd is not None:
+            os.close(self._lock_fd)
+            self._lock_fd = None
 
 
 def serve(spec: MockPPUSpec, manager_url: str | None, *, log_dir: Path | None = None,

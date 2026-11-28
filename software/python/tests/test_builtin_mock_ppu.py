@@ -390,3 +390,16 @@ def _load_installer():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_one_launcher_owns_a_device_root(tmp_path: Path) -> None:
+    spec = mock_ppu.MockPPUSpec(root=tmp_path / "m", control_plane=SCRIPTS)
+    first, second = mock_ppu.Stack(spec), mock_ppu.Stack(spec)
+    first._acquire_root()
+    socket_path = spec.paths()["admission_socket"]
+    with pytest.raises(mock_ppu.MockPPUError, match="another launcher"):
+        second.start()
+    assert second.processes == [] and not socket_path.exists()
+    first.stop()
+    second._acquire_root()          # released on stop: a restart may take it
+    second.stop()
