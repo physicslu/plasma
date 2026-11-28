@@ -410,3 +410,35 @@ def test_one_launcher_owns_a_device_root(tmp_path: Path) -> None:
     first.stop()
     second._acquire_root()          # released on stop: a restart may take it
     second.stop()
+
+
+def test_rejected_ticket_is_discarded_and_ends_the_launcher(monkeypatch, tmp_path: Path) -> None:
+    spec = mock_ppu.MockPPUSpec(root=tmp_path / "m", control_plane=SCRIPTS)
+    spec.root.mkdir()
+    spec.paths()["ticket"].write_text("t" * 64)
+
+    def request(method, url, body=None, *, timeout=10.0):
+        if url.endswith("/api/registry"):
+            return 200, {"ppus": [{"alias": spec.alias, "endpoint": spec.gateway_url,
+                                   "lifecycle": "commissioned"}]}
+        if url.endswith("/bootstrap"):
+            return 200, {"pairing": {"paired": False}}
+        return 409, {"ok": False, "state": "ENROLLMENT_EXPIRED"}
+
+    monkeypatch.setattr(mock_ppu, "_request", request)
+    with pytest.raises(mock_ppu.EnrollmentTicketRejected):
+        mock_ppu.register_with_manager(spec, "http://127.0.0.1:18280")
+    assert not spec.paths()["ticket"].exists()
+
+
+def test_busy_enrollment_window_does_not_crash_the_bootstrap(tmp_path: Path) -> None:
+    service, server, _armed = _fake_server(tmp_path, "mock")
+    controller = SimpleNamespace(ControllerError=RuntimeError, boot_clock=lambda: 1.0)
+
+    def busy(now, authorized):
+        raise RuntimeError("ENROLLMENT_BUSY")
+
+    server.controller_module = controller
+    server.engine.engineering_arm = busy
+    assert service.arm_mock_enrollment_ticket(server, tmp_path / "ticket") is False
+    assert not (tmp_path / "ticket").exists()

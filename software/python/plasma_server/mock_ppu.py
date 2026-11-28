@@ -67,6 +67,11 @@ class MockPPUError(RuntimeError):
     pass
 
 
+class EnrollmentTicketRejected(MockPPUError):
+    """The PPU refused the armed ticket (e.g. its window expired). The ticket
+    is discarded and the launcher exits, so a restart arms a fresh one."""
+
+
 def route_document() -> dict[str, Any]:
     """The built-in Mock Route file document (single source of its bytes)."""
     return mock_resources.mock_route_document(
@@ -342,6 +347,9 @@ def register_with_manager(spec: MockPPUSpec, manager_url: str) -> str:
     status, payload = _request(
         "POST", f"{manager_url}/api/registry/{alias}/bootstrap/enrollment",
         {"entry": "ticket", "ticket": ticket, "label": ENROLLMENT_LABEL}, timeout=60.0)
+    if status == 409 and payload.get("ok") is False:   # the PPU refused the claim
+        ticket_path.unlink(missing_ok=True)
+        raise EnrollmentTicketRejected(f"Mock PPU refused its enrollment ticket: {payload.get('state')}")
     if status != 200 or payload.get("ok") is not True:
         raise MockPPUError(f"Mock PPU enrollment failed: HTTP {status} {payload.get('state')}")
     ticket_path.unlink(missing_ok=True)
@@ -456,6 +464,8 @@ def serve(spec: MockPPUSpec, manager_url: str | None, *, log_dir: Path | None = 
             if not registered:
                 try:
                     result = register_with_manager(spec, manager_url)
+                except EnrollmentTicketRejected:
+                    raise
                 except (MockPPUError, URLError, OSError) as exc:
                     if str(exc) != last_error:
                         print(f"[mock-ppu] {spec.alias} registration pending: {exc}",

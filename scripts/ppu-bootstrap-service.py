@@ -1987,7 +1987,13 @@ def arm_mock_enrollment_ticket(server: "BootstrapHTTPServer", ticket_file: Path)
     controller = server.controller_module
     if server.engine.controller_state() != "UNENROLLED" or ticket_file.exists():
         return False
-    ticket = server.engine.engineering_arm(controller.boot_clock(), authorized=True)
+    try:
+        ticket = server.engine.engineering_arm(controller.boot_clock(), authorized=True)
+    except controller.ControllerError as exc:
+        # A window armed by an earlier start is still open (its ticket is not
+        # recoverable): serve anyway; it expires and the next start re-arms.
+        sys.stderr.write(f"mock enrollment ticket not armed: {exc}\n")
+        return False
     partial = ticket_file.with_name(ticket_file.name + ".part")
     fd = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
