@@ -16,7 +16,8 @@ Control Station
      v
 ├── Plasma Control Console
 ├── Manager BFF runtime
-└── Plasma Manager
+├── Plasma Manager
+└── Built-in Mock PPU (default on; simulated, see 3.1)
         |
         | managed network route
         v
@@ -86,6 +87,8 @@ The Control Station is the operator/fleet product role. It owns:
 - operator-facing logs and effective-version observability.
 
 It does **not** own PPU Site execution, FPGA behavior, target power, or real IC programming.
+
+**Built-in Mock PPU (owner Product Decision 2026-11-28, Gate 1 D1-D7).** The Control Station also installs and, by default, starts one simulated PPU: alias `mock-ppu-01`, eight Mock Sites, Virtual Flash. It is the **same three-process PPU** as a Z2 (Plasma Runtime with Mock Sites, PPU Bootstrap, Plasma Gateway), launched by `python -m plasma_server.mock_ppu serve` from the release venv and the release's own PPU control plane. The Manager reaches it only through the PPU boundary (registry, ticket enrollment, G13 writes, Batch Engine); the Mock Driver is never wired into the Manager. The Manager classifies a PPU as Mock only from the enrolled device's MACed Bootstrap status (owner-provisioned package target `platform: mock`), refuses a Batch that mixes Mock and non-Mock PPUs, resolves the Mock Route only for a Mock Batch, and labels Mock results `MOCK` so they are never production quantities, PASS/FAIL or Yield. An installer may opt out (`--no-mock-ppu`). Linux only for now: its Runtime control socket and G13 admission rely on Linux Unix-socket peer credentials; macOS/Windows are tracked in the TODO register.
 
 The planned Control Station platform baseline is:
 
@@ -251,6 +254,8 @@ The product should avoid three independent Control Station implementations. The 
 Control Station common runtime payload
 ├── Console/BFF application
 ├── Manager runtime
+├── built-in Mock PPU: Python runtime (same venv) + PPU control plane
+│   (the Bootstrap file set of ppu-bootstrap-installer.control_plane_files())
 ├── product metadata
 └── common configuration model
 

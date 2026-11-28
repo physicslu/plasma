@@ -14,21 +14,59 @@ Control Station Console/BFF  127.0.0.1:18190
   |
   v
 Plasma Manager               127.0.0.1:18280
-  |
-  v
-Configured PPU Plasma Gateway endpoint
+  |                    \
+  v                     v
+Configured PPU          Built-in Mock PPU mock-ppu-01 (default on)
+Plasma Gateway          127.0.80.1: Gateway 18080, Bootstrap 18081, Runtime 18082
 ```
 
-The profile deliberately does **not** start:
+The Physical PPU is a separate deployment role. The profile never starts a
+physical PPU runtime, FPGA/PL runtime or Engineering Mock Provider.
+
+## Built-in Mock PPU
+
+Owner Product Decision 2026-11-28, Gate 1 D1-D7. The profile installs
+`plasma-mock-ppu.service` (user systemd, enabled and started by default):
 
 ```text
-Plasma Server
-Plasma Gateway
-Mock Provider
-FPGA/PL runtime
+plasma-mock-ppu.service
+  -> <current>/venv/bin/python -m plasma_server.mock_ppu serve
+       --root ~/.local/state/plasma/local-control-station/mock-ppu
+       --control-plane <current>/ppu-control-plane
+       --alias mock-ppu-01 --sites 8 --manager-url http://127.0.0.1:18280
+     ├── plasma_server.runtime_server   (8 Mock Sites, Virtual Flash)
+     ├── ppu-bootstrap-service.py serve (enrollment, B1/B2/B3, G13 admission socket)
+     └── plasma_web.gateway_phase3      (Plasma Gateway)
 ```
 
-The PPU is a separate deployment role.
+- **Same PPU boundary (D1).** Three real PPU processes; the Manager uses its
+  normal registry, ticket enrollment, G13-signed writes, Resource Reservation
+  and Batch Engine. Nothing is added to the Manager or the Scheduler.
+- **Stable identity.** The device root keeps its machine identity, Bootstrap
+  controller state and Active Set across restarts; a restart reuses the
+  existing enrollment. The launcher's Engineering ticket is armed only while
+  UNENROLLED and only on a device whose 0600 package target says
+  `platform: mock` (`ppu-bootstrap-service.py --mock-enrollment-ticket-file`).
+  To re-enroll a Mock, stop the service and remove its root.
+- **Registration.** The launcher adds `mock-ppu-01` to the Manager registry
+  (loopback API), commissions it once the Manager observes it, and enrolls it
+  with its one-time ticket, which is then deleted. It refuses an alias that
+  already belongs to another endpoint. The Console's fixed Physical alias
+  (`--ppu-alias`) is unchanged and `mock-ppu-01` is reserved (D6).
+- **Isolation (D3/D4).** The Manager classifies each enrolled PPU from its MACed
+  Bootstrap status, refuses Mock/non-Mock mixed Batches before any PPU is read
+  or reserved, resolves `data/opf/programming-routes/mock-site-simulated.json`
+  only for Mock Batches, and records `ppu_class` on every Batch. The Console
+  shows `MOCK` on the PPU, the KPIs (`MOCK YIELD`, ...) and `[STATISTICS]` lines.
+- **Opt-out (D7).** `plasmactl install|deploy local-control-station --no-mock-ppu`
+  removes and disables the unit; `--mock-ppu` re-enables it. The choice is
+  persisted in `profile.env` (`PLASMA_LOCAL_CONTROL_STATION_MOCK_PPU`).
+- **No repository at runtime.** The Mock runs from the release venv and the
+  release's `ppu-control-plane/` (built with the same `_build_control_plane`
+  as the PPU Runtime release); it needs no Git, Playwright or CI fixture.
+- **Platform.** Linux only. Its Runtime control socket and G13 admission rely on
+  Linux Unix-socket peer credentials (`SO_PEERCRED`) and 0600 socket files;
+  macOS/Windows are deferred (TODO register).
 
 ## Why this profile exists
 
