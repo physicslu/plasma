@@ -1,0 +1,12 @@
+== Manager relay POST /api/engineering/session (removed)
+{"ok": false, "error": {"code": "managed_route_not_allowed", "message": "Manager PPU route is not allowlisted"}} HTTP 404
+== Z2 Gateway unsigned POST /api/engineering/session (G13)
+{"ok": false, "error": {"code": "CONTROLLER_OPERATION_UNCLASSIFIED"}} HTTP 403
+== Z2 Gateway unsigned POST engineering target jobs (G13)
+{"ok": false, "error": {"code": "CONTROLLER_OPERATION_UNCLASSIFIED"}} HTTP 403
+== Manager relay GET /api/engineering/targets (kept)
+HTTP 503
+== Manager relay GET /api/status (kept)
+gen 25 reservation NONE busy False
+== Console
+HTTP 307
