@@ -178,14 +178,6 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
             self.assertFalse(any("/api/devices/search" in r["path"]
                                  for r in FakeManagedPPUGatewayHandler.requests[before:]))
 
-            body = json.dumps({"site_id": 1, "operations": ["erase", "program", "verify"]}).encode("utf-8")
-            status, _, data = self.relay(
-                "POST", "/api/jobs", body=body,
-                headers={"Content-Type": "application/json", "Idempotency-Key": "catalog-down-1"},
-            )
-            self.assertEqual(status, 200, data)
-            self.assertEqual(FakeManagedPPUGatewayHandler.requests[-1]["path"], "/api/jobs")
-            self.assertEqual(FakeManagedPPUGatewayHandler.requests[-1]["body"], body)
             status, _, _ = self.relay("GET", "/api/status")
             self.assertEqual(status, 200)
 
@@ -210,24 +202,6 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
         self.assertEqual(observed["content_type"], "application/json")
         self.assertEqual(observed["body"], body)
 
-    def test_binary_programming_asset_is_relayed_byte_for_byte(self):
-        asset = bytes(range(256)) * 8
-        path = (
-            "/api/engineering/targets/fac-a/ppu-01/api/programming-assets"
-            "?session_id=s1&name=image.bin&type=image&format=binary&sha256=abc"
-        )
-        status, _, data = self.relay(
-            "POST",
-            path,
-            body=asset,
-            headers={"Content-Type": "application/octet-stream", "Idempotency-Key": "asset-1"},
-        )
-        self.assertEqual(status, 201)
-        self.assertEqual(json.loads(data)["size"], len(asset))
-        observed = FakeManagedPPUGatewayHandler.requests[-1]
-        self.assertEqual(observed["body"], asset)
-        self.assertIn("session_id=s1", observed["path"])
-
     def test_retired_ppu_batch_routes_are_denied_before_ppu_contact(self):
         # A Manager-owned Batch is started through /api/programming/batches;
         # the PPU runs no Batch, so no /api/batches route is relayed (U10).
@@ -247,16 +221,25 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
                 self.assertEqual(json.loads(data)["error"]["code"], "managed_route_not_allowed")
                 self.assertEqual(len(FakeManagedPPUGatewayHandler.requests), before)
 
-    def test_retained_job_relay_still_reaches_ppu(self):
-        # The Job relay (Mock/CD and Render smoke callers) stays.
-        status, _, data = self.relay(
-            "POST", "/api/jobs", body=b"{}",
-            headers={"Content-Type": "application/json", "Idempotency-Key": "job-1"},
-        )
-        self.assertEqual(status, 200, data)
-        observed = FakeManagedPPUGatewayHandler.requests[-1]
-        self.assertEqual((observed["method"], observed["path"]), ("POST", "/api/jobs"))
-        self.assertEqual(observed["idempotency_key"], "job-1")
+    def test_direct_programming_routes_are_denied_before_ppu_contact(self):
+        # U7: a Programming Job is admitted only under a Manager Batch Resource
+        # Reservation, so no direct Job, Job cancel or Engineering Programming
+        # Asset write is relayed to a PPU.
+        before = len(FakeManagedPPUGatewayHandler.requests)
+        for path in (
+            "/api/jobs",
+            "/api/jobs/job-7/cancel",
+            "/api/engineering/targets/fac-a/ppu-01/api/jobs",
+            "/api/engineering/targets/fac-a/ppu-01/api/jobs/job-7/cancel",
+            "/api/engineering/targets/fac-a/ppu-01/api/programming-assets",
+            "/api/engineering/targets/fac-a/ppu-01/api/programming-assets/check",
+        ):
+            with self.subTest(path=path):
+                status, _, data = self.relay(
+                    "POST", path, body=b"{}", headers={"Content-Type": "application/json"})
+                self.assertEqual(status, 404, data)
+                self.assertEqual(json.loads(data)["error"]["code"], "managed_route_not_allowed")
+                self.assertEqual(len(FakeManagedPPUGatewayHandler.requests), before)
 
     def test_manager_declares_one_exchange_per_connection(self):
         # HTTP/1.0 Manager: every response says Connection: close, so a pooling

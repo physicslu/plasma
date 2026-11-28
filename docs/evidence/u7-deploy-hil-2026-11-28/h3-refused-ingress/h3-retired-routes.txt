@@ -1,0 +1,15 @@
+== Z2 Gateway direct GET /api/batches/x
+{"ok": false, "error": {"error_code": "PPU_BATCH_RETIRED", "error_type": "PPU_BATCH_RETIRED", "message": "The PPU no longer runs Batches; submit Programming to the Plasma Manager /api/programming/batches"}} HTTP 410
+== Z2 Gateway direct POST /api/jobs (unsigned, diagnostic/mock labels)
+{"ok": false, "error": {"code": "CONTROLLER_UNAUTHENTICATED", "controller_generation": 2}} HTTP 401
+== Manager relay POST /api/jobs (removed by U7)
+{"ok": false, "error": {"code": "managed_route_not_allowed", "message": "Manager PPU route is not allowlisted"}} HTTP 404
+== Manager relay POST /api/jobs/x/cancel (removed by U7)
+{"ok": false, "error": {"code": "managed_route_not_allowed", "message": "Manager PPU route is not allowlisted"}} HTTP 404
+== Manager relay POST engineering jobs (removed by U7)
+{"ok": false, "error": {"code": "managed_route_not_allowed", "message": "Manager PPU route is not allowlisted"}} HTTP 404
+== Console BFF relay POST /api/jobs
+{"ok":false,"error":{"code":"managed_route_not_allowed","message":"Managed PPU path must remain under /api"}} HTTP 404
+== Manager relay GET /api/batches/x
+{"ok": false, "error": {"code": "managed_route_not_allowed", "message": "Manager PPU route is not allowlisted"}} HTTP 404
+after-h3 gen 25 reservation NONE busy False

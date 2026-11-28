@@ -630,9 +630,11 @@ def test_read_is_refused_while_a_programming_job_owns_the_site():
                 status, first = await stack.api(
                     "POST", "/api/jobs", ops_body(resource, ["erase", "program", "verify"], FW_A))
                 assert status == 202, first
+                # Another execution's Read: it has no claim on this Reservation.
                 status, second = await stack.api(
                     "POST", "/api/jobs",
-                    job_body(resource, None, operation="read", address=BASE, length=64))
+                    {**job_body(resource, None, operation="read", address=BASE, length=64),
+                     "execution_owner_id": "other-batch", "resource_reservation_token": "0" * 32})
                 gate.set()
                 job_id = first["job"]["job_id"]
                 for _ in range(500):

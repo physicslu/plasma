@@ -1,0 +1,1 @@
+<operator-home>/.local/share/plasma/local-control-station/releases/6cda93f2b5b6

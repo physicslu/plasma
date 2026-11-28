@@ -512,7 +512,50 @@ class Stack:
         await self.server.close()
         self.opf_context.close()
 
+    async def reserved(self, body, owner="host-test-batch", *, required=True):
+        """U7: a Job body under this PPU's ACTIVE Resource Reservation, acquired
+        through the real Gateway REST route exactly as the Manager does.
+
+        ``required=False``: when the PPU refuses the Reservation itself (no
+        verifiable Active Set, quiesced), the body is returned unreserved so a
+        negative test proves the Job is refused all the same."""
+        self.unreserved = False
+        held = getattr(self, "_reservation", None)
+        if held is not None and held[0] == owner:
+            return {**body, "execution_owner_id": owner, "resource_reservation_token": held[2]}
+        try:
+            identity = self.manager._resolve_active_resources()
+        except Exception:
+            if required:
+                raise
+            self.unreserved = True
+            return body
+        expected = {"ppu_id": self.manager.config.ppu.id,
+                    "asset_set_sha256": identity["asset_set_sha256"],
+                    "generation": identity["generation"],
+                    "resource_set_sha256": identity["resource_set_sha256"]}
+        if held is not None:
+            await self.api("POST", "/api/resource-reservations",
+                           {"action": "release", "owner_id": held[0], "token": held[2]})
+            held = None
+        if held is None:
+            status, answer = await self.api("POST", "/api/resource-reservations",
+                                            {"action": "acquire", "owner_id": owner,
+                                             "expected": expected})
+            if status != 200 and not required:
+                self.unreserved = True
+                return body
+            assert status == 200, answer
+            held = (owner, expected, answer["reservation"]["token"])
+            self._reservation = held
+        return {**body, "execution_owner_id": owner, "resource_reservation_token": held[2]}
+
     async def api(self, method, endpoint, payload=None):
+        if (method, endpoint) == ("POST", "/api/jobs") and isinstance(payload, dict) \
+                and "execution_owner_id" not in payload:
+            # As the Manager does: every Job is sent under its Batch Reservation.
+            payload = await self.reserved(payload, required=False)
+
         def request():
             if self.in_process:
                 handler = object.__new__(self.gateway)
@@ -756,7 +799,10 @@ def test_opf_rest_fail_closed_before_flash(case, options, code):
                     write_selection(stack.opf["engine_record"],
                                     {**stack.opf["engine_data"], "adapter_khz": 2000})
                 _job_id, job = await stack.flash(b"DENIED")
-                assert code in json.dumps(job), job
+                # U7: an unverifiable Active Set grants no Reservation, so the
+                # Job is refused before its Binding is read.
+                assert code in json.dumps(job) or (
+                    stack.unreserved and "Reservation required" in json.dumps(job)), job
                 assert not stack.sim.argvs
                 assert stack.core._sessions == {} and stack.core._site_owners == {}
                 assert not stack.images.exists() or list(stack.images.iterdir()) == []
@@ -864,7 +910,8 @@ def test_rest_multi_profile_invalid_selection_never_writes(selection, code):
                              bundle_options={"profile_count": 2}) as stack:
                 _job_id, job = await stack.flash(b"DENIED", **selection)
                 assert ("JOB_RESOURCE_IDENTITY_UNAVAILABLE" in json.dumps(job)
-                        or "job_binding does not match this Job request" in json.dumps(job)), job
+                        or "job_binding does not match this Job request" in json.dumps(job)
+                        or (stack.unreserved and "Reservation required" in json.dumps(job))), job
                 assert not stack.sim.argvs and not stack.core._sessions
     run(scenario())
 

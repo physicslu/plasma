@@ -185,7 +185,7 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
 
         self.assertEqual(report.checks["api:device-catalog-search"], "SKIP_UNPINNED")
         self.assertNotIn("/api/devices/search?q=stm32&limit=1", calls)
-        self.assertNotIn("api:managed-mock-program", report.checks)
+        self.assertNotIn("api:direct-job-refused", report.checks)
 
     def test_unpinned_pr_observation_accepts_the_current_main_topology(self) -> None:
         def request_json(_origin: str, path: str, *, timeout: float):
@@ -200,7 +200,7 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
 
         self.assertEqual(report.checks["api:engineering-targets"], "PASS")
 
-    def test_pinned_post_deployment_smoke_enforces_managed_contract_and_programs(self) -> None:
+    def test_pinned_post_deployment_smoke_enforces_managed_contract_and_refuses_direct_jobs(self) -> None:
         calls: list[str] = []
         posts: list[str] = []
 
@@ -208,24 +208,31 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
             calls.append(path)
             return self.contract_payload(path)
 
-        def request_json_post(_origin: str, path: str, payload: dict, *, timeout: float):
+        def refused(_origin: str, path: str, payload: dict, *, timeout: float):
             posts.append(path)
-            self.assertEqual(payload["site_id"], 1)
-            return {"job": {"job_id": "job-1", "state": "queued"}}
+            raise SMOKE.HTTPError(path, 404, "managed_route_not_allowed", None, None)
 
         report = self.report("d" * 40)
         with (
             patch.object(SMOKE, "request_json", side_effect=request_json),
-            patch.object(SMOKE, "request_json_post", side_effect=request_json_post),
+            patch.object(SMOKE, "request_json_post", side_effect=refused),
         ):
             SMOKE.assert_contracts(self.origin, timeout=0.1, report=report)
 
         self.assertEqual(report.checks["api:device-catalog-search"], "PASS")
-        self.assertEqual(report.checks["api:managed-mock-program"], "PASS")
+        self.assertEqual(report.checks["api:direct-job-refused"], "PASS")
         self.assertIn("/api/manager/devices/search?q=stm32&limit=1", calls)
         self.assertNotIn("/api/manager/ppu/api/devices/search?q=stm32&limit=1", calls)
-        self.assertIn("/api/manager/ppu/api/status?job=job-1", calls)
         self.assertEqual(posts, ["/api/manager/ppu/api/jobs"])
+
+    def test_pinned_smoke_fails_when_a_direct_job_is_accepted(self) -> None:
+        report = self.report("d" * 40)
+        with (
+            patch.object(SMOKE, "request_json", side_effect=lambda _o, path, *, timeout: self.contract_payload(path)),
+            patch.object(SMOKE, "request_json_post", return_value={"job": {"job_id": "job-1"}}),
+            self.assertRaisesRegex(RuntimeError, "accepted outside a Manager Batch"),
+        ):
+            SMOKE.assert_contracts(self.origin, timeout=0.1, report=report)
 
 
 if __name__ == "__main__":

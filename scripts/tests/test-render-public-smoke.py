@@ -4,8 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
-import hashlib
 import json
 import time
 from dataclasses import dataclass, field
@@ -17,7 +15,6 @@ from urllib.request import Request, urlopen
 
 DEFAULT_ORIGIN = "https://plasma-6zz7.onrender.com"
 USER_AGENT = "plasma-render-public-smoke/1"
-TERMINAL_JOB_STATES = {"success", "failed", "cancelled", "timeout", "aborted"}
 
 
 @dataclass
@@ -223,39 +220,17 @@ def assert_contracts(origin: str, *, timeout: float, report: SmokeReport) -> Non
     report.checks["api:mock-runtime"] = "PASS"
 
     if report.expected_commit is not None:
-        image = b"Plasma public managed smoke" * 16
-        submitted = request_json_post(
-            origin,
-            f"{prefix}/api/jobs",
-            {
-                "site_id": 1,
-                "operation": "program",
-                "asset_name": "public-smoke.bin",
-                "asset_type": "image",
-                "asset_format": "binary",
-                "asset_size": len(image),
-                "asset_sha256": hashlib.sha256(image).hexdigest(),
-                "asset_base64": base64.b64encode(image).decode(),
-            },
-            timeout=timeout,
-        )
-        job = submitted.get("job")
-        job_id = job.get("job_id") if isinstance(job, dict) else None
-        if not isinstance(job_id, str) or not job_id:
-            raise RuntimeError("managed Mock programming submit returned no Job ID")
-        deadline = time.monotonic() + 20
-        while time.monotonic() < deadline:
-            payload = request_json(origin, f"{prefix}/api/status?job={job_id}", timeout=timeout)
-            current = payload.get("job")
-            state = current.get("state") if isinstance(current, dict) else None
-            if state in TERMINAL_JOB_STATES:
-                if state != "success":
-                    raise RuntimeError(f"managed Mock programming Job ended in {state}")
-                report.checks["api:managed-mock-program"] = "PASS"
-                break
-            time.sleep(0.1)
+        # U7: a Programming Job runs only under a Manager Batch Resource
+        # Reservation. The direct managed Job route is refused, never relayed.
+        try:
+            request_json_post(origin, f"{prefix}/api/jobs", {"site_id": 1, "operation": "erase"},
+                              timeout=timeout)
+        except HTTPError as exc:
+            if exc.code != 404:
+                raise RuntimeError(f"direct managed Job returned HTTP {exc.code}, expected 404") from None
+            report.checks["api:direct-job-refused"] = "PASS"
         else:
-            raise RuntimeError("managed Mock programming Job did not finish before timeout")
+            raise RuntimeError("direct managed Job was accepted outside a Manager Batch")
 
 
 def write_report(path: Path | None, payload: dict[str, Any]) -> None:

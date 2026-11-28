@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import base64
-import hashlib
 import json
 import os
 import socket
@@ -139,33 +137,15 @@ def main() -> None:
                 f"{catalog['site_count']} Sites / 1 MiB each"
             )
 
-            image = b"Plasma Render managed integration test" * 16
-            response = post(
-                origin,
-                f"{managed}/api/jobs",
-                {
-                    "site_id": 1,
-                    "operation": "program",
-                    "asset_name": "render-demo.bin",
-                    "asset_type": "image",
-                    "asset_format": "binary",
-                    "asset_size": len(image),
-                    "asset_sha256": hashlib.sha256(image).hexdigest(),
-                    "asset_base64": base64.b64encode(image).decode(),
-                },
-            )
-            job_id = response["job"]["job_id"]
-            deadline = time.monotonic() + 10
-            while time.monotonic() < deadline:
-                _, _, payload = get(origin, f"{managed}/api/status?job={job_id}")
-                job = json.loads(payload)["job"]
-                if job["state"] in {"success", "failed", "cancelled", "timeout", "aborted"}:
-                    break
-                time.sleep(0.05)
+            # U7: a Programming Job runs only under a Manager Batch Resource
+            # Reservation; the direct managed Job route is refused, never relayed.
+            try:
+                post(origin, f"{managed}/api/jobs", {"site_id": 1, "operation": "erase"})
+            except HTTPError as exc:
+                assert exc.code == 404, exc.code
             else:
-                raise RuntimeError("Managed Mock programming Job did not complete")
-            assert job["state"] == "success", job
-            print(f"[render-runtime] managed Mock program: SITE 1 / {len(image)} bytes / success")
+                raise AssertionError("direct managed Job was accepted outside a Manager Batch")
+            print("[render-runtime] direct managed Job refused (U7)")
 
             memory_kib = child_memory_kib(process.pid)
             if memory_kib is not None:

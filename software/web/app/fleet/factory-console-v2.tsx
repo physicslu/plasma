@@ -41,7 +41,7 @@ import type {
   ServerBatchSiteState,
   ServerBatchSnapshot,
 } from "../batch-snapshot";
-import { useWorkspaceSession, type SelectionMap } from "../workspace-session";
+import { useJobSetting, useWorkspaceSession, type SelectionMap } from "../workspace-session";
 import {
   gatewayHealthFromError,
   summarizePPUHealth,
@@ -383,18 +383,18 @@ export default function FactoryConsoleV2() {
   const [providerError, setProviderError] = useState<string | null>(null);
   const [gatewayHealth, setGatewayHealth] = useState<GatewayHealthState>("connecting");
   const [runtimes, setRuntimes] = useState<Record<string, PPURuntime>>({});
-  const [targetDevice, setTargetDevice] = useState<DeviceSearchResult | null>(null);
+  const [targetDevice, setTargetDevice] = useJobSetting<DeviceSearchResult | null>("pmode.targetDevice", null);
   const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
   const [batchCommandState, setBatchCommandState] = useState<BatchCommandState>("idle");
   const [batchObservationState, setBatchObservationState] = useState<BatchObservationState>("connected");
   const [batchSnapshot, setBatchSnapshot] = useState<ServerBatchSnapshot | null>(null);
   const [clockNow, setClockNow] = useState(() => Date.now());
-  const [repeatCount, setRepeatCount] = useState("1");
-  const [replaceIc, setReplaceIc] = useState(true);
+  const [repeatCount, setRepeatCount] = useJobSetting("pmode.repeatCount", "1");
+  const [replaceIc, setReplaceIc] = useJobSetting("pmode.replaceIc", true);
   // Manual Repeat: Sites the operator marked "IC replaced", per pause.
   const [replacedMarks, setReplacedMarks] = useState<ReadonlySet<string>>(new Set());
-  const [siteRetryLimit, setSiteRetryLimit] = useState("3");
-  const [failedSiteThreshold, setFailedSiteThreshold] = useState("");
+  const [siteRetryLimit, setSiteRetryLimit] = useJobSetting("pmode.siteRetryLimit", "3");
+  const [failedSiteThreshold, setFailedSiteThreshold] = useJobSetting("pmode.failedSiteThreshold", "");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [programmingJobCollapsed, setProgrammingJobCollapsed] = useState(false);
 
@@ -402,9 +402,9 @@ export default function FactoryConsoleV2() {
   // Manager programming runs.
   const [managedTopology, setManagedTopology] = useState<ManagedTopology | null>(null);
   const [managedRoutes, setManagedRoutes] = useState<RoutesState | null>(null);
-  const [programmingSource, setProgrammingSource] = useState<ProgrammingSource>("image");
-  const [managedFile, setManagedFile] = useState<File | null>(null);
-  const [managedOperations, setManagedOperations] = useState<SequenceOperation[]>(["erase", "program", "verify"]);
+  const [programmingSource, setProgrammingSource] = useJobSetting<ProgrammingSource>("pmode.source", "image");
+  const [managedFile, setManagedFile] = useJobSetting<File | null>("pmode.file", null);
+  const [managedOperations, setManagedOperations] = useJobSetting<SequenceOperation[]>("pmode.operations", ["erase", "program", "verify"]);
   const [managedStartHold, setManagedStartHold] = useState<string | null>(null);
   const [managedBatchRecoveryId, setManagedBatchRecoveryId] = useState<string | null>(null);
   // Factory Log is a read-only view of the Manager's per-Site Job/Receipt truth.

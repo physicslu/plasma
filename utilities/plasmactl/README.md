@@ -108,10 +108,10 @@ plasmactl program status --batch-id B --wait
 | `scripts/plasmactl` Bash profile router (310 LOC) | MIGRATE | `plasma_cli/operations.py`; launcher kept (Z2 kit and installed symlink); Path 2 invokes the owner-authorized exact-argv CLI without a second command allowlist |
 | `plasmactl test receipt` | MIGRATE | `plasmactl program receipt` (single name) |
 | `scripts/plasma_programming_load.py`, `specs/programming-loading-benchmark-v1.schema.json`, Path 2 `p2hw-*` claim | DELETE | `plasmactl program` + `scripts/plasma_hil_timing.py` |
-| `scripts/plasma_program.py` | RETAIN | single-PPU Bundle commissioning (B1/B2/B3, Runtime Kit, one-Site diagnostic flash); not the formal programming entry; uses neutral `ppu_bootstrap_transport.py` |
+| `scripts/plasma_program.py` | RETAIN | single-PPU Bundle commissioning (B1/B2/B3, Runtime Kit); submits no Programming Job (U7: direct flash/run retired); uses neutral `ppu_bootstrap_transport.py` |
 | `scripts/plasmactl-*` backends | REMOVED | one canonical implementation in `utilities/plasmactl/backends/`; no repository aliases |
 | `scripts/plasma_engineering_hil.py` (`hil programming`) | RETAIN | Blue Pill A/B + USB CDC verification harness (unique CDC check) |
-| `software/python/plasma_client/cli.py` (`plasma`) | RETAIN | PPU-local Gateway debug client; not a Controller CLI |
+| `software/python/plasma_client/cli.py` (`plasma`) | RETAIN | PPU-local debug client (status / cancel only; U7 retired its direct program/erase/verify/read) |
 | `scripts/plasma_ppu.py` | RETAIN | read-only SWPC→PPU deployment doctor (direct PPU observation, no Manager) |
 
 ## Backend source ownership

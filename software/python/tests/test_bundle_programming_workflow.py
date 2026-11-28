@@ -379,7 +379,32 @@ def make(tmp_path, *, coordinator=None, gateway=None, registry=None, journal=Tru
         gate=PPUOperationGate(), request_timeout_s=5.0, routes_root=ROUTES,
         journal_path=(tmp_path / "runs.json") if journal else None,
         sleep=lambda _s: None, spawn=lambda target: target(), poll_interval_s=0.0)
+    workflow.start = _batch_owned_start(workflow)
     return workflow, coordinator, gateway
+
+
+TEST_BATCH = "test-batch"
+
+
+def _batch_owned_start(workflow):
+    """U7: the Manager submits a Job only under its Batch Resource Reservation.
+    A test that drives one run directly starts it the way a one-run Batch
+    does: reserve the plan's Resources on the PPU, then start under that owner.
+    If the PPU refuses the Reservation, the run is BLOCKED, as in production."""
+    start = workflow.start
+
+    def started(alias, body, *, execution_owner_id=None):
+        if execution_owner_id is None:
+            execution_owner_id = TEST_BATCH
+            plan = workflow._plans.get(body.get("plan_id")) if isinstance(body, dict) else None
+            if plan is not None and workflow._batch_session(alias, TEST_BATCH) is None:
+                try:
+                    workflow.begin_batch_resource(
+                        alias, TEST_BATCH, plan.payload["resource"]["resource_set_sha256"], plan.site)
+                except Exception:  # noqa: BLE001 - refused: the run is then BLOCKED
+                    pass
+        return start(alias, body, execution_owner_id=execution_owner_id)
+    return started
 
 
 def plan_body(raw: bytes | None = None, site: int = 2, icpn: str = ICPN,
@@ -1353,3 +1378,16 @@ def test_user_bundle_passes_the_host_only_ppu_bundle_verifier(tmp_path):
         path, expected_sha256=built.archive_sha256, target_profile=route.target)
     assert [p.kind for p in verified.packages] == [
         "platform-provider", "programming-profile", "firmware-asset"]
+
+
+def test_u7_a_run_without_its_batch_reservation_is_blocked_before_any_job_post(tmp_path):
+    """U7: the Manager never sends a Programming Job outside its Batch
+    Resource Reservation; the refusal is definite (BLOCKED), never UNKNOWN."""
+    workflow, _coordinator, gateway = make(tmp_path)
+    planned = workflow.plan(ALIAS, plan_body())["plan"]
+    started = workflow.start(ALIAS, {"plan_id": planned["plan_id"], "confirm": CONFIRM_TOKEN},
+                             execution_owner_id="batch-without-reservation")
+    run = workflow.run_status(ALIAS, started["run"]["run_id"])["run"]
+    assert (run["outcome"], run["reason"]) == ("BLOCKED", "RESOURCE_RESERVATION_MISSING")
+    assert gateway.posts == []
+    assert gateway.resource_reservation is None

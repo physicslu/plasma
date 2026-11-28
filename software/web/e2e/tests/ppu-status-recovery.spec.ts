@@ -26,18 +26,10 @@ async function openFactory(page: Page, ppus: MockPpu[]) {
 
 const fleetReads = (requests: string[]) => requests.filter(entry => entry === "GET /api/fleet").length;
 
-// KNOWN APP BUG (U10 managed PMode, reported, not fixed here): the Production
-// Set runtime of a PPU that the Manager Fleet could not observe never recovers.
-// `loadSelectionRuntimes` only retries on a transient PlasmaApiError, but the
-// managed status reader (`managedPpuStatus(await loadManagedTopology(), alias)`)
-// throws a plain Error, and the 5 s Fleet poll refreshes only the topology.
-// The PPU stays "0/1 READY · DEGRADED" with START disabled until the operator
-// re-commits the Production Set. These tests state the required contract and
-// are expected to fail until the app is fixed; then drop `test.fail`.
-const KNOWN_BUG = "managed PMode PPU status never auto-recovers after a Fleet observation failure";
-
+// A commissioned PPU the Fleet cannot observe is a transient status fault:
+// the status recovery re-reads the Manager Fleet with backoff until it is
+// observable again, so no stale OFFLINE state is kept.
 test("transient PPU status failure auto-recovers without reselecting FPS", async ({ page }) => {
-  test.fail(true, KNOWN_BUG);
   const ppus = mockFleet(1, [2]);
   const counters = await openFactory(page, ppus);
   // The Manager temporarily cannot reach the PPU while the set is committed.
@@ -55,7 +47,6 @@ test("transient PPU status failure auto-recovers without reselecting FPS", async
 });
 
 test("PMode keeps START disabled during a PPU status outage and re-enables it after recovery without reselecting FPS", async ({ page }) => {
-  test.fail(true, KNOWN_BUG);
   const ppus = mockFleet(1, [2]);
   await openFactory(page, ppus);
   ppus[0].transport = "unreachable";

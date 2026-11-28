@@ -16,7 +16,6 @@ import bluepill_bundle_v3_firmware_build as bluepill  # noqa: E402
 RUNTIME = "c" * 40
 DEVICE = "ppu-device-" + "1" * 24
 HOST = "192.168.2.99"
-JOB = "job-20261107-110001-abcdef12"
 
 
 def selection():
@@ -68,23 +67,6 @@ def patch_ready(monkeypatch):
     return observations
 
 
-def successful_job():
-    chosen = selection()
-    return {
-        "job_id": JOB, "site_id": chosen.site, "operation": "programming",
-        "state": "success",
-        "result": {
-            "state": "success", "image_sha256": chosen.firmware_sha,
-            "image_size": chosen.firmware_size, "attempts": 1,
-            "details": {"programming": {
-                "result": "PASS", "operations": ["erase", "program", "verify"],
-                "steps": {"erase": {}, "program": {}, "verify": {
-                    "readback_sha256": chosen.firmware_sha, "bytes_verified": chosen.firmware_size}},
-                "safe_off": True}},
-        },
-    }
-
-
 def test_local_bundle_selects_firmware_from_canonical_v3(tmp_path):
     image = (ROOT / "docs/evidence/bluepill-z2-flash-2026-10-27"
              / "firmware/plasma-blue-pill-cdc.bin")
@@ -115,11 +97,25 @@ def test_local_bundle_selects_firmware_from_canonical_v3(tmp_path):
 def test_mutation_requires_approval_before_io(monkeypatch):
     client = Client()
     monkeypatch.setattr(program, "readiness", lambda *a: pytest.fail("No I/O"))
-    for command in ("deploy", "flash", "run"):
-        with pytest.raises(program.ProgramDenied, match="OWNER_APPROVAL_REQUIRED"):
-            program.execute(command, selection(), host=HOST, device_id=DEVICE,
-                            client=client, runtime_sha=RUNTIME)
+    with pytest.raises(program.ProgramDenied, match="OWNER_APPROVAL_REQUIRED"):
+        program.execute("deploy", selection(), host=HOST, device_id=DEVICE, client=client)
     assert client.events == []
+
+
+def test_direct_programming_job_commands_are_retired(monkeypatch):
+    # U7: a Programming Job runs only under a Manager Batch Resource
+    # Reservation (`plasmactl program`); this tool submits no Job at all.
+    client = Client()
+    monkeypatch.setattr(program, "readiness", lambda *a: pytest.fail("No I/O"))
+    for command in ("flash", "run"):
+        with pytest.raises(program.ProgramDenied, match="COMMAND_DENIED"):
+            program.execute(command, selection(), host=HOST, device_id=DEVICE,
+                            client=client, approved_once=True)
+        with pytest.raises(SystemExit):
+            program.main([command, "--bundle", "x", "--site", "2", "--host", HOST,
+                          "--device-id", DEVICE])
+    assert client.events == []
+    assert not hasattr(program, "post_once")
 
 
 def test_diagnose_is_read_only(monkeypatch):
@@ -132,42 +128,6 @@ def test_diagnose_is_read_only(monkeypatch):
     assert "B1_B2_B3" not in client.events
 
 
-def test_runtime_version_guard_blocks_before_deployment(monkeypatch):
-    observations = patch_ready(monkeypatch)
-    client = Client(runtime="0" * 40)
-    with pytest.raises(program.ProgramDenied, match="RUNTIME_RELEASE_NOT_UPDATED"):
-        program.execute("run", selection(), host=HOST, device_id=DEVICE,
-                        client=client, runtime_sha=RUNTIME, approved_once=True)
-    assert not observations and "B1_B2_B3" not in client.events
-
-
-def test_flash_requires_matching_current_active_set(monkeypatch):
-    patch_ready(monkeypatch)
-    client = Client(active="e" * 64)
-    monkeypatch.setattr(program, "post_once", lambda *_, **_kw: pytest.fail("No Job"))
-    with pytest.raises(program.ProgramDenied, match="BUNDLE_NOT_CURRENTLY_ACTIVE"):
-        program.execute("flash", selection(), host=HOST, device_id=DEVICE,
-                        client=client, runtime_sha=RUNTIME, approved_once=True)
-
-
-def test_run_deploys_once_then_submits_one_bundle_reference_job(monkeypatch):
-    observations = patch_ready(monkeypatch)
-    client = Client(active="e" * 64)
-    submitted = []
-    monkeypatch.setattr(program, "post_once",
-                        lambda host, chosen, **_kw: submitted.append((host, chosen)) or JOB)
-    monkeypatch.setattr(program, "poll_job", lambda host, job: successful_job())
-    result = program.execute("run", selection(), host=HOST, device_id=DEVICE,
-                             client=client, runtime_sha=RUNTIME, approved_once=True)
-    assert result["status"] == "PASS"
-    assert result["deployment"]["transaction_id"] == "d" * 32
-    assert result["job"]["safe_off"] is True
-    assert client.events.count("B1_B2_B3") == 1
-    assert client.events.count("B3_STATUS") == 1
-    assert len(submitted) == 1 and submitted[0][1].bundle_sha == "a" * 64
-    assert len(observations) == 3
-
-
 def test_already_active_does_not_reupload(monkeypatch):
     patch_ready(monkeypatch)
     client = Client()
@@ -175,109 +135,6 @@ def test_already_active_does_not_reupload(monkeypatch):
                           client=client, approved_once=True)
     assert out["deployment"]["result"] == "ALREADY_ACTIVE"
     assert "B1_B2_B3" not in client.events
-
-
-def test_submitted_job_unknown_preserves_id_and_does_not_retry(monkeypatch):
-    patch_ready(monkeypatch)
-    client = Client()
-    events = []
-    monkeypatch.setattr(program, "post_once",
-                        lambda *a, **_kw: events.append("POST") or JOB)
-    def lost(*a):
-        raise program.OutcomeUnknown("JOB_RESULT_UNKNOWN", JOB)
-    monkeypatch.setattr(program, "poll_job", lost)
-    out = program.execute("flash", selection(), host=HOST, device_id=DEVICE,
-                          client=client, runtime_sha=RUNTIME, approved_once=True)
-    assert out["status"] == "OUTCOME_UNKNOWN"
-    assert out["job_id"] == JOB and out["submission_count"] == 1
-    assert out["auto_retry"] == "DISABLED"
-    assert events == ["POST"]
-
-
-def test_failed_readback_or_safe_off_not_pass(monkeypatch):
-    bad = successful_job()
-    bad["result"]["details"]["programming"]["safe_off"] = False
-    assert program.verify_job(bad, selection())["status"] == "FAIL_OR_INCOMPLETE"
-    bad["result"]["details"]["programming"]["safe_off"] = True
-    bad["result"]["details"]["programming"]["steps"]["verify"]["readback_sha256"] = "0" * 64
-    assert program.verify_job(bad, selection())["status"] == "FAIL_OR_INCOMPLETE"
-
-
-def test_job_http_payload_carries_one_programming_list_and_binding(monkeypatch, tmp_path):
-    """The Job is signed under the enrolled controller (LOM-P2A-2 G13)."""
-    auth = program.ppu_deploy_api._request_auth_module()
-    credential, device = "c" * 64, "ppu-device-0123456789abcdef01234567"
-    observed, nonce = [], "5" * 32
-    class Response:
-        def __init__(self, status, raw, headers=None):
-            self.status, self._raw, self._headers = status, raw, headers or {}
-        def read(self, _max):
-            return self._raw
-        def getheader(self, name):
-            return self._headers.get(name)
-    class HTTP:
-        def __init__(self, host, port, timeout):
-            assert (host, port) == (HOST, 18080)
-        def request(self, method, path, body=None, headers=None):
-            self.method, self.path, self.body, self.headers = method, path, body, headers
-        def getresponse(self):
-            if self.method == "GET":
-                assert self.path == "/api/auth/challenge"
-                return Response(200, json.dumps({"ok": True, "schema": auth.SCHEMA,
-                                                 "device_id": device, "nonce": nonce}).encode())
-            assert (self.method, self.path) == ("POST", "/api/jobs")
-            observed.append(json.loads(self.body))
-            admitted = auth.admit_request_header(header=self.headers["Authorization"],
-                                                 device_id=device, nonces=Nonces())
-            context = auth.verify_request(credential=credential, admitted=admitted,
-                                          method="POST", path="/api/jobs", body=self.body)
-            raw = json.dumps({"job": {"job_id": JOB}}).encode()
-            return Response(202, raw, {auth.RESPONSE_HEADER: auth.sign_response(
-                credential=credential, context=context, status=202, body=raw)})
-        def close(self):
-            pass
-    class Nonces:
-        def consume(self, value):
-            return value == nonce
-    monkeypatch.setattr(program.http.client, "HTTPConnection", HTTP)
-    from plasma_opf import bundle_v3
-    route = bundle_v3.load_route(ROOT / "data/opf/programming-routes/z2-site2-stm32f103c8t6-operations.json")
-    built = bundle_v3.build_user_image_bundle(route, b"TEST")
-    archive = tmp_path / "programming.zip"
-    archive.write_bytes(built.archive)
-    chosen = program.read_bundle(archive, site=2, package=None)
-    from .test_ofe1b_resource_reuse_job_image import submit, PPU_ID
-    monkeypatch.setattr(program, "readiness", lambda *args: {"ppu_id": PPU_ID})
-    assert program.post_once(HOST, chosen, credential=credential, device_id=device) == JOB
-    assert len(observed) == 1
-    body = observed[0]
-    assert body["operations"] == ["erase", "program", "verify"]
-    assert body["job_binding"]["operations"] == body["operations"]
-    assert body["job_binding"]["site_id"] == 2
-    assert body["image_asset"]["sha256"] == chosen.firmware_sha
-    assert "asset_base64" in body and "operation" not in body
-
-    # Admit the CLI's actual signed payload through the real PPU pipeline,
-    # rather than accepting a fabricated 202 as proof of compatibility.
-    from .test_c3_rest_flash_cycle import Stack, short_tmp, run
-
-    async def scenario():
-        with short_tmp() as folder:
-            async with Stack(Path(folder), in_process=True,
-                             bundle_options={"programming_bundle": built}) as stack:
-                status, job = await submit(stack, body)
-                assert status == 202 and job["state"] == "success", job
-                expected_sha = bundle_v3.sha256_hex(bundle_v3.canonical_json(body["job_binding"]))
-                assert job["job_binding"]["job_binding_sha256"] == expected_sha
-                assert job["result"]["details"]["programming"]["job_binding_sha256"] == expected_sha
-                assert program.verify_job(job, chosen)["status"] == "PASS"
-                job["result"]["details"]["programming"]["safe_off"] = False
-                assert program.verify_job(job, chosen)["status"] == "FAIL_OR_INCOMPLETE"
-                body["job_binding"]["site_id"] = 1
-                status, denied = await submit(stack, body)
-                assert status == 400, denied
-                assert len(stack.sim.argvs) == 1  # no second execution
-    run(scenario())
 
 
 def test_existing_private_bootstrap_assets_read_only(monkeypatch):
@@ -368,8 +225,6 @@ def test_runtime_deploy_one_bootstrap_transaction_never_programs(tmp_path, monke
             return {**super().status(), "capabilities": {"runtime_deployment": True}}
 
     client = RuntimeClient()
-    monkeypatch.setattr(program, "post_once",
-                        lambda *args, **_kw: pytest.fail("DUT programming forbidden"))
     result = program.deploy_runtime_kit(
         client, selection(), host=HOST, device_id=DEVICE,
         runtime_sha="d" * 40, kit_sha256=hashlib.sha256(data).hexdigest(),

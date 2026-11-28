@@ -238,15 +238,29 @@ class SiteManager:
 
         return "client", cls._validate_execution_owner(request.client_id, "client_id")
 
-    def _reserve_execution_job(self, request: JobRequest) -> tuple[str, str]:
+    def _reserve_execution_job(self, request: JobRequest, *,
+                               root_package_action: bool = False) -> tuple[str, str]:
+        """Admit one Programming Job under the PPU's ACTIVE Resource Reservation (U7).
+
+        Every Programming Job, Read Memory included and Mock or physical alike,
+        must name the current Reservation's token and owner. The only Job
+        without one is the root-only Stage C Package Action, whose authority is
+        the TrustedProviderAction object of the local root control socket,
+        never request metadata; it still cannot enter another owner's
+        Reservation.
+        """
         owner_kind, owner_id = self._execution_owner(request)
         acquired = False
         conflict: PPUExecutionLease | None = None
         with self._execution_lock:
             reservation = self._reservation_now()
             token = request.metadata.get("resource_reservation_token")
-            if token is not None and reservation is None:
-                raise PlasmaError(ErrorCode.PPU_BUSY, "PPU Resource Reservation expired")
+            if reservation is None and (token is not None or not root_package_action):
+                raise PlasmaError(
+                    ErrorCode.PPU_BUSY,
+                    "PPU Resource Reservation expired" if token is not None
+                    else "PPU Resource Reservation required",
+                    context={"resource_reservation": self._reservation_view(None)})
             if reservation is not None:
                 if reservation["state"] != "ACTIVE":
                     raise self._reservation_busy("PPU Resource Reservation is "
@@ -1023,7 +1037,8 @@ class SiteManager:
             clock = now
 
         try:
-            owner_kind, owner_id = self._reserve_execution_job(request)
+            owner_kind, owner_id = self._reserve_execution_job(
+                request, root_package_action=trusted_provider is not None)
             lap("reserve")
             # Pin the trusted Active Set when the Runtime composition provides it.
             pinned = deepcopy(self._active_asset_set_reader()) if self._active_asset_set_reader else {
