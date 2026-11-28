@@ -69,7 +69,7 @@ docker run --rm \
     test "$(git rev-parse HEAD)" = "$OPENOCD_SOURCE_COMMIT"
     git submodule update --init --depth 1 jimtcl
 
-    ./bootstrap
+    ./bootstrap nosubmodule
     ./configure \
       --prefix="$prefix" \
       --disable-werror \

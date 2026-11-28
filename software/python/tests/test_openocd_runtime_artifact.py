@@ -55,6 +55,7 @@ def test_openocd_builder_fetches_only_required_jimtcl_submodule() -> None:
     assert "git submodule update --init --depth 1" in source
     assert "jimtcl" in source
     assert "src/jtag/drivers/libjaylink" not in source
+    assert "./bootstrap nosubmodule" in source
     assert "--disable-internal-libjaylink" in source
     assert "tools/git2cl" not in source
 
