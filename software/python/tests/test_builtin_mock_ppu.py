@@ -442,3 +442,21 @@ def test_busy_enrollment_window_does_not_crash_the_bootstrap(tmp_path: Path) -> 
     server.engine.engineering_arm = busy
     assert service.arm_mock_enrollment_ticket(server, tmp_path / "ticket") is False
     assert not (tmp_path / "ticket").exists()
+
+
+def test_status_reports_the_class_its_own_authentication_proved(tmp_path: Path) -> None:
+    """No stale `unknown` from a status read that itself bound the class."""
+    store = BootstrapCredentialStore(tmp_path / "bootstrap-credentials.json")
+    store.set("mock-ppu-01", DEVICE, TOKEN)
+    coordinator = object.__new__(bootstrap.ManagerBootstrapCoordinator)
+    coordinator.credentials = store
+    payload = {"bootstrap": {"state": "bootstrap_ready"},
+               "target": {"platform": "mock", "board": "mock-site", "fpga_part": "none"}}
+
+    def authenticated(alias):
+        store.record_class(alias, ppu_class_from_status(payload))
+        return alias, None, None, payload, DEVICE, TOKEN
+
+    coordinator._live = lambda alias: (alias, None, None, payload, DEVICE)
+    coordinator._authenticated = authenticated
+    assert coordinator.status("mock-ppu-01")["pairing"]["ppu_class"] == PPU_CLASS_MOCK

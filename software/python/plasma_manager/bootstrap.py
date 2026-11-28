@@ -731,6 +731,9 @@ class ManagerBootstrapCoordinator:
             else:
                 payload, device_id = authenticated, proven_device
                 pairing["device_match"] = pairing["device_authenticated"] = True
+                # The class this very authentication just proved (and bound).
+                with shared_boundary("CREDENTIAL_PUBLIC_STATE"):
+                    pairing["ppu_class"] = self.credentials.ppu_class(normalized)
         return {
             "ok": True,
             "ppu_alias": normalized,

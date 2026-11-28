@@ -385,13 +385,12 @@ def wait_enrolled(specs: dict[str, Any], processes: list[tuple[str, subprocess.P
         while True:
             assert_processes_alive(processes)
             pairing = mock_ppu.enrollment_state(spec, manager)
-            if pairing.get("paired") and pairing.get("device_authenticated"):
+            if (pairing.get("paired") and pairing.get("device_authenticated")
+                    and pairing.get("ppu_class") == "mock"):
                 break
             if time.monotonic() > deadline:
-                raise MockCDError(f"{name} was not enrolled by its launcher: {pairing}")
+                raise MockCDError(f"{name} was not enrolled as a Mock PPU by its launcher: {pairing}")
             time.sleep(0.25)
-        if pairing.get("ppu_class") != "mock":
-            raise MockCDError(f"{name} enrollment-proven class is {pairing.get('ppu_class')}")
         if spec.paths()["ticket"].exists():
             raise MockCDError(f"{name} enrollment ticket was not consumed")
         statuses[name] = http_json(f"{manager}/api/registry/{name}/bootstrap", timeout=10.0)
