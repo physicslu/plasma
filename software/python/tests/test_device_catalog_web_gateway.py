@@ -299,7 +299,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
         self.assertEqual(result["catalog_level"], 2)
-        self.assertFalse(result["job_selectable"])
+        self.assertTrue(result["job_selectable"])
         qualification = result["programming_qualification"]
         self.assertEqual(qualification["state"], "SUPPORTED")
         self.assertTrue(qualification["reviewed"])
