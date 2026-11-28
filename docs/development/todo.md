@@ -450,6 +450,29 @@ Required work:
 - Reuse the existing `plasma_opf.bundle_v3` writer and the existing Manager/PPU verifiers. Add no second Bundle format, ZIP writer or privileged bypass.
 - An accepted upload is not B2 admission, B3 activation, Job admission or a physical Flash PASS. Experimental results never promote L2/L3 qualification.
 
+### Built-in Mock PPU — Control Station Product Capability
+
+**Status:** TODO / Owner Product Decision recorded 2026-11-28. Scheduled **after U10 and U7 complete**. This entry is not Gate 1 approval for installer packaging, auto start or any source change.
+
+**Decision:** The Mock PPU is a built-in PLASMA product capability, installed with the Control Station Installer and started by default. It is not only a CI test tool.
+
+**Architecture constraints (apply now to any change that touches Mock):**
+
+- Keep the Mock PPU Runtime, Mock Driver, Mock Settings and Virtual Flash independently packageable.
+- Mock and Physical PPUs share the one Unified Manager Programming Engine (Batch Coordinator, Admission, Job Binding, Resource Reservation). No Mock-only Batch engine, Scheduler or Manager.
+- The Mock PPU must run without a Git worktree, Playwright or a CI fixture.
+- Do not integrate the Mock Driver directly into the Manager Scheduler; the Manager reaches a Mock PPU through the same PPU boundary as a Physical PPU.
+- Isolate Mock and Physical PPUs in device identity, execution resources and production statistics.
+
+**Current state after U10 (#1549, #1550):**
+
+- Product-side pieces already ship in the Python package: `plasma_interfaces/mock.py` (Mock Driver, Virtual Flash, Read evidence), `plasma_server/mock_resources.py` (Mock Route, Bootstrap Active Set install), `plasma_server/runtime_server.py` `--mock-asset-set-*` options, and `plasma_web/mock_runtime_settings.py`.
+- Route interface isolation is enforced by `SITE_INTERFACE_BY_PROFILE_ABI` (`mock-simulated:1` → `mock`); a Mock Route cannot qualify on a physical Site and the reverse fails `SITE_INTERFACE_NOT_READY`.
+- **Gap:** the managed Mock PPU stack wiring (per-PPU Bootstrap, enrollment, Active Set install, Gateway G13 admission socket, loopback addressing, Manager registration) lives only in the test fixtures `scripts/mock-cd.py` and `scripts/mock-cd-browser-stack.py`. Nothing installs or starts it outside CI.
+- **To audit:** whether Manager Batch Statistics, Fleet views and production records already separate Mock from Physical PPUs.
+
+**Required (future Gate 1):** a product launcher/service for the Mock PPU stack independent of the test fixtures; Control Station Installer packaging and default auto start; Mock/Physical identity, resource and statistics isolation with positive and negative tests; cross-platform acceptance (Linux, Windows, macOS Control Station). Relates to [Mock Runtime Core Convergence](#mock-runtime-core-convergence).
+
 ### Real Provider and Physical IC Quantity Handoff
 
 **Status:** TODO / deferred from the current 1-4 technical-debt sequence
