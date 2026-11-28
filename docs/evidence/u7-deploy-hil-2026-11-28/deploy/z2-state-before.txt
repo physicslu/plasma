@@ -1,0 +1,40 @@
+Sat Nov 28 07:54:48 AM UTC 2026
+/opt/plasma/releases/0.2.1-6cda93f2b5b6
+root_manifest e3830a036c6678e1d3c8ead9c4c801038ad5eba7367913ae92e2ffce986fa9c4
+root_guard d5ab228e060daba9f2a6c152fb92a454ed0ee6de8bfbd08bf9ea18dd8808bea4
+journal 986446e768a38ab19dab6b9dd9d521b880dcd72412a07ab4d90631795adafb0e
+fpga_manager operating
+no-openocd
+admission_records 0
+active 957ac4e62d23507fd577300c3dc827777fa1ccddb0fffdb13911dc9e8b8d8d83 gen 25
+  max_concurrent_jobs: 2
+asset_set_py 72bd4474a3887323
+ExecMainStartTimestamp=Sat 2026-11-28 09:44:13 CST
+Environment=PYTHONUNBUFFERED=1 PLASMA_PACKAGE_ACTIONS_CONFIG=/etc/plasma/ppu-package-actions.json
+Id=plasma-server.service
+ActiveState=active
+
+ExecMainStartTimestamp=Sat 2026-11-28 09:44:07 CST
+Environment=
+Id=plasma-site-worker.service
+ActiveState=active
+
+ExecMainStartTimestamp=Sat 2026-11-28 09:44:07 CST
+Environment=
+Id=plasma-package-control.service
+ActiveState=active
+
+ExecMainStartTimestamp=Fri 2026-11-27 20:58:52 CST
+Environment=
+Id=plasma-bootstrap.service
+ActiveState=active
+
+ExecMainStartTimestamp=Sat 2026-11-28 09:44:13 CST
+Environment=PYTHONUNBUFFERED=1
+Id=plasma-web.service
+ActiveState=active
+ls: cannot access '/etc/systemd/system/plasma-site-worker.service.d': No such file or directory
+ls: cannot access '/etc/systemd/system/plasma-bootstrap.service.d': No such file or directory
+ls: cannot access '/etc/systemd/system/plasma-package-control.service.d': No such file or directory
+/etc/systemd/system/plasma-server.service.d:
+50-package-actions.conf
