@@ -6,6 +6,9 @@ on:
       - ".github/workflows/mock-cd-browser.yml"
       - "scripts/mock-cd.py"
       - "scripts/mock-cd-browser-stack.py"
+      # Built-in Mock PPU: its PPU control plane and the committed Mock Route.
+      - "scripts/ppu*.py"
+      - "data/opf/programming-routes/**"
       - "software/python/**"
       - "!software/python/plasma_web/nxp_mcxn236_blhost_compat_poc.py"
       - "!software/python/tests/**"
@@ -29,6 +32,9 @@ on:
       - ".github/workflows/mock-cd-browser.yml"
       - "scripts/mock-cd.py"
       - "scripts/mock-cd-browser-stack.py"
+      # Built-in Mock PPU: its PPU control plane and the committed Mock Route.
+      - "scripts/ppu*.py"
+      - "data/opf/programming-routes/**"
       - "software/python/**"
       - "!software/python/plasma_web/nxp_mcxn236_blhost_compat_poc.py"
       - "!software/python/tests/**"
