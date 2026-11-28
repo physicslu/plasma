@@ -1,0 +1,14 @@
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c1/3 P0 F0 R0 NOT_RUN
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c1/3 P0 F0 R0 RUNNING
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c1/3 P0 F0 R0 running 0%
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c1/3 P0 F0 R0 erase 0%
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c1/3 P0 F0 R0 verify 0%
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c2/3 P1 F0 R0 RUNNING
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c2/3 P1 F0 R0 running 0%
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c2/3 P1 F0 R0 program 0%
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c2/3 P1 F0 R0 verify 0%
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c3/3 P2 F0 R0 RUNNING
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c3/3 P2 F0 R0 running 0%
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c3/3 P2 F0 R0 program 0%
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 RUNNING: z2:2 c3/3 P2 F0 R0 verify 0%
+[plasmactl] batch a3d7f57f96a236184fab1cee164a1d27 COMPLETED: z2:2 c3/3 P3 F0 R0 PASS 100%

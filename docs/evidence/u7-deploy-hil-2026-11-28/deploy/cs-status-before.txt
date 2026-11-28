@@ -1,0 +1,10 @@
+Profile:        local-control-station
+Git SHA:        6cda93f2b5b69a2239542057c42f67aabb6ba635
+Release:        /home/gordon/.local/share/plasma/local-control-station/releases/6cda93f2b5b6
+PPU alias:      z2
+PPU endpoint:   http://192.168.2.99:18080
+Console:        http://127.0.0.1:18190
+Manager:        http://127.0.0.1:18280
+Manager svc:    active
+Console svc:    active
+[plasmactl local-control-station] target PPU probe: ONLINE (z2 -> http://192.168.2.99:18080)

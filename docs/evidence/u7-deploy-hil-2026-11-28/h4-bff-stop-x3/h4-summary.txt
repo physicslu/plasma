@@ -1,0 +1,3 @@
+run 1 batch 5feef494 stop HTTP 200 settled_at_stop 1 stop_requested True outcome PARTIAL STOP_REQUESTED_NOTHING_SUBMITTED cycles {'settled': 2, 'pass': 2, 'fail': 0, 'remaining': 3}
+run 2 batch 252ee8f3 stop HTTP 200 settled_at_stop 1 stop_requested True outcome PARTIAL STOP_REQUESTED_NOTHING_SUBMITTED cycles {'settled': 2, 'pass': 2, 'fail': 0, 'remaining': 3}
+run 3 batch 09818ffa stop HTTP 200 settled_at_stop 1 stop_requested True outcome PARTIAL STOP_REQUESTED_NOTHING_SUBMITTED cycles {'settled': 2, 'pass': 2, 'fail': 0, 'remaining': 3}
