@@ -3,14 +3,13 @@ from __future__ import annotations
 import argparse
 import re
 import time
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 
 from . import gateway_base as base
@@ -62,75 +61,12 @@ def _ppu_network_settings_payload(settings: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@dataclass(frozen=True, slots=True)
-class TargetDeviceSnapshot:
-    """An Engineering Job's exact target CLAIM (never Catalog qualification)."""
-
-    vendor: str
-    family: str
-    identifier: str
-    identifier_kind: str
-    icpn: str | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "vendor": self.vendor,
-            "family": self.family,
-            "identifier": self.identifier,
-            "identifier_kind": self.identifier_kind,
-            "icpn": self.icpn,
-        }
-
-
-def _require_object(value: Any, label: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise ValueError(f"{label} must be an object")
-    return value
-
-
 def _validated_target_claim(value: Any, *, label: str) -> str:
     if (not isinstance(value, str)
             or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+/-]{0,127}", value)
             or any(part in {".", "..", ""} for part in value.split("/"))):
         raise ValueError(f"{label} must be a valid exact target identifier")
     return value
-
-
-def _parse_target_device(
-    value: Any,
-    *,
-    label: str = "target_device",
-) -> TargetDeviceSnapshot | None:
-    if value is None:
-        return None
-    raw = _require_object(value, label)
-    base._require_declared_keys(
-        raw,
-        allowed={"vendor", "identifier"},
-        required={"vendor", "identifier"},
-        label=label,
-    )
-    vendor = raw["vendor"]
-    identifier = raw["identifier"]
-    if not isinstance(vendor, str) or not vendor.strip():
-        raise ValueError(f"{label} vendor is required")
-    if not isinstance(identifier, str) or not identifier.strip():
-        raise ValueError(f"{label} identifier is required")
-    # User-supplied target identity is a CLAIM, not Catalog qualification.
-    # No Catalog dependency is permitted in Programming Job submission.
-    # The selected Runtime Provider must separately resolve exact-target
-    # capabilities and refuse unsupported operations before any hardware I/O.
-    vendor = vendor.strip()
-    identifier = _validated_target_claim(identifier.strip(), label=label)
-    if len(vendor) > 128 or any(ord(c) < 32 or ord(c) == 127 for c in vendor):
-        raise ValueError(f"{label} target identity is invalid")
-    return TargetDeviceSnapshot(
-        vendor=vendor,
-        family="",
-        identifier=identifier,
-        identifier_kind="unverified_exact_target_claim",
-        icpn=identifier,
-    )
 
 
 class PlasmaWebHandler(base.PlasmaWebHandler):
@@ -184,23 +120,6 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
         provider = cls.engineering_provider
         return provider if isinstance(provider, SharedImageMockEngineeringPPUProvider) else None
 
-    def _body(self) -> dict[str, Any]:
-        body = super()._body()
-        if self._mock_provider() is None:
-            return body
-        engineering = self._engineering_target(urlparse(self.path).path)
-        if engineering is None or engineering[2] != ["api", "jobs"]:
-            return body
-        operation = body.get("operation")
-        if operation in {Operation.PROGRAM.value, Operation.VERIFY.value} and "asset_sha256" not in body:
-            # The Engineering Asset contract normally requires an Asset SHA.
-            # Canonical Shared-Image Mock jobs may intentionally omit it so the
-            # provider can generate one Synthetic Image from the immutable Mock
-            # execution profile. The key is normalized to None only in this
-            # Mock-specific handler; non-Mock providers remain fail-closed.
-            body["asset_sha256"] = None
-        return body
-
     @staticmethod
     def _validated_rest_owner(value: Any) -> str | None:
         if value is None:
@@ -215,7 +134,6 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
         *,
         client_id: str,
         default_timeout_s: float = 30.0,
-        allow_inline_asset: bool = True,
     ):
         normalized = dict(body)
         raw_target_device = normalized.pop("target_device", None)
@@ -231,38 +149,22 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
             normalized,
             client_id=client_id,
             default_timeout_s=default_timeout_s,
-            allow_inline_asset=allow_inline_asset,
         )
         if execution_owner_id is not None:
-            owner_kind = "engineering_session" if client_id == "plasma-web-engineering" else "rest_client"
             request = replace(
                 request,
                 metadata={
                     **request.metadata,
-                    "execution_owner_kind": owner_kind,
+                    "execution_owner_kind": "rest_client",
                     "execution_owner_id": execution_owner_id,
                 },
             )
         if reservation_token is not None:
             request = replace(request, metadata={**request.metadata,
                                                  "resource_reservation_token": reservation_token})
-        if raw_target_device is None:
-            return request
-        if client_id != "plasma-web-engineering":
-            raise ValueError("target_device is only valid for an Engineering PPU job")
-        target_device = _parse_target_device(
-            raw_target_device,
-            label="Engineering target_device",
-        )
-        assert target_device is not None
-        return replace(
-            request,
-            target=target_device.icpn or target_device.identifier,
-            metadata={
-                **request.metadata,
-                "target_device": target_device.to_dict(),
-            },
-        )
+        if raw_target_device is not None:
+            raise ValueError("target_device is not a PPU Job field; send the exact target claim as target")
+        return request
 
     def _error(self, exc: Exception) -> None:
         if isinstance(exc, PlasmaError) and exc.code is ErrorCode.PPU_BUSY:

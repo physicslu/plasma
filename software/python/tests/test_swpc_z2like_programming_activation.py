@@ -59,8 +59,8 @@ def test_configured_provider_refuses_hardware_interfaces_and_reuses_local_server
     assert "does not create the legacy 8-Facility / 32-PPU demo topology" in text
     assert "PlasmaClient(self._identity[2], self._ports[key])" in text
     assert '"provider": "configured_mock"' in text
-    assert "image=image.data" in text
-    assert "image_ref" not in text
+    # Programming goes through the Manager Batch (U7); no Gateway Job write path.
+    assert "start_job" not in text
 
 
 def test_phase3_configured_provider_is_opt_in_and_excludes_legacy_mock() -> None:

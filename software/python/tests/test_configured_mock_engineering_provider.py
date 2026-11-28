@@ -1,29 +1,16 @@
 from __future__ import annotations
 
-import hashlib
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import JobRequest
 from plasma_web.configured_mock_provider import ConfiguredMockEngineeringPPUProvider
 from plasma_web.shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
-class _FakeClient:
-    def __init__(self) -> None:
-        self.requests: list[JobRequest] = []
-
-    async def start(self, request: JobRequest) -> dict[str, object]:
-        self.requests.append(request)
-        return {"ok": True, "job": {"job_id": request.job_id, "state": "queued"}}
-
-
-class ConfiguredMockEngineeringProviderTests(unittest.IsolatedAsyncioTestCase):
+class ConfiguredMockEngineeringProviderTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
@@ -71,13 +58,6 @@ class ConfiguredMockEngineeringProviderTests(unittest.IsolatedAsyncioTestCase):
             encoding="utf-8",
         )
 
-    @staticmethod
-    def _activate_without_server(provider: ConfiguredMockEngineeringPPUProvider) -> tuple[str, str]:
-        key = ("lab", "swpc-z2like-01")
-        provider._ports[key] = 9900
-        provider._output_roots[key] = provider._initial_config.server.output_root.resolve()
-        return key
-
     def test_catalog_is_exactly_one_configured_ppu_and_eight_sites(self) -> None:
         provider = ConfiguredMockEngineeringPPUProvider(self.config)
         catalog = provider.catalog()
@@ -101,70 +81,6 @@ class ConfiguredMockEngineeringProviderTests(unittest.IsolatedAsyncioTestCase):
             ConfiguredMockEngineeringPPUProvider(self.config)
         self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
         self.assertEqual(caught.exception.context["site_ids"], [2])
-
-    async def test_program_sends_uploaded_image_bytes_to_existing_server(self) -> None:
-        provider = ConfiguredMockEngineeringPPUProvider(self.config)
-        self._activate_without_server(provider)
-        session_id = provider.begin_session()["session"]["session_id"]
-        image = b"configured-z2like-image"
-        sha256 = hashlib.sha256(image).hexdigest()
-        provider.cache_asset(
-            session_id,
-            "lab",
-            "swpc-z2like-01",
-            "image.bin",
-            "image",
-            "binary",
-            sha256,
-            image,
-        )
-        client = _FakeClient()
-        request = JobRequest(
-            site_id=1,
-            operation=Operation.PROGRAM,
-            job_id="job-configured-program",
-            target="STM32F103C8T6",
-        )
-
-        with patch.object(provider, "_client", return_value=client):
-            accepted = await provider.start_job(
-                "lab",
-                "swpc-z2like-01",
-                request,
-                session_id=session_id,
-                asset_sha256=sha256,
-            )
-
-        self.assertTrue(accepted["ok"])
-        self.assertEqual(len(client.requests), 1)
-        submitted = client.requests[0]
-        self.assertEqual(submitted.image, image)
-        self.assertIsNone(submitted.image_ref)
-        self.assertEqual(submitted.metadata["source_asset_sha256"], sha256)
-        self.assertEqual(submitted.metadata["source_asset_origin"], "user")
-        self.assertEqual(submitted.timeout_s, 30.0)
-
-    async def test_read_uses_configured_site_main_flash_geometry(self) -> None:
-        provider = ConfiguredMockEngineeringPPUProvider(self.config)
-        self._activate_without_server(provider)
-        client = _FakeClient()
-        request = JobRequest(
-            site_id=1,
-            operation=Operation.READ,
-            job_id="job-configured-read",
-            target="STM32F103C8T6",
-        )
-
-        with patch.object(provider, "_client", return_value=client):
-            await provider.start_job("lab", "swpc-z2like-01", request)
-
-        submitted = client.requests[0]
-        self.assertEqual(submitted.map_data["scope"], "main_flash")
-        self.assertEqual(
-            submitted.map_data["sections"],
-            [{"name": "main_flash", "address": 0, "length": 65536}],
-        )
-        self.assertEqual(submitted.metadata["read_size_bytes"], 65536)
 
 
 if __name__ == "__main__":

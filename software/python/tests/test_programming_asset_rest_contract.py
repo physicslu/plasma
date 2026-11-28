@@ -12,11 +12,6 @@ from plasma_web.gateway import PlasmaWebHandler, WEB_REST_CONTRACT_VERSION
 
 
 class FakeProgrammingAssetProvider:
-    last_begin_session = None
-    last_cache_check = None
-    last_cache_upload = None
-    last_start = None
-
     def catalog(self):
         return {
             "ok": True,
@@ -32,87 +27,6 @@ class FakeProgrammingAssetProvider:
             ],
             "facilities": [],
         }
-
-    def begin_session(self, previous_session_id=None):
-        self.last_begin_session = previous_session_id
-        return {
-            "ok": True,
-            "session": {
-                "session_id": "1" * 32,
-                "programming_asset_cache_scope": "connection-session-and-ppu",
-                "previous_session_cleared": previous_session_id is not None,
-            },
-        }
-
-    def asset_cache_status(
-        self,
-        session_id,
-        facility_id,
-        ppu_id,
-        asset_name,
-        asset_type,
-        asset_format,
-        asset_size,
-        asset_sha256,
-    ):
-        self.last_cache_check = (
-            session_id,
-            facility_id,
-            ppu_id,
-            asset_name,
-            asset_type,
-            asset_format,
-            asset_size,
-            asset_sha256,
-        )
-        return {
-            "ok": True,
-            "programming_asset": {
-                "cache_hit": False,
-                "asset_name": asset_name,
-                "asset_type": asset_type,
-                "asset_format": asset_format,
-                "asset_size": asset_size,
-                "asset_sha256": asset_sha256,
-            },
-        }
-
-    def cache_asset(
-        self,
-        session_id,
-        facility_id,
-        ppu_id,
-        asset_name,
-        asset_type,
-        asset_format,
-        asset_sha256,
-        data,
-    ):
-        self.last_cache_upload = (
-            session_id,
-            facility_id,
-            ppu_id,
-            asset_name,
-            asset_type,
-            asset_format,
-            asset_sha256,
-            data,
-        )
-        return {
-            "ok": True,
-            "programming_asset": {
-                "cache_hit": True,
-                "uploaded": True,
-                "asset_name": asset_name,
-                "asset_type": asset_type,
-                "asset_format": asset_format,
-                "asset_size": len(data),
-                "asset_sha256": asset_sha256,
-            },
-        }
-
-    def job_timeout_s(self, facility_id, ppu_id):
-        return 90.0
 
     async def status(self, facility_id, ppu_id, *, site_id=None, job_id=None):
         return {
@@ -131,29 +45,6 @@ class FakeProgrammingAssetProvider:
             },
             "sites": [],
         }
-
-    async def start_job(
-        self,
-        facility_id,
-        ppu_id,
-        request,
-        *,
-        session_id=None,
-        asset_sha256=None,
-    ):
-        self.last_start = (facility_id, ppu_id, request, session_id, asset_sha256)
-        return {
-            "ok": True,
-            "job": {
-                "job_id": "programming-asset-job-1",
-                "site_id": request.site_id,
-                "operation": request.operation.value,
-                "state": "queued",
-            },
-        }
-
-    async def cancel_job(self, facility_id, ppu_id, job_id):
-        return {"ok": True, "job": {"job_id": job_id, "cancel_requested": True}}
 
     def read_output_file(self, facility_id, ppu_id, job_id, filename):
         return b""
@@ -189,78 +80,13 @@ class ProgrammingAssetRestContractTests(unittest.TestCase):
         payload = json.loads(data) if data and response_content_type.startswith("application/json") else data
         return response.status, payload
 
-    def test_catalog_and_session_publish_rest_v3_asset_contract(self):
+    def test_catalog_publishes_rest_v3_asset_contract(self):
         status, payload = self.request("GET", "/api/engineering/targets")
         self.assertEqual(status, 200)
         self.assertEqual(payload["rest_contract_version"], WEB_REST_CONTRACT_VERSION)
         self.assertEqual(WEB_REST_CONTRACT_VERSION, "3")
         self.assertEqual(payload["programming_asset_scope"], "connection-session-and-ppu")
         self.assertIn("serial_number", payload["supported_asset_types"])
-
-        status, payload = self.request("POST", "/api/engineering/session", {})
-        self.assertEqual(status, 201)
-        self.assertEqual(payload["rest_contract_version"], "3")
-        self.assertEqual(
-            payload["session"]["programming_asset_cache_scope"],
-            "connection-session-and-ppu",
-        )
-
-    def test_programming_asset_check_and_upload_routes(self):
-        session_id = "1" * 32
-        data = b"image-bytes"
-        sha256 = hashlib.sha256(data).hexdigest()
-        status, payload = self.request(
-            "POST",
-            f"{self.target}/api/programming-assets/check",
-            {
-                "session_id": session_id,
-                "asset_name": "image.bin",
-                "asset_type": "image",
-                "asset_format": "binary",
-                "asset_size": len(data),
-                "asset_sha256": sha256,
-            },
-        )
-        self.assertEqual(status, 200)
-        self.assertFalse(payload["programming_asset"]["cache_hit"])
-        self.assertEqual(payload["programming_asset"]["asset_name"], "image.bin")
-        self.assertEqual(
-            self.provider.last_cache_check,
-            (session_id, "facility-01", "ppu-01", "image.bin", "image", "binary", len(data), sha256),
-        )
-
-        status, payload = self.request(
-            "POST",
-            f"{self.target}/api/programming-assets?session_id={session_id}&name=image.bin&type=image&format=binary&sha256={sha256}",
-            raw_body=data,
-            content_type="application/octet-stream",
-        )
-        self.assertEqual(status, 201)
-        self.assertTrue(payload["programming_asset"]["uploaded"])
-        self.assertEqual(
-            self.provider.last_cache_upload,
-            (session_id, "facility-01", "ppu-01", "image.bin", "image", "binary", sha256, data),
-        )
-
-    def test_engineering_job_references_cached_asset_only(self):
-        session_id = "2" * 32
-        sha256 = "b" * 64
-        status, payload = self.request(
-            "POST",
-            f"{self.target}/api/jobs",
-            {
-                "site_id": 2,
-                "operation": "program",
-                "session_id": session_id,
-                "asset_sha256": sha256,
-            },
-        )
-        self.assertEqual(status, 202)
-        self.assertEqual(payload["job"]["operation"], "program")
-        _, _, request, routed_session, routed_sha = self.provider.last_start
-        self.assertEqual(request.image, b"")
-        self.assertEqual(routed_session, session_id)
-        self.assertEqual(routed_sha, sha256)
 
     def test_local_job_materializes_asset_then_normalizes_image(self):
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
@@ -304,27 +130,22 @@ class ProgrammingAssetRestContractTests(unittest.TestCase):
                 client_id="test-client",
             )
 
-    def test_unknown_rest_fields_fail_closed(self):
-        status, payload = self.request(
-            "POST",
-            f"{self.target}/api/programming-assets/check",
-            {
-                "session_id": "1" * 32,
-                "asset_name": "image.bin",
-                "asset_type": "image",
-                "asset_format": "binary",
-                "asset_size": 1,
-                "asset_sha256": "a" * 64,
-                "unexpected": True,
-            },
-        )
-        self.assertEqual(status, 400)
-        self.assertFalse(payload["ok"])
+    def test_unknown_or_session_asset_fields_fail_closed(self):
+        handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
+        for extra in ({"unexpected": True}, {"session_id": "1" * 32}):
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                handler._job_request({"site_id": 1, "operation": "erase", **extra},
+                                     client_id="test-client")
 
     def test_retired_rest_routes_are_not_available(self):
+        # The session Programming Asset cache existed only for the retired
+        # Engineering Job path (U7).
         for path in (
             f"{self.target}/api/programming-images/check",
             f"{self.target}/api/firmware/check",
+            f"{self.target}/api/programming-assets/check",
+            f"{self.target}/api/programming-assets",
+            "/api/engineering/session",
         ):
             with self.subTest(path=path):
                 status, _payload = self.request("POST", path, {})

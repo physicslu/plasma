@@ -33,18 +33,18 @@ def test_ingress_exposes_programming_and_site_runtime_routes_with_read_only_sett
         "location = /api/settings/sites {",
         "location = /api/settings/sites/activation {",
         "location = /api/mock/runtime {",
-        "location = /api/engineering/session {",
         "location = /api/engineering/diagnostics/openocd-control-plane {",
         "location = /api/jobs {",
-        "api/programming-assets/check$",
-        "api/programming-assets$",
-        "api/jobs$",
         "api/jobs/[^/]+/cancel$",
         "api/jobs/[^/]+/files/[^/]+$",
     ):
         assert route in source
     # The PPU runs no Batch (U10): the ingress exposes no /api/batches route.
     assert "/api/batches" not in source
+    # Retired Engineering session/Asset/Job writes (U7) are not exposed.
+    assert "location = /api/engineering/session {" not in source
+    assert "api/programming-assets" not in source.split("# Deliberately excluded")[0]
+    assert "[^/]+/[^/]+/api/jobs$" not in source
 
     assert "managed Gateway settings read is unavailable" in source
     assert "managed PPU network settings read is unavailable" in source
