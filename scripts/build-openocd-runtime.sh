@@ -67,9 +67,7 @@ docker run --rm \
     git fetch --depth 1 origin "$OPENOCD_SOURCE_COMMIT"
     git checkout --detach FETCH_HEAD
     test "$(git rev-parse HEAD)" = "$OPENOCD_SOURCE_COMMIT"
-    git submodule update --init --depth 1 \
-      jimtcl \
-      src/jtag/drivers/libjaylink
+    git submodule update --init --depth 1 jimtcl
 
     ./bootstrap
     ./configure \
@@ -79,6 +77,7 @@ docker run --rm \
       --enable-dummy \
       --enable-remote-bitbang \
       --enable-linuxgpiod \
+      --disable-internal-libjaylink \
       --disable-jlink
     make -j2
     make install

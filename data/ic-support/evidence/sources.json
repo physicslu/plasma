@@ -90,6 +90,45 @@
       ]
     },
     {
+      "source_id": "st_ds16554_rev4",
+      "manufacturer": "STMicroelectronics",
+      "document_number": "DocID16554",
+      "revision": "4",
+      "title": "STM32F103xF/G XL-density datasheet",
+      "authority": "manufacturer_official",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f103vg.pdf",
+      "integrity": {
+        "status": "not_content_pinned",
+        "sha256": null
+      },
+      "used_for": [
+        "device_scope",
+        "flash_capacity",
+        "package_family",
+        "exact_ordering_grammar"
+      ],
+      "note": "Documentary review only; original PDF bytes and hash NOT_ATTESTED."
+    },
+    {
+      "source_id": "st_pm0068_rev2",
+      "manufacturer": "STMicroelectronics",
+      "document_number": "PM0068",
+      "revision": "2",
+      "title": "STM32F10xxx XL-density Flash programming manual",
+      "authority": "manufacturer_official",
+      "url": "https://www.st.com/resource/en/programming_manual/pm0068-stm32f10xxx-xldensity-flash-programming-stmicroelectronics.pdf",
+      "integrity": {
+        "status": "not_content_pinned",
+        "sha256": null
+      },
+      "used_for": [
+        "memory_organization",
+        "programming_algorithm",
+        "flash_bank_registers"
+      ],
+      "note": "Documentary review only; original PDF bytes and hash NOT_ATTESTED."
+    },
+    {
       "source_id": "plasma_stm32f1_catalog_main",
       "manufacturer": "Plasma",
       "document_number": "stm32f1-commercial-icpn.csv",
