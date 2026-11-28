@@ -20,6 +20,7 @@
 - **Plan** · `Gate 1` · `Draft PR #1472` · `Host-only` — [Root Site Admission parallelism and SHA dedup](development/root-site-admission-parallel-gate1-20261117.md)：在既有 PPU Reload Fence SH／EX 與 Site Lock EX 保護下，改為不同 Site 共享 supervisor SH；消除重複 Image SHA 並加入階段耗時計時。根據 2,234 LOC 基準回報淨增 +28 行（測量程式），尚未取得 Z2 HIL 或 Gate 2。
 - **Plan** · `Owner Gate 1 2026-11-15` · `Docs-only` — [Unified 8-Site Scheduler, Manual Repeat and Work Order Quantity v1](architecture/unified-8site-scheduler-repeat-work-order-v1.md)：EMode/PMode 共用 Scheduler／Site Lane；Manual 1～10000 Cycle 與換料確認；Automation 全域 PASS 工單配額、有限補量、每 Site 並行、UNKNOWN／SAFE_OFF 安全及 MES/PLC 交握。尚未實作或完成多 Site HIL。
 - **Plan** · `Issue #1424` · `Draft PR #1425` · `Gate 1` — [OPF Site-independent Programming Audit](development/issue-1424-site-independent-programming-audit.md)：逐層稽核並修復 ICPN 與固定 Site 綁定；PPU 回報 Site、Job 指定 ICPN、保留 Job Binding，Profile／Resource Set 升級 v2。Host-only 檢查與實機驗收分開，尚未 Gate 2。
+- **Plan** · `Gate 1` · `Draft PR #1540` · `Path 3` · `Host-only` — [OPP Common v1 Z2 Physical Admission Audit](development/opp-common-z2-admission-gate1-20261123.md)：核對已合併 #1530 的 Vivado Host Build 證據、候選映像配對與 Z2 Root/Golden 保護；實機 FPGA 載入、MMIO、DUT 均未授權或執行。
 - **Current** — [Shared Development Contract — shared clauses, execution zones, domain routing](development/plasma-development-common.md)
 - **Current** — [Path 2 SWPC CLI Contract — guarded-hardware operator-cli, CPU-only and Vivado host build](development/plasma-path2-cli.md)
 - **Current** — [Path 3 SWPC Codex Contract](development/plasma-path3-codex.md)

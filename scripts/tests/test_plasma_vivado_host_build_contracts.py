@@ -54,6 +54,16 @@ class HostBuildRouteContracts(unittest.TestCase):
 class HostBuildOutputPathContracts(unittest.TestCase):
     """Offline contract: candidate-relative Runner checkout must not duplicate paths."""
 
+    def test_path2_upload_includes_candidate_pair_only(self):
+        workflow = (ROOT / ".github/workflows/plasma-engineering-runtime-dispatch.yml").read_text()
+        job = workflow.split("  development-execute:", 1)[1].split("  development-codex:", 1)[0]
+        paths = {line.strip() for line in job.splitlines()}
+        for suffix in ("**/*.bit", "**/*.hwh", "**/artifacts/system_wrapper.bin",
+                       "**/artifacts/plasma-image-manifest.json"):
+            self.assertIn("candidate/pl/build/" + suffix, paths)
+        self.assertNotIn("candidate/pl/build/**/*.json", paths)
+        self.assertNotIn("candidate/pl/build/**/*.bin", paths)
+
     def test_relative_candidate_workspace_uses_absolute_build_dir(self):
         with tempfile.TemporaryDirectory() as td:
             parent = Path(td)
