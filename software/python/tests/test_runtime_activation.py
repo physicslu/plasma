@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+from .test_mock_programming_operations import reserved_request
 
 from plasma_core.config import PlasmaConfig, PPUConfig, ServerConfig, SiteConfig
 from plasma_core.enums import Operation
@@ -400,6 +401,81 @@ def test_batch_reservation_spans_idle_cycles_and_releases_only_with_ppu_safe_off
     asyncio.run(scenario())
 
 
+def test_u7_every_programming_job_needs_the_active_reservation_token_and_owner(tmp_path: Path) -> None:
+    """U7: no Reservation, token or owner -> refused before dispatch, nothing left behind."""
+    from dataclasses import replace
+    from .test_mock_programming_operations import LENGTH, LOAD_ADDRESS, read_request
+
+    def refused(manager, request, match: str) -> None:
+        with pytest.raises(PlasmaError, match=match) as denied:
+            manager.enqueue(request)
+        assert denied.value.code is ErrorCode.PPU_BUSY
+        assert request.job_id not in {job.request.job_id for job in manager.registry.all()}
+        assert manager._execution_lease is None
+        assert all(worker.queue.empty() for worker in manager.workers.values())
+        record = manager._reservation
+        assert record is None or request.job_id not in record["job_ids"]
+
+    def read(identity, owner="batch-1", token=None, **extra):
+        request = read_request(identity, LOAD_ADDRESS, LENGTH)
+        metadata = {**request.metadata, "execution_owner_kind": "rest_client",
+                    "execution_owner_id": owner, **extra}
+        if token is not None:
+            metadata["resource_reservation_token"] = token
+        return replace(request, metadata=metadata)
+
+    async def scenario() -> None:
+        manager, identity, expected = _m3_manager(tmp_path)
+        await manager.start()
+        try:
+            # No Reservation: Programming and Read Memory alike, with or without labels.
+            refused(manager, _m3_job(identity, 1), "Reservation required")
+            refused(manager, read(identity), "Reservation required")
+            bare = _m3_job(identity, 1)
+            refused(manager, replace(bare, metadata={
+                key: value for key, value in bare.metadata.items()
+                if not key.startswith("execution_owner")}), "Reservation required")
+            for label in ({"diagnostic": True}, {"mock": True, "interface": "mock"}):
+                refused(manager, replace(bare, metadata={**bare.metadata, **label}),
+                        "Reservation required")
+            refused(manager, _m3_job(identity, 1, token="f" * 32), "Reservation expired")
+
+            token = manager.resource_reservation("acquire", owner_id="batch-1",
+                                                 expected=expected)["token"]
+            # Missing / wrong token, wrong owner or owner kind.
+            refused(manager, _m3_job(identity, 1), "another execution")
+            refused(manager, _m3_job(identity, 1, token="0" * 32), "another execution")
+            refused(manager, _m3_job(identity, 1, owner="batch-2", token=token), "another execution")
+            spoofed = _m3_job(identity, 1, token=token)
+            refused(manager, replace(spoofed, metadata={
+                **spoofed.metadata, "execution_owner_kind": "engineering_session"}), "another execution")
+            # Valid: Programming and Read Memory under the same Reservation.
+            assert (await manager.enqueue(_m3_job(identity, 1, token=token))).state.value == "success"
+            assert (await manager.enqueue(read(identity, token=token))).state.value == "success"
+
+            # Expired: the TTL lapsed with nothing running.
+            manager._reservation["deadline"] = time.monotonic() - 1
+            refused(manager, _m3_job(identity, 1, token=token), "Reservation expired")
+            # Released.
+            token = manager.resource_reservation("acquire", owner_id="batch-1",
+                                                 expected=expected)["token"]
+            manager.resource_reservation("release", owner_id="batch-1", token=token)
+            refused(manager, _m3_job(identity, 1, token=token), "Reservation expired")
+            # Recovery required.
+            token = manager.resource_reservation("acquire", owner_id="batch-1",
+                                                 expected=expected)["token"]
+            resolver = manager._active_resource_resolver
+            manager._active_resource_resolver = lambda: {**resolver(), "generation": 9}
+            with pytest.raises(PlasmaError):
+                manager.resource_reservation("check", owner_id="batch-1", token=token)
+            manager._active_resource_resolver = resolver
+            refused(manager, _m3_job(identity, 1, token=token), "RECOVERY_REQUIRED")
+        finally:
+            await manager.shutdown()
+
+    asyncio.run(scenario())
+
+
 @pytest.mark.parametrize("kind,proven", [
     ("pass_safe", True), ("fail_safe", True), ("transport_denied", True),
     ("operation_failed_safe", True), ("cancelled_before_start", True),
@@ -634,7 +710,7 @@ def test_p4_job_pins_active_identity_inside_ppu_lease(tmp_path):
                 assert error.value.code is ErrorCode.PPU_BUSY
                 return original()
             manager._active_asset_set_reader = read
-            request = JobRequest(site_id=1, operation=Operation.READ, job_id="p4-pinned")
+            request = reserved_request(manager, JobRequest(site_id=1, operation=Operation.READ, job_id="p4-pinned"))
             future = manager.enqueue(request)
             runtime = manager.registry.get(request.job_id)
             active["asset_set_sha256"] = "b" * 64
@@ -660,7 +736,7 @@ def test_p4_asset_read_failure_releases_job_reservation(tmp_path):
         await manager.start()
         try:
             with pytest.raises(RuntimeError, match="ASSET_SET_CORRUPT"):
-                manager.enqueue(JobRequest(site_id=1, operation=Operation.READ, job_id="p4-denied"))
+                manager.enqueue(reserved_request(manager, JobRequest(site_id=1, operation=Operation.READ, job_id="p4-denied")))
             assert manager.execution_lease_snapshot()["busy"] is False
             assert manager.registry.all() == []
         finally:
@@ -680,6 +756,7 @@ def test_p4_ppu_fence_covers_other_site_queue_and_cancellation(tmp_path):
             requests = [JobRequest(site_id=site, operation=Operation.READ, job_id=f"p4-site-{site}",
                                    metadata={"execution_owner_kind": "batch", "execution_owner_id": "p4"})
                         for site in (1, 2)]
+            requests = [reserved_request(manager, request, owner="p4") for request in requests]
             futures = [manager.enqueue(request) for request in requests]
             manager.cancel(requests[0].job_id)
             with pytest.raises(PlasmaError) as error:
@@ -689,6 +766,15 @@ def test_p4_ppu_fence_covers_other_site_queue_and_cancellation(tmp_path):
             manager._semaphore.release()
             await asyncio.gather(*futures)
             await asyncio.sleep(0)
+            # The Batch ends: these bare READs carry no SAFE_OFF proof, so the
+            # Reservation settles as RECOVERY_REQUIRED and needs the explicit
+            # local recovery before B3 may quiesce.
+            with pytest.raises(PlasmaError, match="recovery required"):
+                manager.resource_reservation(
+                    "release", owner_id="p4",
+                    token=requests[0].metadata["resource_reservation_token"])
+            manager.recover_resource_reservation(
+                manager.resource_reservation_snapshot()["recovery_id"])
             lease = manager.acquire_asset_set_quiesce()
             manager.release_runtime_quiesce(lease["token"])
         finally:

@@ -520,13 +520,25 @@ export async function getProgrammingBatchCycles(
     `${PROGRAMMING}/batches/${batchId}/cycles?offset=${offset}&limit=${limit}`);
 }
 
-/** Stop queuing: no further attempt is submitted. Never cancels a submitted Job. */
+/**
+ * Stop queuing: no further attempt is submitted. Never cancels a submitted Job.
+ * A lost or 5xx answer leaves the write uncertain: it is never resent, the
+ * Manager Batch journal decides. Only a Batch that reads stop_requested (or is
+ * already terminal) is returned; otherwise the original failure is thrown.
+ */
 export async function stopProgrammingBatch(batchId: string): Promise<ProgrammingBatch> {
-  const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${PROGRAMMING}/batches/${batchId}/stop`, {
-    method: "POST",
-    body: JSON.stringify({ stop: PROGRAMMING_STOP_TOKEN }),
-  });
-  return payload.batch;
+  try {
+    const payload = await request<{ ok: true; batch: ProgrammingBatch }>(`${PROGRAMMING}/batches/${batchId}/stop`, {
+      method: "POST",
+      body: JSON.stringify({ stop: PROGRAMMING_STOP_TOKEN }),
+    });
+    return payload.batch;
+  } catch (reason) {
+    if (reason instanceof BootstrapApiError && reason.status >= 400 && reason.status < 500) throw reason;
+    const current = await getProgrammingBatch(batchId).catch(() => null);
+    if (current && (current.stop_requested || current.outcome != null)) return current;
+    throw reason;
+  }
 }
 
 /**

@@ -198,7 +198,7 @@ test("EMode Batch Policy: Repeat / Retry / Stop Policy are decided by the Manage
   // Manual Repeat (WP-02): an editable Cycle count and the replace-IC choice
   // (default Yes) are inputs only; the Browser never loops over Cycles.
   assert.match(emode, /repeatValue: repeatCount,\s*repeatDisabled: active,/);
-  assert.match(emode, /const \[replaceIc, setReplaceIc\] = useState\(true\);/);
+  assert.match(emode, /const \[replaceIc, setReplaceIc\] = useJobSetting\("emode\.replaceIc", true\);/);
   assert.match(emode, /repeatParsed <= MAX_REPEAT/);
   assert.match(core, /export async function continueAwaitingSites\(/);
   assert.equal((core.match(/continueProgrammingBatch\(/g) ?? []).length, 1);
@@ -222,7 +222,7 @@ test("EMode Batch Policy: Repeat / Retry / Stop Policy are decided by the Manage
 });
 
 test("Image is the default Source; switching clears file, plan and validation state only", () => {
-  assert.match(emode, /useState<ProgrammingSource>\("image"\)/);
+  assert.match(emode, /useJobSetting<ProgrammingSource>\("emode\.source", "image"\)/);
   assert.match(emode, /function changeSource\(next: ProgrammingSource\) \{\s*if \(active \|\| next === source\) return;\s*setSource\(next\);\s*setFile\(null\);\s*clearRunState\(\);/);
   assert.match(selector, /role="radiogroup"/);
   assert.match(selector, /\{ value: "image", label: "Programming Image" \},\s*\{ value: "bundle", label: "Bundle" \}/);
@@ -311,7 +311,7 @@ test("PR-D Manager controls Retry/Stop and the Browser restores durable Batch by
 });
 
 test("PMode retains Factory UI and no Mock is presented as HIL acceptance", () => {
-  assert.match(factory, /useState<ProgrammingSource>\("image"\)/);
+  assert.match(factory, /useJobSetting<ProgrammingSource>\("pmode\.source", "image"\)/);
   assert.match(factory, /source=\{\{ value: programmingSource, disabled: batchRunning, onChange: changeProgrammingSource \}\}/);
   assert.match(factory, /repeatDisabled: batchRunning,/);
   assert.match(factoryBackend, /readyLabel: "MANAGER BATCH READY"/);
@@ -432,7 +432,7 @@ test("PR-C: the Console reaches the canonical Batch resource, never an alias-sco
 });
 
 test("PR-C: EMode selects many Sites of one PPU and sends one Target Set", () => {
-  assert.match(emode, /const \[chosenSiteIds, setChosenSiteIds\] = useState<number\[\]>\(\[\]\);/);
+  assert.match(emode, /const \[chosenSiteIds, setChosenSiteIds\] = useJobSetting<number\[\]>\("emode\.siteIds", \[\]\);/);
   assert.match(emode, /const next = chosenSiteIds\.includes\(id\)/);
   assert.match(api, /targets: input\.targets[\s\S]*\? input\.targets\.map\(/);
   assert.match(api, /: \[\{ ppu_alias: input\.alias, site_ids: \[\.\.\.input\.siteIds\] \}\]/);

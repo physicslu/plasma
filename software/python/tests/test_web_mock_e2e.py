@@ -121,84 +121,27 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
             "asset_base64": base64.b64encode(image).decode(),
         }
 
-    async def test_web_gateway_programs_mock_and_reports_real_progress(self) -> None:
+    async def test_web_gateway_refuses_a_direct_mock_job_without_a_reservation(self) -> None:
+        # U7: the Mock PPU admits a Programming Job only under its ACTIVE
+        # Resource Reservation (the Manager Batch path), exactly like a
+        # physical PPU. Progress, STOP and Read download are covered by the
+        # Managed Mock-CD browser acceptance.
         status, topology, headers = await self.request("GET", "/api/status")
         self.assertEqual(status, 200)
         self.assertEqual(headers["Access-Control-Allow-Origin"], "http://localhost:4173")
         self.assertEqual([item["site_id"] for item in topology["sites"] if item["enabled"]], [1, 2])
 
         image = bytes(range(64))
-        status, accepted, _ = await self.request(
+        status, refused, _ = await self.request(
             "POST",
             "/api/jobs",
-            {
-                "site_id": 2,
-                "operation": "program",
-                **self.asset_body(image, "web-e2e.bin"),
-            },
+            {"site_id": 2, "operation": "program", **self.asset_body(image, "web-e2e.bin")},
         )
-        self.assertEqual(status, 202)
-        job_id = accepted["job"]["job_id"]
-        self.assertEqual(accepted["job"]["site_id"], 2)
-        final, updates = await self.wait_for_terminal(job_id)
-        self.assertEqual(final["state"], "success")
-        self.assertEqual(final["progress_percent"], 100.0)
-        self.assertEqual({item["stage"] for item in updates if item["stage"]}, {"program"})
-        self.assertTrue(any(0 < item["progress_percent"] < 100 for item in updates))
-
-    async def test_web_gateway_cancel_reaches_mock_worker(self) -> None:
-        status, accepted, _ = await self.request(
-            "POST",
-            "/api/jobs",
-            {"site_id": 1, "operation": "erase"},
-        )
-        self.assertEqual(status, 202)
-        job_id = accepted["job"]["job_id"]
-        for _ in range(100):
-            _, payload, _ = await self.request("GET", f"/api/status?job={job_id}")
-            if payload["job"]["state"] == "running":
-                break
-            await asyncio.sleep(0.005)
-        else:
-            self.fail("erase job did not start")
-        status, cancelled, _ = await self.request("POST", f"/api/jobs/{job_id}/cancel", {})
+        self.assertEqual(status, 409)
+        self.assertIn("Reservation required", refused["error"]["message"])
+        status, after, _ = await self.request("GET", "/api/status")
         self.assertEqual(status, 200)
-        self.assertTrue(cancelled["cancel_requested"])
-        final, _ = await self.wait_for_terminal(job_id)
-        self.assertEqual(final["state"], "cancelled")
-        self.assertTrue(final["cancel_requested"])
-
-    async def test_program_then_read_and_download_exact_mock_bytes(self) -> None:
-        image = bytes(range(64))
-        status, accepted, _ = await self.request(
-            "POST",
-            "/api/jobs",
-            {"site_id": 2, "operation": "program", **self.asset_body(image, "known.bin")},
-        )
-        self.assertEqual(status, 202)
-        programmed, _ = await self.wait_for_terminal(accepted["job"]["job_id"])
-        self.assertEqual(programmed["state"], "success")
-
-        status, accepted, _ = await self.request(
-            "POST",
-            "/api/jobs",
-            {"site_id": 2, "operation": "read", "offset": 7, "length": 29},
-        )
-        self.assertEqual(status, 202)
-        read_job, updates = await self.wait_for_terminal(accepted["job"]["job_id"])
-        self.assertEqual(read_job["state"], "success")
-        self.assertTrue(any(item["stage"] == "read_flash" for item in updates))
-        output_file = Path(read_job["result"]["output_files"][0])
-        self.assertTrue(output_file.is_file())
-        self.assertEqual(output_file.read_bytes(), image[7:36])
-        self.assertIn("read_SITE2_", output_file.name)
-
-        status, downloaded, headers = await self.request(
-            "GET", f"/api/jobs/{read_job['job_id']}/files/{output_file.name}"
-        )
-        self.assertEqual(status, 200)
-        self.assertEqual(headers["Content-Type"], "application/octet-stream")
-        self.assertEqual(downloaded, image[7:36])
+        self.assertFalse(after["ppu"]["execution"]["busy"])
 
 
 if __name__ == "__main__":

@@ -12,6 +12,8 @@ and is not asserted. That behaviour is covered on the C-3 path only
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 import asyncio
 import hashlib
 from pathlib import Path
@@ -69,11 +71,49 @@ def mock_config(tmp_path: Path, *, site_ids=(1, SITE), **options) -> PlasmaConfi
     )
 
 
-async def started_manager(config: PlasmaConfig, **kwargs) -> tuple[SiteManager, dict]:
+TEST_BATCH = "test-batch"
+
+
+def reserve(manager: SiteManager, identity: dict, owner: str = TEST_BATCH) -> dict:
+    """U7: acquire the PPU's Resource Reservation exactly as a Manager Batch
+    does; ``programming_request``/``read_request`` then carry its token."""
+    token = manager.resource_reservation("acquire", owner_id=owner, expected={
+        "ppu_id": manager.config.ppu.id, "asset_set_sha256": identity["asset_set_sha256"],
+        "generation": identity["generation"],
+        "resource_set_sha256": identity["resource_set_sha256"]})["token"]
+    identity["reservation"] = {"execution_owner_kind": "rest_client",
+                               "execution_owner_id": owner,
+                               "resource_reservation_token": token}
+    return identity
+
+
+def reserved_request(manager: SiteManager, request: JobRequest,
+                     owner: str = TEST_BATCH) -> JobRequest:
+    """U7 for a test that builds its own JobRequest: hold (or reuse) this PPU's
+    ACTIVE Resource Reservation and send the Job under its token. A PPU wired
+    without Resources gets the existing Mock Resource identity first."""
+    record = manager._reservation
+    if record is None or record["state"] != "ACTIVE" or record["owner_id"] != owner:
+        if getattr(manager, "_active_resource_resolver", None) is None:
+            try:
+                mocked = mock_resources.mock_resources_for_config(manager.config)
+            except PlasmaError:  # not a uniform Mock PPU: any verified identity
+                mocked = mock_resources.mock_resource_identity(
+                    mock_resources.mock_route(icpn=ICPN))
+            manager._active_resource_resolver = lambda: dict(mocked)
+        reserve(manager, {**manager._resolve_active_resources()}, owner)
+        record = manager._reservation
+    return replace(request, metadata={
+        **request.metadata, "execution_owner_kind": "rest_client",
+        "execution_owner_id": owner, "resource_reservation_token": record["token"]})
+
+
+async def started_manager(config: PlasmaConfig, *, reserved: bool = True,
+                          **kwargs) -> tuple[SiteManager, dict]:
     manager = SiteManager(config, **kwargs)
     identity = mock_resources.install_mock_resources(manager)
     await manager.start()
-    return manager, identity
+    return manager, reserve(manager, identity) if reserved else identity
 
 
 def programming_request(identity: dict, operations: tuple[str, ...], image: bytes, *,
@@ -93,6 +133,7 @@ def programming_request(identity: dict, operations: tuple[str, ...], image: byte
                 "job_binding": binding}
     if asset is not None:
         metadata["job_image_asset"] = asset
+    metadata.update(identity.get("reservation", {}))
     return JobRequest(site_id=site_id, operation=Operation.PROGRAMMING,
                       image=image if takes_image else b"", target=target,
                       max_retries=0, timeout_s=10.0, metadata=metadata)
@@ -299,7 +340,8 @@ def test_programming_without_an_admitted_binding_is_refused(tmp_path: Path, meta
             # the interface has no default list or range to fall back on.
             request = JobRequest(
                 site_id=SITE, operation=Operation.PROGRAMMING, image=IMAGE_A,
-                target=ICPN, max_retries=0, timeout_s=10.0, metadata=metadata)
+                target=ICPN, max_retries=0, timeout_s=10.0,
+                metadata={**metadata, **identity["reservation"]})
             if metadata:
                 with pytest.raises(PlasmaError, match="JOB_BINDING_NOT_QUALIFIED"):
                     await manager.submit(request)
@@ -332,12 +374,13 @@ def test_a_binding_for_another_site_is_refused(tmp_path: Path):
 
 def test_a_resource_set_from_another_ppu_is_refused(tmp_path: Path):
     async def scenario():
-        manager, _ = await started_manager(mock_config(tmp_path))
+        manager, identity = await started_manager(mock_config(tmp_path))
         try:
             other = mock_resources.mock_resource_identity(mock_resources.mock_route(
                 icpn=ICPN, flash_base=FLASH_BASE,
                 flash_size=FLASH_SIZE, erase_granularity=GRANULARITY,
                 profile_id="some-other-programming-profile"))
+            other["reservation"] = identity["reservation"]
             with pytest.raises(PlasmaError, match="JOB_RESOURCE_PACKAGE_MISMATCH"):
                 await manager.submit(programming_request(
                     other, ("erase", "program", "verify"), IMAGE_A))
@@ -363,7 +406,7 @@ def read_request(identity: dict, address: int, length: int, *,
                                               "length": sec_length}]},
                       metadata={"provider": kinds["platform-provider"],
                                 "profile": kinds["programming-profile"],
-                                "job_binding": binding})
+                                "job_binding": binding, **identity.get("reservation", {})})
 
 
 def test_a_bound_read_publishes_the_c3_shaped_receipt_from_flash(tmp_path: Path):

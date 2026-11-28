@@ -130,6 +130,20 @@ A Batch Resource Reservation (#1521) also pins the **loaded FPGA image** of the 
 * **B3.** The B3 FPGA load was already excluded: it needs the Runtime's asset quiesce lease, which a held Reservation refuses.
 * **Residual window.** A Root load between a Job's Worker `status` read and its own `open_job_session` is still caught by the Worker's per-session identity comparison and the Reload Fence. That comparison is not against the Reservation pin.
 
+## Mandatory Resource Reservation (U7, 2026-11-28)
+
+Every Programming Job (Erase, Program, Verify, Read Memory and the `programming` operations list), Mock or physical alike, is admitted only under the PPU's **ACTIVE Resource Reservation** (#1521). `SiteManager._reserve_execution_job()` checks, under `_execution_lock` and before any Job Binding, route admission or worker dispatch:
+
+* a Reservation exists and is `ACTIVE` (not `EXPIRED`, released or `RECOVERY_REQUIRED`);
+* the Job carries the Reservation token; and
+* the Job's execution owner is `rest_client:<Reservation owner_id>`.
+
+Otherwise it is refused with `E4010 PPU_BUSY` (`PPU Resource Reservation required` / `expired` / `belongs to another execution`). A refused Job leaves no registry entry, queue entry, lease or Reservation membership. Only the Manager Batch Coordinator acquires a Reservation, so it is the only Programming ingress; the Manager itself refuses to submit a Job without its Batch Reservation (`RESOURCE_RESERVATION_MISSING`, BLOCKED).
+
+The single exception is the root-only Stage C Package Action: its authority is the `TrustedProviderAction` object created behind the root `SO_PEERCRED` runtime control socket and the owner `asset.execute` authorization, never request metadata. It still cannot enter another owner's Reservation, and while it runs no Reservation can be acquired. No diagnostic, Mock or client label in request metadata bypasses admission.
+
+Removed direct ingress: the Manager PPU relay no longer forwards `POST /api/jobs`, `/api/jobs/{id}/cancel`, or the Engineering target `jobs`, `jobs/{id}/cancel` and `programming-assets` writes; `scripts/plasma_program.py flash|run` is retired. The Owner model above (page-instance and raw REST owners) describes owner identity only; none of those owners can program without a Reservation.
+
 ## Scope and limitations
 
 This change establishes the active-work non-overlap invariant at the PPU execution boundary. It does not persist leases across a Plasma Server process restart; restart reconciliation belongs to the separate Persistent Batch State / Gateway Restart Recovery work.

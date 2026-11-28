@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -41,6 +42,9 @@ type WorkspaceSessionContextValue = {
 
   emodeSection: EngineeringSection;
   setEmodeSection: Dispatch<SetStateAction<EngineeringSection>>;
+
+  /** Operator Programming Job settings of each mode, kept across a mode switch. */
+  jobSettings: Map<string, unknown>;
 };
 
 const WorkspaceSessionContext = createContext<WorkspaceSessionContextValue | null>(null);
@@ -65,6 +69,8 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
   const [pmodSelectorCollapsed, setPmodSelectorCollapsed] = useState(false);
 
   const [emodeSection, setEmodeSection] = useState<EngineeringSection>("overview");
+  // Written only by useJobSetting; never a Batch, run or lease state.
+  const [jobSettings] = useState(() => new Map<string, unknown>());
 
   useEffect(() => {
     // The Console reaches a PPU only through the Plasma Manager (U10): every
@@ -86,6 +92,7 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     setPmodSelectorCollapsed,
     emodeSection,
     setEmodeSection,
+    jobSettings,
   }), [
     hydrated,
     apiBase,
@@ -94,6 +101,7 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     pmodBatchSelection,
     pmodSelectorCollapsed,
     emodeSection,
+    jobSettings,
   ]);
 
   return <WorkspaceSessionContext.Provider value={value}>{children}</WorkspaceSessionContext.Provider>;
@@ -103,4 +111,23 @@ export function useWorkspaceSession(): WorkspaceSessionContextValue {
   const context = useContext(WorkspaceSessionContext);
   if (!context) throw new Error("useWorkspaceSession must be used inside WorkspaceSessionProvider");
   return context;
+}
+
+/**
+ * useState for one operator Programming Job setting (Target IC, Image,
+ * Operations, Site selection, Batch Policy) that survives a PMode <-> EMode
+ * switch. `key` is namespaced by mode; the value lives in the session only.
+ */
+export function useJobSetting<T>(key: string, initial: T | (() => T)): [T, Dispatch<SetStateAction<T>>] {
+  const { jobSettings } = useWorkspaceSession();
+  const [value, setValue] = useState<T>(() => (
+    jobSettings.has(key) ? jobSettings.get(key) as T
+      : typeof initial === "function" ? (initial as () => T)() : initial
+  ));
+  const set = useCallback<Dispatch<SetStateAction<T>>>(action => setValue(current => {
+    const next = typeof action === "function" ? (action as (previous: T) => T)(current) : action;
+    jobSettings.set(key, next);
+    return next;
+  }), [jobSettings, key]);
+  return [value, set];
 }

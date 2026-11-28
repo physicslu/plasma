@@ -665,9 +665,11 @@ def test_same_resources_new_firmware_reuses_ppu_verified_resources(tmp_path):
     assert run["outcome"] == "PASS"
     assert not {"B1_create", "B2", "B3"} & set(coord.calls)
     assert coord.active_sha == other.archive_sha256
+    # U7: every Job is sent under its Batch Reservation (owner + token).
     assert set(gateway.posts[0]) == {
         "site_id", "operations", "timeout_s", "target", "provider", "profile",
-        "job_binding", "image_asset", "asset_base64"}
+        "job_binding", "image_asset", "asset_base64",
+        "execution_owner_id", "resource_reservation_token"}
 
 
 def test_active_set_reporting_resource_identity_is_not_trusted(tmp_path):

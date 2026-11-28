@@ -109,15 +109,10 @@ _MANAGED_POST_PATTERNS = tuple(
         r"^/api/engineering/diagnostics/loopback$",
         r"^/api/engineering/diagnostics/openocd-control-plane$",
         r"^/api/engineering/session$",
-        # The PPU no longer runs Batches (U10): no /api/batches route is
-        # relayed in either direction. Programming Batches are Manager-owned
-        # and start only at /api/programming/batches (U3).
-        r"^/api/jobs$",
-        rf"^/api/jobs/{_SEGMENT}/cancel$",
-        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/programming-assets/check$",
-        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/programming-assets$",
-        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/jobs$",
-        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/jobs/{_SEGMENT}/cancel$",
+        # The PPU no longer runs Batches (U10) and admits a Programming Job
+        # only under a Manager Batch Resource Reservation (U7): no /api/batches
+        # and no direct Job, Job cancel or Engineering Programming Asset route
+        # is relayed. Programming starts only at /api/programming/batches.
     )
 )
 

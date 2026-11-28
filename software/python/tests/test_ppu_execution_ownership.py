@@ -14,6 +14,7 @@ from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
 
 from tests.helpers import make_config
+from tests.test_mock_programming_operations import reserved_request
 
 
 class PPUExecutionOwnershipTests(unittest.IsolatedAsyncioTestCase):
@@ -37,26 +38,27 @@ class PPUExecutionOwnershipTests(unittest.IsolatedAsyncioTestCase):
                 2: {"mock": {"default_delay_s": 0.2}},
             },
         )
-        self.server = PlasmaServer(config, SiteManager(config))
+        self.manager = SiteManager(config)
+        self.server = PlasmaServer(config, self.manager)
         await self.server.start()
         return PlasmaClient(*self.server.address, response_timeout_s=2.0)
 
-    @staticmethod
-    def owned_request(
-        site_id: int,
-        job_id: str,
-        owner_id: str,
-    ) -> JobRequest:
-        return JobRequest(
+    def owned_request(self, site_id: int, job_id: str, owner_id: str) -> JobRequest:
+        """A Job of ``owner_id``'s Batch under its Resource Reservation (U7)."""
+        return reserved_request(self.manager, JobRequest(
             site_id=site_id,
             operation=Operation.ERASE,
             job_id=job_id,
             client_id="ownership-test-client",
-            metadata={
-                "execution_owner_kind": "test",
-                "execution_owner_id": owner_id,
-            },
-        )
+        ), owner_id)
+
+    def foreign_request(self, site_id: int, job_id: str, owner_id: str) -> JobRequest:
+        """Another Batch's Job while ``owner-a`` holds the Reservation."""
+        return JobRequest(
+            site_id=site_id, operation=Operation.ERASE, job_id=job_id,
+            client_id="ownership-test-client",
+            metadata={"execution_owner_kind": "rest_client", "execution_owner_id": owner_id,
+                      "resource_reservation_token": "0" * 32})
 
     async def test_same_owner_can_run_multiple_sites_and_other_owner_is_rejected(self) -> None:
         client = await self.start_server()
@@ -68,16 +70,14 @@ class PPUExecutionOwnershipTests(unittest.IsolatedAsyncioTestCase):
 
         status = await client.status()
         self.assertTrue(status["ppu"]["execution"]["busy"])
-        self.assertEqual(status["ppu"]["execution"]["owner_kind"], "test")
+        self.assertEqual(status["ppu"]["execution"]["owner_kind"], "rest_client")
         self.assertEqual(status["ppu"]["execution"]["owner_id"], "owner-a")
         self.assertEqual(status["ppu"]["execution"]["active_job_count"], 2)
 
         with self.assertRaises(PlasmaError) as caught:
-            await client.start(self.owned_request(1, "owner-b-site-1", "owner-b"))
+            await client.start(self.foreign_request(1, "owner-b-site-1", "owner-b"))
         self.assertEqual(caught.exception.code, ErrorCode.PPU_BUSY)
-        self.assertTrue(caught.exception.recoverable)
-        self.assertEqual(caught.exception.context["active_owner_id"], "owner-a")
-        self.assertEqual(caught.exception.context["requested_owner_id"], "owner-b")
+        self.assertIn("another execution", caught.exception.message)
 
         await client.wait_for_job(first.job_id)
         await client.wait_for_job(second.job_id)
@@ -87,6 +87,14 @@ class PPUExecutionOwnershipTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(released["ppu"]["execution"]["owner_id"])
         self.assertEqual(released["ppu"]["execution"]["active_job_count"], 0)
 
+        # owner-a's Batch ends; its Reservation settles (Mock ERASE proves no
+        # SAFE_OFF, so through the explicit local recovery), then owner-b reserves.
+        with self.assertRaises(PlasmaError):
+            self.manager.resource_reservation(
+                "release", owner_id="owner-a",
+                token=first.metadata["resource_reservation_token"])
+        self.manager.recover_resource_reservation(
+            self.manager.resource_reservation_snapshot()["recovery_id"])
         third = self.owned_request(1, "owner-b-after-release", "owner-b")
         await client.start(third)
         await client.wait_for_job(third.job_id)
@@ -102,7 +110,7 @@ class PPUExecutionOwnershipTests(unittest.IsolatedAsyncioTestCase):
 
         status = await client.status()
         self.assertTrue(status["ppu"]["execution"]["busy"])
-        self.assertEqual(status["ppu"]["execution"]["owner_kind"], "test")
+        self.assertEqual(status["ppu"]["execution"]["owner_kind"], "rest_client")
         self.assertEqual(status["ppu"]["execution"]["owner_id"], "owner-a")
         self.assertEqual(status["ppu"]["execution"]["active_job_count"], 1)
 
@@ -113,71 +121,28 @@ class PPUExecutionOwnershipTests(unittest.IsolatedAsyncioTestCase):
         released = await client.status()
         self.assertFalse(released["ppu"]["execution"]["busy"])
 
-    async def test_batch_id_is_the_execution_owner_not_shared_batch_client_id(self) -> None:
+    async def test_owner_labels_without_a_reservation_never_program(self) -> None:
+        # U7: a batch_id, a fixed Gateway client label or an explicit owner of
+        # any kind is only an owner identity; without the ACTIVE Reservation's
+        # token no Programming Job is admitted and nothing is left behind.
         client = await self.start_server()
-        first = JobRequest(
-            site_id=1,
-            operation=Operation.ERASE,
-            job_id="batch-a-site-1",
-            client_id="plasma-batch-runtime",
-            metadata={"batch_id": "batch-a", "batch_round": 1},
-        )
-        same_batch = JobRequest(
-            site_id=2,
-            operation=Operation.ERASE,
-            job_id="batch-a-site-2",
-            client_id="plasma-batch-runtime",
-            metadata={"batch_id": "batch-a", "batch_round": 1},
-        )
-        different_batch = JobRequest(
-            site_id=2,
-            operation=Operation.ERASE,
-            job_id="batch-b-site-2",
-            client_id="plasma-batch-runtime",
-            metadata={"batch_id": "batch-b", "batch_round": 1},
-        )
-
-        await client.start(first)
-        await client.start(same_batch)
-        with self.assertRaises(PlasmaError) as caught:
-            await client.start(different_batch)
-        self.assertEqual(caught.exception.code, ErrorCode.PPU_BUSY)
-        self.assertEqual(caught.exception.context["active_owner_kind"], "batch")
-        self.assertEqual(caught.exception.context["active_owner_id"], "batch-a")
-        self.assertEqual(caught.exception.context["requested_owner_id"], "batch-b")
-
-        await client.wait_for_job(first.job_id)
-        await client.wait_for_job(same_batch.job_id)
-
-    async def test_unscoped_rest_jobs_do_not_share_fixed_gateway_client_identity(self) -> None:
-        client = await self.start_server()
-        first = JobRequest(
-            site_id=1,
-            operation=Operation.ERASE,
-            job_id="rest-job-a",
-            client_id="plasma-web-engineering",
-        )
-        second = JobRequest(
-            site_id=2,
-            operation=Operation.ERASE,
-            job_id="rest-job-b",
-            client_id="plasma-web-engineering",
-        )
-
-        await client.start(first)
+        for request in (
+            JobRequest(site_id=1, operation=Operation.ERASE, job_id="batch-a-site-1",
+                       client_id="plasma-batch-runtime", metadata={"batch_id": "batch-a"}),
+            JobRequest(site_id=1, operation=Operation.ERASE, job_id="rest-job-a",
+                       client_id="plasma-web-engineering"),
+            JobRequest(site_id=1, operation=Operation.ERASE, job_id="labelled",
+                       metadata={"execution_owner_kind": "diagnostic",
+                                 "execution_owner_id": "mock"}),
+        ):
+            with self.subTest(job=request.job_id):
+                with self.assertRaises(PlasmaError) as caught:
+                    await client.start(request)
+                self.assertEqual(caught.exception.code, ErrorCode.PPU_BUSY)
+                self.assertIn("Reservation required", caught.exception.message)
         status = await client.status()
-        self.assertEqual(status["ppu"]["execution"]["owner_kind"], "rest_job")
-        self.assertEqual(status["ppu"]["execution"]["owner_id"], first.job_id)
-
-        with self.assertRaises(PlasmaError) as caught:
-            await client.start(second)
-        self.assertEqual(caught.exception.code, ErrorCode.PPU_BUSY)
-        self.assertEqual(caught.exception.context["active_owner_id"], first.job_id)
-        self.assertEqual(caught.exception.context["requested_owner_id"], second.job_id)
-
-        await client.wait_for_job(first.job_id)
-        await client.start(second)
-        await client.wait_for_job(second.job_id)
+        self.assertFalse(status["ppu"]["execution"]["busy"])
+        self.assertEqual(status["ppu"]["execution"]["active_job_count"], 0)
 
     async def test_execution_owner_metadata_requires_kind_and_id_together(self) -> None:
         client = await self.start_server()
@@ -227,9 +192,9 @@ class PPUSiteConcurrencyOracleTests(unittest.IsolatedAsyncioTestCase):
             site.id, arrived, release))
         await manager.start()
         self.addAsyncCleanup(manager.shutdown)
-        futures = [manager.enqueue(JobRequest(
+        futures = [manager.enqueue(reserved_request(manager, JobRequest(
             site_id=site, operation=Operation.ERASE, job_id=f"batch-a-site-{site}",
-            client_id="plasma-batch-runtime", metadata={"batch_id": "batch-a"}))
+            client_id="plasma-batch-runtime"), "batch-a"))
             for site in (1, 2)]
         return manager, arrived, release, futures
 
@@ -238,7 +203,7 @@ class PPUSiteConcurrencyOracleTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(asyncio.gather(arrived[1].wait(), arrived[2].wait()), 5)
         lease = manager.execution_lease_snapshot()
         self.assertEqual((lease["owner_kind"], lease["owner_id"], lease["active_job_count"]),
-                         ("batch", "batch-a", 2))
+                         ("rest_client", "batch-a", 2))
         states = {site: manager.registry.get(f"batch-a-site-{site}").state.value for site in (1, 2)}
         self.assertEqual(states, {1: "running", 2: "running"})
         release.set()

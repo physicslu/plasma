@@ -231,8 +231,11 @@ def test_dispatch_through_real_site_manager_scope(tmp_path):
             assert manager.execution_lease_snapshot()["busy"] is False
 
             # A running programming Job blocks the Package Action entirely.
+            # (Only the lease is held here; root_package_action skips the U7
+            # Reservation so the fixture needs no Active Resource identity.)
             manager._reserve_execution_job(
-                JobRequest(site_id=1, operation=Operation.READ, job_id="prog-1", client_id="cli"))
+                JobRequest(site_id=1, operation=Operation.READ, job_id="prog-1", client_id="cli"),
+                root_package_action=True)
             with pytest.raises(PlasmaError) as busy:
                 execution.dispatch_asset_execution(
                     co.paths.product_root, request, **owner.kw(request),

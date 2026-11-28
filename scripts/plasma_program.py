@@ -2,9 +2,9 @@
 """Single-PPU Bundle commissioning tool, independent of the execution path.
 
 Direct PPU engineering/commissioning entry (Bootstrap B1/B2/B3 activation,
-Runtime Kit deployment, one-Site diagnostic flash). It is NOT the formal
-programming entry: production and load programming use the Manager Batch
-through `plasmactl program`. Uses existing Bootstrap and Gateway APIs. The Runtime and
+Runtime Kit deployment). It submits no Programming Job: every Programming
+Job runs under a Manager Batch Resource Reservation (U7), through
+`plasmactl program`. Uses existing Bootstrap and Gateway APIs. The Runtime and
 Site Worker own all physical admission, FPGA/SWD and SAFE_OFF operations.
 One invocation selects exactly one Bundle and one Site. Never retry a write.
 """
@@ -23,7 +23,6 @@ import re
 import stat
 import subprocess
 import time
-from urllib.parse import quote
 import zipfile
 
 import ppu_bootstrap_transport
@@ -34,20 +33,12 @@ SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 SHA64 = re.compile(r"[0-9a-f]{64}\Z")
 PACKAGE_ID = re.compile(r"[a-z][a-z0-9_.-]{0,63}\Z")
 DEVICE_ID = re.compile(r"ppu-device-[0-9a-f]{16,64}\Z")
-JOB_ID = re.compile(r"job-[0-9]{8}-[0-9]{6}-[0-9a-f]{8}\Z")
-TERMINAL = frozenset(("success", "failed", "error", "cancelled", "timeout", "aborted"))
 MAX_BUNDLE = 64 * 1024 * 1024
 SCHEMA = "plasma.program.bundle-flash.v1"
 
 
 class ProgramDenied(RuntimeError):
     pass
-
-
-class OutcomeUnknown(ProgramDenied):
-    def __init__(self, reason: str, job_id: str | None = None):
-        super().__init__(reason)
-        self.job_id = job_id
 
 
 def require(condition: bool, code: str) -> None:
@@ -276,131 +267,13 @@ def activate(client: ppu_deploy_api.BootstrapAPIClient,
             "transaction_id": transaction}
 
 
-def _gateway_challenge(host: str, device_id: str, auth) -> str:
-    """Read-only P2A-1 challenge from the PPU Gateway (LOM-P2A-2 G13)."""
-    connection = http.client.HTTPConnection(host, 18080, timeout=12)
-    try:
-        connection.request("GET", "/api/auth/challenge", headers={"Accept": "application/json"})
-        response = connection.getresponse()
-        raw = response.read(65537)
-    finally:
-        connection.close()
-    value = json.loads(raw) if response.status == 200 and len(raw) <= 65536 else None
-    require(type(value) is dict and value.get("ok") is True and value.get("schema") == auth.SCHEMA
-            and value.get("device_id") == device_id and type(value.get("nonce")) is str,
-            "GATEWAY_CHALLENGE_DENIED")
-    return value["nonce"]
-
-
-def post_once(host: str, selection: Selection, *, credential: str, device_id: str) -> str:
-    """Submit ONE programming Job, signed under the enrolled PPU controller (G13)."""
-    # Reuse the Runtime/Manager identity writer. No unbound execution fallback.
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "software/python"))
-    from plasma_opf import bundle_v3
-    resource, asset = bundle_v3.identity_from_archive(selection.archive)
-    identity = readiness(host, selection)
-    operations = ["erase", "program", "verify"]
-    binding = bundle_v3.job_image_binding(
-        resource, asset, ppu_id=identity["ppu_id"], site_id=selection.site,
-        operation="programming", operations=operations)
-    with zipfile.ZipFile(io.BytesIO(selection.archive)) as archive:
-        manifest = json.loads(archive.read("manifest.json"))
-        package = next(p for p in manifest["packages"] if p["id"] == selection.firmware_package)
-        image = archive.read(package["files"][0]["path"])
-    import base64
-    payload = {
-        "site_id": selection.site, "operations": operations, "timeout_s": 180.0,
-        "target": selection.target, "provider": selection.provider,
-        "profile": selection.profile, "job_binding": binding,
-        "image_asset": asset, "asset_base64": base64.b64encode(image).decode(),
-    }
-    auth = ppu_deploy_api._request_auth_module()
-    body = json.dumps(payload, sort_keys=True).encode()
-    nonce = _gateway_challenge(host, device_id, auth)
-    header, context = auth.sign_request(credential=credential, method="POST", path="/api/jobs",
-                                        body=body, device_id=device_id, nonce=nonce)
-    connection = http.client.HTTPConnection(host, 18080, timeout=18)
-    try:
-        # No retry, including any network error after the bytes were sent.
-        connection.request("POST", "/api/jobs",
-                           body=body,
-                           headers={"Content-Type": "application/json",
-                                    "Accept": "application/json",
-                                    "Authorization": header})
-        response = connection.getresponse()
-        raw = response.read(65537)
-        if len(raw) > 65536:
-            raise OutcomeUnknown("JOB_SUBMISSION_RESPONSE_TOO_LARGE")
-        if response.status != 202:
-            raise ProgramDenied("JOB_SUBMISSION_REJECTED_HTTP_" + str(response.status))
-        try:
-            auth.verify_response(credential=credential, context=context, status=202, body=raw,
-                                 header=response.getheader(auth.RESPONSE_HEADER))
-        except auth.RequestAuthError:
-            raise OutcomeUnknown("JOB_SUBMISSION_RESPONSE_UNAUTHENTICATED_DO_NOT_RESUBMIT") from None
-        reply = json.loads(raw)
-        job = reply.get("job") if type(reply) is dict else None
-        if type(job) is not dict or type(job.get("job_id")) is not str:
-            raise OutcomeUnknown("JOB_ID_UNKNOWN_DO_NOT_RESUBMIT")
-        job_id = job["job_id"]
-        if JOB_ID.fullmatch(job_id) is None:
-            raise OutcomeUnknown("JOB_ID_INVALID_DO_NOT_RESUBMIT")
-        return job_id
-    except (OSError, TimeoutError, http.client.HTTPException, ValueError):
-        raise OutcomeUnknown("JOB_SUBMISSION_OUTCOME_UNKNOWN_DO_NOT_RESUBMIT") from None
-    finally:
-        connection.close()
-
-
-def poll_job(host: str, job_id: str) -> dict:
-    deadline = time.monotonic() + 240
-    while True:
-        job = get_gateway(host, "/api/status?job=" +
-                          quote(job_id, safe="")).get("job")
-        if type(job) is not dict or job.get("job_id") != job_id:
-            raise OutcomeUnknown("JOB_STATUS_IDENTITY_UNKNOWN", job_id)
-        if job.get("state") in TERMINAL:
-            return job
-        if job.get("state") not in ("queued", "running") or time.monotonic() >= deadline:
-            raise OutcomeUnknown("JOB_RESULT_UNKNOWN_DO_NOT_RESUBMIT", job_id)
-        time.sleep(1)
-
-
-def verify_job(job: dict, selection: Selection) -> dict:
-    result = job.get("result")
-    details = result.get("details") if type(result) is dict else None
-    flash = details.get("programming") if type(details) is dict else None
-    verify = (flash.get("steps", {}).get("verify", {}) if type(flash) is dict else {})
-    good = (job.get("state") == "success" and job.get("site_id") == selection.site
-            and job.get("operation") == "programming"
-            and type(result) is dict and result.get("state") == "success"
-            and result.get("image_sha256") == selection.firmware_sha
-            and result.get("image_size") == selection.firmware_size
-            and result.get("attempts") == 1
-            and type(flash) is dict and flash.get("result") == "PASS"
-            and flash.get("operations") == ["erase", "program", "verify"]
-            and set(flash.get("steps", {})) == {"erase", "program", "verify"}
-            and verify.get("readback_sha256") == selection.firmware_sha
-            and verify.get("bytes_verified") == selection.firmware_size
-            and flash.get("safe_off") is True)
-    return {"status": "PASS" if good else "FAIL_OR_INCOMPLETE",
-            "job_id": job.get("job_id"), "job_state": job.get("state"),
-            "firmware_sha256": selection.firmware_sha,
-            "readback_sha256": verify.get("readback_sha256") if type(flash) is dict else None,
-            "bytes_verified": verify.get("bytes_verified") if type(flash) is dict else None,
-            "safe_off": flash.get("safe_off") if type(flash) is dict else None,
-            "submission_count": 1}
-
-
 def execute(command: str, selection: Selection, *, host: str, device_id: str,
             client: ppu_deploy_api.BootstrapAPIClient,
-            runtime_sha: str | None = None, approved_once: bool = False) -> dict:
-    require(command in {"diagnose", "deploy", "flash", "run"}, "COMMAND_DENIED")
+            approved_once: bool = False) -> dict:
+    require(command in {"diagnose", "deploy"}, "COMMAND_DENIED")
     require(command == "diagnose" or approved_once, "OWNER_APPROVAL_REQUIRED")
     validate_host(host, device_id)
-    require_device(client, device_id,
-                   runtime_sha if command in ("flash", "run") else None)
+    require_device(client, device_id, None)
     before = readiness(host, selection)
     active = client.assets_status()
     if command == "diagnose":
@@ -408,44 +281,9 @@ def execute(command: str, selection: Selection, *, host: str, device_id: str,
                 "active_asset_set_sha256": active.get("asset_set_sha256"),
                 "expected_asset_set_sha256": selection.bundle_sha,
                 "mutations": "NOT_RUN"}
-    deployed = None
-    if command in ("deploy", "run"):
-        # Do not allow an FPGA-bearing Bundle to silently load or replace PL.
-        deployed = activate(client, selection)
-    else:
-        require(active["state"] == "ACTIVE" and
-                active["asset_set_sha256"] == selection.bundle_sha,
-                "BUNDLE_NOT_CURRENTLY_ACTIVE")
-    if command == "deploy":
-        return {"status": "PASS", "deployment": deployed,
-                "flash": "NOT_RUN"}
-    # A deployment receipt alone does not authorize a programming Job.
-    require_device(client, device_id, runtime_sha)
-    require(client.assets_status()["asset_set_sha256"] == selection.bundle_sha,
-            "ACTIVE_SET_CHANGED")
-    readiness(host, selection)
-    try:
-        job_id = post_once(host, selection, credential=client._token, device_id=device_id)
-    except OutcomeUnknown as exc:
-        return {"status": "OUTCOME_UNKNOWN", "reason": str(exc),
-                "submission_count": "UNKNOWN", "auto_retry": "DISABLED"}
-    try:
-        job = poll_job(host, job_id)
-    except (OutcomeUnknown, ProgramDenied, OSError, TimeoutError) as exc:
-        return {"status": "OUTCOME_UNKNOWN",
-                "reason": str(exc) if isinstance(exc, ProgramDenied)
-                else type(exc).__name__, "job_id": job_id,
-                "submission_count": 1, "auto_retry": "DISABLED"}
-    verified = verify_job(job, selection)
-    if verified["status"] == "PASS":
-        try:
-            readiness(host, selection)
-        except Exception:
-            verified["status"] = "FAIL_OR_INCOMPLETE"
-            verified["post_site_state"] = "UNKNOWN"
-    return {"status": verified["status"], "deployment": deployed,
-            "job": verified, "auto_retry": "DISABLED"}
-
+    # Do not allow an FPGA-bearing Bundle to silently load or replace PL.
+    return {"status": "PASS", "deployment": activate(client, selection),
+            "flash": "NOT_RUN"}
 
 
 def deploy_runtime_kit(client, selection: Selection, *, host: str,
@@ -548,7 +386,7 @@ def deploy_runtime_kit(client, selection: Selection, *, host: str,
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("diagnose", "deploy", "flash", "run", "runtime-deploy"))
+    parser.add_argument("command", choices=("diagnose", "deploy", "runtime-deploy"))
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--firmware-package")
     parser.add_argument("--image", type=Path,
@@ -557,7 +395,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", required=True)
     parser.add_argument("--device-id", required=True)
     parser.add_argument("--runtime-sha",
-                        help="required for flash/run/runtime-deploy; full Runtime Git SHA")
+                        help="required for runtime-deploy; full Runtime Git SHA")
     parser.add_argument("--kit-sha256", help="source-bound CI Runtime Kit digest")
     parser.add_argument("--ppu-id", help="existing Z2 PPU ID, for runtime-deploy")
     parser.add_argument("--facility-id", help="existing facility ID, for runtime-deploy")
@@ -570,7 +408,7 @@ def main(argv: list[str] | None = None) -> int:
     receipt = {"schema": SCHEMA, "command": args.command,
                "status": "NOT_RUN", "auto_retry": "DISABLED"}
     try:
-        require(args.command not in ("flash", "run", "runtime-deploy")
+        require(args.command != "runtime-deploy"
                 or args.runtime_sha is not None, "RUNTIME_SHA_REQUIRED")
         require(args.command == "diagnose" or args.approved_once,
                 "OWNER_APPROVAL_REQUIRED")
@@ -593,7 +431,6 @@ def main(argv: list[str] | None = None) -> int:
         else:
             result = execute(args.command, selection, host=args.host,
                              device_id=args.device_id, client=client,
-                             runtime_sha=args.runtime_sha,
                              approved_once=args.approved_once)
         receipt.update(result)
         code = 0 if receipt["status"] == "PASS" else 1

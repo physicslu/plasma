@@ -2,7 +2,7 @@
 // The Manager alone schedules PPU/Site Jobs, persists Journal/Receipt and
 // applies retry/stop. This module only projects truth into the Factory UI.
 
-import type { EngineeringTargetCatalog, PPUStatus } from "../plasma-api";
+import { PlasmaApiError, type EngineeringTargetCatalog, type PPUStatus } from "../plasma-api";
 import {
   awaitingUnits, batchSiteVerdict, runOfUnit, siteCapability, unitCycleLabel, unitFailDetail,
   unitProgressPercent, type ManagedTopology, type ProgrammingRoute,
@@ -39,11 +39,18 @@ export function managedFactoryCatalog(topology: ManagedTopology): ProgrammingCap
   };
 }
 
-/** Site status of one PPU from the Manager Fleet. Throws the exact reason when not observable. */
+/**
+ * Site status of one PPU from the Manager Fleet. Throws the exact reason when
+ * not observable. A commissioned PPU the Fleet cannot observe right now is a
+ * transient fault (the PMode status recovery re-reads the Fleet); a PPU that
+ * is not a Registry entry is not.
+ */
 export function managedPpuStatus(topology: ManagedTopology, alias: string): PPUStatus {
   const ppu = topology.ppus.find(item => item.alias === alias);
   if (!ppu) throw new Error("PPU is not a commissioned Manager Registry entry");
-  if (!ppu.online) throw new Error(`${ppu.availability.label} · ${ppu.availability.reason}`);
+  if (!ppu.online) {
+    throw new PlasmaApiError(`${ppu.availability.label} · ${ppu.availability.reason}`, undefined, ppu.availability.code, true);
+  }
   return {
     sites: ppu.sites.map(site => ({
       site_id: site.site_id,

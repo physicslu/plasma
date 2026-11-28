@@ -50,14 +50,9 @@ test("Production Set, Site Selection collapse and the EMode section survive a mo
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 });
 
-// KNOWN REGRESSION (U10 managed workspaces, reported, not fixed here): the
-// Programming Job configuration (Target IC, Programming Image, Operations) of
-// both modes and the EMode PPU / Site selection are component-local state and
-// are reset by a mode switch; before U10 the shared workspace session kept
-// them. This test states the previous contract and is expected to fail until
-// the app restores it (or the owner retires the contract); then drop `test.fail`.
+// The operator's Programming Job settings of both modes and the EMode PPU /
+// Site selection are kept by the workspace session across a mode switch.
 test("Programming Job configuration and the EMode PPU / Site selection survive a mode switch", async ({ page }) => {
-  test.fail(true, "managed workspaces reset Programming Job configuration and EMode PPU/Site selection on a mode switch");
   await mockManager(page, { ppus: mockFleet(1, [2, 4]) });
 
   await page.goto("/fleet");

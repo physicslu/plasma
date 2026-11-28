@@ -205,3 +205,36 @@ test("EMode Manager Batch carries a non-contiguous Site subset × selected opera
   expect(traffic.batches).toHaveLength(1);
   expect(traffic.legacy).toEqual([]);
 });
+
+// Carried over from the retired PPU runtime_acceptance `eight-site-batch`
+// scenario (#1550): every Site of one PPU in ONE Manager Batch, one Image, one
+// Job per Site, no retry, each Job bound to that Image.
+test("EMode Manager Batch programs every Site of one PPU with one Image, one Job per Site and no retry", async ({ page, request }) => {
+  const traffic = observeManagedTraffic(page);
+  const workspace = await openEngineering(page, managed.ppuA);
+  const job = await selectEngineeringIc(page);
+  const allSites = Array.from({ length: managed.ppuASites }, (_, index) => index + 1);
+  const image = imagePattern(512, 41, 9);
+  await setEngineeringSites(workspace, allSites, managed.ppuASites);
+  await setEngineeringOperations(job, ["program"]);
+  await job.getByLabel("Engineering Programming Image file").setInputFiles(imageFile("engineering-all-sites.bin", image));
+  await job.getByRole("button", { name: /START PROGRAMMING/ }).click();
+  await expect.poll(() => traffic.batches.length, { timeout: 15_000 }).toBe(1);
+  const sent = traffic.batches[0];
+  expect(sent.body.targets).toEqual([{ ppu_alias: managed.ppuA, site_ids: allSites }]);
+  await expect.poll(() => sent.batchId, { timeout: 15_000 }).toMatch(/^[0-9a-f]{32}$/);
+
+  const batch = await settledManagerBatch(request, sent.batchId!, 90_000);
+  expect(batch.outcome).toBe("PASS");
+  expect(batch.counts).toMatchObject({ sites: allSites.length, pass: allSites.length, fail: 0 });
+  expect(batch.attempts).toHaveLength(allSites.length);
+  const runs = await batchRuns(request, batch);
+  expect(runs.map(item => item.run.site_id).sort((a, b) => a - b)).toEqual(allSites);
+  const imageSha = createHash("sha256").update(image).digest("hex");
+  for (const { run } of runs) {
+    expect(run.outcome).toBe("PASS");
+    expect(run.receipt?.observed_image_sha256).toBe(imageSha);
+  }
+  expect(new Set(runs.map(item => item.run.receipt?.job_id)).size).toBe(allSites.length);
+  expect(traffic.legacy).toEqual([]);
+});
