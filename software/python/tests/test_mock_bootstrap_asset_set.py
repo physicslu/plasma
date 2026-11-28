@@ -100,19 +100,28 @@ def test_a_mock_route_with_a_real_icpn_never_qualifies_on_a_physical_site() -> N
     assert raised.value.args[0] == "SITE_INTERFACE_NOT_READY"
 
 
-def test_production_routes_carry_no_mock_route() -> None:
-    for route in bundle_v3.load_routes(PRODUCTION_ROUTES):
-        assert route.capabilities["driver_abi"] != mock_resources.MOCK_DRIVER_ABI
-        assert route.site_interface == "openocd"
+def test_production_routes_hold_exactly_one_mock_route_on_mock_sites() -> None:
+    """Built-in Mock PPU (M2): the committed Mock Route is the only Mock-ABI
+    Route, it declares the Mock platform, and every other Route is OpenOCD."""
+    routes = bundle_v3.load_routes(PRODUCTION_ROUTES)
+    mock = [r for r in routes if r.capabilities["driver_abi"] == mock_resources.MOCK_DRIVER_ABI]
+    assert len(mock) == 1
+    assert mock[0].target == mock_resources.MOCK_PLATFORM and mock[0].site_interface == "mock"
+    for route in routes:
+        if route not in mock:
+            assert route.target["platform"] != "mock" and route.site_interface == "openocd"
 
 
 def test_a_mock_and_a_physical_route_for_one_icpn_are_never_guessed_between() -> None:
-    physical = bundle_v3.load_routes(PRODUCTION_ROUTES)
-    mock = mock_resources.mock_route(icpn=REAL_ICPN)
-    both = bundle_v3.resolve_routes((*physical, mock), icpn=REAL_ICPN,
+    routes = bundle_v3.load_routes(PRODUCTION_ROUTES)
+    both = bundle_v3.resolve_routes(routes, icpn=REAL_ICPN,
                                     operations=["erase", "program", "verify"])
-    # The Manager refuses more than one match (programming_route_ambiguous).
+    # Unscoped, both match (the Manager would refuse: programming_route_ambiguous);
+    # the Manager therefore resolves per Batch class: exactly one each.
     assert len(both) == 2
+    for mock in (True, False):
+        scoped = [r for r in both if (r.target["platform"] == "mock") == mock]
+        assert len(scoped) == 1
 
 
 @pytest.mark.parametrize("socket, actions", [(None, None), ("control.sock", "actions.json")])

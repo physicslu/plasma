@@ -25,7 +25,8 @@ export function managedFactoryCatalog(topology: ManagedTopology): ProgrammingCap
       display_name: facility.displayName,
       ppus: facility.ppus.map(ppu => ({
         ppu_id: ppu.alias,
-        display_name: `${ppu.alias} · PPU ID ${ppu.ppuId ?? "unknown"}`,
+        // A Mock PPU is always named MOCK where an operator selects it.
+        display_name: `${ppu.ppuClass === "mock" ? "MOCK · " : ""}${ppu.alias} · PPU ID ${ppu.ppuId ?? "unknown"}`,
         model: ppu.model ?? "—",
         site_count: ppu.siteCount,
         provider: "manager",
@@ -181,7 +182,7 @@ export function managedProductionSnapshot(
       ? "partial"
     : "error";
   return {
-    batch_id: batch.batch_id, state,
+    batch_id: batch.batch_id, state, mock: batch.ppu_class === "mock",
     // Forward Manager truth unchanged, including unknown historical timing.
     created_at: batch.created_at ?? "",
     started_at: batch.started_at ?? null, finished_at: batch.finished_at ?? null,

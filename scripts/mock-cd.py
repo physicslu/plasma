@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
 import base64
 import hashlib
-import importlib.util
 import json
 import os
 import signal
@@ -41,22 +39,15 @@ MANAGER_PORT = 19880
 WEB_PORT = 15173
 BOOTSTRAP_PORT = 18081
 
-# The one Mock Programming Route (plasma_server.mock_resources). A real ICPN
-# so the Console's Catalog IC selection can name it; its Mock Driver ABI maps
-# to Site interface "mock" (U10 D1), so it never qualifies on a physical Site.
-MOCK_ROUTE_ICPN = "STM32F103C8T6"
-MOCK_FLASH_BASE = 0x08000000
-MOCK_FLASH_SIZE = 1024 * 1024
-MOCK_ERASE_GRANULARITY = 1024
-MOCK_PACKAGE_TARGET = {"platform": "mock", "board": "mock-site", "fpga_part": "none"}
-MOCK_RELEASE_SHA = "0" * 39 + "1"
-B3_INSTALL_POLICY = {
-    "schema": "plasma.ppu.b3-install-policy.v2",
-    "mode": "development",
-    "modes": ["activate", "stage_only"],
-    "actions": ["install", "verify"],
-}
-MAX_UNIX_SOCKET_PATH = 107
+sys.path.insert(0, str(PYTHON_DIR))
+from plasma_server import mock_ppu  # noqa: E402  the product Mock PPU launcher
+
+# The built-in Mock Programming Route (data/opf/programming-routes).
+MOCK_ROUTE_ICPN = mock_ppu.ROUTE_ICPN
+MOCK_FLASH_BASE = mock_ppu.FLASH_BASE
+MOCK_FLASH_SIZE = mock_ppu.FLASH_SIZE
+MOCK_ERASE_GRANULARITY = mock_ppu.ERASE_GRANULARITY
+PRODUCTION_ROUTES = ROOT / "data" / "opf" / "programming-routes"
 
 
 class MockCDError(RuntimeError):
@@ -103,50 +94,6 @@ def wait_json(
     raise MockCDError(f"timeout waiting for {label}: {detail}")
 
 
-def write_ppu_config(path: Path, *, ppu_id: str, site_count: int, port: int, work: Path) -> None:
-    sites = [
-        {
-            "id": site_id,
-            "enabled": True,
-            "interface": "mock",
-            "target": MOCK_ROUTE_ICPN,
-            "operation_timeout_s": 30.0,
-            "max_retries": 0,
-            "retry_backoff_s": 0.01,
-            "mock": {
-                "flash_base": MOCK_FLASH_BASE,
-                "flash_size": MOCK_FLASH_SIZE,
-                "erase_granularity": MOCK_ERASE_GRANULARITY,
-                "default_delay_s": 0.01,
-                "progress_steps": 2,
-            },
-        }
-        for site_id in range(1, site_count + 1)
-    ]
-    payload = {
-        "ppu": {
-            "id": ppu_id,
-            "facility_id": "mock-facility",
-            "model": "MOCK-PPU",
-            "display_name": ppu_id,
-        },
-        "server": {
-            "host": "127.0.0.1",
-            "port": port,
-            "max_supported_sites": site_count,
-            "max_concurrent_jobs": site_count,
-            "max_queue_depth_per_site": 4,
-            "output_root": str(work / f"{ppu_id}-output"),
-            "log_root": str(work / f"{ppu_id}-logs"),
-            "max_metadata_bytes": 65536,
-            "max_map_bytes": 1048576,
-            "max_binary_bytes": 67108864,
-        },
-        "sites": sites,
-    }
-    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-
-
 def gateway_url(item: dict[str, Any]) -> str:
     return f"http://{item['host']}:{item['gateway_port']}"
 
@@ -164,10 +111,9 @@ def write_manager_config(path: Path, work: Path) -> None:
             # Bootstrap credentials / Batch journals live next to it.
             "registry_state_path": str((work / "manager-state" / "registry.json").resolve()),
         },
-        "ppus": [
-            {"alias": item["name"], "endpoint": gateway_url(item)}
-            for item in PPUS
-        ],
+        # No seeded PPUs: each Mock PPU launcher registers, commissions and
+        # enrolls itself through the Manager's own routes (product path).
+        "ppus": [],
     }
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
@@ -350,178 +296,28 @@ def dump_failure_logs() -> None:
 # Gateway. Nothing here is a Mock engine: this is fixture provisioning only.
 
 
-def write_private_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
-    path.chmod(0o600)
+def ppu_spec(work: Path, item: dict[str, Any], gateway_args: list[str] | None = None) -> Any:
+    return mock_ppu.MockPPUSpec(
+        root=work / str(item["name"]), control_plane=SCRIPTS_DIR, alias=str(item["name"]),
+        ppu_id=str(item["ppu_id"]), sites=int(item["sites"]), host=str(item["host"]),
+        gateway_port=int(item["gateway_port"]), server_port=int(item["server_port"]),
+        gateway_args=tuple(gateway_args or ()))
 
 
-def ppu_fixture_paths(work: Path, item: dict[str, Any]) -> dict[str, Path]:
-    root = work / str(item["name"])
-    paths = {
-        "root": root,
-        "config": root / "ppu.yaml",
-        "product": root / "product",
-        "state": root / "state",
-        "runtime_dir": root / "rt",
-        "runtime_socket": root / "rt" / "control.sock",
-        "admission_socket": root / "adm.sock",
-        "machine_id": root / "machine-id",
-        "package_target": root / "ppu-package-target.json",
-        "install_policy": root / "ppu-bundle-install-policy.json",
-        "ticket": root / "enrollment-ticket",
-        "output": root / f"{item['ppu_id']}-output",
-    }
-    for key in ("runtime_socket", "admission_socket"):
-        if len(str(paths[key])) > MAX_UNIX_SOCKET_PATH:
-            raise MockCDError(f"Unix socket path too long for AF_UNIX: {paths[key]}")
-    return paths
-
-
-def bootstrap_service_paths(service: Any, paths: dict[str, Path], gateway_port: int) -> Any:
-    """Temporary ServicePaths for one Mock PPU (lom_p0_lab.py pattern)."""
-    return service.ServicePaths(
-        product_root=paths["product"], state_root=paths["state"],
-        machine_id_path=paths["machine_id"],
-        bootstrap_script=SCRIPTS_DIR / "ppu-bootstrap.py",
-        kit_tool=SCRIPTS_DIR / "ppu-bootstrap-kit.py",
-        package_target_file=paths["package_target"],
-        bundle_install_policy=paths["install_policy"],
-        deployment_engine_script=SCRIPTS_DIR / "ppu-bootstrap-deployment.py",
-        z2_installer_script=SCRIPTS_DIR / "ppu-z2-installer.py",
-        button_profile=paths["root"] / "no-button-profile.json",
-        admission_socket=paths["admission_socket"],
-        seal_dir=paths["root"] / "seals",
-        # U10 D2: B3 borrows the Job-admission lease from THIS Mock Runtime.
-        runtime_control_socket=paths["runtime_socket"],
-        reload_fence=paths["root"] / "mmio.lock",
-        site_recovery_script=paths["root"] / "absent-site-recovery.py",
-        gateway_port=gateway_port,
-    )
-
-
-def provision_mock_ppu(work: Path, item: dict[str, Any]) -> dict[str, Path]:
-    """Files a factory would provision on a PPU, under a temporary root."""
-    paths = ppu_fixture_paths(work, item)
-    paths["root"].mkdir(parents=True, exist_ok=True)
-    paths["runtime_dir"].mkdir(mode=0o700, exist_ok=True)
-    paths["runtime_dir"].chmod(0o700)
-    write_ppu_config(paths["config"], ppu_id=str(item["ppu_id"]), site_count=int(item["sites"]),
-                     port=int(item["server_port"]), work=paths["root"])
-    paths["machine_id"].write_text(os.urandom(16).hex() + "\n", encoding="utf-8")
-    write_private_json(paths["package_target"], MOCK_PACKAGE_TARGET)
-    write_private_json(paths["install_policy"], B3_INSTALL_POLICY)
-    # An active Runtime release, so /v1/status reports runtime_active.
-    release = paths["product"] / "releases" / f"0.2.1-{MOCK_RELEASE_SHA[:12]}"
-    release.mkdir(parents=True, exist_ok=True)
-    (release / "release.json").write_text(json.dumps({
-        "role": "ppu", "target": "linux-armv7l", "product_version": "0.2.1",
-        "git_sha": MOCK_RELEASE_SHA}) + "\n", encoding="utf-8")
-    current = paths["product"] / "current"
-    if not current.is_symlink():
-        current.symlink_to(release)
-    return paths
-
-
-def mock_route_document() -> dict[str, Any]:
-    sys.path.insert(0, str(PYTHON_DIR))
-    from plasma_server import mock_resources
-
-    return mock_resources.mock_route_document(
-        icpn=MOCK_ROUTE_ICPN, flash_base=MOCK_FLASH_BASE, flash_size=MOCK_FLASH_SIZE,
-        erase_granularity=MOCK_ERASE_GRANULARITY)
-
-
-def write_mock_routes(work: Path) -> Path:
-    routes = work / "programming-routes"
-    routes.mkdir(parents=True, exist_ok=True)
-    document = mock_route_document()
-    (routes / f"{document['route_id']}.json").write_text(
-        json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return routes
-
-
-def load_script(name: str, filename: str) -> Any:
-    if name in sys.modules:
-        return sys.modules[name]
-    spec = importlib.util.spec_from_file_location(name, SCRIPTS_DIR / filename)
-    if spec is None or spec.loader is None:
-        raise MockCDError(f"cannot load {filename}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def bootstrap_fixture_main(argv: list[str]) -> None:
-    """Run the REAL PPU Bootstrap HTTP service for one Mock PPU (harness child).
-
-    Bootstrap's own CLI exposes only six paths, so the fixture builds the same
-    BootstrapHTTPServer with temporary ServicePaths. It arms one Engineering
-    enrollment ticket (the factory CLI path) and hands it to the harness via
-    a 0600 file; the Manager then claims it through its own enrollment route.
-    """
-    parser = argparse.ArgumentParser(prog="mock-cd.py bootstrap-fixture")
-    parser.add_argument("--work", type=Path, required=True)
-    parser.add_argument("--name", required=True)
-    args = parser.parse_args(argv)
-    item = next(entry for entry in PPUS if entry["name"] == args.name)
-    paths = ppu_fixture_paths(args.work, item)
-    service = load_script("mock_cd_bootstrap_service", "ppu-bootstrap-service.py")
-    base = load_script("mock_cd_bootstrap_base", "ppu-bootstrap.py")
-    server = service.BootstrapHTTPServer(
-        (str(item["host"]), BOOTSTRAP_PORT),
-        paths=bootstrap_service_paths(service, paths, int(item["gateway_port"])),
-        base_module=base)
-    server.start_controller_services()
-    ticket = server.engine.engineering_arm(server.controller_module.boot_clock(), authorized=True)
-    partial = paths["ticket"].with_suffix(".part")
-    fd = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(ticket)
-    os.replace(partial, paths["ticket"])
-    print(f"Mock PPU Bootstrap {item['name']} listening on {item['host']}:{BOOTSTRAP_PORT}",
-          flush=True)
-    try:
-        server.serve_forever()
-    finally:
-        server.server_close()
-
-
-def runtime_command(paths: dict[str, Path]) -> list[str]:
-    return [
-        sys.executable, "-m", "plasma_server.runtime_server",
-        "--config", str(paths["config"]),
-        "--runtime-control-socket", str(paths["runtime_socket"]),
-        "--mock-asset-set-product-root", str(paths["product"]),
-        "--mock-asset-set-control-plane", str(SCRIPTS_DIR),
+def serve_command(spec: Any) -> list[str]:
+    """The product launcher, exactly as plasma-mock-ppu.service runs it."""
+    command = [
+        sys.executable, "-m", "plasma_server.mock_ppu", "serve",
+        "--root", str(spec.root), "--control-plane", str(spec.control_plane),
+        "--alias", spec.alias, "--ppu-id", spec.device_id, "--sites", str(spec.sites),
+        "--host", spec.host, "--gateway-port", str(spec.gateway_port),
+        "--server-port", str(spec.server_port),
+        "--manager-url", f"http://127.0.0.1:{MANAGER_PORT}",
+        "--log-dir", str(LOG_DIR),
     ]
-
-
-def gateway_command(item: dict[str, Any], paths: dict[str, Path],
-                    extra: list[str] | None = None) -> list[str]:
-    # Read downloads are served from the same Job output directory the
-    # Runtime writes. Every write is bound to the PPU controller (G13).
-    return [
-        sys.executable, "-m", "plasma_web.gateway_phase3",
-        "--host", str(item["host"]), "--port", str(item["gateway_port"]),
-        "--plasma-host", "127.0.0.1", "--plasma-port", str(item["server_port"]),
-        "--output-root", str(paths["output"]),
-        "--ppu-config", str(paths["config"]),
-        "--controller-admission-socket", str(paths["admission_socket"]),
-        *(extra or []),
-    ]
-
-
-def wait_path(path: Path, *, label: str, processes: list[tuple[str, subprocess.Popen[str]]],
-              timeout_s: float = 20.0) -> None:
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        if path.exists():
-            log(f"PASS {label}")
-            return
-        assert_processes_alive(processes)
-        time.sleep(0.1)
-    raise MockCDError(f"timeout waiting for {label}: {path}")
+    for arg in spec.gateway_args:
+        command.append(f"--gateway-arg={arg}")
+    return command
 
 
 def http_post_json(url: str, body: dict[str, Any], *, timeout: float = 30.0) -> tuple[int, dict[str, Any]]:
@@ -545,44 +341,26 @@ def http_bytes(url: str, *, timeout: float = 30.0) -> tuple[bytes, dict[str, str
 
 
 def start_managed_ppus(work: Path, processes: list[tuple[str, subprocess.Popen[str]]], *,
-                       gateway_extra: dict[str, list[str]] | None = None) -> dict[str, dict[str, Path]]:
-    """Mock Runtime -> PPU Bootstrap -> Gateway for each Mock PPU.
-
-    The Runtime control socket exists before the Bootstrap starts, so the
-    controller enrolls in NORMAL (not RECOVERY_ONLY) mode.
-    """
-    fixtures = {str(item["name"]): provision_mock_ppu(work, item) for item in PPUS}
-    for item in PPUS:
-        name = str(item["name"])
-        paths = fixtures[name]
-        processes.append((f"{name}-runtime", start_process(
-            f"{name}-runtime", runtime_command(paths), cwd=PYTHON_DIR)))
-    for item in PPUS:
-        name = str(item["name"])
-        wait_path(fixtures[name]["runtime_socket"], label=f"{name} Runtime control socket",
-                  processes=processes)
-        processes.append((f"{name}-bootstrap", start_process(
-            f"{name}-bootstrap",
-            [sys.executable, str(Path(__file__).resolve()), "bootstrap-fixture",
-             "--work", str(work), "--name", name],
-            cwd=PYTHON_DIR, env={"PYTHONPATH": str(PYTHON_DIR)})))
-    for item in PPUS:
-        name = str(item["name"])
-        wait_path(fixtures[name]["admission_socket"], label=f"{name} Bootstrap admission socket",
-                  processes=processes)
-        wait_path(fixtures[name]["ticket"], label=f"{name} Bootstrap enrollment ticket",
-                  processes=processes)
-        processes.append((f"{name}-gateway", start_process(
-            f"{name}-gateway",
-            gateway_command(item, fixtures[name], (gateway_extra or {}).get(name)),
-            cwd=PYTHON_DIR)))
+                       gateway_extra: dict[str, list[str]] | None = None) -> dict[str, Any]:
+    """One product Mock PPU launcher per Mock PPU (Runtime -> Bootstrap ->
+    Gateway, then Manager registration + ticket enrollment)."""
+    specs = {str(item["name"]): ppu_spec(work, item, (gateway_extra or {}).get(str(item["name"])))
+             for item in PPUS}
+    for name, spec in specs.items():
+        processes.append((f"{name}-ppu", start_process(f"{name}-ppu", serve_command(spec),
+                                                       cwd=PYTHON_DIR)))
+        # One at a time, so the Registry (and every Console list) keeps the
+        # PPUS order instead of whichever launcher registered first.
+        wait_json(f"http://127.0.0.1:{MANAGER_PORT}/api/registry",
+                  lambda value, alias=name: any(p.get("alias") == alias for p in value.get("ppus") or []),
+                  label=f"{name} registered", timeout_s=60.0)
     for item in PPUS:
         wait_json(
             f"{gateway_url(item)}/api/health/ready",
             lambda value: value.get("ok") is True and value.get("execution") == "ready",
-            label=f"{item['name']} gateway ready",
+            label=f"{item['name']} gateway ready", timeout_s=60.0,
         )
-    return fixtures
+    return specs
 
 
 def manager_command(manager_config: Path) -> list[str]:
@@ -591,25 +369,32 @@ def manager_command(manager_config: Path) -> list[str]:
     return [sys.executable, "-m", "plasma_manager.bootstrap_server", "--config", str(manager_config)]
 
 
-def manager_env(routes: Path) -> dict[str, str]:
-    return {"PLASMA_PROGRAMMING_ROUTES_ROOT": str(routes)}
+def manager_env() -> dict[str, str]:
+    # The committed production Routes root: the Physical Route and the
+    # built-in Mock Route side by side, resolved per Batch PPU class.
+    return {"PLASMA_PROGRAMMING_ROUTES_ROOT": str(PRODUCTION_ROUTES)}
 
 
-def enroll_mock_ppus(fixtures: dict[str, dict[str, Path]]) -> dict[str, Any]:
-    """Enroll each Mock PPU to the Manager with its Engineering ticket."""
+def wait_enrolled(specs: dict[str, Any], processes: list[tuple[str, subprocess.Popen[str]]],
+                  timeout_s: float = 60.0) -> dict[str, Any]:
+    """Each launcher registered and enrolled its Mock PPU (credential proven)."""
     manager = f"http://127.0.0.1:{MANAGER_PORT}"
     statuses: dict[str, Any] = {}
-    for item in PPUS:
-        name = str(item["name"])
-        ticket = fixtures[name]["ticket"].read_text(encoding="utf-8").strip()
-        status, payload = http_post_json(
-            f"{manager}/api/registry/{name}/bootstrap/enrollment",
-            {"entry": "ticket", "ticket": ticket, "label": "mock-cd"})
-        if status != 200 or payload.get("ok") is not True:
-            raise MockCDError(f"{name} enrollment failed: HTTP {status} {payload}")
-        fixtures[name]["ticket"].unlink()
+    for name, spec in specs.items():
+        deadline = time.monotonic() + timeout_s
+        while True:
+            assert_processes_alive(processes)
+            pairing = mock_ppu.enrollment_state(spec, manager)
+            if (pairing.get("paired") and pairing.get("device_authenticated")
+                    and pairing.get("ppu_class") == "mock"):
+                break
+            if time.monotonic() > deadline:
+                raise MockCDError(f"{name} was not enrolled as a Mock PPU by its launcher: {pairing}")
+            time.sleep(0.25)
+        if spec.paths()["ticket"].exists():
+            raise MockCDError(f"{name} enrollment ticket was not consumed")
         statuses[name] = http_json(f"{manager}/api/registry/{name}/bootstrap", timeout=10.0)
-        log(f"PASS {name} enrolled to the Manager")
+        log(f"PASS {name} registered + enrolled by the product launcher (class mock)")
     return statuses
 
 
@@ -723,11 +508,12 @@ def assert_site_interface_boundary(route: dict[str, Any]) -> dict[str, str]:
             site["interface"] = "openocd"
         return payload
 
-    production = bundle_v3.load_routes(ROOT / "data" / "opf" / "programming-routes")
+    physical = next(r for r in bundle_v3.load_routes(PRODUCTION_ROUTES)
+                    if r.target.get("platform") != "mock")
     result = {
         "mock_route_on_live_mock_site": readiness(route["site_interface"], live),
         "mock_route_on_physical_site": readiness(route["site_interface"], as_physical),
-        "physical_route_on_live_mock_site": readiness(production[0].site_interface, live),
+        "physical_route_on_live_mock_site": readiness(physical.site_interface, live),
     }
     expected = {"mock_route_on_live_mock_site": "READY",
                 "mock_route_on_physical_site": "SITE_INTERFACE_NOT_READY",
@@ -826,22 +612,24 @@ def web_env() -> dict[str, str]:
 
 
 def start_manager(work: Path, processes: list[tuple[str, subprocess.Popen[str]]], *,
-                  extra_env: dict[str, str] | None = None) -> dict[str, Any]:
+                  extra_env: dict[str, str] | None = None) -> None:
     manager_config = work / "manager.yaml"
     write_manager_config(manager_config, work)
-    routes = write_mock_routes(work)
     processes.append(("manager", start_process(
         "manager", manager_command(manager_config), cwd=PYTHON_DIR,
-        env={**manager_env(routes), **(extra_env or {})})))
+        env={**manager_env(), **(extra_env or {})})))
     wait_json(
         f"http://127.0.0.1:{MANAGER_PORT}/api/health/live",
         lambda value: value.get("ok") is True,
         label="Manager liveness",
     )
+
+
+def wait_manager_fleet() -> dict[str, Any]:
     manager_fleet = wait_json(
         f"http://127.0.0.1:{MANAGER_PORT}/api/fleet",
         manager_is_current,
-        timeout_s=20.0,
+        timeout_s=30.0,
         label="Manager two-PPU fleet",
     )
     validate_manager_fleet(manager_fleet)
@@ -867,12 +655,12 @@ def run() -> None:
     evidence: dict[str, Any] = {}
     work = Path(tempfile.mkdtemp(prefix="plasma-mock-cd-"))
     try:
-        fixtures = start_managed_ppus(work, processes)
-        scenarios["ppu_runtime_ready"] = "PASS"
         start_manager(work, processes)
+        specs = start_managed_ppus(work, processes)
+        scenarios["ppu_runtime_ready"] = "PASS"
+        wait_enrolled(specs, processes)
+        wait_manager_fleet()
         scenarios["two_ppu_heterogeneous_topology"] = "PASS"
-
-        enroll_mock_ppus(fixtures)
         route = assert_mock_route_listed()
         scenarios["managed_ppu_enrollment"] = "PASS"
         programming = run_managed_programming(route)
@@ -921,10 +709,6 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    if sys.argv[1:2] == ["bootstrap-fixture"]:
-        # Harness child only: one Mock PPU's real Bootstrap service.
-        bootstrap_fixture_main(sys.argv[2:])
-        raise SystemExit(0)
     try:
         run()
     except Exception as exc:

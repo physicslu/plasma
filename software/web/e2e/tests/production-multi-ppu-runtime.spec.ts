@@ -97,14 +97,18 @@ test("real Production Mock shares one Programming Image across two PPUs for Eras
   await expect(siteCard(page, managed.ppuA)).toHaveAttribute("data-site-state", "success", { timeout: 60_000 });
   await expect(siteCard(page, managed.ppuB)).toHaveAttribute("data-site-state", "success", { timeout: 60_000 });
   await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
-  await expect(page.locator('[data-kpi="pass"] b')).toHaveText("2");
-  await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");
-  await expect(page.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
+  // Built-in Mock PPUs (D4): MOCK-labelled KPIs, never the production names.
+  await expect(page.locator('[data-kpi="source"] b')).toHaveText("MOCK");
+  await expect(page.locator('[data-kpi="mock-pass"] b')).toHaveText("2");
+  await expect(page.locator('[data-kpi="mock-fail"] b')).toHaveText("0");
+  await expect(page.locator('[data-kpi="mock-yield"] b')).toHaveText("100.0%");
+  await expect(page.locator('[data-kpi="yield"], [data-kpi="pass"]')).toHaveCount(0);
 
   // Manager evidence: one Batch, one Job per PPU with its own Binding, same Image.
   await expect.poll(() => sent.batchId).toMatch(/^[0-9a-f]{32}$/);
   const batch = await settledManagerBatch(request, sent.batchId!);
   expect(batch.outcome).toBe("PASS");
+  expect((batch as { ppu_class?: string }).ppu_class).toBe("mock");
   expect(batch.units.map(unit => unit.ppu_alias)).toEqual(ppus);
   const runs = await batchRuns(request, batch);
   expect(runs.map(item => item.unit.ppu_alias)).toEqual(ppus);
@@ -142,8 +146,8 @@ test("real Production Mock submits one Manager Batch for two PPUs (Erase) and co
   await expect(siteCard(page, managed.ppuA)).toHaveAttribute("data-site-state", "success", { timeout: 60_000 });
   await expect(siteCard(page, managed.ppuB)).toHaveAttribute("data-site-state", "success", { timeout: 60_000 });
   await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
-  await expect(page.locator('[data-kpi="pass"] b')).toHaveText("2");
-  await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");
+  await expect(page.locator('[data-kpi="mock-pass"] b')).toHaveText("2");
+  await expect(page.locator('[data-kpi="mock-fail"] b')).toHaveText("0");
 
   await expect.poll(() => sent.batchId).toMatch(/^[0-9a-f]{32}$/);
   const batch = await settledManagerBatch(request, sent.batchId!);

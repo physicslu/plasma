@@ -536,6 +536,32 @@ test("T18 Same-IC Debug: 2 Sites x Repeat 10 is Cycle-oriented and never shows Y
   assert.match(stats.statisticsLogLine(s), /no YIELD/);
 });
 
+test("Built-in Mock PPU Batch: numbers kept, never under production KPI names (D4)", () => {
+  for (const replaceIc of [true, false]) {
+    const s = stats.batchStatistics({ mock: true, sites: 8, repeat: 2, replaceIc,
+      tally: { settled: 16, pass: 15, fail: 1 }, jobAttempts: 16, retryAttempts: 0, sitesCompleted: 8 });
+    assert.equal(s.mock, true);
+    const items = stats.statisticsKpis(s, "00:00:10");
+    assert.deepEqual(items[0], { key: "source", label: "SOURCE", value: "MOCK", tone: "info" });
+    // No production key or label survives: YIELD / PASS IC / TOTAL IC are MOCK-prefixed.
+    for (const item of items.slice(1)) {
+      if (item.key === "sites" || item.key === "batch-time") continue;
+      assert.match(item.key, /^mock-/);
+      assert.match(item.label, /^MOCK /);
+    }
+    assert.equal(items.some(item => item.key === "yield" || item.label === "YIELD" || item.label === "PASS IC"), false);
+    assert.equal(kpi(items, replaceIc ? "mock-yield" : "mock-cycle-pass-rate"), "93.8%");
+    assert.match(stats.statisticsLogLine(s), /^\[STATISTICS\] MOCK \(simulated, not production\) · /);
+    assert.match(stats.statisticsMeta(s), /^MOCK PPU · not production · /);
+  }
+  // A Physical (or unclassified historical) Batch keeps the production names.
+  const physical = stats.batchStatistics({ sites: 1, repeat: 1, replaceIc: true,
+    tally: { settled: 1, pass: 1, fail: 0 } });
+  assert.equal(physical.mock, false);
+  assert.equal(stats.statisticsKpis(physical, "00:00:01")[0].label, "SITES");
+  assert.doesNotMatch(stats.statisticsLogLine(physical), /MOCK/);
+});
+
 test("rates are N/A without a settled Cycle, never 100%", () => {
   for (const replaceIc of [true, false]) {
     const s = stats.batchStatistics({ sites: 2, repeat: 10, replaceIc });

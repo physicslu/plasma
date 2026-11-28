@@ -21,6 +21,14 @@ current_link="$data_home/plasma/local-control-station/current"
 unit_dir="$config_home/systemd/user"
 manager_unit="$unit_dir/plasma-local-manager.service"
 console_unit="$unit_dir/plasma-control-station.service"
+# Built-in Mock PPU (D1-D7): the SAME three-process PPU (Runtime, Bootstrap,
+# Gateway) as a Z2, run by plasma_server.mock_ppu from the release venv and the
+# release's own PPU control plane; it registers itself with this Manager.
+mock_ppu_unit="$unit_dir/plasma-mock-ppu.service"
+mock_ppu_root="$state_dir/mock-ppu"
+mock_ppu_alias="mock-ppu-01"
+mock_ppu_sites=8
+release_control_plane_dir="ppu-control-plane"
 unit_marker="# Managed by Plasma local-control-station profile"
 registry_state="$state_dir/registry.json"
 dev_fresh_state=0
@@ -38,6 +46,7 @@ env_ppu_alias="${PLASMA_LOCAL_CONTROL_STATION_PPU_ALIAS-}"
 env_ppu_endpoint="${PLASMA_LOCAL_CONTROL_STATION_PPU_ENDPOINT-}"
 env_console_port="${PLASMA_LOCAL_CONTROL_STATION_CONSOLE_PORT-}"
 env_manager_port="${PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT-}"
+env_mock_ppu="${PLASMA_LOCAL_CONTROL_STATION_MOCK_PPU-}"
 if [[ -f "$config_file" ]]; then
   # shellcheck source=/dev/null
   source "$config_file"
@@ -47,6 +56,7 @@ fi
 [[ -n "$env_ppu_endpoint" ]] && PLASMA_LOCAL_CONTROL_STATION_PPU_ENDPOINT="$env_ppu_endpoint"
 [[ -n "$env_console_port" ]] && PLASMA_LOCAL_CONTROL_STATION_CONSOLE_PORT="$env_console_port"
 [[ -n "$env_manager_port" ]] && PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT="$env_manager_port"
+[[ -n "$env_mock_ppu" ]] && PLASMA_LOCAL_CONTROL_STATION_MOCK_PPU="$env_mock_ppu"
 
 base_python="${PLASMA_LOCAL_CONTROL_STATION_PYTHON:-}"
 plasma_python_root="/opt/plasma/python"
@@ -56,6 +66,8 @@ console_host="127.0.0.1"
 console_port="${PLASMA_LOCAL_CONTROL_STATION_CONSOLE_PORT:-18190}"
 manager_host="127.0.0.1"
 manager_port="${PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT:-18280}"
+# Default on (D7); --no-mock-ppu persists 0 in the profile.
+mock_ppu="${PLASMA_LOCAL_CONTROL_STATION_MOCK_PPU:-1}"
 
 say() {
   printf '[plasmactl local-control-station] %s\n' "$*"
@@ -109,6 +121,9 @@ validate_settings() {
   validate_port "$console_port" "Console port"
   validate_port "$manager_port" "Manager port"
   (( console_port != manager_port )) || die "Console and Manager ports must be different"
+  [[ "$mock_ppu" == 0 || "$mock_ppu" == 1 ]] || die "Mock PPU setting must be 0 or 1: $mock_ppu"
+  # D6: the Physical PPU keeps its fixed alias; the Mock never takes it.
+  [[ "$ppu_alias" != "$mock_ppu_alias" ]] || die "PPU alias $mock_ppu_alias is reserved for the built-in Mock PPU"
   validate_endpoint
 }
 
@@ -184,6 +199,7 @@ validate_release() {
   [[ -f "$release/release.json" ]] || return 1
   [[ -x "$release/venv/bin/python" ]] || return 1
   [[ -f "$release/web/server.js" ]] || return 1
+  [[ -f "$release/$release_control_plane_dir/ppu-bootstrap-service.py" ]] || return 1
   "$base_python" - "$release/release.json" "$sha" <<'PY'
 import json
 import sys
@@ -261,6 +277,26 @@ PY
   fi
 }
 
+# The built-in Mock PPU's Bootstrap control plane: exactly the set the PPU
+# Runtime release ships (ppu-runtime.py / ppu-bootstrap-installer.py), so the
+# installed Mock runs without the repository.
+build_release_control_plane() {
+  local destination="$1"
+  "$base_python" -I -B - "$repo_root" "$destination" <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+repo, destination = Path(sys.argv[1]), Path(sys.argv[2])
+spec = importlib.util.spec_from_file_location("plasma_ppu_runtime_packager",
+                                              repo / "scripts" / "ppu-runtime.py")
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+module._build_control_plane(repo, destination)
+PY
+}
+
 # Sudo's non-login owner context does not load nvm's Node.js PATH.
 # Prefer the caller's PATH; fall back only to one existing Node.js 22 install.
 ensure_nvm_node22_path() {
@@ -323,6 +359,7 @@ prepare_release() {
   cp -a "$web_dir/dist/standalone/." "$staging/web/"
   [[ -f "$staging/web/server.js" ]] || die "Control Station standalone build did not produce server.js"
   export_release_catalog "$staging/$release_catalog_dir"
+  build_release_control_plane "$staging/$release_control_plane_dir"
   validate_release_selector "$staging" || die "Manager Device Selector self-test failed for release ${sha:0:12}"
   "$base_python" - "$staging/release.json" "$sha" <<'PY'
 import json
@@ -346,6 +383,7 @@ write_profile_config() {
     printf 'PLASMA_LOCAL_CONTROL_STATION_PPU_ENDPOINT=%q\n' "$ppu_endpoint"
     printf 'PLASMA_LOCAL_CONTROL_STATION_CONSOLE_PORT=%q\n' "$console_port"
     printf 'PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT=%q\n' "$manager_port"
+    printf 'PLASMA_LOCAL_CONTROL_STATION_MOCK_PPU=%q\n' "$mock_ppu"
   } >"$config_file"
 }
 
@@ -433,19 +471,94 @@ PrivateTmp=true
 [Install]
 WantedBy=default.target
 EOF
+  write_mock_ppu_unit
+}
+
+write_mock_ppu_unit() {
+  if (( ! mock_ppu )); then
+    # --no-mock-ppu: remove only a unit this profile owns.
+    if [[ -f "$mock_ppu_unit" ]] && grep -Fxq "$unit_marker" "$mock_ppu_unit"; then
+      rm -f -- "$mock_ppu_unit"
+    fi
+    return 0
+  fi
+  cat >"$mock_ppu_unit" <<EOF
+$unit_marker
+[Unit]
+Description=Plasma Built-in Mock PPU ($mock_ppu_alias, $mock_ppu_sites Sites)
+After=plasma-local-manager.service
+Wants=plasma-local-manager.service
+
+[Service]
+Type=simple
+WorkingDirectory=$state_dir
+Environment=PYTHONUNBUFFERED=1
+# AF_UNIX sockets (Runtime control, G13 admission) in the private runtime dir.
+RuntimeDirectory=plasma-mock-ppu
+RuntimeDirectoryMode=0700
+ExecStart=$current_link/venv/bin/python -m plasma_server.mock_ppu serve --root $mock_ppu_root --socket-dir %t/plasma-mock-ppu --control-plane $current_link/$release_control_plane_dir --alias $mock_ppu_alias --sites $mock_ppu_sites --manager-url http://$manager_host:$manager_port
+KillMode=mixed
+TimeoutStopSec=20
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+EOF
+}
+
+apply_mock_ppu_enablement() {
+  if (( mock_ppu )); then
+    systemctl --user enable plasma-mock-ppu.service >/dev/null
+  else
+    systemctl --user disable --now plasma-mock-ppu.service >/dev/null 2>&1 || true
+  fi
+}
+
+verify_mock_ppu() {
+  if (( ! mock_ppu )); then
+    ! systemctl --user is-active --quiet plasma-mock-ppu.service || \
+      die "plasma-mock-ppu.service is active although the Mock PPU is disabled"
+    say "built-in Mock PPU: disabled (--no-mock-ppu)"
+    return 0
+  fi
+  systemctl --user is-active --quiet plasma-mock-ppu.service || die "plasma-mock-ppu.service is not active"
+  grep -Fq "plasma_server.mock_ppu serve --root $mock_ppu_root --socket-dir %t/plasma-mock-ppu --control-plane $current_link/$release_control_plane_dir" "$mock_ppu_unit" || \
+    die "Mock PPU unit does not run the release launcher"
+  local attempt
+  for attempt in {1..60}; do
+    if "$base_python" - "http://$manager_host:$manager_port/api/registry/$mock_ppu_alias/bootstrap" >/dev/null 2>&1 <<'PY'
+import json
+import sys
+from urllib.request import urlopen
+
+with urlopen(sys.argv[1], timeout=5) as reply:
+    pairing = json.load(reply).get("pairing") or {}
+ok = pairing.get("paired") and pairing.get("device_authenticated") and pairing.get("ppu_class") == "mock"
+raise SystemExit(0 if ok else 1)
+PY
+    then
+      say "built-in Mock PPU: $mock_ppu_alias enrolled with the Manager (class mock, $mock_ppu_sites Sites)"
+      return 0
+    fi
+    sleep 1
+  done
+  die "built-in Mock PPU $mock_ppu_alias is not enrolled with the Manager"
 }
 
 write_evidence() {
   local sha="$1" release="$2"
   mkdir -p "$state_dir"
   "$base_python" - "$evidence" "$sha" "$(basename "$release")" "$base_python" \
-    "$ppu_alias" "$ppu_endpoint" "$console_port" "$manager_port" <<'PY'
+    "$ppu_alias" "$ppu_endpoint" "$console_port" "$manager_port" "$mock_ppu" "$mock_ppu_alias" "$mock_ppu_sites" <<'PY'
 import json
 import platform
 import sys
 from pathlib import Path
 
-path, sha, release_id, python, alias, endpoint, console_port, manager_port = sys.argv[1:]
+path, sha, release_id, python, alias, endpoint, console_port, manager_port, mock, mock_alias, mock_sites = sys.argv[1:]
 payload = {
     "schema_version": 1,
     "role": "local-control-station",
@@ -459,6 +572,8 @@ payload = {
     "console_bind": f"127.0.0.1:{console_port}",
     "manager_bind": f"127.0.0.1:{manager_port}",
     "hardware_claim": "none",
+    "mock_ppu": ({"enabled": True, "alias": mock_alias, "sites": int(mock_sites)}
+                 if mock == "1" else {"enabled": False}),
 }
 Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
@@ -545,6 +660,7 @@ verify_profile() {
   wait_for_http "http://$manager_host:$manager_port/api/devices/search?$selector_probe_query" "Manager Device Selector" || \
     die "Manager Device Selector is unavailable (expected HTTP 200 from the Manager-owned Catalog)"
   wait_for_http "http://$console_host:$console_port/" "Control Station Console" || die "Control Station Console health failed"
+  verify_mock_ppu
   say "PASS: local Control Station Console + Manager are healthy on loopback"
   say "qualification boundary: Control Station runtime only; PPU/PS/PL/Site/IC readiness is separate"
   probe_target
@@ -567,12 +683,19 @@ status_profile() {
   printf 'Manager:        http://%s:%s\n' "$manager_host" "$manager_port"
   printf 'Manager svc:    %s\n' "$(systemctl --user is-active plasma-local-manager.service 2>/dev/null || true)"
   printf 'Console svc:    %s\n' "$(systemctl --user is-active plasma-control-station.service 2>/dev/null || true)"
+  if (( mock_ppu )); then
+    printf 'Mock PPU:       %s (%s Sites) svc %s\n' "$mock_ppu_alias" "$mock_ppu_sites" \
+      "$(systemctl --user is-active plasma-mock-ppu.service 2>/dev/null || true)"
+  else
+    printf 'Mock PPU:       disabled\n'
+  fi
   probe_target
 }
 
 logs_profile() {
   require_linux_user_runtime
   journalctl --user -u plasma-local-manager.service -u plasma-control-station.service \
+    -u plasma-mock-ppu.service \
     -n "${PLASMACTL_LOG_LINES:-200}" --no-pager
 }
 
@@ -584,12 +707,13 @@ restart_profile() {
   require_owned_installation
   systemctl --user restart plasma-local-manager.service
   systemctl --user restart plasma-control-station.service
+  (( ! mock_ppu )) || systemctl --user restart plasma-mock-ppu.service
   verify_profile
 }
 
 require_clean_first_install_boundary() {
   local path
-  for path in "$current_link" "$evidence" "$manager_unit" "$console_unit"; do
+  for path in "$current_link" "$evidence" "$manager_unit" "$console_unit" "$mock_ppu_unit"; do
     [[ ! -e "$path" && ! -L "$path" ]] || die "first install found pre-existing local-control-station artifact: $path"
   done
 }
@@ -614,13 +738,17 @@ install_profile() {
   write_evidence "$sha" "$release"
   systemctl --user daemon-reload
   systemctl --user enable plasma-local-manager.service plasma-control-station.service >/dev/null
+  apply_mock_ppu_enablement
   say "installed Linux reference profile at ${sha:0:12}; services remain stopped until deploy activation"
   say "Console is loopback-only by design: http://$console_host:$console_port"
 }
 
 backup_file_if_present() {
   local source="$1" target="$2"
-  [[ -f "$source" ]] && cp -a "$source" "$target"
+  # Absent is normal (e.g. no Mock PPU unit before the first upgrade).
+  if [[ -f "$source" ]]; then
+    cp -a "$source" "$target"
+  fi
 }
 
 run_deployment_preflight() {
@@ -705,6 +833,7 @@ deploy_profile() {
   backup_file_if_present "$evidence" "$backup_dir/install.json"
   backup_file_if_present "$manager_unit" "$backup_dir/manager.service"
   backup_file_if_present "$console_unit" "$backup_dir/console.service"
+  backup_file_if_present "$mock_ppu_unit" "$backup_dir/mock-ppu.service"
 
   rollback() {
     local rc=$?
@@ -733,9 +862,16 @@ deploy_profile() {
     [[ -f "$backup_dir/install.json" ]] && cp -a "$backup_dir/install.json" "$evidence"
     [[ -f "$backup_dir/manager.service" ]] && cp -a "$backup_dir/manager.service" "$manager_unit"
     [[ -f "$backup_dir/console.service" ]] && cp -a "$backup_dir/console.service" "$console_unit"
+    if [[ -f "$backup_dir/mock-ppu.service" ]]; then
+      cp -a "$backup_dir/mock-ppu.service" "$mock_ppu_unit"
+    else
+      rm -f -- "$mock_ppu_unit"
+      systemctl --user stop plasma-mock-ppu.service 2>/dev/null
+    fi
     systemctl --user daemon-reload
     systemctl --user restart plasma-local-manager.service
     systemctl --user restart plasma-control-station.service
+    [[ -f "$mock_ppu_unit" ]] && systemctl --user restart plasma-mock-ppu.service
     rm -rf --one-file-system "$backup_dir"
     set -e
     exit "$rc"
@@ -746,6 +882,7 @@ deploy_profile() {
     # Stop the only managed admission entrypoint before swapping state.
     # Never stop/restart the Z2 PPU or turn DUT power off from this command.
     systemctl --user stop plasma-control-station.service
+    systemctl --user stop plasma-mock-ppu.service 2>/dev/null || true
     systemctl --user stop plasma-local-manager.service
     check_development_ppu_idle
     [[ -d "$state_dir" && ! -L "$state_dir" ]] || {
@@ -785,6 +922,8 @@ deploy_profile() {
   wait_for_http "http://$manager_host:$manager_port/api/health/live" "Manager"
   systemctl --user restart plasma-control-station.service
   wait_for_http "http://$console_host:$console_port/" "Control Station Console"
+  apply_mock_ppu_enablement
+  (( ! mock_ppu )) || systemctl --user restart plasma-mock-ppu.service
   if ! (trap - ERR; verify_profile); then
     false
   fi
@@ -816,6 +955,10 @@ parse_options() {
         manager_port="$2"; shift 2 ;;
       --dev-fresh-state)
         dev_fresh_state=1; shift ;;
+      --no-mock-ppu)
+        mock_ppu=0; shift ;;
+      --mock-ppu)
+        mock_ppu=1; shift ;;
       -h|--help)
         usage; exit 0 ;;
       *) die "unknown option: $1" ;;
@@ -828,16 +971,17 @@ usage() {
 Usage: plasmactl-local-control-station COMMAND [OPTIONS]
 
 Linux reference deployment for the local Control Station role:
-  Console/BFF + Manager only. It does not start a local PPU Server/Gateway.
+  Console/BFF + Manager, plus the built-in Mock PPU (default on): one
+  simulated 8-Site PPU (alias mock-ppu-01) behind the same PPU boundary.
 
 Commands:
   install   Build immutable runtime, write user-systemd units/config, do not start
   deploy    Activate current clean committed source, restart and verify local runtime
             --dev-fresh-state: archive old development State and start clean (no migration)
-  verify    Verify Console + Manager only; target PPU reachability is reported separately
+  verify    Verify Console + Manager (+ Mock PPU enrollment); target PPU reachability is reported separately
   status    Show release, target configuration and user-service state
   logs      Show recent Manager + Console user-service journal lines (read-only)
-  restart   Restart the installed release's two user services, then verify
+  restart   Restart the installed release's user services, then verify
 
 Options:
   --python PATH          Python >= 3.11 used to build the immutable runtime
@@ -845,6 +989,8 @@ Options:
   --ppu-endpoint URL     PPU Plasma Gateway root; HTTP or HTTPS, required on first install
   --console-port PORT    Loopback Console port (default: 18190)
   --manager-port PORT    Loopback Manager port (default: 18280)
+  --no-mock-ppu          Do not install/start the built-in Mock PPU (persisted)
+  --mock-ppu             Re-enable the built-in Mock PPU (default)
 
 Examples:
   plasmactl install local-control-station \
@@ -855,7 +1001,9 @@ Examples:
 Boundary:
   This profile is the Linux user-systemd reference deployment. macOS and Windows
   use the same Control Station product/runtime contract but require platform-native
-  packaging. No PPU/PS/PL/Site/IC hardware qualification is implied.
+  packaging. No PPU/PS/PL/Site/IC hardware qualification is implied. The
+  built-in Mock PPU is simulated (MOCK), never production statistics; its
+  Linux peer authentication (SO_PEERCRED) is Linux-only (macOS/Windows: TODO).
 EOF
 }
 

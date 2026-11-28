@@ -134,7 +134,7 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.doesNotMatch(abortFunction, /ppu_id|site_id/);
 
   const statistics = await fs.readFile(new URL("../app/programming/batch-statistics.ts", import.meta.url), "utf8");
-  assert.match(source, /snapshotStatistics\(\{\s*sites: batchSnapshot\.sites,/);
+  assert.match(source, /snapshotStatistics\(\{\s*mock: batchSnapshot\.mock,\s*sites: batchSnapshot\.sites,/);
   assert.match(statistics, /site\.pass_rounds \?\? site\.completed_rounds/);
   assert.match(statistics, /site\.final_failures/);
   assert.doesNotMatch(statistics.slice(statistics.indexOf("export function snapshotStatistics"), statistics.indexOf("export function passRate")), /cancelled/);
@@ -191,4 +191,20 @@ test("fleet BFF source keeps Manager loopback-only and latest-job summaries brow
   assert.match(vite, /PLASMA_MANAGER_API_URL:\s*process\.env\.PLASMA_MANAGER_API_URL/);
   assert.match(vite, /vars:\s*fleetWorkerVars/);
   assert.match(vite, /nodejs_compat_populate_process_env/);
+});
+
+test("Fleet contract forwards the Manager's enrollment-proven PPU class (built-in Mock PPU)", async () => {
+  const ts = (await import("typescript")).default;
+  const source = await fs.readFile(new URL("../app/fleet/fleet-contract.ts", import.meta.url), "utf8");
+  const contract = await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  }).outputText).toString("base64")}`);
+  const ppu = (alias, ppuClass) => ({ alias, ppu_class: ppuClass, transport_state: "reachable",
+    execution_state: "ready", observation: { state: "current" }, errors: [], execution_ready: true });
+  const payload = contract.sanitizeManagerFleet({ ok: true, summary: {}, ppus: [
+    ppu("mock-ppu-01", "mock"), ppu("z2", "physical"), ppu("legacy", undefined), ppu("forged", "MOCK"),
+  ] });
+  assert.deepEqual(payload.ppus.map(item => item.ppu_class), ["mock", "physical", "unknown", "unknown"]);
+  assert.equal(payload.summary.mock_ppus, 1);
+  assert.equal(payload.summary.physical_ppus, 1);
 });

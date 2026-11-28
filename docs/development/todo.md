@@ -452,7 +452,7 @@ Required work:
 
 ### Built-in Mock PPU — Control Station Product Capability
 
-**Status:** TODO / Owner Product Decision recorded 2026-11-28. Scheduled **after U10 and U7 complete**. This entry is not Gate 1 approval for installer packaging, auto start or any source change.
+**Status:** Linux M1–M3 IMPLEMENTED under owner Gate 1 (2026-11-28, D1–D7) on branch `agent/builtin-mock-ppu-20261128` (Draft PR, awaiting Gate 2; not deployed). **M4 Windows/macOS: DEFERRED** (separate future scope, below).
 
 **Decision:** The Mock PPU is a built-in PLASMA product capability, installed with the Control Station Installer and started by default. It is not only a CI test tool.
 
@@ -464,14 +464,25 @@ Required work:
 - Do not integrate the Mock Driver directly into the Manager Scheduler; the Manager reaches a Mock PPU through the same PPU boundary as a Physical PPU.
 - Isolate Mock and Physical PPUs in device identity, execution resources and production statistics.
 
-**Current state after U10 (#1549, #1550):**
+**Implemented (Linux, M1–M3):**
 
-- Product-side pieces already ship in the Python package: `plasma_interfaces/mock.py` (Mock Driver, Virtual Flash, Read evidence), `plasma_server/mock_resources.py` (Mock Route, Bootstrap Active Set install), `plasma_server/runtime_server.py` `--mock-asset-set-*` options, and `plasma_web/mock_runtime_settings.py`.
-- Route interface isolation is enforced by `SITE_INTERFACE_BY_PROFILE_ABI` (`mock-simulated:1` → `mock`); a Mock Route cannot qualify on a physical Site and the reverse fails `SITE_INTERFACE_NOT_READY`.
-- **Gap:** the managed Mock PPU stack wiring (per-PPU Bootstrap, enrollment, Active Set install, Gateway G13 admission socket, loopback addressing, Manager registration) lives only in the test fixtures `scripts/mock-cd.py` and `scripts/mock-cd-browser-stack.py`. Nothing installs or starts it outside CI.
-- **To audit:** whether Manager Batch Statistics, Fleet views and production records already separate Mock from Physical PPUs.
+- M1 — product launcher `python -m plasma_server.mock_ppu serve` (Runtime + real PPU Bootstrap + real Gateway, stable device root, Manager registry/commission/ticket enrollment); `ppu-bootstrap-service.py` CLI takes the device paths/sockets, and `--mock-enrollment-ticket-file` arms one Engineering ticket only while UNENROLLED and only when the 0600 package target is `platform: mock`. `scripts/mock-cd.py` and `mock-cd-browser-stack.py` run the product launcher; the fixture-only Bootstrap/provisioning code is deleted.
+- M2 — the Manager binds each enrolled PPU's class (`mock` / `physical` / `unknown`) from its MACed Bootstrap status (`target`), refuses Mock/non-Mock mixed Batches (`409 mixed_mock_physical_batch`) before the start is consumed, resolves Mock Routes only for Mock Batches (`data/opf/programming-routes/mock-site-simulated.json`), records `ppu_class` on Batches and Cycle History, and labels Fleet and Console statistics `MOCK`. Historical/unproven records read `unknown` (never Mock).
+- M3 — `plasmactl install|deploy local-control-station` ships the PPU control plane in the release and manages `plasma-mock-ppu.service` (default on; `--no-mock-ppu` / `--mock-ppu`).
 
-**Required (future Gate 1):** a product launcher/service for the Mock PPU stack independent of the test fixtures; Control Station Installer packaging and default auto start; Mock/Physical identity, resource and statistics isolation with positive and negative tests; cross-platform acceptance (Linux, Windows, macOS Control Station). Relates to [Mock Runtime Core Convergence](#mock-runtime-core-convergence).
+**M4 — Windows / macOS Control Station (DEFERRED; concrete platform dependencies):**
+
+| Dependency | Where | Linux mechanism | macOS gap | Windows gap |
+| --- | --- | --- | --- | --- |
+| Runtime control socket peer identity | `plasma_server/runtime_control.py` (Bootstrap B3 Job-admission lease) | AF_UNIX + `SO_PEERCRED` | needs `LOCAL_PEERCRED`/`getpeereid` | AF_UNIX has no peer credentials; needs a named pipe with client identity or ACL |
+| G13 controller admission socket | `scripts/ppu_controller.py` `AdmissionServer` | AF_UNIX, socket file mode 0600/0660 | POSIX perms work; verify path length (104 bytes) | needs ACL-protected named pipe or AF_UNIX + DACL |
+| Bootstrap / controller state locks | `ppu-bootstrap-service.py`, `ppu_controller.py` (`fcntl.flock`) | `fcntl` | available | no `fcntl`; needs `msvcrt.locking`/LockFileEx |
+| Per-PPU loopback host (Bootstrap fixed at `<host>:18081`) | `plasma_server/mock_ppu.py` (dedicated `127.0.80.1`) | all of 127/8 on `lo` | only 127.0.0.1 unless `lo0` aliases are configured | 127/8 works; firewall prompts possible |
+| Process group supervision | `mock_ppu.Stack` (`start_new_session`, `killpg`) | POSIX sessions | POSIX | needs Job Objects / `CREATE_NEW_PROCESS_GROUP` |
+| Device root symlinks / `O_NOFOLLOW` | `mock_ppu.provision`, Bootstrap product root `current` | symlinks | symlinks | symlink privilege; `O_NOFOLLOW` absent |
+| Service lifecycle | installer | user systemd unit | launchd agent | SCM service |
+
+Do not weaken Linux peer authentication or G13 to fit another platform; M4 needs each platform's own peer authentication behind a separate Gate 1.
 
 ### Real Provider and Physical IC Quantity Handoff
 

@@ -19,7 +19,7 @@ Current profiles:
 | Profile | Purpose | Service ownership | Release model | Hardware claim |
 |---|---|---|---|---|
 | `integration` | SWPC development/integration host | user systemd | repository/runtime environment | none |
-| `local-control-station` | Linux reference Control Station: Console/BFF + Manager | user systemd | immutable user-local release | none |
+| `local-control-station` | Linux reference Control Station: Console/BFF + Manager + built-in Mock PPU (default on, `--no-mock-ppu`) | user systemd | immutable user-local release | none (Mock PPU is simulated) |
 | `swpc-z2like` | x86_64 PS-only PPU surrogate | system systemd | immutable `/opt/plasma/releases/<release-id>` | PS-surrogate software only |
 | `z2-ps` | Real PYNQ-Z2 ARMv7 PS-only PPU | system systemd | GitHub-built Python runtime + immutable PPU release | PS runtime/local diagnostic only |
 

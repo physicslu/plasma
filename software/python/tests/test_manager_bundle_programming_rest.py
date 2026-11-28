@@ -27,7 +27,7 @@ class StubWorkflow:
     def __init__(self):
         self.calls: list[tuple] = []
 
-    def list_routes(self):
+    def list_routes(self, alias=None):
         self.calls.append(("routes",))
         return {"ok": True, "routes": [{"route_id": "r"}]}
 

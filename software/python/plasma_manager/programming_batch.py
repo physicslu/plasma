@@ -95,7 +95,8 @@ from .programming import (
     TARGET_TRANSACTION_UNKNOWN, BatchPreparation, BundleProgrammingWorkflow, JOB_TERMINAL,
     PROGRAMMING, SITE_DENIED_BEFORE_HARDWARE, ProgrammingError, _m0_timing,
 )
-from .bootstrap import BootstrapManagerError
+from .bootstrap import (PPU_CLASS_MOCK, PPU_CLASS_PHYSICAL, PPU_CLASS_UNKNOWN,
+                        BootstrapManagerError)
 from .client import PPUHTTPError
 
 BATCH_SCHEMA = "plasma.manager.programming-batch.v2"
@@ -186,6 +187,25 @@ def parse_targets(body: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
         raise ProgrammingError(400, "invalid_request",
                                f"a Batch covers at most {MAX_SITES_PER_BATCH} Sites")
     return tuple(parsed)
+
+
+def batch_ppu_class(classes: Mapping[str, str]) -> str:
+    """The one class of a Batch's PPUs; a Mock/non-Mock mixture is refused.
+
+    ``unknown`` (unproven, e.g. an older Bootstrap) is never Mock, so it may
+    not join a Mock PPU in one Batch either.
+    """
+    values = set(classes.values())
+    if PPU_CLASS_MOCK in values and len(values) > 1:
+        mock = sorted(alias for alias, value in classes.items() if value == PPU_CLASS_MOCK)
+        other = sorted(alias for alias, value in classes.items() if value != PPU_CLASS_MOCK)
+        raise ProgrammingError(
+            409, "mixed_mock_physical_batch",
+            f"a Batch cannot mix Mock PPUs ({', '.join(mock)}) with non-Mock PPUs "
+            f"({', '.join(other)})")
+    if len(values) == 1:
+        return values.pop()
+    return PPU_CLASS_PHYSICAL if values == {PPU_CLASS_PHYSICAL} else PPU_CLASS_UNKNOWN
 
 
 def site_count(targets) -> int:
@@ -1063,6 +1083,8 @@ class ProgrammingBatchCoordinator:
         attempts = [attempt for unit in units for attempt in unit["attempts"]]
         outcomes = [unit.get("outcome") for unit in units]
         view = {**batch, "units": units,
+                # Historical records (before M2) carry no class: unknown.
+                "ppu_class": batch.get("ppu_class") or PPU_CLASS_UNKNOWN,
                 # The CURRENT Cycle's attempts of every Site (live detail);
                 # settled Cycles are in the Cycle History (``/cycles``).
                 "attempts": attempts,
@@ -1149,6 +1171,11 @@ class ProgrammingBatchCoordinator:
             # request and resend the same token.
             for alias in aliases:
                 self.workflow._require_commissioned(alias)
+            # Built-in Mock PPU isolation (D3): a Batch is wholly Mock or wholly
+            # not, by each PPU's enrollment-proven class. Refused before the
+            # start is consumed and before any PPU is read or reserved.
+            classes = {alias: self.workflow.ppu_class(alias) for alias in aliases}
+            ppu_class = batch_ppu_class(classes)
             # The token is an idempotency guard, never an authority, and it is
             # not issued under a PPU: every Target's own authority was checked
             # on its own just above (§5.3, §5.8). No Target Set ordering can
@@ -1177,6 +1204,9 @@ class ProgrammingBatchCoordinator:
                 "operations": plan_body.get("operations"),
                 "operation": plan_body.get("operation"),
                 "source": _source_of(plan_body), "icpn": plan_body.get("icpn"),
+                # mock | physical | unknown. A MOCK Batch's counts are never
+                # production quantities (D4); a record without it predates M2.
+                "ppu_class": ppu_class,
                 "policy": policy, "state": "running",
                 "execution_status": "RUNNING", "outcome": None, "reason": None,
                 "stop_requested": False, "failure_domain": None, "units": units,
@@ -1395,10 +1425,12 @@ class ProgrammingBatchCoordinator:
             raise ProgrammingError(400, "invalid_request",
                                    "offset must be >= 0 and limit 1..1000")
         with self._lock:
-            self._get(batch_id)
+            batch = self._get(batch_id)
             total, page = self._ledger_page(batch_id, offset, limit)
         records = [{**record, "seq": seq} for seq, record in page if record is not None]
-        return {"ok": True, "batch_id": batch_id, "total": total, "offset": offset,
+        return {"ok": True, "batch_id": batch_id,
+                "ppu_class": batch.get("ppu_class") or PPU_CLASS_UNKNOWN,
+                "total": total, "offset": offset,
                 "next_offset": offset + len(page), "records": records}
 
     # ---------------------------------------------------------------- execution
@@ -1587,7 +1619,7 @@ class ProgrammingBatchCoordinator:
         lanes = []
         # Batch-once immutable preparation (WO-2 F2 M2), shared by every lane
         # of this Batch run and by none other. It carries no PPU state.
-        preparation = BatchPreparation()
+        preparation = BatchPreparation(mock=batch.get("ppu_class") == PPU_CLASS_MOCK)
         owner_id = batch["batch_id"]
         blocks: dict[str, tuple[str, str]] = {}
         self._reservation_blocks[owner_id] = blocks

@@ -36,7 +36,7 @@ test("Production KPI row separates equipment scope, planned IC quantity, and pro
     "PHYSICAL IC", "TOTAL CYCLES", "SETTLED CYCLES", "PASS CYCLES", "FAIL CYCLES", "CYCLE PASS RATE"]) {
     assert.match(statistics, new RegExp(`label: \\\"${label}\\\"`));
   }
-  assert.match(pmod, /snapshotStatistics\(\{\s*sites: batchSnapshot\.sites,\s*repeat: batchSnapshot\.execution_policy\.repeat_count,/);
+  assert.match(pmod, /snapshotStatistics\(\{\s*mock: batchSnapshot\.mock,\s*sites: batchSnapshot\.sites,\s*repeat: batchSnapshot\.execution_policy\.repeat_count,/);
   assert.match(pmod, /batchStatistics\(\{ sites: batchCounts\.sites, repeat: repeatValue \?\? 0,/);
   assert.match(pmod, /formatBatchTime\(batchSnapshot, clockNow\)/);
   assert.match(pmod, /displayedBatchSelection = serverBatchRunning \? serverBatchMembership : batchSelection/);

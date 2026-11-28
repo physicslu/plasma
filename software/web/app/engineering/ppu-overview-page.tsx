@@ -196,6 +196,7 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
             <small>SELECTED PPU</small>
             <h3>{selectedFleet?.identity.display_name ?? selectedEntry?.alias ?? "No PPU selected"}</h3>
           </div>
+          {selectedFleet?.ppu_class === "mock" && <span className="ppuDimensionPill" data-tone="info" data-ppu-class="mock">MOCK PPU</span>}
           {lifecycle && <span className="ppuDimensionPill" data-tone={lifecycle.tone}>{lifecycle.label}</span>}
         </header>
         <div className="ppuOverviewTargetBody">
@@ -210,6 +211,8 @@ export default function PpuOverviewPage({ onNavigate }: Props) {
           {selectedEntry && (
             <dl className="ppuOverviewIdentity">
               <div><dt>PPU ID</dt><dd>{selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</dd></div>
+              <div><dt>Class</dt><dd>{selectedFleet?.ppu_class === "mock" ? "Mock (simulated, not production)"
+                : selectedFleet?.ppu_class === "physical" ? "Physical" : "Unknown"}</dd></div>
               <div><dt>Facility</dt><dd>{selectedFleet?.identity.facility_id ?? "—"}</dd></div>
               <div><dt>Gateway</dt><dd>{selectedEntry.endpoint}</dd></div>
               <div><dt>Active Execution</dt><dd>{siteSummary.busy > 0 ? "Yes" : "No"}</dd></div>

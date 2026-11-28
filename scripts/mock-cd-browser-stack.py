@@ -61,9 +61,10 @@ class PPUHarnessControl:
     """Test-harness-only offline/online switch for one Mock PPU's Gateway.
 
     Not a product API: it binds 127.0.0.1 only and exists only while this
-    browser stack runs. Offline stops the PPU's Gateway process (its Runtime
-    and Bootstrap keep running), so the Manager observes an unreachable PPU;
-    online restarts the same Gateway command and waits until it is ready.
+    browser stack runs. Offline stops the PPU's product launcher (Runtime,
+    Bootstrap and Gateway), so the Manager observes an unreachable PPU;
+    online restarts the same launcher on the same device root (same identity
+    and enrollment) and waits until its Gateway is ready.
     """
 
     def __init__(self, cd: ModuleType, processes: list[tuple[str, subprocess.Popen[str]]],
@@ -88,17 +89,17 @@ class PPUHarnessControl:
             out = {}
             for item in self.cd.PPUS:
                 alias = item["name"]
-                process = self.processes[self._index(f"{alias}-gateway")][1]
+                process = self.processes[self._index(f"{alias}-ppu")][1]
                 out[alias] = {"state": "offline" if alias in self.offline else "online",
                               "gateway_url": self.cd.gateway_url(item),
-                              "gateway_pid": None if alias in self.offline else process.pid}
+                              "launcher_pid": None if alias in self.offline else process.pid}
             return {"ok": True, "ppus": out}
 
     def set_offline(self, alias: str) -> dict:
         self._item(alias)
         with self.lock:
             if alias not in self.offline:
-                index = self._index(f"{alias}-gateway")
+                index = self._index(f"{alias}-ppu")
                 self.cd.stop_processes([self.processes[index]])
                 self.offline.add(alias)
         return self.status()
@@ -107,7 +108,7 @@ class PPUHarnessControl:
         item = self._item(alias)
         with self.lock:
             if alias in self.offline:
-                name = f"{alias}-gateway"
+                name = f"{alias}-ppu"
                 process = self.cd.start_process(name, self.commands[alias], cwd=self.cd.PYTHON_DIR)
                 self.processes[self._index(name)] = (name, process)
                 self.cd.wait_json(
@@ -119,7 +120,7 @@ class PPUHarnessControl:
 
     def assert_alive(self) -> None:
         with self.lock:
-            stopped = {f"{alias}-gateway" for alias in self.offline}
+            stopped = {f"{alias}-ppu" for alias in self.offline}
             self.cd.assert_processes_alive(
                 [(name, process) for name, process in self.processes if name not in stopped])
 
@@ -189,13 +190,22 @@ def main() -> None:
             "--engineering-mock-root", str(work / "engineering-mock"),
             "--engineering-mock-profile", str(ci_mock_profile),
         ]}
-        fixtures = cd.start_managed_ppus(work, processes, gateway_extra=gateway_extra)
-        gateway_commands = {
-            str(item["name"]): cd.gateway_command(item, fixtures[str(item["name"])],
-                                                  gateway_extra.get(str(item["name"])))
-            for item in cd.PPUS
-        }
-
+        # Provision an isolated, qualified SQLite revision for the Mock CD
+        # Manager, not via a live Selector fallback. PPU gateways remain
+        # Catalog-free and use only their own execution authority.
+        sys.path.insert(0, str(cd.PYTHON_DIR))
+        from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
+        from plasma_web.device_catalog import default_catalog_manifest_path
+        from plasma_web.programming_qualification import get_default_programming_qualification_registry
+        catalog_database = work / "catalog.sqlite3"
+        CatalogSqliteShadowRepository(catalog_database).import_verified_manifest(
+            default_catalog_manifest_path(),
+            qualification_registry=get_default_programming_qualification_registry(),
+        )
+        cd.start_manager(work, processes,
+                         extra_env={"PLASMA_CATALOG_SQLITE_DB": str(catalog_database)})
+        specs = cd.start_managed_ppus(work, processes, gateway_extra=gateway_extra)
+        ppu_commands = {name: cd.serve_command(spec) for name, spec in specs.items()}
         engineering_catalog = cd.wait_json(
             f"{cd.gateway_url(cd.PPUS[0])}/api/engineering/targets",
             lambda value: (
@@ -208,22 +218,8 @@ def main() -> None:
             label="Engineering server-side mock PPU catalog",
         )
 
-        # Provision an isolated, qualified SQLite revision for the Mock CD
-        # Manager, not via a live Selector fallback. PPU gateways remain
-        # Catalog-free and use only their own execution authority.
-        sys.path.insert(0, str(cd.PYTHON_DIR))
-        from plasma_web.catalog_sqlite_repository import CatalogSqliteShadowRepository
-        from plasma_web.device_catalog import default_catalog_manifest_path
-        from plasma_web.programming_qualification import get_default_programming_qualification_registry
-
-        catalog_database = work / "catalog.sqlite3"
-        CatalogSqliteShadowRepository(catalog_database).import_verified_manifest(
-            default_catalog_manifest_path(),
-            qualification_registry=get_default_programming_qualification_registry(),
-        )
-        cd.start_manager(work, processes,
-                         extra_env={"PLASMA_CATALOG_SQLITE_DB": str(catalog_database)})
-        cd.enroll_mock_ppus(fixtures)
+        cd.wait_enrolled(specs, processes)
+        cd.wait_manager_fleet()
         route = cd.assert_mock_route_listed()
 
         web = cd.start_process(
@@ -243,7 +239,7 @@ def main() -> None:
         cd.assert_local_routes()
         cd.assert_processes_alive(processes)
 
-        control = PPUHarnessControl(cd, processes, gateway_commands)
+        control = PPUHarnessControl(cd, processes, ppu_commands)
         control_server = control.serve()
         pids = {name: process.pid for name, process in processes}
 
@@ -284,8 +280,10 @@ def main() -> None:
                         # Before its first Batch a PPU has no Active Set: the
                         # first Batch runs B1/B2/B3, later Batches reuse it.
                         "active_set": "NONE_UNTIL_FIRST_BATCH",
-                        "pids": {kind: pids[f"{item['name']}-{kind}"]
-                                 for kind in ("runtime", "bootstrap", "gateway")},
+                        "ppu_class": "mock",
+                        # The product launcher (plasma_server.mock_ppu) that
+                        # owns this PPU's Runtime, Bootstrap and Gateway.
+                        "launcher_pid": pids[f"{item['name']}-ppu"],
                     }
                     for item in cd.PPUS
                 ],
@@ -304,7 +302,7 @@ def main() -> None:
                     "status": "GET /ppus",
                     "offline": "POST /ppus/<alias>/offline",
                     "online": "POST /ppus/<alias>/online",
-                    "scope": "test harness only; stops/restarts the PPU Gateway process",
+                    "scope": "test harness only; stops/restarts the Mock PPU launcher",
                 },
                 "manager_pid": pids["manager"],
                 "web_pid": pids["web"],

@@ -423,6 +423,12 @@ export type ProgrammingBatch = {
   /** "read" for a Read Memory Batch; absent or null otherwise. */
   operation?: "read" | null;
   source: ProgrammingSource | "range";
+  /**
+   * The Batch PPUs' enrollment-proven class (built-in Mock PPU, M2). A Batch
+   * is never mixed; "mock" counts are never production quantities; absent on
+   * records that predate the classification (read as "unknown").
+   */
+  ppu_class?: "mock" | "physical" | "unknown";
   policy: BatchPolicy;
   state: string;
   execution_status: string;

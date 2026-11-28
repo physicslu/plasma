@@ -18,8 +18,9 @@ PRODUCTION_ROUTES = ROOT / "data" / "opf" / "programming-routes"
 
 
 def _production_route() -> bundle_v3.ProgrammingRoute:
-    routes = bundle_v3.load_routes(PRODUCTION_ROUTES)
-    assert routes
+    # The Physical Route; the built-in Mock Route sits beside it (Mock PPU M2).
+    routes = [r for r in bundle_v3.load_routes(PRODUCTION_ROUTES) if r.target["platform"] != "mock"]
+    assert len(routes) == 1
     return routes[0]
 
 

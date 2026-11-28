@@ -48,6 +48,8 @@ from urllib.parse import urlparse
 
 API_VERSION = "1"
 DEFAULT_PORT = 18081
+# Package target platform of the built-in Mock PPU (plasma_server.mock_ppu).
+MOCK_PLATFORM = "mock"
 MAX_JSON_BODY = 2 * 1024 * 1024
 MAX_CHUNK_BYTES = 1024 * 1024
 MAX_UPLOAD_BYTES = 512 * 1024 * 1024
@@ -1820,6 +1822,14 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                     "request_authentication": self.owner.request_auth.SCHEMA,
                 }
                 payload["deployment"] = _deployment_api_record(self.owner.bootstrap_paths)
+                # Device-local target identity (root-provisioned, never sent by a
+                # client). An authenticated read is MACed, so the Manager can
+                # classify this PPU (Mock vs Physical) from it; null if absent.
+                try:
+                    payload["target"] = _trusted_package_target(self.owner.bootstrap_paths)
+                except (BootstrapServiceError, OSError, ValueError):
+                    # Unreadable or invalid: unclassified (never Mock), status still served.
+                    payload["target"] = None
                 self._json(HTTPStatus.OK, payload)
             except BootstrapServiceError as exc:
                 self._json(
@@ -1936,12 +1946,61 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path(__file__).with_name("ppu-bootstrap-kit.py"),
     )
+    # Device-provisioned paths. The defaults are the Z2 layout; the built-in
+    # Mock PPU (plasma_server.mock_ppu) points them at its own private root.
+    defaults = ServicePaths()
+    for flag, field in (
+        ("--bundle-install-policy", "bundle_install_policy"),
+        ("--deployment-engine-script", "deployment_engine_script"),
+        ("--z2-installer-script", "z2_installer_script"),
+        ("--button-profile", "button_profile"),
+        ("--admission-socket", "admission_socket"),
+        ("--seal-dir", "seal_dir"),
+        ("--runtime-control-socket", "runtime_control_socket"),
+        ("--reload-fence", "reload_fence"),
+        ("--site-recovery-script", "site_recovery_script"),
+    ):
+        parser.add_argument(flag, dest=field, type=Path, default=getattr(defaults, field))
+    parser.add_argument("--gateway-port", type=int, default=defaults.gateway_port)
     sub = parser.add_subparsers(dest="command", required=True)
 
     serve = sub.add_parser("serve")
     serve.add_argument("--host", required=True)
     serve.add_argument("--port", type=int, default=DEFAULT_PORT)
+    serve.add_argument(
+        "--mock-enrollment-ticket-file", type=Path, default=None,
+        help="Mock PPU only: arm one Engineering ticket while UNENROLLED and "
+             "write it to this new 0600 file. Refused unless the device-local "
+             "package target platform is 'mock'.")
     return parser
+
+
+def arm_mock_enrollment_ticket(server: "BootstrapHTTPServer", ticket_file: Path) -> bool:
+    """The Mock PPU's own Engineering entry (the factory ``plasma-enroll arm``
+    equivalent for a device that has no root or button).
+
+    Allowed only for a device whose trusted, owner-provisioned package target
+    is the Mock platform, so it can never open an enrollment window on a
+    Physical PPU. Arms nothing once enrolled or while a ticket is pending.
+    """
+    if _trusted_package_target(server.bootstrap_paths).get("platform") != MOCK_PLATFORM:
+        raise BootstrapServiceError("MOCK_ENROLLMENT_REQUIRES_MOCK_PLATFORM")
+    controller = server.controller_module
+    if server.engine.controller_state() != "UNENROLLED" or ticket_file.exists():
+        return False
+    try:
+        ticket = server.engine.engineering_arm(controller.boot_clock(), authorized=True)
+    except controller.ControllerError as exc:
+        # A window armed by an earlier start is still open (its ticket is not
+        # recoverable): serve anyway; it expires and the next start re-arms.
+        sys.stderr.write(f"mock enrollment ticket not armed: {exc}\n")
+        return False
+    partial = ticket_file.with_name(ticket_file.name + ".part")
+    fd = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(ticket)
+    os.replace(partial, ticket_file)
+    return True
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1953,11 +2012,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         bootstrap_script=args.bootstrap_script,
         kit_tool=args.kit_tool,
         package_target_file=args.package_target_file,
+        bundle_install_policy=args.bundle_install_policy,
+        deployment_engine_script=args.deployment_engine_script,
+        z2_installer_script=args.z2_installer_script,
+        button_profile=args.button_profile,
+        admission_socket=args.admission_socket,
+        seal_dir=args.seal_dir,
+        runtime_control_socket=args.runtime_control_socket,
+        reload_fence=args.reload_fence,
+        site_recovery_script=args.site_recovery_script,
+        gateway_port=args.gateway_port,
     )
     try:
         base = _load_script(paths.bootstrap_script, "plasma_ppu_bootstrap_base")
         server = BootstrapHTTPServer((args.host, args.port), paths=paths, base_module=base)
         server.start_controller_services()
+        if args.mock_enrollment_ticket_file is not None:
+            arm_mock_enrollment_ticket(server, args.mock_enrollment_ticket_file)
+        print(f"ppu-bootstrap-service: listening on {args.host}:{args.port}", flush=True)
         try:
             server.serve_forever()
         except KeyboardInterrupt:
