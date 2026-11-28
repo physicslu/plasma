@@ -83,6 +83,8 @@ docker run --rm \
     make -j2
     make install
     strip --strip-unneeded "$prefix/bin/openocd"
+    install -m 0644 /repo/data/ic-support/target/stm32f103xl.cfg \
+      "$prefix/share/openocd/scripts/target/stm32f103xl.cfg"
 
     "$prefix/bin/openocd" --version
     test -d "$prefix/share/openocd/scripts/target"

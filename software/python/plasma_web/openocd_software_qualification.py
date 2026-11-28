@@ -12,6 +12,7 @@ return SUPPORTED. All other exact ICPNs remain UNKNOWN by default.
 """
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 from copy import deepcopy
@@ -29,6 +30,9 @@ from .runtime_evidence_root import default_runtime_evidence_root, source_files_a
 
 ROOT = default_runtime_evidence_root()
 SOURCE_LOCK_REL = "release/openocd-qualification/openocd-0.12.0-stm32f1-source-lock-v1.json"
+XL_TARGET_SOURCE_LOCK_REL = "release/openocd-qualification/stm32f103-xl-target-config-source-lock-v1.json"
+XL_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-xl-20-v1.json"
+QUALIFICATION_V11_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-v11.json"
 QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-v8.json"
 MEDIUM_QUALIFICATION_REL = "release/openocd-qualification/openocd-0.12.0-stm32f103-medium-v4.json"
 APPLICABILITY_REL = "release/openocd-qualification/stm32f103-medium-density-lqfp-t6-t7-applicability-v2.json"
@@ -75,6 +79,7 @@ class OpenOCDSoftwareQualificationRegistry:
 
         release = _read_json(root / RELEASE_REL)
         source_lock = _read_json(root / SOURCE_LOCK_REL)
+        xl_target_lock = _read_json(root / XL_TARGET_SOURCE_LOCK_REL)
         qualification_manifest = _read_json(root / QUALIFICATION_REL)
         qualification = _read_json(root / MEDIUM_QUALIFICATION_REL)
         applicability = _read_json(root / APPLICABILITY_REL)
@@ -162,6 +167,37 @@ class OpenOCDSoftwareQualificationRegistry:
                 and item.get("git_blob_sha1") == blob,
                 f"reviewed upstream source lock drift: {key}",
             )
+
+        extension = xl_target_lock.get("extension", {})
+        base = xl_target_lock.get("base_target_config", {})
+        _require(
+            xl_target_lock.get("source_lock_id") == "openocd-0.12.0-stm32f103-xl-target-config-v1"
+            and xl_target_lock.get("provider_source_lock_id") == source_lock["source_lock_id"]
+            and xl_target_lock.get("source_commit") == release["source_commit"]
+            and base.get("path") == expected_external["target_config"][0]
+            and base.get("git_blob_sha1") == expected_external["target_config"][1]
+            and extension.get("repository_path") == "data/ic-support/target/stm32f103xl.cfg"
+            and extension.get("installed_path") == "tcl/target/stm32f103xl.cfg",
+            "XL target configuration source identity drift",
+        )
+        extension_bytes = (root / extension["repository_path"]).read_bytes()
+        _require(
+            _git_blob_sha1(extension_bytes) == extension.get("git_blob_sha1")
+            and hashlib.sha256(extension_bytes).hexdigest() == extension.get("sha256")
+            and xl_target_lock.get("reviewed_contract") == {
+                "bank_1_base": "0x08000000", "bank_2_base": "0x08080000",
+                "device_id": "0x430", "raw_flash_size_register": "0x1FFFF7E0",
+                "allowed_flash_kib": [768, 1024],
+                "capacity_check_before_flash_probe": True,
+                "both_banks_probed_before_operations": True,
+            }
+            and xl_target_lock.get("non_claims") == {
+                "installed_runtime_attested": False,
+                "physical_programming_qualified": False,
+                "execution_authorized": False,
+            },
+            "XL target configuration source lock drift",
+        )
 
         local_locks = qualification.get("local_evidence_locks")
         _require(isinstance(local_locks, dict) and local_locks, "local evidence locks missing")
@@ -1475,7 +1511,7 @@ class OpenOCDSoftwareQualificationRegistry:
                  "low-density combined unique exact count mismatch")
 
         self.source_lock_id = source_lock["source_lock_id"]
-        self.qualification_id = low["v10"]["qualification_id"]
+        self.qualification_id = "adr0002-phase2-openocd-012-stm32f103-v11"
         self.provider = deepcopy(q_provider)
         self.programming_group = deepcopy(group)
         self.operation_qualification = deepcopy(opq)
@@ -1491,11 +1527,161 @@ class OpenOCDSoftwareQualificationRegistry:
         self._programming_groups_by_profile["stm32f1-low-density-flash-v0"] = deepcopy(low_group)
         self._operation_qualification_by_profile["stm32f1-low-density-flash-v0"] = deepcopy(
             low_group["operation_qualification"])
+        self._admit_xl_documentary_qualification(root, catalog_by_key, q_provider,
+                                                 source_lock["source_lock_id"])
         self.acceptance_boundary = deepcopy(boundary)
         self.default_unreviewed_state = qualification_manifest.get(
             "default_unreviewed_software_state"
         )
         _require(self.default_unreviewed_state == "UNKNOWN", "unreviewed exact ICPNs must remain UNKNOWN")
+
+    def _admit_xl_documentary_qualification(self, root: Path,
+                                             catalog_by_key: dict[tuple[str, str], Any],
+                                             provider: dict[str, Any],
+                                             source_lock_id: str) -> None:
+        """Source-check the exact F/G cohort without changing the Provider."""
+        def locked(lock: dict[str, str]) -> bytes:
+            rel = lock.get("path")
+            _require(isinstance(rel, str), "XL evidence path missing")
+            path = (root / rel).resolve()
+            _require(path.is_relative_to(root.resolve()), "XL evidence path escapes root")
+            raw = path.read_bytes()
+            _require(_git_blob_sha1(raw) == lock.get("git_blob_sha1"),
+                     f"XL evidence source lock drift: {rel}")
+            return raw
+
+        v11 = _read_json(root / QUALIFICATION_V11_REL)
+        xl = _read_json(root / XL_QUALIFICATION_REL)
+        _require(v11.get("qualification_id") == self.qualification_id
+                 and v11.get("predecessor_qualification_id") ==
+                    "adr0002-phase2-openocd-012-stm32f103-v10"
+                 and v11.get("provider_source_lock_id") == source_lock_id
+                 and v11.get("supported_exact_icpn_count") == 109
+                 and v11.get("new_xl_exact_icpn_count") == 20
+                 and v11.get("non_claims") == {
+                     "installed_runtime_attested": False,
+                     "physical_programming_qualified": False,
+                     "execution_authorized": False,
+                 }, "XL combined qualification manifest drift")
+        _require(json.loads(locked(v11["existing_qualification"]))["qualification_id"] ==
+                 "adr0002-phase2-openocd-012-stm32f103-v10"
+                 and json.loads(locked(v11["xl_qualification"])) == xl,
+                 "XL predecessor or qualification lock drift")
+        _require(xl.get("qualification_id") ==
+                 "adr0002-phase2-openocd-012-stm32f103-xl-20-v1"
+                 and xl.get("status") == "reviewed_source_only"
+                 and xl.get("provider_source_lock_id") == source_lock_id
+                 and xl.get("provider") == provider
+                 and xl.get("reviewed_exact_icpn_count") == 20
+                 and xl.get("non_claims") == v11["non_claims"],
+                 "XL qualification/provider boundary drift")
+        cfg = json.loads(locked(xl["target_extension_source_lock"]))
+        _require(cfg["source_lock_id"] ==
+                 "openocd-0.12.0-stm32f103-xl-target-config-v1",
+                 "XL target extension authority drift")
+        source = json.loads(locked(xl["manufacturer_source_lock"]))
+        _require(source.get("status") == "REVIEWED_DOCUMENTARY_EVIDENCE"
+                 and source.get("datasheet", {}).get("document") == "DocID16554 Rev 4"
+                 and source.get("programming_manual", {}).get("document") == "PM0068 Rev 2"
+                 and source["datasheet"]["original_bytes_attested"] is False
+                 and source["programming_manual"]["original_bytes_attested"] is False
+                 and source.get("not_authorized") == [
+                     "installed_runtime", "hardware_programming", "job_batch_execution"],
+                 "XL documentary source/custody drift")
+        audit = source["documentary_review"]
+        locked(audit)
+        ordering = json.loads(locked(xl["ordering_source_lock"]))
+        band = next((x for x in ordering["records"]["STM32F103"]["bands"]
+                     if x["name"] == "xl"), None)
+        _require(band is not None and band["flash_kib"] == {"F": 768, "G": 1024}
+                 and band["pin_count"] == {"R": 64, "V": 100, "Z": 144}
+                 and band["package"] == {"H": "LFBGA", "T": "LQFP"},
+                 "XL manufacturer ordering geometry drift")
+        source_rows = list(csv.DictReader(locked(xl["catalog_source_lock"]).decode().splitlines()))
+        expected = {r["icpn"] for r in source_rows
+                    if r["icpn"].startswith("STM32F103") and len(r["icpn"]) >= 13
+                    and r["icpn"][9] in "RVZ" and r["icpn"][10] in "FG"
+                    and r["package"] in ("LQFP", "LFBGA")}
+        records = xl.get("records", [])
+        _require(len(expected) == len(records) == 20
+                 and {r.get("icpn") for r in records} == expected,
+                 "XL exact 20 scope drift")
+        profile = json.loads(locked(xl["programming_profile"]))
+        pdata = profile.get("data", {})
+        _require(profile.get("profile_id") == "stm32f1-xl-density-flash-v0"
+                 and profile.get("status") == "reviewed_source_only"
+                 and pdata.get("expected_device_id") == "0x430"
+                 and pdata.get("supported_flash_sizes_bytes") == [786432, 1048576]
+                 and pdata.get("bank_1_size_bytes") == 524288
+                 and pdata.get("bank_2_start") == "0x08080000"
+                 and pdata.get("bank_2_control_register_base") == "0x40022040"
+                 and pdata.get("flash_size_read_fail_closed") is True
+                 and pdata.get("user_flash_size_override_as_authority") is False
+                 and pdata.get("prohibit_full_bank_erase_until_separately_approved") is True,
+                 "XL programming Profile drift")
+        group = xl["manufacturer_programming_group"]
+        _require(group["manufacturer_evidence"]["programming_profile_id"] == profile["profile_id"]
+                 and group["silicon_identity"]["openocd_device_id"] == "0x430"
+                 and group["density_class"] == "xl"
+                 and group["shared_flash_geometry"]["erase_unit_bytes"] == 2048
+                 and all(group["operation_qualification"][op]["state"] == "SUPPORTED"
+                         for op in REQUIRED_OPERATIONS), "XL programming group drift")
+        row_by_icpn = {r["icpn"]: r for r in source_rows}
+        routes: dict[str, dict[str, Any]] = {}
+        for raw in records:
+            icpn = raw["icpn"]
+            source_row = row_by_icpn[icpn]
+            row = catalog_by_key.get(("STMicroelectronics", icpn))
+            base = source_row["base_device"]
+            pin, flash = base[9], base[10]
+            size = band["flash_kib"][flash] * 1024
+            package_code = icpn[len(base)]
+            temperature = icpn[len(base) + 1]
+            _require(row is not None and row.identity_state == "IDENTIFIED"
+                     and row.mapping_status == "mapped"
+                     and row.target_config == provider["target_config"]
+                     and row.base_device == raw["base_device"] == base
+                     and row.package == band["package"][package_code]
+                     and row.pin_count == str(band["pin_count"][pin])
+                     and row.flash_size == f"{size // 1024} KiB"
+                     and row.temperature_grade == band["temperature_c"][temperature]
+                     and row.source_reference == band["source_url"]
+                     and row.source_authority == "STMicroelectronics official"
+                     and raw["main_flash_size_bytes"] == size
+                     and raw["page_count"] == size // 2048
+                     and raw["software_state"] == "SUPPORTED"
+                     and raw["programming_profile_id"] == profile["profile_id"]
+                     and raw["operations"] == list(REQUIRED_OPERATIONS),
+                     f"XL canonical exact identity/geometry drift: {icpn}")
+            geometry = json.loads(locked(raw["geometry"]))
+            geom_data = geometry["data"]
+            _require(geometry["profile_id"] == raw["memory_geometry_profile_id"]
+                     and geometry["scope"]["base_device"] == base
+                     and geom_data["main_flash_size_bytes"] == size
+                     and geom_data["main_flash_end"] == f"0x{0x08000000 + size - 1:08X}"
+                     and geom_data["page_size_bytes"] == 2048
+                     and geom_data["page_count"] == size // 2048,
+                     f"XL geometry source drift: {icpn}")
+            route = routes.setdefault(raw["package_route"]["path"],
+                                      json.loads(locked(raw["package_route"])))
+            _require(route["manufacturer"] == row.vendor
+                     and route["density_class"] == "xl"
+                     and route["provider_source_lock_id"] == source_lock_id
+                     and icpn in route["exact_icpns"]
+                     and route["catalog_package"] == row.package
+                     and route["pin_count"] == row.pin_count
+                     and route["package_route"]["transport"] == "SWD"
+                     and route["package_route"]["source_sha256"] ==
+                         group["manufacturer_evidence"]["source_lock"]["st_ds16554_documentary_review"],
+                     f"XL package route drift: {icpn}")
+            key = (row.vendor, icpn)
+            _require(key not in self._records, "XL duplicate exact claim")
+            self._records[key] = deepcopy(raw)
+        _require(len(self._records) == v11["supported_exact_icpn_count"],
+                 "XL combined count drift")
+        self._programming_groups_by_profile[profile["profile_id"]] = deepcopy(group)
+        self._operation_qualification_by_profile[profile["profile_id"]] = deepcopy(
+            group["operation_qualification"])
 
     @property
     def reviewed_exact_keys(self) -> tuple[tuple[str, str], ...]:
@@ -1614,6 +1800,9 @@ def get_default_openocd_software_qualification_registry() -> OpenOCDSoftwareQual
     required = (
         RELEASE_REL,
         SOURCE_LOCK_REL,
+        XL_TARGET_SOURCE_LOCK_REL,
+        XL_QUALIFICATION_REL,
+        QUALIFICATION_V11_REL,
         QUALIFICATION_REL,
         MEDIUM_QUALIFICATION_REL,
         APPLICABILITY_REL,

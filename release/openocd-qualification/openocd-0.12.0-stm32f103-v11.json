@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "qualification_id": "adr0002-phase2-openocd-012-stm32f103-v11",
+  "predecessor_qualification_id": "adr0002-phase2-openocd-012-stm32f103-v10",
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1",
+  "existing_qualification": {
+    "path": "release/openocd-qualification/openocd-0.12.0-stm32f103-v10.json",
+    "git_blob_sha1": "617cc784dbcfc4d12ea24c74cb4840d6862fab95"
+  },
+  "xl_qualification": {
+    "path": "release/openocd-qualification/openocd-0.12.0-stm32f103-xl-20-v1.json",
+    "git_blob_sha1": "f2ab054a710705973f629722b91cd1c7cce8a909"
+  },
+  "supported_exact_icpn_count": 109,
+  "new_xl_exact_icpn_count": 20,
+  "non_claims": {
+    "installed_runtime_attested": false,
+    "physical_programming_qualified": false,
+    "execution_authorized": false
+  }
+}

@@ -609,6 +609,135 @@ def test_new_exact_data_only_l1_to_l2_uses_official_source_and_provider_group(
     assert repo.read_active().qualifications[(record.vendor.casefold(), record.identifier.casefold())]["catalog_level"] == 2
 
 
+def test_xl_exact_twenty_isolated_publish_and_rollback(tmp_path: Path) -> None:
+    from collections import Counter
+    from plasma_web.openocd_software_qualification import (
+        APPLICABILITY_REL, XL_QUALIFICATION_REL,
+        get_default_openocd_software_qualification_registry,
+    )
+
+    registry = get_default_programming_qualification_registry()
+    provider = get_default_openocd_software_qualification_registry()
+    assert provider is not None
+    catalog = get_default_device_catalog()
+    xl = json.loads((provider._root / XL_QUALIFICATION_REL).read_text())
+    exacts = {item["icpn"] for item in xl["records"]}
+    assert len(exacts) == 20
+
+    class BeforeXL:
+        _catalog = catalog
+
+        def describe(self, vendor, icpn):
+            value = json.loads(json.dumps(registry.describe(vendor, icpn)))
+            if icpn in exacts:
+                value.update(state="CANDIDATE", reviewed=False, catalog_level=1,
+                             catalog_level_state="PROGRAMMING_CANDIDATE", job_selectable=False,
+                             provider=None, programming=None, operations={})
+            return value
+
+    repo = CatalogSqliteShadowRepository(tmp_path / "xl-only.sqlite3")
+    before = repo.import_verified_manifest(default_catalog_manifest_path(),
+                                           qualification_registry=BeforeXL())
+    snapshot = repo.read_active()
+    assert Counter(q["catalog_level"] for q in snapshot.qualifications.values()) == {
+        0: 204, 1: 5592, 2: 12, 3: 77,
+    }
+    old_l3 = {key: (snapshot.catalog.resolve(*key), value)
+              for key, value in snapshot.qualifications.items()
+              if value["catalog_level"] == 3}
+    group = xl["manufacturer_programming_group"]
+    applicability = json.loads((provider._root / APPLICABILITY_REL).read_text())
+    ordering_lock = applicability["manufacturer_authority"]["ordering"]
+    ordering = json.loads((provider._root / ordering_lock["path"]).read_text())
+    identity_lock = applicability["manufacturer_authority"]["production_exact_identity"]
+    changes = []
+    for item in xl["records"]:
+        record = catalog.resolve("STMicroelectronics", item["icpn"])
+        assert record is not None
+        q = json.loads(json.dumps(registry.describe(record.vendor, record.identifier)))
+        assert q["catalog_level"] == 2 and q["execution_authorized"] is False
+        size = item["main_flash_size_bytes"] // 1024
+        geometry_id = f"{record.base_device.lower()}-{size}k-catalog-v1"
+        q["programming"]["memory_geometry_profile_id"] = geometry_id
+        packet_path = tmp_path / f"{record.identifier}-reviewed.json"
+        _reviewed_l2_packet(record, q, packet_path)
+        packet = json.loads(packet_path.read_text())
+        evidence_id = repo.acquire_exact_evidence(
+            record, kind="locked_production_identity",
+            source_revision=identity_lock["git_blob_sha1"])
+        packet["official_exact_source"] = {
+            "kind": "locked_production_identity", "path": identity_lock["path"],
+            "git_blob_sha1": identity_lock["git_blob_sha1"],
+            "exact_icpn": record.identifier, "evidence_id": evidence_id,
+        }
+        route_lock = item["package_route"]
+        route_bytes = (provider._root / route_lock["path"]).read_bytes()
+        assert hashlib.sha1(b"blob " + str(len(route_bytes)).encode() + b"\0" +
+                            route_bytes).hexdigest() == route_lock["git_blob_sha1"]
+        route = json.loads(route_bytes)
+        packet["applicability"] = {
+            "base_device": record.base_device, "density_class": "xl",
+            "ordering_authority_id": ordering["authority_id"],
+            "ordering_source_blob": ordering_lock["git_blob_sha1"],
+            "provider_source_lock_id": provider.source_lock_id,
+            "programming_group_id": group["group_id"],
+            "geometry_id": geometry_id,
+            "package_route_source": {"path": route_lock["path"],
+                                     "sha256": hashlib.sha256(route_bytes).hexdigest()},
+            "package_route": route["package_route"],
+        }
+        packet["fact_references"] = {
+            "identity": f"{identity_lock['path']}#{record.identifier}",
+            "route": f"{provider.source_lock_id}#{provider.provider['target_config']}",
+            "geometry": (f"{record.source_reference}#{ordering['records']['STM32F103']['bands'][-1]['document']};"
+                         f"st_pm0068_documentary_review:"
+                         f"{group['manufacturer_evidence']['source_lock']['st_pm0068_documentary_review']}"),
+            "operations": f"{provider.qualification_id}#{group['group_id']}",
+        }
+        packet_path.write_text(json.dumps(packet))
+        q["publication_evidence"]["source_sha256"] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+        changes.append({"record": asdict(record), "qualification": q})
+
+    assert len(repo.validate_changes(changes)) == 20
+    bad_capacity = json.loads(json.dumps(changes[0]))
+    bad_capacity["qualification"]["programming"]["flash_geometry"]["main_flash_size_bytes"] += 2048
+    with pytest.raises(DeviceCatalogIntegrityError, match="reviewed facts|geometry"):
+        repo.validate_changes([bad_capacity])
+    bad_provider = json.loads(json.dumps(changes[0]))
+    bad_provider["qualification"]["provider"]["source_commit"] = "0" * 40
+    with pytest.raises(DeviceCatalogIntegrityError, match="reviewed facts|Provider"):
+        repo.validate_changes([bad_provider])
+    bad_package = json.loads(json.dumps(changes[0]))
+    bad_package["record"]["package"] = "LFBGA" if bad_package["record"]["package"] == "LQFP" else "LQFP"
+    with pytest.raises(DeviceCatalogIntegrityError, match="reviewed facts|identity|applicability"):
+        repo.validate_changes([bad_package])
+    packet_file = tmp_path / f"{changes[0]['record']['identifier']}-reviewed.json"
+    original_packet = packet_file.read_bytes()
+    wrong_route = json.loads(original_packet)
+    wrong_route["applicability"]["package_route"]["swclk"]["pin"] = 0
+    packet_file.write_text(json.dumps(wrong_route))
+    bad_route = json.loads(json.dumps(changes[0]))
+    bad_route["qualification"]["publication_evidence"]["source_sha256"] = hashlib.sha256(
+        packet_file.read_bytes()).hexdigest()
+    with pytest.raises(DeviceCatalogIntegrityError, match="applicability"):
+        repo.validate_changes([bad_route])
+    packet_file.write_bytes(original_packet)
+    stage = repo.stage_revision(changes, actor="xl-test")
+    published = repo.publish_staged(stage, actor="xl-test")
+    assert repo.publish_staged(stage, actor="xl-test") == published
+    after = repo.read_active()
+    assert Counter(q["catalog_level"] for q in after.qualifications.values()) == {
+        0: 204, 1: 5572, 2: 32, 3: 77,
+    }
+    assert {key: (after.catalog.resolve(*key), value)
+            for key, value in after.qualifications.items()
+            if value["catalog_level"] == 3} == old_l3
+    assert all(after.qualifications[("stmicroelectronics", name.casefold())]["catalog_level"] == 2
+               for name in exacts)
+    repo.rollback(before, actor="xl-test")
+    assert repo.read_active().revision_sha256 == before
+
+
 def test_low_density_twelve_publish_from_l1_without_active_profile(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -650,7 +779,7 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
                                            qualification_registry=BeforePublication())
     old = repo.read_active()
     assert Counter(q["catalog_level"] for q in old.qualifications.values()) == {
-        0: 204, 1: 5604, 3: 77,
+        0: 204, 1: 5584, 2: 20, 3: 77,
     }
     assert not any(q.get("programming", {}) and q["programming"].get("programming_profile_id") ==
                    "stm32f1-low-density-flash-v0" for q in old.qualifications.values())
@@ -747,7 +876,7 @@ def test_low_density_twelve_publish_from_l1_without_active_profile(
     assert published != before
     after = repo.read_active()
     assert Counter(q["catalog_level"] for q in after.qualifications.values()) == {
-        0: 204, 1: 5592, 2: 12, 3: 77,
+        0: 204, 1: 5572, 2: 32, 3: 77,
     }
     assert len(after.qualifications) == 5885
     assert {key: (after.catalog.resolve(*key), q) for key, q in after.qualifications.items()

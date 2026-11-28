@@ -1,0 +1,106 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f1-xl-density-flash-v0",
+  "kind": "programming",
+  "status": "reviewed_source_only",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "family": "STM32F1",
+    "density_class": "xl",
+    "exact_device_id": "0x430"
+  },
+  "evidence": [
+    {
+      "source_id": "st_pm0068_rev2",
+      "sections": [
+        "1.1\u20131.3 XL dual-bank organization",
+        "Table 1: Bank 1 and Bank 2",
+        "Main Flash program and page erase"
+      ]
+    }
+  ],
+  "data": {
+    "flash_register_base": "0x40022000",
+    "main_flash_start": "0x08000000",
+    "supported_flash_sizes_bytes": [
+      786432,
+      1048576
+    ],
+    "page_size_bytes": 2048,
+    "program_granularity_bytes": 2,
+    "erase_granularity_bytes": 2048,
+    "expected_device_id": "0x430",
+    "device_id_register": "0xE0042000",
+    "flash_size_register": "0x1FFFF7E0",
+    "flash_size_read_fail_closed": true,
+    "user_flash_size_override_as_authority": false,
+    "prohibit_full_bank_erase_until_separately_approved": true,
+    "disallowed_operations": [
+      "mass_erase",
+      "readout_unlock",
+      "option_erase",
+      "option_write",
+      "security_mutation"
+    ],
+    "required_operations": [
+      "probe",
+      "erase",
+      "program",
+      "read",
+      "verify"
+    ],
+    "control_bits": {
+      "PG": "0x00000001",
+      "PER": "0x00000002",
+      "MER": "0x00000004",
+      "OPTPG": "0x00000010",
+      "OPTER": "0x00000020",
+      "STRT": "0x00000040",
+      "LOCK": "0x00000080",
+      "OPTWRE": "0x00000200"
+    },
+    "operation_mode_bits": [
+      "PG",
+      "PER",
+      "MER",
+      "OPTPG",
+      "OPTER"
+    ],
+    "operation_mode_mask": "0x00000037",
+    "registers": {
+      "FLASH_ACR": "0x40022000",
+      "FLASH_KEYR": "0x40022004",
+      "FLASH_OPTKEYR": "0x40022008",
+      "FLASH_SR": "0x4002200C",
+      "FLASH_CR": "0x40022010",
+      "FLASH_AR": "0x40022014",
+      "FLASH_OBR": "0x4002201C",
+      "FLASH_WRPR": "0x40022020"
+    },
+    "status_bits": {
+      "BSY": "0x00000001",
+      "PGERR": "0x00000004",
+      "WRPRTERR": "0x00000010",
+      "EOP": "0x00000020"
+    },
+    "w1c_status_flags": [
+      "PGERR",
+      "WRPRTERR",
+      "EOP"
+    ],
+    "unlock_keys": [
+      "0x45670123",
+      "0xCDEF89AB"
+    ],
+    "bank_1_size_bytes": 524288,
+    "bank_2_start": "0x08080000",
+    "bank_2_control_register_base": "0x40022040",
+    "raw_capacity_guard": "plasma_flash_capacity_guard"
+  },
+  "acceptance_boundary": {
+    "software_state": "SUPPORTED",
+    "physical_programming_qualified": false,
+    "runtime_execution_authorized": false
+  },
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1"
+}

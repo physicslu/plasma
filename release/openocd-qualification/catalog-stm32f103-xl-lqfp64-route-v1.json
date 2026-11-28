@@ -1,0 +1,35 @@
+{
+  "schema_version": "catalog-package-route-authority-v1",
+  "status": "reviewed_source_only",
+  "manufacturer": "STMicroelectronics",
+  "series": "STM32F103",
+  "density_class": "xl",
+  "provider_source_lock_id": "openocd-0.12.0-stm32f1-source-lock-v1",
+  "exact_icpns": [
+    "STM32F103RFT6",
+    "STM32F103RFT6TR",
+    "STM32F103RGT6",
+    "STM32F103RGT6TR",
+    "STM32F103RGT7"
+  ],
+  "catalog_package": "LQFP",
+  "pin_count": "64",
+  "source_lock_key": "st_ds16554_documentary_review",
+  "geometry_source_lock_key": "st_pm0068_documentary_review",
+  "package_route": {
+    "package": "LQFP64",
+    "transport": "SWD",
+    "swdio": {
+      "signal": "PA13",
+      "pin": 46
+    },
+    "swclk": {
+      "signal": "PA14",
+      "pin": 49
+    },
+    "source_document": "DocID16554 Rev 4 Table 5",
+    "source_locator": "Pin definitions",
+    "source_sha256": "42ed7861df4d2d17832bfa59c9368f19513c62cefe25ae202be6e80f65756bb4",
+    "original_pdf_bytes_attested": false
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f103zf-768k-v0",
+  "kind": "memory_geometry",
+  "status": "reviewed_source_only",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "base_device": "STM32F103ZF"
+  },
+  "evidence": [
+    {
+      "source_id": "st_ds16554_rev4",
+      "sections": [
+        "XL exact ordering and capacity"
+      ]
+    },
+    {
+      "source_id": "st_pm0068_rev2",
+      "sections": [
+        "Table 1: two-bank organization and 2 KiB pages"
+      ]
+    }
+  ],
+  "data": {
+    "main_flash_start": "0x08000000",
+    "main_flash_size_bytes": 786432,
+    "main_flash_end": "0x080BFFFF",
+    "page_size_bytes": 2048,
+    "page_count": 384,
+    "erase_granularity_bytes": 2048,
+    "program_granularity_bytes": 2
+  }
+}
